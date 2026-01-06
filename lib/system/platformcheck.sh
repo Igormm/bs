@@ -1,0 +1,370 @@
+#!/usr/bin/env bs
+# lib/system/platformcheck.sh — Platform compatibility checker for BS
+# lib/system/platformcheck.sh — Модуль проверки совместимости платформ для BS
+#
+# Этот модуль проверяет совместимость фреймворка с различными платформами:
+# macOS, AlmaLinux, Debian, Ubuntu, Fedora, ALT Linux
+# This module checks framework compatibility with various platforms:
+# macOS, AlmaLinux, Debian, Ubuntu, Fedora, ALT Linux
+
+set -euo pipefail
+
+declare -g PLATFORM_CHECK_VERSION="1.0.0"
+declare -g -A PLATFORM_CHECK_RESULTS
+
+# ==========================================
+# Проверка платформ / Platform checks
+# ==========================================
+
+# @description Check if running on macOS
+# @description Проверить, запущен ли на macOS
+# @return 0 if macOS, 1 otherwise / 0 если macOS, иначе 1
+# @example
+#   if platformcheck::is_macos; then ...
+platformcheck::is_macos() {
+    if [[ "$OSTYPE" == "darwin"* ]] || [[ -n "${MACOS:-}" ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# @description Check if running on AlmaLinux
+# @description Проверить, запущен ли на AlmaLinux
+# @return 0 if AlmaLinux, 1 otherwise / 0 если AlmaLinux, иначе 1
+# @example
+#   if platformcheck::is_alma; then ...
+platformcheck::is_alma() {
+    if [[ -f /etc/almalinux-release ]] || [[ -f /etc/redhat-release && $(cat /etc/redhat-release) == *"AlmaLinux"* ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# @description Check if running on Debian
+# @description Проверить, запущен ли на Debian
+# @return 0 if Debian, 1 otherwise / 0 если Debian, иначе 1
+# @example
+#   if platformcheck::is_debian; then ...
+platformcheck::is_debian() {
+    if [[ -f /etc/debian_version ]] && [[ ! -f /etc/lsb-release ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# @description Check if running on Ubuntu
+# @description Проверить, запущен ли на Ubuntu
+# @return 0 if Ubuntu, 1 otherwise / 0 если Ubuntu, иначе 1
+# @example
+#   if platformcheck::is_ubuntu; then ...
+platformcheck::is_ubuntu() {
+    if [[ -f /etc/lsb-release ]] && [[ $(cat /etc/lsb-release) == *"Ubuntu"* ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# @description Check if running on Fedora
+# @description Проверить, запущен ли на Fedora
+# @return 0 if Fedora, 1 otherwise / 0 если Fedora, иначе 1
+# @example
+#   if platformcheck::is_fedora; then ...
+platformcheck::is_fedora() {
+    if [[ -f /etc/fedora-release ]] || [[ -f /etc/redhat-release && $(cat /etc/redhat-release) == *"Fedora"* ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# @description Check if running on ALT Linux
+# @description Проверить, запущен ли на ALT Linux
+# @return 0 if ALT Linux, 1 otherwise / 0 если ALT Linux, иначе 1
+# @example
+#   if platformcheck::is_altlinux; then ...
+platformcheck::is_altlinux() {
+    if [[ -f /etc/altlinux-release ]] || [[ -f /etc/os-release && $(cat /etc/os-release) == *"ALT"* ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# @description Get platform information
+# @description Получить информацию о платформе
+# @return Platform info string / Строка с информацией о платформе
+# @example
+#   platform_info=$(platformcheck::get_info)
+platformcheck::get_info() {
+    local os_name=""
+    local os_version=""
+    local kernel_version=""
+    
+    # Определяем ОС / Detect OS
+    if platformcheck::is_macos; then
+        os_name="macOS"
+        os_version=$(sw_vers -productVersion 2>/dev/null || echo "Unknown")
+    elif platformcheck::is_alma; then
+        os_name="AlmaLinux"
+        os_version=$(cat /etc/almalinux-release 2>/dev/null | awk '{print $2}' || echo "Unknown")
+    elif platformcheck::is_ubuntu; then
+        os_name="Ubuntu"
+        os_version=$(lsb_release -rs 2>/dev/null || echo "Unknown")
+    elif platformcheck::is_debian; then
+        os_name="Debian"
+        os_version=$(cat /etc/debian_version 2>/dev/null || echo "Unknown")
+    elif platformcheck::is_fedora; then
+        os_name="Fedora"
+        os_version=$(cat /etc/fedora-release 2>/dev/null | awk '{print $3}' || echo "Unknown")
+    elif platformcheck::is_altlinux; then
+        os_name="ALT Linux"
+        os_version=$(cat /etc/altlinux-release 2>/dev/null | head -1 | awk '{print $3}' || echo "Unknown")
+    else
+        os_name=$(cat /etc/os-release 2>/dev/null | grep "^NAME=" | cut -d'"' -f2 || echo "Unknown")
+        os_version=$(cat /etc/os-release 2>/dev/null | grep "^VERSION_ID=" | cut -d'"' -f2 || echo "Unknown")
+    fi
+    
+    # Получаем версию ядра / Get kernel version
+    kernel_version=$(uname -r)
+    
+    echo "OS: $os_name $os_version, Kernel: $kernel_version"
+}
+
+# @description Check platform compatibility
+# @description Проверить совместимость платформы
+# @return 0 if compatible, 1 otherwise / 0 если совместимо, иначе 1
+# @example
+#   if platformcheck::is_compatible; then ...
+platformcheck::is_compatible() {
+    local supported_platforms=("macOS" "AlmaLinux" "Ubuntu" "Debian" "Fedora" "ALT Linux")
+    local platform_info
+    platform_info=$(platformcheck::get_info)
+    
+    for platform in "${supported_platforms[@]}"; do
+        if [[ "$platform_info" == *"$platform"* ]]; then
+            return 0
+        fi
+    done
+    
+    return 1
+}
+
+# @description Get detailed platform report
+# @description Получить детальный отчет о платформе
+# @return Detailed platform report / Детальный отчет о платформе
+# @example
+#   report=$(platformcheck::get_report)
+platformcheck::get_report() {
+    local report=""
+    local platform_info
+    platform_info=$(platformcheck::get_info)
+    
+    report+="Platform Information / Информация о платформе:\n"
+    report+="  $platform_info\n\n"
+    
+    report+="Compatibility Check / Проверка совместимости:\n"
+    if platformcheck::is_compatible; then
+        report+="  ${GREEN}✓ Supported platform / Поддерживаемая платформа${NC}\n"
+    else
+        report+="  ${RED}✗ Unsupported platform / Неподдерживаемая платформа${NC}\n"
+    fi
+    
+    report+="\nPlatform Detection / Обнаружение платформы:\n"
+    platformcheck::is_macos && report+="  ${GREEN}✓ macOS${NC}\n" || report+="  ${RED}✗ macOS${NC}\n"
+    platformcheck::is_alma && report+="  ${GREEN}✓ AlmaLinux${NC}\n" || report+="  ${RED}✗ AlmaLinux${NC}\n"
+    platformcheck::is_ubuntu && report+="  ${GREEN}✓ Ubuntu${NC}\n" || report+="  ${RED}✗ Ubuntu${NC}\n"
+    platformcheck::is_debian && report+="  ${GREEN}✓ Debian${NC}\n" || report+="  ${RED}✗ Debian${NC}\n"
+    platformcheck::is_fedora && report+="  ${GREEN}✓ Fedora${NC}\n" || report+="  ${RED}✗ Fedora${NC}\n"
+    platformcheck::is_altlinux && report+="  ${GREEN}✓ ALT Linux${NC}\n" || report+="  ${RED}✗ ALT Linux${NC}\n"
+    
+    echo -e "$report"
+}
+
+# ==========================================
+# Проверки зависимостей / Dependency checks
+# ==========================================
+
+# @description Check if required tools are available
+# @description Проверить доступность необходимых инструментов
+# @return 0 if all tools available, 1 otherwise / 0 если все инструменты доступны, иначе 1
+# @example
+#   if platformcheck::check_dependencies; then ...
+platformcheck::check_dependencies() {
+    local required_tools=("bash" "grep" "sed" "awk" "cut" "cat" "uname")
+    local missing_tools=()
+    
+    for tool in "${required_tools[@]}"; do
+        if ! command -v "$tool" >/dev/null 2>&1; then
+            missing_tools+=("$tool")
+        fi
+    done
+    
+    if [[ ${#missing_tools[@]} -eq 0 ]]; then
+        log::info "All required tools are available" 2>/dev/null || true
+        return 0
+    else
+        log::error "Missing required tools: ${missing_tools[*]}" 2>/dev/null || {
+            echo "Missing required tools: ${missing_tools[*]}" >&2
+        }
+        return 1
+    fi
+}
+
+# @description Check macOS-specific dependencies
+# @description Проверить зависимости macOS
+# @return 0 if all macOS tools available, 1 otherwise / 0 если все инструменты macOS
+# доступны, иначе 1
+# @example
+#   if platformcheck::check_macos_deps; then ...
+platformcheck::check_macos_deps() {
+    if ! platformcheck::is_macos; then
+        return 0  # Not macOS, skip check
+    fi
+    
+    local macos_tools=("sw_vers" "osascript")
+    local missing_tools=()
+    
+    for tool in "${macos_tools[@]}"; do
+        if ! command -v "$tool" >/dev/null 2>&1; then
+            missing_tools+=("$tool")
+        fi
+    done
+    
+    if [[ ${#missing_tools[@]} -eq 0 ]]; then
+        log::info "All macOS tools are available" 2>/dev/null || true
+        return 0
+    else
+        log::warn "Missing macOS tools: ${missing_tools[*]}" 2>/dev/null || true
+        return 1
+    fi
+}
+
+# @description Check Linux-specific dependencies
+# @description Проверить зависимости Linux
+# @return 0 if all Linux tools available, 1 otherwise / 0 если все инструменты Linux
+# доступны, иначе 1
+# @example
+#   if platformcheck::check_linux_deps; then ...
+platformcheck::check_linux_deps() {
+    if platformcheck::is_macos; then
+        return 0  # Not Linux, skip check
+    fi
+    
+    local linux_tools=("lsb_release" "systemctl" "ip")
+    local missing_tools=()
+    
+    for tool in "${linux_tools[@]}"; do
+        if ! command -v "$tool" >/dev/null 2>&1; then
+            missing_tools+=("$tool")
+        fi
+    done
+    
+    if [[ ${#missing_tools[@]} -eq 0 ]]; then
+        log::info "All Linux tools are available" 2>/dev/null || true
+        return 0
+    else
+        log::warn "Missing Linux tools: ${missing_tools[*]}" 2>/dev/null || true
+        return 1
+    fi
+}
+
+# ==========================================
+# Установка зависимостей / Dependency installation
+# ==========================================
+
+# @description Install missing dependencies for platform
+# @description Установить недостающие зависимости для платформы
+# @return 0 if successful, 1 otherwise / 0 если успешно, иначе 1
+# @example
+#   platformcheck::install_dependencies
+platformcheck::install_dependencies() {
+    log::info "Checking and installing dependencies..." 2>/dev/null || true
+    
+    if platformcheck::is_macos; then
+        platformcheck::install_macos_deps
+    else
+        platformcheck::install_linux_deps
+    fi
+}
+
+# @description Install macOS dependencies
+# @description Установить зависимости macOS
+# @example
+#   platformcheck::install_macos_deps
+platformcheck::install_macos_deps() {
+    log::info "Installing macOS dependencies..." 2>/dev/null || true
+    
+    # Проверяем Homebrew / Check Homebrew
+    if ! command -v brew >/dev/null 2>&1; then
+        log::info "Homebrew not found. Installing..." 2>/dev/null || true
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    fi
+    
+    # Устанавливаем необходимые пакеты / Install necessary packages
+    brew install coreutils gnu-sed grep
+    
+    log::success "macOS dependencies installed" 2>/dev/null || true
+}
+
+# @description Install Linux dependencies
+# @description Установить зависимости Linux
+# @example
+#   platformcheck::install_linux_deps
+platformcheck::install_linux_deps() {
+    log::info "Installing Linux dependencies..." 2>/dev/null || true
+    
+    load "lib/system/distrologic"
+    
+    # Устанавливаем необходимые пакеты / Install necessary packages
+    system::distrologic::pkg_install_cross "curl" "wget" "git" "tree" "jq"
+    
+    log::success "Linux dependencies installed" 2>/dev/null || true
+}
+
+# ==========================================
+# Утилиты / Utilities
+# ==========================================
+
+# @description Show platform compatibility report
+# @description Показать отчет о совместимости платформы
+# @example
+#   platformcheck::show_report
+platformcheck::show_report() {
+    log::header "Platform Compatibility Report" 2>/dev/null || true
+    log::header "Отчет о совместимости платформы" 2>/dev/null || true
+    
+    platformcheck::get_report
+    
+    echo
+    echo -e "${BLUE}Dependency Check / Проверка зависимостей:${NC}"
+    if platformcheck::check_dependencies; then
+        echo -e "  ${GREEN}✓ All dependencies satisfied / Все зависимости удовлетворены${NC}"
+    else
+        echo -e "  ${RED}✗ Some dependencies missing / Некоторые зависимости отсутствуют${NC}"
+        platformcheck::install_dependencies
+    fi
+    
+    echo
+    echo -e "${BLUE}Platform Support / Поддержка платформ:${NC}"
+    platformcheck::is_macos && echo -e "  ${GREEN}✓ macOS support available / Поддержка macOS доступна${NC}" || echo -e "  ${RED}✗ macOS support missing / Поддержка macOS отсутствует${NC}"
+    platformcheck::is_alma && echo -e "  ${GREEN}✓ AlmaLinux support available / Поддержка AlmaLinux доступна${NC}" || echo -e "  ${RED}✗ AlmaLinux support missing / Поддержка AlmaLinux отсутствует${NC}"
+    platformcheck::is_ubuntu && echo -e "  ${GREEN}✓ Ubuntu support available / Поддержка Ubuntu доступна${NC}" || echo -e "  ${RED}✗ Ubuntu support missing / Поддержка Ubuntu отсутствует${NC}"
+    platformcheck::is_debian && echo -e "  ${GREEN}✓ Debian support available / Поддержка Debian доступна${NC}" || echo -e "  ${RED}✗ Debian support missing / Поддержка Debian отсутствует${NC}"
+    platformcheck::is_fedora && echo -e "  ${GREEN}✓ Fedora support available / Поддержка Fedora доступна${NC}" || echo -e "  ${RED}✗ Fedora support missing / Поддержка Fedora отсутствует${NC}"
+    platformcheck::is_altlinux && echo -e "  ${GREEN}✓ ALT Linux support available / Поддержка ALT Linux доступна${NC}" || echo -e "  ${RED}✗ ALT Linux support missing / Поддержка ALT Linux отсутствует${NC}"
+}
+
+# ==========================================
+# Инициализация / Initialization
+# ==========================================
+
+# Инициализируем модуль при загрузке
+# Initialize module on load
+if [[ -z "${PLATFORM_CHECK_INITIALIZED:-}" ]]; then
+    PLATFORM_CHECK_INITIALIZED="1"
+    log::debug "Platform check module initialized" 2>/dev/null || true
+fi
