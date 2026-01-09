@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 
 # BS Framework - Enhanced Bash Scripting
 # Фреймворк BS - Расширенное bash-скриптование
@@ -163,7 +164,7 @@ HELP
 		# version_content - локальная переменная для этой функции
 		# version_content - local variable for this function
 
-		local version_content
+		declare version_content
 
 		version_content=$(grep "^export BOSA_VERSION=" "${BOSA_ROOT}/core/version.sh" 2>/dev/null)
 
@@ -173,7 +174,7 @@ HELP
 		# version - локальная переменная для этой функции
 		# version - local variable for this function
 			
-			local version
+			declare version
 
 			# ПЕРЕМЕННАЯ / VARIABLE:
 			# version - [Описание переменной]
@@ -267,7 +268,7 @@ HELP
 			# major_version - локальная переменная для этой функции
 			# major_version - local variable for this function
 
-			local major_version="${BASH_VERSION%%.*}"
+			declare major_version="${BASH_VERSION%%.*}"
 
 			if (( major_version >= 4 )); then
 
@@ -310,7 +311,7 @@ HELP
 		# version_content - локальная переменная для этой функции
 		# version_content - local variable for this function
 
-		local version_content
+		declare version_content
 
 		version_content=$(grep "^export BOSA_VERSION=" "${BOSA_ROOT}/core/version.sh" 2>/dev/null)
 
@@ -320,7 +321,7 @@ HELP
 			# version - локальная переменная для этой функции
 			# version - local variable for this function
 
-			local version
+			declare version
 
 			# ПЕРЕМЕННАЯ / VARIABLE:
 			# version - [Описание переменной]
@@ -358,7 +359,7 @@ HELP
 		# module_count - локальная переменная для этой функции
 		# module_count - local variable for this function
 
-		local module_count
+		declare module_count
 
 		# ПЕРЕМЕННАЯ / VARIABLE:
 		# module_count - [Описание переменной]
@@ -428,7 +429,7 @@ HELP
 	# essential_commands - локальная переменная для этой функции
 	# essential_commands - local variable for this function
 	
-	local essential_commands=("grep" "sed" "find" "ls" "cp" "mv" "rm")
+	declare -a essential_commands=("grep" "sed" "find" "ls" "cp" "mv" "rm")
 
 	for cmd in "${essential_commands[@]}"; do
 
@@ -503,7 +504,7 @@ list)
 # rel_path - локальная переменная для этой функции
 # rel_path - local variable for this function
 #
-		local rel_path
+		declare rel_path
 
 #
 # ПЕРЕМЕННАЯ / VARIABLE:

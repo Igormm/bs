@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 #
 # bootstrap/init.sh — единая инициализация фреймворка 
 # BS unified BS framework initialization

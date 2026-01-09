@@ -1,5 +1,5 @@
-#!/usr/bin/env bs
-
+#!/usr/bin/env bash
+# shellcheck shell=bash
 #
 # BS Framework - Enhanced Bash Scripting
 # Фреймворк BS - Расширенное bash-скриптование

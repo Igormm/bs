@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 #
 # bootstrap/loader.sh — модуль загрузки с предотвращением повторного подключения
 # bootstrap/loader.sh — loading module with duplicate loading prevention
