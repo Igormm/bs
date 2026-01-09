@@ -200,7 +200,7 @@ print_path_hint() {
 # Функция добавления PATH в ~/.bashrc
 update_path_bashrc() {
 	local bashrc="${HOME}/.bashrc"
-	local line='export PATH="$HOME/.local/bin:$PATH"'
+	local line="export PATH=\"\$HOME/.local/bin:\$PATH\""
 
 	# Создаем файл если не существует
 	[[ -f "${bashrc}" ]] || touch "${bashrc}"
@@ -332,6 +332,7 @@ uninstall)
 	do_uninstall
 	;;
 *)
-	die "Неизвестное действие: ${ACTION}"
+	printf "ERROR: %s\n" "Неизвестное действие: ${ACTION}" >&2
+	exit 1
 	;;
 esac
