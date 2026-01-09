@@ -25,15 +25,14 @@
 
 set -euo pipefail
 
-#
 # КОНФИГУРАЦИЯ БЕЗОПАСНОСТИ:
 # SECURITY CONFIGURATION:
 #   -e: Выход при ошибке / Exit on error
 #   -u: Выход при использовании неопределенной переменной / Exit on undefined variable
 #   -o pipefail: Выход при ошибке в pipeline / Exit on pipeline error
-#
 
-# определяем BS_ROOT / determine BS_ROOT
+# определяем BS_ROOT
+# determine BS_ROOT
 
 bs::__resolve_root() {
 
@@ -83,14 +82,13 @@ bs::__resolve_root() {
 
 }
 
-
+# 
 
 if [[ -z "${BOSA_ROOT-}" ]]; then
 
 	if ! BOSA_ROOT="$(bs::__resolve_root)"; then
 
 		echo "bs: предупреждение: BOSA_ROOT не определен, используется fallback: ${BOSA_ROOT}" >&2
-
 		echo "bs: warning: BOSA_ROOT not defined, using fallback: ${BOSA_ROOT}" >&2
 
 	fi
@@ -119,17 +117,14 @@ fi
 
 
 
-# --- CLI (минимально оставим как было) / CLI (minimal, keep as was) ---
+# CLI (минимально оставим как было) 
+# CLI (minimal, keep as was) ---
 
 case "${1-}" in
 
--h | --help)
-
-	cat <<'HELP'
-
+	-h | --help)
+		cat <<'HELP'
 bs
-
-
 
 Команды:
 
@@ -143,27 +138,10 @@ bs
 
   bs list
 
-
-
 Shebang:
 
   #!/usr/bin/env bs
-
-#
-# BS Framework - Enhanced Bash Scripting
-# Фреймворк BS - Расширенное bash-скриптование
-#
-# НАЗНАЧЕНИЕ: Главный entrypoint фреймворка BS
-# PURPOSE: Main entrypoint for BS framework
-#
-# ЗАВИСИМОСТИ: bash 4.0+, стандартные утилиты Linux
-# DEPENDENCIES: bash 4.0+, standard Linux utilities
-#
-# ИСПОЛЬЗУЕТСЯ: Для инициализации фреймворка и загрузки модулей
-# USAGE: For framework initialization and module loading
-#
   bs::init
-
   logger::print "Привет"
 
 HELP
@@ -172,39 +150,35 @@ HELP
 
 	;;
 
--v | --version)
+	-v | --version)
 
 	# Try to source the version module to get the version
 
 	if [[ -f "${BOSA_ROOT}/core/version.sh" ]]; then
 
 		# We'll source the version module to get the version
-
 		# This is a simple way to get the version without full initialization
+		#
+		# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
+		# version_content - локальная переменная для этой функции
+		# version_content - local variable for this function
 
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# version_content - локальная переменная для этой функции
-# version_content - local variable for this function
-#
 		local version_content
 
 		version_content=$(grep "^export BOSA_VERSION=" "${BOSA_ROOT}/core/version.sh" 2>/dev/null)
 
 		if [[ -n "${version_content}" ]]; then
 
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# version - локальная переменная для этой функции
-# version - local variable for this function
-#
+		# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
+		# version - локальная переменная для этой функции
+		# version - local variable for this function
+			
 			local version
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# version - [Описание переменной]
-# version - [Variable description]
-#
+			# ПЕРЕМЕННАЯ / VARIABLE:
+			# version - [Описание переменной]
+			# version - [Variable description]
+
 			version=$(echo "${version_content}" | cut -d'"' -f2)
 
 			echo "bs ${version}"
@@ -225,106 +199,92 @@ HELP
 
 	;;
 
--w | --where)
+	-w | --where)
 
-	echo "${BOSA_ROOT}"
+		echo "${BOSA_ROOT}"
 
-	exit 0
+		exit 0
 
 	;;
 
-doctor)
+	doctor)
 
-	echo "bs Doctor Report"
+		echo "bs Doctor Report"
 
-	echo "=================="
+		echo "BOSA_ROOT: ${BOSA_ROOT}"
 
-	echo "BOSA_ROOT: ${BOSA_ROOT}"
+		# Check core files / Проверка основных файлов
 
-	
+		if [[ -f "${BOSA_ROOT}/bs" ]]; then
 
-	# Check core files / Проверка основных файлов
-
-	if [[ -f "${BOSA_ROOT}/bs" ]]; then
-
-		echo "[OK] entrypoint bs"
-
-	else
-
-		echo "[ERROR] entrypoint bs"
-
-	fi
-
-	
-
-	if [[ -f "${BOSA_ROOT}/bootstrap/init.sh" ]]; then
-
-		echo "[OK] bootstrap/init.sh"
-
-	else
-
-		echo "[ERROR] bootstrap/init.sh"
-
-	fi
-
-	
-
-	if [[ -f "${BOSA_ROOT}/core/logger.sh" ]]; then
-
-		echo "[OK] core/logger.sh"
-
-	else
-
-		echo "[ERROR] core/logger.sh"
-
-	fi
-
-	
-
-	# Check system dependencies / Проверка системных зависимостей
-
-	if command -v bash >/dev/null 2>&1; then
-
-		echo "[OK] bash (version: $(bash --version | head -n1))"
-
-	else
-
-		echo "[ERROR] bash"
-
-	fi
-
-	
-
-	# Check Bash version compatibility
-
-	if [[ -n "${BASH_VERSION:-}" ]]; then
-
-		# Extract major version
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# major_version - локальная переменная для этой функции
-# major_version - local variable for this function
-#
-		local major_version="${BASH_VERSION%%.*}"
-
-		if (( major_version >= 4 )); then
-
-			echo "[OK] bash version ${BASH_VERSION} (>= 4.0)"
+			echo "[OK] entrypoint bs"
 
 		else
 
-			echo "[WARNING] bash version ${BASH_VERSION} (< 4.0)"
+			echo "[ERROR] entrypoint bs"
 
 		fi
 
-	else
+		if [[ -f "${BOSA_ROOT}/bootstrap/init.sh" ]]; then
 
-		echo "[ERROR] could not determine bash version"
+			echo "[OK] bootstrap/init.sh"
 
-	fi
+		else
 
-	
+			echo "[ERROR] bootstrap/init.sh"
+
+		fi
+
+		if [[ -f "${BOSA_ROOT}/core/logger.sh" ]]; then
+
+			echo "[OK] core/logger.sh"
+
+		else
+
+			echo "[ERROR] core/logger.sh"
+
+		fi
+
+		# Check system dependencies / Проверка системных зависимостей
+
+		if command -v bash >/dev/null 2>&1; then
+
+			echo "[OK] bash (version: $(bash --version | head -n1))"
+
+		else
+
+			echo "[ERROR] bash"
+
+		fi
+
+		# Check Bash version compatibility
+
+		if [[ -n "${BASH_VERSION:-}" ]]; then
+
+			# Extract major version
+
+			# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
+			# major_version - локальная переменная для этой функции
+			# major_version - local variable for this function
+
+			local major_version="${BASH_VERSION%%.*}"
+
+			if (( major_version >= 4 )); then
+
+				echo "[OK] bash version ${BASH_VERSION} (>= 4.0)"
+
+			else
+
+				echo "[WARNING] bash version ${BASH_VERSION} (< 4.0)"
+
+			fi
+
+		else
+
+			echo "[ERROR] could not determine bash version"
+
+		fi
+
 
 	# Check core modules
 
@@ -346,29 +306,26 @@ doctor)
 
 		# Try to get version
 
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# version_content - локальная переменная для этой функции
-# version_content - local variable for this function
-#
+		# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
+		# version_content - локальная переменная для этой функции
+		# version_content - local variable for this function
+
 		local version_content
 
 		version_content=$(grep "^export BOSA_VERSION=" "${BOSA_ROOT}/core/version.sh" 2>/dev/null)
 
 		if [[ -n "${version_content}" ]]; then
 
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# version - локальная переменная для этой функции
-# version - local variable for this function
-#
+			# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
+			# version - локальная переменная для этой функции
+			# version - local variable for this function
+
 			local version
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# version - [Описание переменной]
-# version - [Variable description]
-#
+			# ПЕРЕМЕННАЯ / VARIABLE:
+			# version - [Описание переменной]
+			# version - [Variable description]
+
 			version=$(echo "${version_content}" | cut -d'"' -f2)
 
 			echo "  - Version: ${version}"
@@ -381,8 +338,6 @@ doctor)
 
 	fi
 
-	
-
 	if [[ -f "${BOSA_ROOT}/core/error_handler.sh" ]]; then
 
 		echo "[OK] core/error_handler.sh"
@@ -393,26 +348,22 @@ doctor)
 
 	fi
 
-	
-
 	# Check library modules
 
 	if [[ -d "${BOSA_ROOT}/lib" ]]; then
 
 		echo "[OK] lib directory exists"
 
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# module_count - локальная переменная для этой функции
-# module_count - local variable for this function
-#
+		# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
+		# module_count - локальная переменная для этой функции
+		# module_count - local variable for this function
+
 		local module_count
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# module_count - [Описание переменной]
-# module_count - [Variable description]
-#
+		# ПЕРЕМЕННАЯ / VARIABLE:
+		# module_count - [Описание переменной]
+		# module_count - [Variable description]
+
 		module_count=$(find "${BOSA_ROOT}/lib" -name "*.sh" -type f | wc -l)
 
 		echo "  - Found ${module_count} library modules"
@@ -422,8 +373,6 @@ doctor)
 		echo "[ERROR] lib directory missing"
 
 	fi
-
-	
 
 	# Check system modules
 
@@ -437,8 +386,6 @@ doctor)
 
 	fi
 
-	
-
 	if [[ -f "${BOSA_ROOT}/lib/system/utils.sh" ]]; then
 
 		echo "[OK] system/utils.sh"
@@ -449,8 +396,6 @@ doctor)
 
 	fi
 
-	
-
 	if [[ -f "${BOSA_ROOT}/lib/automation.sh" ]]; then
 
 		echo "[OK] automation.sh"
@@ -460,8 +405,6 @@ doctor)
 		echo "[ERROR] automation.sh"
 
 	fi
-
-	
 
 	# Check distribution detection
 
@@ -479,15 +422,12 @@ doctor)
 
 	fi
 
-	
-
 	# Check essential commands
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# essential_commands - локальная переменная для этой функции
-# essential_commands - local variable for this function
-#
+	#
+	# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
+	# essential_commands - локальная переменная для этой функции
+	# essential_commands - local variable for this function
+	
 	local essential_commands=("grep" "sed" "find" "ls" "cp" "mv" "rm")
 
 	for cmd in "${essential_commands[@]}"; do
@@ -504,8 +444,6 @@ doctor)
 
 	done
 
-	
-
 	# Check if system can load bs
 
 	if [[ -n "${BOSA_INITIALIZED:-}" ]]; then
@@ -519,8 +457,6 @@ doctor)
 		echo "  (This is normal when running from command line)"
 
 	fi
-
-	
 
 	exit 0
 
@@ -655,25 +591,6 @@ exec bash -c '
 
   set -euo pipefail
 
-#
-# КОНФИГУРАЦИЯ БЕЗОПАСНОСТИ:
-# SECURITY CONFIGURATION:
-#   -e: Выход при ошибке / Exit on error
-#   -u: Выход при использовании неопределенной переменной / Exit on undefined variable
-#   -o pipefail: Выход при ошибке в pipeline / Exit on pipeline error
-#
-#
-# ПОДКЛЮЧЕНИЕ МОДУЛЯ / MODULE IMPORT:
-# Импортируется: "'"${BOSA_ROOT}"'/bs"
-# Imports: "'"${BOSA_ROOT}"'/bs"
-#
-  source "'"${BOSA_ROOT}"'/bs"
-
-#
-# ПОДКЛЮЧЕНИЕ МОДУЛЯ / MODULE IMPORT:
-# Импортируется: "'"${SCRIPT_PATH}"'"
-# Imports: "'"${SCRIPT_PATH}"'"
-#
   source "'"${SCRIPT_PATH}"'"
 
 ' bash "$@"

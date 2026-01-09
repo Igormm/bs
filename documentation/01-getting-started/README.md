@@ -1,4 +1,4 @@
-# Getting Started with BOSA Framework
+# Getting Started with Bs or BOSA or Bourn shell again open source arhitecture framework
 
 ## Quick Start Guide
 
@@ -111,7 +111,7 @@ chmod +x my_first_bosa_script.sh
 ```bash
 # Create a shebang script
 cat > shebang_script.sh << 'EOF'
-#!/usr/bin/env bosa
+#!/usr/bin/env bs
 # Shebang mode script
 
 bosa::init
