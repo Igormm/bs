@@ -1,6 +1,4 @@
 #!/usr/bin/env bs
-# shellcheck shell=bash
-
 # BS Framework - Enhanced Bash Scripting
 # Фреймворк BS - Расширенное bash-скриптование
 #
@@ -17,7 +15,109 @@
 # interpreter for shebang: #!/usr/bin/env bs
 
 # Важно: скрипт должен выполняться в bs-процессе, 
-# где уже доступны bs::init и другие функции. 
+# где уже доступны #!/usr/bin/env bash
+# BS main launcher / Главный лаунчер BS
+
+set -euo pipefail
+
+if [[ -z "${BASH_VERSION:-}" ]]; then
+  printf "ERROR: BS requires bash.\n" >&2
+  printf "ОШИБКА: BS требует bash.\n" >&2
+  exit 1
+fi
+
+VERSION="0.1.0"
+
+usage() {
+  cat <<'HELP'
+BS - command launcher
+
+Usage:
+  bs [command] [args...]
+
+Common commands / Частые команды:
+  help                 - show help / показать помощь
+  version              - show version / показать версию
+  env                  - print environment info / информация окружения
+  init-shell           - source bootstrap for current shell / инициализация окружения
+  run <script> [args]  - run script within BS env / запуск скрипта в окружении BS
+
+HELP
+}
+
+# Resolve BS_ROOT / Определяем BS_ROOT
+if [[ -z "${BS_ROOT:-}" ]]; then
+  # Try location of this file / Пробуем рядом с текущим файлом
+  THIS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+  export BS_ROOT="${THIS_DIR}"
+fi
+
+if [[ ! -d "${BS_ROOT}" ]]; then
+  printf "ERROR: Invalid BS_ROOT: %s\n" "${BS_ROOT}" >&2
+  printf "ОШИБКА: Некорректный BS_ROOT: %s\n" "${BS_ROOT}" >&2
+  exit 1
+fi
+
+bootstrap_init="${BS_ROOT}/bootstrap/init.sh"
+if [[ -f "${bootstrap_init}" ]]; then
+  # shellcheck disable=SC1090
+  source "${bootstrap_init}"
+fi
+
+cmd="${1:-help}"
+shift || true
+
+case "${cmd}" in
+  -h|--help|help)
+    usage
+    ;;
+  -v|--version|version)
+    printf "BS version: %s\n" "${VERSION}"
+    printf "Версия BS: %s\n" "${VERSION}"
+    ;;
+  env)
+    printf "BS_ROOT=%s\n" "${BS_ROOT}"
+    printf "PATH=%s\n" "${PATH}"
+    ;;
+  init-shell)
+    if [[ -f "${bootstrap_init}" ]]; then
+      # shellcheck disable=SC1090
+      source "${bootstrap_init}"
+      printf "Bootstrap sourced. Opened in current shell.\n"
+      printf "Бутстрап подключён. Окружение обновлено для текущей оболочки.\n"
+    else
+      printf "ERROR: bootstrap/init.sh not found in %s\n" "${BS_ROOT}" >&2
+      printf "ОШИБКА: bootstrap/init.sh не найден в %s\n" "${BS_ROOT}" >&2
+      exit 1
+    fi
+    ;;
+  run)
+    script="${1:-}"
+    if [[ -z "${script}" ]]; then
+      printf "ERROR: 'run' requires a script path.\n" >&2
+      printf "ОШИБКА: 'run' требует путь к скрипту.\n" >&2
+      exit 1
+    fi
+    shift || true
+    if [[ ! -f "${script}" ]]; then
+      printf "ERROR: Script not found: %s\n" "${script}" >&2
+      printf "ОШИБКА: Скрипт не найден: %s\n" "${script}" >&2
+      exit 1
+    fi
+    exec /usr/bin/env bash "${script}" "$@"
+    ;;
+  *)
+    # Dispatch to core subcommands if available / Диспетчеризация в core-команды
+    if [[ -x "${BS_ROOT}/core/${cmd}.sh" ]]; then
+      exec "${BS_ROOT}/core/${cmd}.sh" "$@"
+    else
+      printf "ERROR: Unknown command: %s\n" "${cmd}" >&2
+      printf "ОШИБКА: Неизвестная команда: %s\n" "${cmd}" >&2
+      usage
+      exit 1
+    fi
+    ;;
+esac и другие функции. 
 # Important: script must run in bs process where bs::init 
 # and other functions are available.
 

@@ -1,7 +1,64 @@
 #!/usr/bin/env bash
-# shellcheck shell=bash
-#
-# BS Framework - Enhanced Bash Scripting
+# Project boot entrypoint / Точка входа проекта
+# Finds BS_ROOT and chains to main launcher. / Находит BS_ROOT и передаёт управление основному лаунчеру.
+
+set -euo pipefail
+
+if [[ -z "${BASH_VERSION:-}" ]]; then
+  printf "ERROR: This script requires bash.\n" >&2
+  printf "Скрипт требует bash. Запустите: bash ./boot.sh\n" >&2
+  exit 1
+fi
+
+usage() {
+  cat <<'HELP'
+BS boot
+
+Usage:
+  ./boot.sh [command] [args...]
+  Examples / Примеры:
+    ./boot.sh help
+    ./boot.sh version
+    ./boot.sh run examples/hello.sh
+
+Notes:
+  - boot.sh resolves BS_ROOT and executes the main launcher "bs".
+  - boot.sh определяет BS_ROOT и запускает главный лаунчер "bs".
+HELP
+}
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" || "${1:-}" == "help" ]]; then
+  usage
+  exit 0
+fi
+
+# Resolve BS_ROOT near this file or from env / Определяем BS_ROOT рядом со скриптом или из окружения
+if [[ -z "${BS_ROOT:-}" ]]; then
+  SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+  # Try project-local layout: repo root has file 'bs' / Пробуем проектную раскладку: в корне есть 'bs'
+  if [[ -f "${SCRIPT_DIR}/bs" ]]; then
+    export BS_ROOT="${SCRIPT_DIR}"
+  elif [[ -f "${SCRIPT_DIR}/lib/bs/bs" ]]; then
+    export BS_ROOT="${SCRIPT_DIR}/lib/bs"
+  else
+    # Fallback to system/local install locations / Пытаемся найти системную установку
+    for loc in "$HOME/.local/lib/bs" "/usr/local/lib/bs"; do
+      if [[ -f "${loc}/bs" ]]; then
+        export BS_ROOT="${loc}"
+        break
+      fi
+    done
+  fi
+fi
+
+if [[ -z "${BS_ROOT:-}" || ! -f "${BS_ROOT}/bs" ]]; then
+  printf "ERROR: Cannot locate BS_ROOT or 'bs' launcher.\n" >&2
+  printf "ОШИБКА: Не удалось найти BS_ROOT или лаунчер 'bs'. Установите BS или задайте BS_ROOT.\n" >&2
+  exit 1
+fi
+
+# Execute main launcher / Запуск основного лаунчера
+exec "${BS_ROOT}/bs" "$@"
 # Фреймворк BS - Расширенное bash-скриптование
 #
 # НАЗНАЧЕНИЕ: Главный entrypoint фреймворка BS
