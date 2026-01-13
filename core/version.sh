@@ -2,18 +2,18 @@
 # version.sh — Framework version information / Информация о версии фреймворка
 
 # @description BS Framework Version / Версия фреймворка BS
-# @export BOSA_VERSION The current version of BS / Текущая версия BS
-export BOSA_VERSION="0.2.0"
+# @export BS_VERSION The current version of BS / Текущая версия BS
+export BS_VERSION="0.2.0"
 
 # @description BS Framework Name / Имя фреймворка BS
-# @export BOSA_NAME The name of the BS framework / Имя фреймворка BS
-export BOSA_NAME="BS (Bash Open Source Architecture (BS))"
+# @export BS_NAME The name of the BS framework / Имя фреймворка BS
+export BS_NAME="BS (Bash Open Source Architecture (BS))"
 
 # @description Print version information / Вывести информацию о версии
 # @example
 #   BS::version::print
 BS::version::print() {
-    echo "${BOSA_NAME} ${BOSA_VERSION}"
+    echo "${BS_NAME} ${BS_VERSION}"
 }
 
 # @description Get version as string / Получить версию как строку
@@ -21,7 +21,7 @@ BS::version::print() {
 # @example
 #   version=$(BS::version::get)
 BS::version::get() {
-    echo "${BOSA_VERSION}"
+    echo "${BS_VERSION}"
 }
 
 # @description Compare versions / Сравнить версии

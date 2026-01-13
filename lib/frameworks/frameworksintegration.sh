@@ -1,8 +1,8 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bs
 # shellcheck disable=SC2155
 
-# frameworksintegration.sh — Frameworks Integration Module for BOSA
-# Модуль интеграции фреймворков для BOSA
+# frameworksintegration.sh — Frameworks Integration Module for BS
+# Модуль интеграции фреймворков для BS
 #
 # Description:
 #   Integrates features and patterns from popular Bash frameworks:
@@ -22,32 +22,32 @@
 #   - Various framework-specific dependencies
 #
 # Usage:
-#   source "${BOSA_HOME}/boot.sh"
+#   source "${BS_HOME}/boot.sh"
 #   bs::init
 #   frameworks::init
 #   frameworks::bashit::load_plugin "git"
 #   frameworks::bashinator::log_message "INFO" "Test message"
 #
-# @author BOSA Framework
+# @author BS Framework
 # @since 2026-01-06
 # @version 1.0.0
 
 # Check if module is already loaded
-if [[ -n "${BOSA_LIB_FRAMEWORKS_INTEGRATION_LOADED:-}" ]]; then
+if [[ -n "${BS_LIB_FRAMEWORKS_INTEGRATION_LOADED:-}" ]]; then
     log::debug "Frameworks Integration module already loaded" 2>/dev/null || true
     return 0
 fi
-readonly BOSA_LIB_FRAMEWORKS_INTEGRATION_LOADED=1
+readonly BS_LIB_FRAMEWORKS_INTEGRATION_LOADED=1
 
 # Import required modules
-source "${BOSA_HOME}/core/const.sh"
-source "${BOSA_HOME}/core/logger.sh"
-source "${BOSA_HOME}/core/errorhandler.sh"
+source "${BS_HOME}/core/const.sh"
+source "${BS_HOME}/core/logger.sh"
+source "${BS_HOME}/core/errorhandler.sh"
 
 # Frameworks Integration configuration
-readonly FRAMEWORKS_CONFIG_DIR="${HOME}/.config/bosa_frameworks"
+readonly FRAMEWORKS_CONFIG_DIR="${HOME}/.config/bs_frameworks"
 readonly FRAMEWORKS_PLUGIN_DIR="${FRAMEWORKS_CONFIG_DIR}/plugins"
-readonly FRAMEWORKS_CACHE_DIR="/tmp/bosa_frameworks"
+readonly FRAMEWORKS_CACHE_DIR="/tmp/bs_frameworks"
 
 # Module state variables
 FRAMEWORKS_ACTIVE_PLUGINS=()
@@ -444,7 +444,7 @@ frameworks::bashinator::log_message() {
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
-    # Map Bashinator levels to BOSA logger levels
+    # Map Bashinator levels to BS logger levels
     case "${level}" in
         DEBUG)
             log::debug "[${component}] ${message}"

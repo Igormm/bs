@@ -47,8 +47,7 @@
 
 # directory (where boot.sh is located)
 
-BS_PROJECT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-
+BS_PROJECT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"  # Получаем абсолютный путь к каталогу, содержащему этот файл (boot.sh)
 
 
 # Абсолютный путь к каталогу фреймворка (по умолчанию: <project>/BS) / Absolute path to
@@ -60,8 +59,7 @@ BS_PROJECT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # : "${BS_PROJECT_FRAMEWORK_DIR: - [Описание переменной]
 # : "${BS_PROJECT_FRAMEWORK_DIR: - [Variable description]
 #
-: "${BS_PROJECT_FRAMEWORK_DIR:="${BS_PROJECT_DIR}/bs"}"
-
+: "${BS_PROJECT_FRAMEWORK_DIR:="${BS_PROJECT_DIR}/bs"}"  # Устанавливаем путь к каталогу фреймворка, если он еще не задан; по умолчанию это ./bs
 
 
 # Подключаем entrypoint фреймворка (в каталоге фреймворка это файл "BS") / Connect
@@ -73,8 +71,13 @@ BS_PROJECT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # Импортируется: "${BS_PROJECT_FRAMEWORK_DIR}/bs"
 # Imports: "${BS_PROJECT_FRAMEWORK_DIR}/bs"
 #
-source "${BS_PROJECT_FRAMEWORK_DIR}/bs"
-
+# Load framework entrypoint
+if [[ -f "${BS_PROJECT_FRAMEWORK_DIR}/BS" ]]; then  # Проверяем, существует ли главный файл фреймворка
+    . source "${BS_PROJECT_FRAMEWORK_DIR}/BS"  # Подключаем главный файл фреймворка с помощью оператора source
+else
+    echo "Framework file not found: ${BS_PROJECT_FRAMEWORK_DIR}/BS" >&2  # Выводим сообщение об ошибке в stderr
+    exit 1  # Завершаем выполнение с кодом ошибки
+fi
 
 
 # Опционально: можно сразу инициализировать (если хочешь без явного BS::init) / Optional:
@@ -88,5 +91,4 @@ source "${BS_PROJECT_FRAMEWORK_DIR}/bs"
 # modules
 
 
-
-unset BS_PROJECT_DIR
+unset BS_PROJECT_DIR  # Удаляем переменную, так как она больше не нужна

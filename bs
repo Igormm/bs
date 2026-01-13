@@ -24,7 +24,7 @@
 # Поэтому мы запускаем bs -c "source ...; source script". 
 # Therefore we run bs -c "source ...; source script"].
 
-set -euo pipefail
+set -euo pipefail  # Устанавливает безопасные настройки оболочки: выход при ошибках (-e), непроверенных переменных (-u), ошибках в пайплайне (-o pipefail)
 
 # КОНФИГУРАЦИЯ БЕЗОПАСНОСТИ:
 # SECURITY CONFIGURATION:
@@ -35,30 +35,30 @@ set -euo pipefail
 # определяем BS_ROOT
 # determine BS_ROOT
 
-bs::__resolve_root() {
+bs::__resolve_root() {  # Функция для определения корневого каталога фреймворка
 
 	# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
 	# bin_dir - локальная переменная для этой функции
 	# bin_dir - local variable for this function
 
-	local bin_dir
+	local bin_dir  # Объявление локальной переменной для хранения пути к каталогу исполняемых файлов
 		
-	bin_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+	bin_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"  # Получаем абсолютный путь к каталогу исполняемого файла bs
 
 	# 1. Проверка: локальный запуск из репозитория
 	#	 Check: local run from repository
 
-	if [[ -f "${bin_dir}/../bs" ]] && [[ -d "${bin_dir}/../bootstrap" ]]; then
-		echo "$(cd -- "${bin_dir}/.." && pwd)"
-		return 0
+	if [[ -f "${bin_dir}/../bs" ]] && [[ -d "${bin_dir}/../bootstrap" ]]; then  # Проверяем, является ли это локальным запуском из репозитория
+		echo "$(cd -- "${bin_dir}/.." && pwd)"  # Возвращаем путь к корню локального репозитория
+		return 0  # Возвращаем успешный код завершения
 	fi
 
 	# 2. Проверка: системная установка (/usr/local/lib/bs)
 	#	 Check: system installation (/usr/local/lib/bs)
 
-	if [[ -d "/usr/local/lib/bs" ]] && [[ -f "/usr/local/lib/bs/bootstrap/init.sh" ]]; then
-		echo "/usr/local/lib/bs"
-		return 0
+	if [[ -d "/usr/local/lib/bs" ]] && [[ -f "/usr/local/lib/bs/bootstrap/init.sh" ]]; then  # Проверяем системную установку
+		echo "/usr/local/lib/bs"  # Выводим путь к системной установке
+		return 0  # Возвращаем успешный код завершения
 	fi
 
 	# 3. Проверка: локальная установка (~/.local/lib/bs)
@@ -68,33 +68,32 @@ bs::__resolve_root() {
 	# local_path - локальная переменная для этой функции
 	# local_path - local variable for this function
 
-	local local_path="${HOME}/.local/lib/bs"
+	local local_path="${HOME}/.local/lib/bs"  # Объявляем переменную для пути к локальной установке
 
-	if [[ -d "${local_path}" ]] && [[ -f "${local_path}/bootstrap/init.sh" ]]; then
-		echo "${local_path}"
-		return 0
+	if [[ -d "${local_path}" ]] && [[ -f "${local_path}/bootstrap/init.sh" ]]; then  # Проверяем локальную установку
+		echo "${local_path}"  # Выводим путь к локальной установке
+		return 0  # Возвращаем успешный код завершения
 	fi
 
 	# 4. Если ничего не найдено - используем fallback (для обратной совместимости) но выводим предупреждение
 	# 	 If nothing found - use fallback (for backward compatibility) but output warning
 
-	echo "/usr/local/lib/bs"
-	return 1
+	echo "/usr/local/lib/bs"  # Возвращаем путь по умолчанию
+	return 1  # Возвращаем код ошибки, если подходящей установки не найдено
 
 }
 
-# 
+# Проверяем, задана ли переменная BOSA_ROOT
+if [[ -z "${BOSA_ROOT-}" ]]; then  # Проверяем, установлена ли переменная BOSA_ROOT
 
-if [[ -z "${BOSA_ROOT-}" ]]; then
+	if ! BOSA_ROOT="$(bs::__resolve_root)"; then  # Вызываем функцию для определения корня и сохраняем результат
 
-	if ! BOSA_ROOT="$(bs::__resolve_root)"; then
-
-		echo "bs: предупреждение: BOSA_ROOT не определен, используется fallback: ${BOSA_ROOT}" >&2
-		echo "bs: warning: BOSA_ROOT not defined, using fallback: ${BOSA_ROOT}" >&2
+		echo "bs: предупреждение: BOSA_ROOT не определен, используется fallback: ${BOSA_ROOT}" >&2  # Выводим предупреждение на stderr
+		echo "bs: warning: BOSA_ROOT not defined, using fallback: ${BOSA_ROOT}" >&2  # Выводим предупреждение на английском
 
 	fi
 
-	export BOSA_ROOT
+	export BOSA_ROOT  # Экспортируем переменную в окружение
 
 fi
 
@@ -102,17 +101,17 @@ fi
 
 # Проверка корректности BOSA_ROOT / Validate BOSA_ROOT correctness
 
-if [[ ! -d "${BOSA_ROOT}" ]] || [[ ! -f "${BOSA_ROOT}/bootstrap/init.sh" ]]; then
+if [[ ! -d "${BOSA_ROOT}" ]] || [[ ! -f "${BOSA_ROOT}/bootstrap/init.sh" ]]; then  # Проверяем существование корневого каталога и основного файла инициализации
 
-	echo "bs: ошибка: BOSA_ROOT указывает на некорректную директорию: ${BOSA_ROOT}" >&2
+	echo "bs: ошибка: BOSA_ROOT указывает на некорректную директорию: ${BOSA_ROOT}" >&2  # Выводим сообщение об ошибке
 
-	echo "bs: error: BOSA_ROOT points to invalid directory: ${BOSA_ROOT}" >&2
+	echo "bs: error: BOSA_ROOT points to invalid directory: ${BOSA_ROOT}" >&2  # Выводим сообщение об ошибке на английском
 
-	echo "bs: установите фреймворк через: ./install.sh install" >&2
+	echo "bs: установите фреймворк через: ./install.sh install" >&2  # Подсказываем пользователю, как исправить ситуацию
 
-	echo "bs: install framework via: ./install.sh install" >&2
+	echo "bs: install framework via: ./install.sh install" >&2  # Подсказываем пользователю на английском
 
-	exit 1
+	exit 1  # Выходим с кодом ошибки
 
 fi
 
@@ -121,10 +120,10 @@ fi
 # CLI (минимально оставим как было) 
 # CLI (minimal, keep as was) ---
 
-case "${1-}" in
+case "${1-}" in  # Начинаем обработку командной строки, проверяем первый аргумент
 
-	-h | --help)
-		cat <<'HELP'
+	-h | --help)  # Если аргумент -h или --help
+		cat <<'HELP'  # Выводим справку
 bs
 
 Команды:
@@ -147,15 +146,15 @@ Shebang:
 
 HELP
 
-	exit 0
+	exit 0  # Выходим с успешным кодом
 
 	;;
 
-	-v | --version)
+	-v | --version)  # Если аргумент -v или --version
 
 	# Try to source the version module to get the version
 
-	if [[ -f "${BOSA_ROOT}/core/version.sh" ]]; then
+	if [[ -f "${BOSA_ROOT}/core/version.sh" ]]; then  # Проверяем существование файла версии
 
 		# We'll source the version module to get the version
 		# This is a simple way to get the version without full initialization
@@ -164,103 +163,101 @@ HELP
 		# version_content - локальная переменная для этой функции
 		# version_content - local variable for this function
 
-		declare version_content
+		declare version_content  # Объявляем переменную для содержимого файла версии
 
-		version_content=$(grep "^export BOSA_VERSION=" "${BOSA_ROOT}/core/version.sh" 2>/dev/null)
+		version_content=$(grep "^export BOSA_VERSION=" "${BOSA_ROOT}/core/version.sh" 2>/dev/null)  # Извлекаем строку с версией
 
-		if [[ -n "${version_content}" ]]; then
+		if [[ -n "${version_content}" ]]; then  # Если строка с версией найдена
 
 		# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
 		# version - локальная переменная для этой функции
 		# version - local variable for this function
 			
-			declare version
+			declare version  # Объявляем переменную для версии
 
 			# ПЕРЕМЕННАЯ / VARIABLE:
 			# version - [Описание переменной]
 			# version - [Variable description]
 
-			version=$(echo "${version_content}" | cut -d'"' -f2)
+			version=$(echo "${version_content}" | cut -d'"' -f2)  # Извлекаем значение версии из строки экспорта
 
-			echo "bs ${version}"
+			echo "bs ${version}"  # Выводим версию
 
 		else
 
-			echo "bs 0.2.0"  # Default fallback
+			echo "bs 0.2.0"  # Default fallback  # Выводим версию по умолчанию
 
 		fi
 
 	else
 
-		echo "bs 0.2.0"  # Default fallback
+		echo "bs 0.2.0"  # Default fallback  # Выводим версию по умолчанию
 
 	fi
 
-	exit 0
+	exit 0  # Выходим с успешным кодом
 
 	;;
 
-	-w | --where)
+	-w | --where)  # Если аргумент -w или --where
 
-		echo "${BOSA_ROOT}"
+		echo "${BOSA_ROOT}"  # Выводим путь к корню фреймворка
 
-		exit 0
+		exit 0  # Выходим с успешным кодом
 
 	;;
 
-	doctor)
-
-		echo "bs Doctor Report"
-
-		echo "BOSA_ROOT: ${BOSA_ROOT}"
+	doctor)  # Если аргумент doctor
+		echo "bs Doctor Report"  # Выводим заголовок отчета диагностики
+		echo "BOSA_ROOT: ${BOSA_ROOT}"  # Выводим путь к корню фреймворка
 
 		# Check core files / Проверка основных файлов
 
-		if [[ -f "${BOSA_ROOT}/bs" ]]; then
+		if [[ -f "${BOSA_ROOT}/bs" ]]; then  # Проверяем существование главного файла bs
 
-			echo "[OK] entrypoint bs"
+			echo "[OK] entrypoint bs"  # Сообщаем, что файл найден
 
 		else
 
-			echo "[ERROR] entrypoint bs"
+			echo "[ERROR] entrypoint bs"  # Сообщаем, что файл не найден
 
 		fi
 
-		if [[ -f "${BOSA_ROOT}/bootstrap/init.sh" ]]; then
+		if [[ -f "${BOSA_ROOT}/bootstrap/init.sh" ]]; then  # Проверяем существование файла инициализации
 
-			echo "[OK] bootstrap/init.sh"
+			echo "[OK] bootstrap/init.sh"  # Сообщаем, что файл найден
 
 		else
 
-			echo "[ERROR] bootstrap/init.sh"
+			echo "[ERROR] bootstrap/init.sh"  # Сообщаем, что файл не найден
 
 		fi
 
-		if [[ -f "${BOSA_ROOT}/core/logger.sh" ]]; then
+		if [[ -f "${BOSA_ROOT}/core/logger.sh" ]]; then  # Проверяем существование файла логирования
 
-			echo "[OK] core/logger.sh"
+			echo "[OK] core/logger.sh"  # Сообщаем, что файл найден
 
 		else
 
-			echo "[ERROR] core/logger.sh"
+			echo "[ERROR] core/logger.sh"  # Сообщаем, что файл не найден
 
 		fi
 
 		# Check system dependencies / Проверка системных зависимостей
 
-		if command -v bash >/dev/null 2>&1; then
+		if command -v bash >/dev/null 2>&1; then  # Проверяем наличие команды bash
 
-			echo "[OK] bash (version: $(bash --version | head -n1))"
+			echo "[OK] bash (version: $(bash --version | head -n1))"  # Сообщаем, что bash найден и выводим его версию
 
 		else
 
-			echo "[ERROR] bash"
+			echo "[ERROR] bash"  # Сообщаем, что bash не найден
 
 		fi
 
 		# Check Bash version compatibility
 
-		if [[ -n "${BASH_VERSION:-}" ]]; then
+		if [[ -n "${BASH_VERSION:-}" ]]; then  # Проверяем, доступна ли переменная с версией bash
 
 			# Extract major version
 
@@ -268,250 +265,243 @@ HELP
 			# major_version - локальная переменная для этой функции
 			# major_version - local variable for this function
 
-			declare major_version="${BASH_VERSION%%.*}"
+			declare major_version="${BASH_VERSION%%.*}"  # Извлекаем номер главной версии bash
 
-			if (( major_version >= 4 )); then
+			if (( major_version >= 4 )); then  # Проверяем, соответствует ли версия требованиям
 
-				echo "[OK] bash version ${BASH_VERSION} (>= 4.0)"
+				echo "[OK] bash version ${BASH_VERSION} (>= 4.0)"  # Сообщаем, что версия bash подходит
 
 			else
 
-				echo "[WARNING] bash version ${BASH_VERSION} (< 4.0)"
+				echo "[WARNING] bash version ${BASH_VERSION} (< 4.0)"  # Предупреждаем, что версия может быть слишком старой
 
 			fi
 
 		else
 
-			echo "[ERROR] could not determine bash version"
+			echo "[ERROR] could not determine bash version"  # Сообщаем об ошибке получения версии bash
 
 		fi
 
 
-	# Check core modules
+	# Check core modules  # Проверяем основные модули
 
-	if [[ -f "${BOSA_ROOT}/core/const.sh" ]]; then
+	if [[ -f "${BOSA_ROOT}/core/const.sh" ]]; then  # Проверяем существование файла констант
 
-		echo "[OK] core/const.sh"
+		echo "[OK] core/const.sh"  # Сообщаем, что файл найден
 
 	else
 
-		echo "[ERROR] core/const.sh"
+		echo "[ERROR] core/const.sh"  # Сообщаем, что файл не найден
 
 	fi
 
 	
+	if [[ -f "${BOSA_ROOT}/core/version.sh" ]]; then  # Проверяем существование файла версии
 
-	if [[ -f "${BOSA_ROOT}/core/version.sh" ]]; then
+		echo "[OK] core/version.sh"  # Сообщаем, что файл найден
 
-		echo "[OK] core/version.sh"
-
-		# Try to get version
+		# Try to get version  # Пытаемся получить версию
 
 		# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
 		# version_content - локальная переменная для этой функции
 		# version_content - local variable for this function
 
-		declare version_content
+		declare version_content  # Объявляем переменную для содержимого файла версии
 
-		version_content=$(grep "^export BOSA_VERSION=" "${BOSA_ROOT}/core/version.sh" 2>/dev/null)
+		version_content=$(grep "^export BOSA_VERSION=" "${BOSA_ROOT}/core/version.sh" 2>/dev/null)  # Извлекаем строку с версией
 
-		if [[ -n "${version_content}" ]]; then
+		if [[ -n "${version_content}" ]]; then  # Если строка с версией найдена
 
 			# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
 			# version - локальная переменная для этой функции
 			# version - local variable for this function
 
-			declare version
+			declare version  # Объявляем переменную для версии
 
 			# ПЕРЕМЕННАЯ / VARIABLE:
 			# version - [Описание переменной]
 			# version - [Variable description]
 
-			version=$(echo "${version_content}" | cut -d'"' -f2)
+			version=$(echo "${version_content}" | cut -d'"' -f2)  # Извлекаем значение версии
 
-			echo "  - Version: ${version}"
+			echo "  - Version: ${version}"  # Выводим информацию о версии
 
 		fi
 
 	else
 
-		echo "[ERROR] core/version.sh"
+		echo "[ERROR] core/version.sh"  # Сообщаем, что файл не найден
 
 	fi
 
-	if [[ -f "${BOSA_ROOT}/core/error_handler.sh" ]]; then
+	if [[ -f "${BOSA_ROOT}/core/error_handler.sh" ]]; then  # Проверяем существование файла обработки ошибок
 
-		echo "[OK] core/error_handler.sh"
+		echo "[OK] core/error_handler.sh"  # Сообщаем, что файл найден
 
 	else
 
-		echo "[ERROR] core/error_handler.sh"
+		echo "[ERROR] core/error_handler.sh"  # Сообщаем, что файл не найден
 
 	fi
 
-	# Check library modules
+	# Check library modules  # Проверяем библиотечные модули
 
-	if [[ -d "${BOSA_ROOT}/lib" ]]; then
+	if [[ -d "${BOSA_ROOT}/lib" ]]; then  # Проверяем существование каталога библиотек
 
-		echo "[OK] lib directory exists"
+		echo "[OK] lib directory exists"  # Сообщаем, что каталог существует
 
 		# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
 		# module_count - локальная переменная для этой функции
 		# module_count - local variable for this function
 
-		declare module_count
+		declare module_count  # Объявляем переменную для подсчета модулей
 
 		# ПЕРЕМЕННАЯ / VARIABLE:
 		# module_count - [Описание переменной]
 		# module_count - [Variable description]
 
-		module_count=$(find "${BOSA_ROOT}/lib" -name "*.sh" -type f | wc -l)
+		module_count=$(find "${BOSA_ROOT}/lib" -name "*.sh" -type f | wc -l)  # Подсчитываем количество файлов модулей
 
-		echo "  - Found ${module_count} library modules"
-
-	else
-
-		echo "[ERROR] lib directory missing"
-
-	fi
-
-	# Check system modules
-
-	if [[ -f "${BOSA_ROOT}/lib/system/distro.sh" ]]; then
-
-		echo "[OK] system/distro.sh"
+		echo "  - Found ${module_count} library modules"  # Выводим количество найденных модулей
 
 	else
 
-		echo "[ERROR] system/distro.sh"
+		echo "[ERROR] lib directory missing"  # Сообщаем, что каталог не найден
 
 	fi
 
-	if [[ -f "${BOSA_ROOT}/lib/system/utils.sh" ]]; then
+	# Check system modules  # Проверяем системные модули
 
-		echo "[OK] system/utils.sh"
+	if [[ -f "${BOSA_ROOT}/lib/system/distro.sh" ]]; then  # Проверяем существование модуля определения дистрибутива
+
+		echo "[OK] system/distro.sh"  # Сообщаем, что файл найден
 
 	else
 
-		echo "[ERROR] system/utils.sh"
+		echo "[ERROR] system/distro.sh"  # Сообщаем, что файл не найден
 
 	fi
 
-	if [[ -f "${BOSA_ROOT}/lib/automation.sh" ]]; then
+	if [[ -f "${BOSA_ROOT}/lib/system/utils.sh" ]]; then  # Проверяем существование модуля служебных функций
 
-		echo "[OK] automation.sh"
+		echo "[OK] system/utils.sh"  # Сообщаем, что файл найден
 
 	else
 
-		echo "[ERROR] automation.sh"
+		echo "[ERROR] system/utils.sh"  # Сообщаем, что файл не найден
 
 	fi
 
-	# Check distribution detection
+	if [[ -f "${BOSA_ROOT}/lib/automation.sh" ]]; then  # Проверяем существование модуля автоматизации
 
-	if command -v lsb_release >/dev/null 2>&1; then
-
-		echo "[OK] lsb_release available"
-
-	elif [[ -f /etc/os-release ]]; then
-
-		echo "[OK] /etc/os-release available"
+		echo "[OK] automation.sh"  # Сообщаем, что файл найден
 
 	else
 
-		echo "[WARNING] No distribution detection method available"
+		echo "[ERROR] automation.sh"  # Сообщаем, что файл не найден
 
 	fi
 
-	# Check essential commands
+	# Check distribution detection  # Проверяем возможность определения дистрибутива
+
+	if command -v lsb_release >/dev/null 2>&1; then  # Проверяем наличие команды lsb_release
+
+		echo "[OK] lsb_release available"  # Сообщаем, что команда доступна
+
+	elif [[ -f /etc/os-release ]]; then  # Иначе проверяем наличие файла /etc/os-release
+
+		echo "[OK] /etc/os-release available"  # Сообщаем, что файл доступен
+
+	else
+
+		echo "[WARNING] No distribution detection method available"  # Предупреждаем об отсутствии методов определения дистрибутива
+
+	fi
+
+	# Check essential commands  # Проверяем наличие основных команд
 	#
 	# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
 	# essential_commands - локальная переменная для этой функции
 	# essential_commands - local variable for this function
 	
-	declare -a essential_commands=("grep" "sed" "find" "ls" "cp" "mv" "rm")
+	declare -a essential_commands=("grep" "sed" "find" "ls" "cp" "mv" "rm")  # Объявляем массив необходимых команд
 
-	for cmd in "${essential_commands[@]}"; do
+	for cmd in "${essential_commands[@]}"; do  # Перебираем все команды из массива
 
-		if command -v "${cmd}" >/dev/null 2>&1; then
+		if command -v "${cmd}" >/dev/null 2>&1; then  # Проверяем, доступна ли команда
 
-			echo "[OK] ${cmd}"
+			echo "[OK] ${cmd}"  # Сообщаем, что команда доступна
 
 		else
 
-			echo "[ERROR] ${cmd}"
+			echo "[ERROR] ${cmd}"  # Сообщаем, что команда недоступна
 
 		fi
 
 	done
 
-	# Check if system can load bs
+	# Check if system can load bs  # Проверяем, можно ли загрузить bs
 
-	if [[ -n "${BOSA_INITIALIZED:-}" ]]; then
+	if [[ -n "${BOSA_INITIALIZED:-}" ]]; then  # Проверяем, инициализирован ли фреймворк в текущей сессии
 
-		echo "[INFO] bs already initialized in this session"
+		echo "[INFO] bs already initialized in this session"  # Сообщаем, что фреймворк уже инициализирован
 
 	else
 
-		echo "[INFO] bs not initialized in this session"
+		echo "[INFO] bs not initialized in this session"  # Сообщаем, что фреймворк не инициализирован
 
-		echo "  (This is normal when running from command line)"
+		echo "  (This is normal when running from command line)"  # Поясняем, что это нормально при запуске из командной строки
 
 	fi
 
-	exit 0
+	exit 0  # Выходим с успешным кодом
 
 	;;
 
-list)
-
-	echo "Available bs modules:"
-
-	echo ""
-
+list)  # Если аргумент list
+	echo "Available bs modules:"  # Выводим заголовок списка модулей
+	echo ""  # Пустая строка
 	
-
 	# Find core modules / Поиск основных модулей
 
-	if [[ -d "${BOSA_ROOT}/core" ]]; then
+	if [[ -d "${BOSA_ROOT}/core" ]]; then  # Проверяем существование каталога core
 
-		echo "Core modules:"
+		echo "Core modules:"  # Выводим заголовок для основных модулей
 
-		for module in "${BOSA_ROOT}"/core/*.sh; do
+		for module in "${BOSA_ROOT}"/core/*.sh; do  # Перебираем все файлы .sh в каталоге core
 
-			if [[ -f "${module}" ]]; then
+			if [[ -f "${module}" ]]; then  # Проверяем, что это файл
 
-				echo "  core/$(basename "${module}" .sh)"
+				echo "  core/$(basename "${module}" .sh)"  # Выводим имя модуля без расширения
 
 			fi
 
 		done
 
-		echo ""
+		echo ""  # Пустая строка
 
 	fi
-
 	
-
 	# Find library modules (including subdirectories) / Поиск библиотечных модулей (включая поддиректории)
 
-	if [[ -d "${BOSA_ROOT}/lib" ]]; then
+	if [[ -d "${BOSA_ROOT}/lib" ]]; then  # Проверяем существование каталога lib
 
-		echo "Library modules:"
+		echo "Library modules:"  # Выводим заголовок для библиотечных модулей
 
 #
 # ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
 # rel_path - локальная переменная для этой функции
 # rel_path - local variable for this function
 #
-		declare rel_path
+		declare rel_path  # Объявляем переменную для относительного пути
 
 #
 # ПЕРЕМЕННАЯ / VARIABLE:
 # while IFS - [Описание переменной]
 # while IFS - [Variable description]
 #
-		while IFS= read -r -d '' module; do
+		while IFS= read -r -d '' module; do  # Читаем каждый найденный файл
 
 			# Получаем относительный путь от BOSA_ROOT/lib / Get relative path from BOSA_ROOT/lib
 
@@ -520,7 +510,7 @@ list)
 # rel_path - [Описание переменной]
 # rel_path - [Variable description]
 #
-			rel_path="${module#${BOSA_ROOT}/lib/}"
+			rel_path="${module#${BOSA_ROOT}/lib/}"  # Удаляем префикс пути до каталога lib
 
 			# Убираем расширение .sh / Remove .sh extension
 
@@ -529,15 +519,15 @@ list)
 # rel_path - [Описание переменной]
 # rel_path - [Variable description]
 #
-			rel_path="${rel_path%.sh}"
+			rel_path="${rel_path%.sh}"  # Удаляем расширение .sh
 
-			echo "  lib/${rel_path}"
+			echo "  lib/${rel_path}"  # Выводим путь к модулю
 
-		done < <(find "${BOSA_ROOT}/lib" -type f -name "*.sh" -print0 2>/dev/null || true)
+		done < <(find "${BOSA_ROOT}/lib" -type f -name "*.sh" -print0 2>/dev/null || true)  # Находим все .sh файлы в lib и передаем их в цикл
 
 	fi
 
-	exit 0
+	exit 0  # Выходим с успешным кодом
 
 	;;
 
@@ -552,31 +542,31 @@ esac
 # SCRIPT_PATH - [Описание переменной]
 # SCRIPT_PATH - [Variable description]
 #
-SCRIPT_PATH="${1-}"
+SCRIPT_PATH="${1-}"  # Сохраняем первый аргумент как путь к скрипту
 
-shift || true
+shift || true  # Удаляем первый аргумент из списка, если он был
 
 
 
-if [[ -z "${SCRIPT_PATH}" ]]; then
+if [[ -z "${SCRIPT_PATH}" ]]; then  # Проверяем, задан ли путь к скрипту
 
-	echo "bs: не указан путь к скрипту (shebang mode)" >&2
+	echo "bs: не указан путь к скрипту (shebang mode)" >&2  # Выводим ошибку на stderr
 
-	echo "bs: script path not specified (shebang mode)" >&2
+	echo "bs: script path not specified (shebang mode)" >&2  # Выводим ошибку на английском
 
-	exit 2
+	exit 2  # Выходим с кодом ошибки
 
 fi
 
 
 
-if [[ ! -f "${SCRIPT_PATH}" ]]; then
+if [[ ! -f "${SCRIPT_PATH}" ]]; then  # Проверяем, существует ли файл скрипта
 
-	echo "bs: скрипт не найден: ${SCRIPT_PATH}" >&2
+	echo "bs: скрипт не найден: ${SCRIPT_PATH}" >&2  # Выводим ошибку на stderr
 
-	echo "bs: script not found: ${SCRIPT_PATH}" >&2
+	echo "bs: script not found: ${SCRIPT_PATH}" >&2  # Выводим ошибку на английском
 
-	exit 2
+	exit 2  # Выходим с кодом ошибки
 
 fi
 
@@ -588,12 +578,12 @@ fi
 
 # - затем source'нуть целевой скрипт (он выполнится с доступными функциями) / - then source target script (it will execute with available functions)
 
-exec bash -c '
+exec bash -c '  # Заменяем текущий процесс новым экземпляром bash
 
-  set -euo pipefail
+  set -euo pipefail  # Устанавливаем безопасные настройки оболочки
 
-  source "'"${SCRIPT_PATH}"'"
+  source "'"${SCRIPT_PATH}"'"  # Подключаем указанный пользовательский скрипт
 
-' bash "$@"
+' bash "$@"  # Передаем оставшиеся аргументы в новый процесс bash
 
-sh "$@"
+sh "$@"  # Эта строка никогда не будет выполнена из-за exec выше

@@ -61,7 +61,7 @@ declare -g FRAMEWORK_DEBUG=false
 declare -g FRAMEWORK_DRY_RUN=false
 
 # Версия фреймворка / Framework version
-declare -g BOSA_VERSION="0.3.0"
+declare -g BS_VERSION="0.3.0"
 
 # ==========================================
 # Константы для цветового вывода / Color output constants
