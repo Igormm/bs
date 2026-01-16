@@ -25,6 +25,10 @@ source "${BS_PROJECT_ROOT}/boot.sh"
 # Initialize BS framework
 bs::init
 
+# Test configuration
+readonly TEST_ACCESS_TOKEN="test_token"
+readonly TEST_USER_ID="123456"
+
 # Test results tracking
 TESTS_RUN=0
 TESTS_PASSED=0

@@ -42,8 +42,8 @@ trap 'BS::__on_exit' EXIT
 # @description Exit BS application with cleanup / Выход из приложения BS с очисткой
 # @param $1 [optional] Exit code (default: 0) / Код выхода (по умолчанию 0)
 # @example
-#   bs::exit
-#   bs::exit 1
+#   BS::exit
+#   BS::exit 1
 bs::exit() {
     local exit_code="${1:-0}"
     # Run all cleanup functions / Запустить все функции очистки

@@ -273,7 +273,6 @@ main() {
     echo -e "${BLUE}To make changes permanent, add to your .bashrc:${NC}"
     echo -e "${BLUE}Чтобы сделать изменения постоянными, добавьте в .bashrc:${NC}"
     echo -e "  source /path/to/BS/boot.sh"
-    echo -e "  bs::init"
     echo -e "  load lib/ui/ps1config"
     echo -e "  ps1config::set_theme \"powerline\""
 }

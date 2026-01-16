@@ -29,6 +29,11 @@ source "${BS_PROJECT_ROOT}/boot.sh"
 # Initialize BS framework
 bs::init
 
+# Test configuration
+readonly TEST_INTERFACE="wg_test"
+readonly TEST_ADDRESS="10.255.255.1/24"
+readonly TEST_PORT="51821"
+
 # Test results tracking
 TESTS_RUN=0
 TESTS_PASSED=0

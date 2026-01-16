@@ -1,14 +1,4 @@
 #!/usr/bin/env bs
-# shellcheck shell=bash
-
-source boot.sh
-
-bs::init
-
-# Загрузка необходимых модулей / Load required modules
-load "lib/ui/presentation"
-load "lib/system/info"
-```
 
 # Simple demonstration of new BS modules
 # Простая демонстрация новых модулей BS

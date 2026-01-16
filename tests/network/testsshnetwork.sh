@@ -29,6 +29,10 @@ source "${BS_PROJECT_ROOT}/boot.sh"
 # Initialize BS framework
 bs::init
 
+# Test configuration
+readonly TEST_HOST="localhost"
+readonly TEST_PORT="22"
+
 # Test results tracking
 TESTS_RUN=0
 TESTS_PASSED=0

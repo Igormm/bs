@@ -255,6 +255,48 @@ bs_doctor() {
   fi
 }
 
+bs_doctor_next() {
+    local bs_root="$1"
+    local status=0
+    
+    echo "Checking BS framework integrity..."
+    
+    # Required files check
+    local required_files=(
+        "bootstrap/init.sh"
+        "core/errorhandler.sh"      # Fixed name - was error_handler.sh
+        "core/logger.sh"
+        "lib/utils.sh"
+    )
+    
+    for file in "${required_files[@]}"; do
+        if [[ ! -f "${bs_root}/${file}" ]]; then
+            echo "ERROR: Missing required file: ${file}"
+            status=1
+        else
+            echo "OK: Found ${file}"
+        fi
+    done
+    
+    # Module directory check
+    local module_dirs=("core" "lib")
+    for dir in "${module_dirs[@]}"; do
+        if [[ ! -d "${bs_root}/${dir}" ]]; then
+            echo "ERROR: Missing directory: ${dir}"
+            status=1
+        else
+            echo "OK: Found directory ${dir}"
+        fi
+    done
+    
+    # Check for common issues
+    if ! command -v git >/dev/null 2>&1 && [[ -d "${bs_root}/.git" ]]; then
+        echo "WARNING: Git not found, some features may be limited"
+    fi
+    
+    return ${status}
+}
+
 # Helper function to check if a file exists
 check_file_exists() {
   local file_path="$1"
