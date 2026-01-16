@@ -19,7 +19,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     # Run directly, load BS
     if [[ -f "boot.sh" ]]; then
         source "boot.sh"
-        BS::init
+        bs::init
     else
         echo "Error: boot.sh not found. Please run from BS directory."
         echo "Ошибка: boot.sh не найден. Пожалуйста, запустите из директории BS."
@@ -273,6 +273,7 @@ main() {
     echo -e "${BLUE}To make changes permanent, add to your .bashrc:${NC}"
     echo -e "${BLUE}Чтобы сделать изменения постоянными, добавьте в .bashrc:${NC}"
     echo -e "  source /path/to/BS/boot.sh"
+    echo -e "  bs::init"
     echo -e "  load lib/ui/ps1config"
     echo -e "  ps1config::set_theme \"powerline\""
 }

@@ -8,11 +8,17 @@
 set -euo pipefail
 
 # Подключаем тестовый фреймворк
-source "../testframework.sh"
+source "${TEST_SCRIPT_DIR}/../testframework.sh"
+source "${BS_PROJECT_ROOT}/boot.sh"
 
-# Подключаем тестируемый модуль
-source "../../../boot.sh"
-BS::init
+# Initialize BS framework
+bs::init
+
+# Test results tracking
+TESTS_RUN=0
+TESTS_PASSED=0
+TESTS_FAILED=0
+FAILED_TESTS=()
 
 # Главная функция тестов
 main() {

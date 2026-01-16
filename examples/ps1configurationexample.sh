@@ -1,4 +1,14 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
+
+# Инициализация BS фреймворка
+# Initialize BS framework
+bs::init
+
+# Загрузка модуля PS1 конфигурации
+# Load PS1 configuration module
+load "lib/ui/ps1config"
+
 # examples/ps1_configuration_example.sh — PS1 configuration example
 # examples/ps1_configuration_example.sh — Пример конфигурации PS1
 #

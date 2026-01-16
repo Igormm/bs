@@ -23,7 +23,7 @@ source "${TEST_SCRIPT_DIR}/../testframework.sh"
 source "${BS_PROJECT_ROOT}/boot.sh"
 
 # Initialize BS framework
-BS::init
+bs::init
 
 # Test results tracking
 TESTS_RUN=0

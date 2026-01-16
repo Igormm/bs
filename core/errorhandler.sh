@@ -42,9 +42,9 @@ trap 'BS::__on_exit' EXIT
 # @description Exit BS application with cleanup / Выход из приложения BS с очисткой
 # @param $1 [optional] Exit code (default: 0) / Код выхода (по умолчанию 0)
 # @example
-#   BS::exit
-#   BS::exit 1
-BS::exit() {
+#   bs::exit
+#   bs::exit 1
+bs::exit() {
     local exit_code="${1:-0}"
     # Run all cleanup functions / Запустить все функции очистки
     cleanup::__run_all
@@ -62,7 +62,7 @@ error::exit() {
     local exit_code="${2:-1}"
     
     log::error "${message}"
-    BS::exit "${exit_code}"
+    bs::exit "${exit_code}"
 }
 
 # @description Exit with error message and backtrace / Выход с сообщением об ошибке и
@@ -84,7 +84,7 @@ error::exit_with_backtrace() {
         log::error "  ${BASH_SOURCE[$frame+1]}:${BASH_LINENO[$frame]} ${FUNCNAME[$frame+1]}(...)"
     done
     
-    BS::exit "${exit_code}"
+    bs::exit "${exit_code}"
 }
 
 # @description Handle error with custom handler / Обработка ошибки с пользовательским

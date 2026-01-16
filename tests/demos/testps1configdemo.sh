@@ -8,8 +8,17 @@
 set -euo pipefail
 
 # Подключаем фреймворк
-source "../../../boot.sh"
-BS::init
+source "${TEST_SCRIPT_DIR}/../testframework.sh"
+source "${BS_PROJECT_ROOT}/boot.sh"
+
+# Initialize BS framework
+bs::init
+
+# Test results tracking
+TESTS_RUN=0
+TESTS_PASSED=0
+TESTS_FAILED=0
+FAILED_TESTS=()
 
 # Подключаем модуль
 load "lib/ui/ps1config"

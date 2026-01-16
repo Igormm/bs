@@ -1,37 +1,19 @@
 #!/usr/bin/env bs
-# shellcheck disable=SC2155
+# shellcheck shell=bash
 
-# vkapi.sh — VK API Integration Module for BS Framework
-# Модуль интеграции VK API для фреймворка BS
 #
-# Description:
-#   Provides comprehensive VK API integration including authentication,
-#   user management, messaging, wall operations, and more.
-#   Предоставляет комплексную интеграцию с VK API, включая аутентификацию,
-#   управление пользователями, сообщениями, операции со стеной и многое другое.
+# lib/integration/vkapi.sh - Интеграция с API ВКонтакте
+# lib/integration/vkapi.sh - Integration with VKontakte API
 #
-# Features:
-#   - OAuth 2.0 authentication flow
-#   - API method calls with rate limiting
-#   - User management (friends, groups, etc.)
-#   - Messaging (send, receive, conversations)
-#   - Wall operations (post, get, delete)
-#   - Photo and document uploads
-#   - Error handling and retries
-#   - Caching for better performance
+
+# Использование / Usage:
 #
-# Dependencies:
-#   - curl (for HTTP requests)
-#   - jq (for JSON parsing)
-#   - openssl (for signatures)
-#   - base64 (for encoding)
+#   source boot.sh
 #
-# Usage:
-#   source "${BS_HOME}/boot.sh"
-#   BS::init
-#   vkapi::init "YOUR_APP_ID" "YOUR_APP_SECRET"
-#   vkapi::auth "USER_TOKEN"
-#   vkapi::users.get "user_id=1"
+#   bs::init
+#
+
+set -euo pipefail
 #
 # @author BS Framework
 # @since 2026-01-06

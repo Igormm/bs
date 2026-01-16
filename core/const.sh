@@ -163,5 +163,5 @@ const::error_description() {
 # @description Get framework version / Получить версию фреймворка
 # @return Framework version string / Строка версии фреймворка
 const::version() {
-    echo "${BOSA_VERSION}"
+    echo "${BS_VERSION}"
 }

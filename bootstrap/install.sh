@@ -248,7 +248,7 @@ WRAP
   # For local installs, auto update PATH / Для локальной установки — автообновление PATH
   if [[ "${MODE}" == "local" ]]; then
     auto_update_path
-  end
+  fi
 }
 
 # Uninstall / Удаление

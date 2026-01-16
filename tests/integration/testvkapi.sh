@@ -30,12 +30,7 @@ source "${TEST_SCRIPT_DIR}/../testframework.sh"
 source "${BS_PROJECT_ROOT}/boot.sh"
 
 # Initialize BS framework
-BS::init
-
-# Test configuration
-readonly TEST_APP_ID="1234567"
-readonly TEST_APP_SECRET="test_secret_key"
-readonly TEST_ACCESS_TOKEN="${VK_TOKEN:-test_token}"
+bs::init
 
 # Test results tracking
 TESTS_RUN=0

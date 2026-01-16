@@ -11,16 +11,16 @@ export BS_NAME="BS (Bash Open Source Architecture (BS))"
 
 # @description Print version information / Вывести информацию о версии
 # @example
-#   BS::version::print
-BS::version::print() {
+#   bs::version::print
+bs::version::print() {
     echo "${BS_NAME} ${BS_VERSION}"
 }
 
 # @description Get version as string / Получить версию как строку
 # @return Version string / Строка версии
 # @example
-#   version=$(BS::version::get)
-BS::version::get() {
+#   version=$(bs::version::get)
+bs::version::get() {
     echo "${BS_VERSION}"
 }
 
@@ -29,10 +29,10 @@ BS::version::get() {
 # @param $2 Second version / Вторая версия
 # @return 0 if equal, 1 if first > second, 2 if first < second
 # @example
-#   if [[ $(BS::version::compare "0.1.0" "0.2.0") -eq 2 ]]; then
+#   if [[ $(bs::version::compare "0.1.0" "0.2.0") -eq 2 ]]; then
 #       echo "First version is older"
 #   fi
-BS::version::compare() {
+bs::version::compare() {
     local ver1="${1}"
     local ver2="${2}"
     
