@@ -7,8 +7,8 @@
 After our comprehensive analysis and refactoring, your BOSA project now has this structure:
 
 ```
-bosa_project/
-├── bosa                          # Main entrypoint
+bs_project/
+├── bs                          # Main entrypoint
 ├── boot.sh                       # Library mode bootstrap
 ├── main.sh                       # Example module
 ├── run_comprehensive_test.sh    # Test suite
@@ -16,7 +16,7 @@ bosa_project/
 ├── PROJECT_ANALYSIS.md          # Analysis report
 ├── GETTING_STARTED.md           # This file
 ├── bin/
-│   └── bosa                     # CLI executable
+│   └── bs                     # CLI executable
 ├── bootstrap/
 │   ├── init.sh                  # Framework initialization
 │   └── loader.sh                # Module loader
@@ -76,7 +76,7 @@ bosa_project/
 
 ```bash
 # Create a simple script
-cat > my_first_bosa_script.sh << 'EOF'
+cat > my_first_bs_script.sh << 'EOF'
 #!/usr/bin/env bash
 # My first BOSA script
 
@@ -84,7 +84,7 @@ cat > my_first_bosa_script.sh << 'EOF'
 source "./boot.sh"
 
 # Initialize
-bosa::init
+bs::init
 
 # Log a message
 logger::info "Hello from BOSA!"
@@ -96,14 +96,14 @@ hostname=$(system::info::get_hostname)
 logger::info "Current hostname: $hostname"
 
 # Exit cleanly
-bosa::exit 0
+bs::exit 0
 EOF
 
 # Make it executable
-chmod +x my_first_bosa_script.sh
+chmod +x my_first_bs_script.sh
 
 # Run it
-./my_first_bosa_script.sh
+./my_first_bs_script.sh
 ```
 
 #### Use Shebang Mode
@@ -114,19 +114,19 @@ cat > shebang_script.sh << 'EOF'
 #!/usr/bin/env bs
 # Shebang mode script
 
-bosa::init
+bs::init
 
 logger::header "Shebang Mode Test"
 logger::info "This script uses shebang mode!"
 logger::list "Feature 1" "Feature 2" "Feature 3"
 
-bosa::exit 0
+bs::exit 0
 EOF
 
 # Make it executable
 chmod +x shebang_script.sh
 
-# Run it (requires bosa in PATH or use bin/bosa)
+# Run it (requires bs in PATH or use bin/bs)
 ./shebang_script.sh
 ```
 
@@ -137,7 +137,7 @@ chmod +x shebang_script.sh
 ```bash
 #!/usr/bin/env bash
 source "./boot.sh"
-bosa::init
+bs::init
 
 load "lib/system/distrologic"
 
@@ -153,7 +153,7 @@ logger::success "Packages installed successfully"
 ```bash
 #!/usr/bin/env bash
 source "./boot.sh"
-bosa::init
+bs::init
 
 load "lib/system/services"
 
@@ -174,7 +174,7 @@ fi
 ```bash
 #!/usr/bin/env bash
 source "./boot.sh"
-bosa::init
+bs::init
 
 load "lib/system/users"
 
@@ -193,7 +193,7 @@ logger::success "User 'deploy' created successfully"
 ```bash
 #!/usr/bin/env bash
 source "./boot.sh"
-bosa::init
+bs::init
 
 # Set custom log level
 export BOSA_LOG_LEVEL=DEBUG
@@ -215,7 +215,7 @@ logger::warn "This is a structured message"
 ```bash
 #!/usr/bin/env bash
 source "./boot.sh"
-bosa::init
+bs::init
 
 # Register cleanup
 cleanup::add "echo 'Cleanup called'"
@@ -267,7 +267,7 @@ EOF
 # Use the custom module
 #!/usr/bin/env bash
 source "./boot.sh"
-bosa::init
+bs::init
 
 load "lib/custom/my_module"
 
@@ -284,7 +284,7 @@ logger::info "Got result: $result"
 cat > test_my_module.sh << 'EOF'
 #!/usr/bin/env bash
 source "./boot.sh"
-bosa::init
+bs::init
 
 # Load module to test
 load "lib/custom/my_module"
@@ -318,7 +318,7 @@ chmod +x test_my_module.sh
 cat > integration_test.sh << 'EOF'
 #!/usr/bin/env bash
 source "./boot.sh"
-bosa::init
+bs::init
 
 load "lib/system/distrologic"
 load "lib/system/packages"
@@ -358,7 +358,7 @@ chmod +x integration_test.sh
 cat > deploy.sh << 'EOF'
 #!/usr/bin/env bash
 source "./boot.sh"
-bosa::init
+bs::init
 
 # Production deployment script
 load "lib/system/distrologic"
@@ -444,7 +444,7 @@ jobs:
 ```bash
 # Good organization
 my_project/
-├── bosa/                      # BOSA framework (git submodule)
+├── bs/                      # BOSA framework (git submodule)
 ├── lib/
 │   ├── project/              # Project-specific modules
 │   │   ├── config.sh
@@ -467,7 +467,7 @@ my_project/
 # config.sh
 #!/usr/bin/env bash
 source "./boot.sh"
-bosa::init
+bs::init
 
 # Load configuration
 config::load "/etc/myapp.conf"
@@ -528,13 +528,13 @@ try_with_fallback() {
 
 #### Common Issues
 
-**Problem:** `bosa: command not found`
+**Problem:** `bs: command not found`
 ```bash
 # Solution 1: Use full path
-./bosa/bosa --help
+./bs/bs --help
 
 # Solution 2: Add to PATH
-export PATH="$PWD/bosa:$PATH"
+export PATH="$PWD/bs:$PATH"
 
 # Solution 3: Install system-wide
 sudo ./install.sh install
@@ -577,7 +577,7 @@ export BOSA_LOG_LEVEL=DEBUG
 bash -x your_script.sh
 
 # Check framework variables
-bosa doctor
+bs doctor
 ```
 
 #### Community Support

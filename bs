@@ -1,364 +1,150 @@
 #!/usr/bin/env bash
-# BS Framework - Enhanced Bash Scripting
-# Фреймворк BS - Расширенное bash-скриптование
-#
-# НАЗНАЧЕНИЕ: Главный entrypoint фреймворка BS
-# PURPOSE: Main entrypoint for BS framework
-#
-# ЗАВИСИМОСТИ: bash 4.0+, стандартные утилиты Linux
-# DEPENDENCIES: bash 4.0+, standard Linux utilities
-#
-# ИСПОЛЬЗУЕТСЯ: Для инициализации фреймворка и загрузки модулей
-# USAGE: For framework initialization and module loading
-#
-# bs — интерпретатор для shebang: #!/usr/bin/env bs
-# interpreter for shebang: #!/usr/bin/env bs
-
+# ------------------------------------------------------------------
+#  BS Framework – STAGE-2 UNIFIED ENTRY-POINT / INTERPRETER
+#  Назначение / Purpose:
+#    - инициализировать окружение фреймворка;
+#    - обрабатывать пользовательские команды (run, doctor, list …);
+#    - работать как shebang-интерпретатор (#!/usr/bin/env bs).
+#  Зависимости: bash 4.0+, bootstrap/init.sh, структура каталогов
+#              core/, lib/ (опционально, но doctor ругается).
+# ------------------------------------------------------------------
 set -euo pipefail
 
-if [[ -z "${BASH_VERSION:-}" ]]; then
-  printf "ERROR: BS requires bash.\n" >&2
-  printf "ОШИБКА: BS требует bash.\n" >&2
+# 1. Версия фреймворка ---------------------
+readonly BS_VERSION='0.3.0'
+
+# 2. Проверка bash -------------------------
+if [[ ${BASH_VERSINFO[0]} -lt 4 ]]; then
+  printf 'ERROR: bash 4.0+ required\n' >&2
   exit 1
 fi
 
-# Resolve BS_ROOT / Определяем BS_ROOT
+# 3. Определение BS_ROOT (если ещё не задан) --
 if [[ -z "${BS_ROOT:-}" ]]; then
-  # Try to determine the root location
-  BS_ROOT="$(bs_resolve_root)"
-  if [[ -n "${BS_ROOT}" ]]; then
-    export BS_ROOT
+  # Если bs запущен из репо-корня, bootstrap/init.sh рядом
+  BS_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+  if [[ -f "${BS_DIR}/bootstrap/init.sh" ]]; then
+    BS_ROOT=$BS_DIR
   else
-    printf "ERROR: Could not determine BS_ROOT\n" >&2
-    printf "ОШИБКА: Не удалось определить BS_ROOT\n" >&2
-    exit 1
+    # Ищем в стандартных местах
+    for dir in "${HOME}/.local/lib/bs" "/usr/local/lib/bs"; do
+      if [[ -f "${dir}/bootstrap/init.sh" ]]; then
+        BS_ROOT=$dir
+        break
+      fi
+    done
   fi
+  export BS_ROOT
 fi
 
-if [[ ! -d "${BS_ROOT}" ]]; then
-  printf "ERROR: Invalid BS_ROOT: %s\n" "${BS_ROOT}" >&2
-  printf "ОШИБКА: Некорректный BS_ROOT: %s\n" "${BS_ROOT}" >&2
-  exit 1
+# 4. Загрузка ядра -------------------------
+if [[ ! -f "${BS_ROOT}/bootstrap/init.sh" ]]; then
+  printf 'ERROR: bootstrap/init.sh not found in BS_ROOT=%s\n' "$BS_ROOT" >&2
+  exit 2
 fi
+# shellcheck source=/dev/null
+source "${BS_ROOT}/bootstrap/init.sh"
 
-# Bootstrap initialization
-bootstrap_init="${BS_ROOT}/bootstrap/init.sh"
-if [[ -f "${bootstrap_init}" ]]; then
-  # shellcheck disable=SC1090
-  source "${bootstrap_init}"
-fi
+# 5. Утилитные функции ---------------------
+die()  { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+help() {
+  cat <<HELP
+BS Framework ${BS_VERSION} – command launcher & shebang interpreter
+Usage: bs [command] [args...]
 
-# Function to resolve the BS root directory
-bs_resolve_root() {
-  local bin_dir
-  bin_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+Commands:
+  help, -h, --help      Show this help
+  version               Print framework version
+  env                   Show environment (BS_ROOT, PATH)
+  list                  List available modules (core/, lib/)
+  doctor                Check framework integrity
+  run <script> [args]   Execute script inside BS environment
+  init-shell            Print snippet for ~/.bashrc or ~/.zshrc
 
-  # 1. Check: local run from repository
-  if [[ -f "${bin_dir}/../bs" ]] && [[ -d "${bin_dir}/../bootstrap" ]]; then
-    echo "$(cd -- "${bin_dir}/.." && pwd)"
-    return 0
-  fi
+Shebang mode:
+  #!/usr/bin/env bs
+  (set BS_SHEBANG=1 internally)
 
-  # 2. Check: system installation (/usr/local/lib/bs)
-  if [[ -d "/usr/local/lib/bs" ]] && [[ -f "/usr/local/lib/bs/bootstrap/init.sh" ]]; then
-    echo "/usr/local/lib/bs"
-    return 0
-  fi
-
-  # 3. Check: local installation (~/.local/lib/bs)
-  local local_path="${HOME}/.local/lib/bs"
-  if [[ -d "${local_path}" ]] && [[ -f "${local_path}/bootstrap/init.sh" ]]; then
-    echo "${local_path}"
-    return 0
-  fi
-
-  # Fallback for compatibility
-  echo "/usr/local/lib/bs"
-  return 1
-}
-
-VERSION="0.1.0"
-
-usage() {
-  cat <<'HELP'
-BS - command launcher
-
-Usage:
-  bs [command] [args...]
-
-Common commands / Частые команды:
-  help                 - show help / показать помощь
-  version              - show version / показать версию
-  env                  - print environment info / информация окружения
-  init-shell           - source bootstrap for current shell / инициализация окружения
-  run <script> [args]  - run script within BS env / запуск скрипта в окружении BS
-
+Examples:
+  bs doctor
+  bs run ./examples/deploy.sh --prod
+  bs list | grep system
 HELP
 }
 
-# CLI handling
-case "${1:-}" in
-  -h | --help | help)
-    usage
-    ;;
-    
-  -v | --version | version)
-    printf "BS version: %s\n" "${VERSION}"
-    printf "Версия BS: %s\n" "${VERSION}"
-    ;;
-    
-  env)
-    printf "BS_ROOT=%s\n" "${BS_ROOT}"
-    printf "PATH=%s\n" "${PATH}"
-    ;;
-    
-  init-shell)
-    if [[ -f "${bootstrap_init}" ]]; then
-      # shellcheck disable=SC1090
-      source "${bootstrap_init}"
-      printf "Bootstrap sourced. Opened in current shell.\n"
-      printf "Бутстрап подключён. Окружение обновлено для текущей оболочки.\n"
-    else
-      printf "ERROR: bootstrap/init.sh not found in %s\n" "${BS_ROOT}" >&2
-      printf "ОШИБКА: bootstrap/init.sh не найден в %s\n" "${BS_ROOT}" >&2
-      exit 1
-    fi
-    ;;
-    
-  --where)
-    echo "${BS_ROOT}"
-    ;;
-    
-  doctor)
-    bs_doctor
-    ;;
-    
-  list)
-    bs_list_modules
-    ;;
-    
-  run)
-    script_path="${2:-}"
-    if [[ -z "${script_path}" ]]; then
-      printf "ERROR: 'run' requires a script path.\n" >&2
-      printf "ОШИБКА: 'run' требует путь к скрипту.\n" >&2
-      exit 1
-    fi
-    shift 2 || true
-    if [[ ! -f "${script_path}" ]]; then
-      printf "ERROR: Script not found: %s\n" "${script_path}" >&2
-      printf "ОШИБКА: Скрипт не найден: %s\n" "${script_path}" >&2
-      exit 1
-    fi
-    exec /usr/bin/env bash "${script_path}" "$@"
-    ;;
-    
-  *)
-    # Dispatch to core subcommands if available
-    if [[ -x "${BS_ROOT}/core/${1:-}.sh" ]]; then
-      exec "${BS_ROOT}/core/$1.sh" "${@:2}"
-    else
-      # If no specific command found, treat as shebang mode
-      bs_shebang_mode "$@"
-    fi
-    ;;
-esac
+version() { printf 'BS Framework version: %s\n' "$BS_VERSION"; }
+env_cmd() { printf 'BS_ROOT=%s\nPATH=%s\n' "$BS_ROOT" "$PATH"; }
 
-# Function for diagnostic checks
-bs_doctor() {
-  echo "bs Doctor Report"
-  echo "BS_ROOT: ${BS_ROOT}"
-  
-  # Check core files
-  check_file_exists "${BS_ROOT}/bs" "entrypoint bs"
-  check_file_exists "${BS_ROOT}/bootstrap/init.sh" "bootstrap/init.sh"
-  check_file_exists "${BS_ROOT}/core/logger.sh" "core/logger.sh"
-  
-  # Check system dependencies
-  if command -v bash >/dev/null 2>&1; then
-    echo "[OK] bash (version: $(bash --version | head -n1))"
-  else
-    echo "[ERROR] bash"
-  fi
-  
-  # Check Bash version compatibility
-  if [[ -n "${BASH_VERSION:-}" ]]; then
-    local major_version="${BASH_VERSION%%.*}"
-    if (( major_version >= 4 )); then
-      echo "[OK] bash version ${BASH_VERSION} (>= 4.0)"
-    else
-      echo "[WARNING] bash version ${BASH_VERSION} (< 4.0)"
-    fi
-  else
-    echo "[ERROR] could not determine bash version"
-  fi
+list_cmd() {
+  echo 'Available modules:'
+  for cat in core lib; do
+    [[ -d "${BS_ROOT}/${cat}" ]] || continue
+    for m in "${BS_ROOT}/${cat}"/*.sh; do
+      [[ -f "$m" ]] && printf '  %s/%s\n' "$cat" "${m##*/}"
+    done
+  done
+}
 
-  # Check core modules
-  check_file_exists "${BS_ROOT}/core/const.sh" "core/const.sh"
-  
-  if [[ -f "${BS_ROOT}/core/version.sh" ]]; then
-    echo "[OK] core/version.sh"
-    # Try to get version
-    local version_content
-    version_content=$(grep "^export BOSA_VERSION=" "${BS_ROOT}/core/version.sh" 2>/dev/null)
-    if [[ -n "${version_content}" ]]; then
-      local version
-      version=$(echo "${version_content}" | cut -d'"' -f2)
-      echo "  - Version: ${version}"
-    fi
-  else
-    echo "[ERROR] core/version.sh"
-  fi
+doctor_cmd() {
+  local fail=0
+  echo "BS doctor report"
+  echo "BS_ROOT: $BS_ROOT"
 
-  check_file_exists "${BS_ROOT}/core/errorhandler.sh" "core/error_handler.sh"
-  
-  # Check library modules
-  if [[ -d "${BS_ROOT}/lib" ]]; then
-    echo "[OK] lib directory exists"
-    local module_count
-    module_count=$(find "${BS_ROOT}/lib" -name "*.sh" -type f | wc -l)
-    echo "  - Found ${module_count} library modules"
-  else
-    echo "[ERROR] lib directory missing"
-  fi
-  
-  # Check system modules
-  check_file_exists "${BS_ROOT}/lib/system/distro.sh" "system/distro.sh"
-  check_file_exists "${BS_ROOT}/lib/system/utils.sh" "system/utils.sh"
-  check_file_exists "${BS_ROOT}/lib/automation.sh" "automation.sh"
-  
-  # Check distribution detection
-  if command -v lsb_release >/dev/null 2>&1; then
-    echo "[OK] lsb_release available"
-  elif [[ -f /etc/os-release ]]; then
-    echo "[OK] /etc/os-release available"
-  else
-    echo "[WARNING] No distribution detection method available"
-  fi
-  
-  # Check essential commands
-  local essential_commands=("grep" "sed" "find" "ls" "cp" "mv" "rm")
-  for cmd in "${essential_commands[@]}"; do
-    if command -v "${cmd}" >/dev/null 2>&1; then
-      echo "[OK] ${cmd}"
+  local req=(bootstrap/init.sh core/logger.sh core/errorhandler.sh lib/utils.sh)
+  for f in "${req[@]}"; do
+    if [[ -f "${BS_ROOT}/${f}" ]]; then
+      echo "  [OK] ${f}"
     else
-      echo "[ERROR] ${cmd}"
+      echo "  [FAIL] ${f}"; fail=1
     fi
   done
-  
-  # Check if system can load bs
-  if [[ -n "${BS_INITIALIZED:-}" ]]; then
-    echo "[INFO] bs already initialized in this session"
-  else
-    echo "[INFO] bs not initialized in this session"
-    echo "  (This is normal when running from command line)"
-  fi
-}
-
-bs_doctor_next() {
-    local bs_root="$1"
-    local status=0
-    
-    echo "Checking BS framework integrity..."
-    
-    # Required files check
-    local required_files=(
-        "bootstrap/init.sh"
-        "core/errorhandler.sh"      # Fixed name - was error_handler.sh
-        "core/logger.sh"
-        "lib/utils.sh"
-    )
-    
-    for file in "${required_files[@]}"; do
-        if [[ ! -f "${bs_root}/${file}" ]]; then
-            echo "ERROR: Missing required file: ${file}"
-            status=1
-        else
-            echo "OK: Found ${file}"
-        fi
-    done
-    
-    # Module directory check
-    local module_dirs=("core" "lib")
-    for dir in "${module_dirs[@]}"; do
-        if [[ ! -d "${bs_root}/${dir}" ]]; then
-            echo "ERROR: Missing directory: ${dir}"
-            status=1
-        else
-            echo "OK: Found directory ${dir}"
-        fi
-    done
-    
-    # Check for common issues
-    if ! command -v git >/dev/null 2>&1 && [[ -d "${bs_root}/.git" ]]; then
-        echo "WARNING: Git not found, some features may be limited"
+  for d in core lib; do
+    if [[ -d "${BS_ROOT}/${d}" ]]; then
+      echo "  [OK] dir ${d}"
+    else
+      echo "  [FAIL] dir ${d}"; fail=1
     fi
-    
-    return ${status}
+  done
+  return "$fail"
 }
 
-# Helper function to check if a file exists
-check_file_exists() {
-  local file_path="$1"
-  local description="$2"
-  
-  if [[ -f "${file_path}" ]]; then
-    echo "[OK] ${description}"
-  else
-    echo "[ERROR] ${description}"
-  fi
-}
-
-# Function to list available modules
-bs_list_modules() {
-  echo "Available bs modules:"
-  echo ""
-  
-  # Find core modules
-  if [[ -d "${BS_ROOT}/core" ]]; then
-    echo "Core modules:"
-    for module in "${BS_ROOT}"/core/*.sh; do
-      if [[ -f "${module}" ]]; then
-        echo "  core/$(basename "${module}" .sh)"
-      fi
-    done
-    echo ""
-  fi
-  
-  # Find library modules (including subdirectories)
-  if [[ -d "${BS_ROOT}/lib" ]]; then
-    echo "Library modules:"
-    local rel_path
-    while IFS= read -r -d '' module; do
-      # Get relative path from BS_ROOT/lib
-      rel_path="${module#${BS_ROOT}/lib/}"
-      # Remove .sh extension
-      rel_path="${rel_path%.sh}"
-      echo "  lib/${rel_path}"
-    done < <(find "${BS_ROOT}/lib" -type f -name "*.sh" -print0 2>/dev/null || true)
-  fi
-}
-
-# Function to handle shebang mode execution
-bs_shebang_mode() {
-  local script_path="${1:-}"
-  
-  if [[ -z "${script_path}" ]]; then
-    echo "bs: script path not specified (shebang mode)" >&2
-    echo "bs: не указан путь к скрипту (shebang mode)" >&2
-    exit 2
-  fi
-  
-  if [[ ! -f "${script_path}" ]]; then
-    echo "bs: script not found: ${script_path}" >&2
-    echo "bs: скрипт не найден: ${script_path}" >&2
-    exit 2
-  fi
-  
-  # Execute the script with BS framework loaded
+run_cmd() {
+  [[ $# -eq 0 ]] && die "run: script path required"
+  local script=$1; shift
+  [[ -f "$script" ]] || die "run: file not found: $script"
+  # Запускаем скрипт в новом bash с уже загруженным BS-окружением
   exec bash -c '
     set -euo pipefail
     source "'"${BS_ROOT}/bootstrap/init.sh"'"
-    source "'"$script_path"'"
-  ' bash "$@"
+    source "$1"
+  ' bash "$script" "$@"
 }
+
+init_shell_cmd() {
+  cat <<EOF
+# Add to ~/.bashrc or ~/.zshrc
+export BS_ROOT="${BS_ROOT}"
+source "\${BS_ROOT}/bootstrap/init.sh"
+EOF
+}
+
+# 6. Shebang-режим -------------------------
+# Если скрипт вызван через #!/usr/bin/env bs, переменная BS_SHEBANG=1
+# экспортируется автоматически загрузчиком (bootstrap/init.sh).
+if [[ "${BS_SHEBANG:-0}" == "1" ]]; then
+  [[ $# -ge 1 ]] || die "shebang mode: script path required"
+  run_cmd "$@"
+  # Функция run_cmd сама сделает exec, поэтому дальше не продолжаем.
+fi
+
+# 7. Обычный CLI-диспетчер -----------------
+case "${1:-help}" in
+  help|-h|--help) help ;;
+  version)        version ;;
+  env)            env_cmd ;;
+  list)           list_cmd ;;
+  doctor)         doctor_cmd ;;
+  run)            shift; run_cmd "$@" ;;
+  init-shell)     init_shell_cmd ;;
+  *)              die "unknown command: $1" ;;
+esac
