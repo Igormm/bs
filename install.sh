@@ -23,6 +23,12 @@
 
 set -euo pipefail
 
-# Run the modular installer
+# 1. Проверка bash
+if [[ ${BASH_VERSINFO[0]} -lt 4 ]]; then
+  printf 'ERROR: bash 4.0+ required\n' >&2
+  exit 1
+fi
+
+# 2. Run the modular installer
 INSTALLER_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/install"
 source "${INSTALLER_DIR}/main.sh" "$@"

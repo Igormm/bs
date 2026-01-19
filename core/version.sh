@@ -3,11 +3,11 @@
 
 # @description BS Framework Version / Версия фреймворка BS
 # @export BS_VERSION The current version of BS / Текущая версия BS
-export BS_VERSION="0.2.0"
+export BS_VERSION="0.3.0"
 
 # @description BS Framework Name / Имя фреймворка BS
 # @export BS_NAME The name of the BS framework / Имя фреймворка BS
-export BS_NAME="BS (Bash Open Source Architecture (BS))"
+export BS_NAME="BS (Bash Open Source Architecture) BOSA Framework"
 
 # @description Print version information / Вывести информацию о версии
 # @example

@@ -8,7 +8,7 @@
 # - при завершении скрипта (даже при ошибке) cleanup выполнится / on script exit (even on
 # error) cleanup will execute
 
-declare -ga BOSA_CLEANUP_STACK=()
+declare -ga BS_CLEANUP_STACK=()
 
 # @description Add cleanup function to stack / Добавить функцию очистки в стек
 # @param $1 Function name to add to cleanup / Имя функции для добавления в очистку
@@ -20,7 +20,7 @@ cleanup::add() {
 		log::warn "cleanup::add: не указана функция"
 		return 2
 	fi
-	BOSA_CLEANUP_STACK+=("${fn}")
+	BS_CLEANUP_STACK+=("${fn}")
 }
 
 # @description Run all cleanup functions / Выполнить все функции очистки
@@ -28,8 +28,8 @@ cleanup::add() {
 #   cleanup::__run_all
 cleanup::__run_all() {
 	local i
-	for ((i = ${#BOSA_CLEANUP_STACK[@]} - 1; i >= 0; i--)); do
-		"${BOSA_CLEANUP_STACK[$i]}" || true
+	for ((i = ${#BS_CLEANUP_STACK[@]} - 1; i >= 0; i--)); do
+		"${BS_CLEANUP_STACK[$i]}" || true
 	done
 }
 
@@ -80,7 +80,8 @@ error::exit_with_backtrace() {
     
     # Print backtrace excluding this function
     local frame
-    for ((frame=1; frame<${#BASH_SOURCE[@]}-1; frame++)); do
+    local bash_source_length=${#BASH_SOURCE[@]}
+    for ((frame=1; frame<${bash_source_length}-1; frame++)); do
         log::error "  ${BASH_SOURCE[$frame+1]}:${BASH_LINENO[$frame]} ${FUNCNAME[$frame+1]}(...)"
     done
     
@@ -251,8 +252,8 @@ error::panic() {
     # Run cleanup functions
     cleanup::__run_all
     
-    # Exit immediately without running exit handlers
-    kill -9 $$ 2>/dev/null || exit 1
+    # Exit immediately with error code
+    exit 1
 }
 
 # @description Log error without exiting / Записать ошибку без выхода

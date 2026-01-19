@@ -196,17 +196,17 @@ source "./boot.sh"
 bs::init
 
 # Set custom log level
-export BOSA_LOG_LEVEL=DEBUG
-export BOSA_LOG_COLOR=always
+export BS_LOG_LEVEL=DEBUG
+export BS_LOG_COLOR=always
 
 logger::debug "This debug message will be shown"
 logger::trace "This trace message will be shown"
 
 # Use different formats
-export BOSA_LOG_FORMAT=json
+export BS_LOG_FORMAT=json
 logger::info "This is a JSON formatted message"
 
-export BOSA_LOG_FORMAT=structured
+export BS_LOG_FORMAT=structured
 logger::warn "This is a structured message"
 ```
 
@@ -571,7 +571,7 @@ bash your_script.sh
 
 ```bash
 # Enable debug mode
-export BOSA_LOG_LEVEL=DEBUG
+export BS_LOG_LEVEL=DEBUG
 
 # Run with trace
 bash -x your_script.sh

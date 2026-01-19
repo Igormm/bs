@@ -4,11 +4,21 @@
 
 # @description Load the interactive UI module
 # @example
-#   load "lib/interactiveui"
+#   source "${BS_ROOT}/lib/ui/interactiveui.sh"
+#   interactiveui::init
+
+# @description Initialize the interactive UI module
 interactiveui::init() {
+    # Prevent multiple initializations
+    if [[ -n "${INTERACTIVEUI_INITIALIZED:-}" ]]; then
+        return 0
+    fi
+
+    INTERACTIVEUI_INITIALIZED=1
+
     # Load the main interactive UI functionality
-    load "lib/interactiveui/main"
-    load "lib/interactiveui/doc_search"
+    source "${BS_ROOT}/lib/interactiveui/main.sh"
+    source "${BS_ROOT}/lib/interactiveui/doc_search.sh"
 }
 
 # Initialize the interactive UI module by default

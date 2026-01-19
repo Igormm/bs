@@ -12,12 +12,6 @@
 # ------------------------------------------------------------------
 set -euo pipefail
 
-# 1. Проверяем версию bash -----------------
-if [[ ${BASH_VERSINFO[0]} -lt 4 ]]; then
-  printf 'Error: bash 4.0+ required (you have %s)\n' "$BASH_VERSION" >&2
-  exit 1
-fi
-
 # 2. Определяем каталог, где лежит boot.sh --
 BOOT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 

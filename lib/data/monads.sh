@@ -4,11 +4,21 @@
 
 # @description Load the monads module
 # @example
-#   load "lib/monads"
+#   source "${BS_ROOT}/lib/data/monads.sh"
+#   monads::init
+
+# @description Initialize the monads module
 monads::init() {
+    # Prevent multiple initializations
+    if [[ -n "${MONADS_INITIALIZED:-}" ]]; then
+        return 0
+    fi
+
+    MONADS_INITIALIZED=1
+
     # Load the main monad functionality
-    load "lib/monads/monad_types"
-    load "lib/monads/utils"
+    source "${BS_ROOT}/lib/monads/monad_types.sh"
+    source "${BS_ROOT}/lib/monads/utils.sh"
 }
 
 # Initialize the monads module by default

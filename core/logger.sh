@@ -15,19 +15,19 @@
 #   log::trace "трассировка"         # Трассировочное сообщение / Trace message
 #
 # Настройка через переменные окружения / Configuration via environment variables:
-# BOSA_LOG_LEVEL=TRACE|DEBUG|INFO|WARN|ERROR|SUCCESS|NONE (по умолчанию INFO / default:
+# BS_LOG_LEVEL=TRACE|DEBUG|INFO|WARN|ERROR|SUCCESS|NONE (по умолчанию INFO / default:
 # INFO)
-# BOSA_LOG_COLOR=auto|always|never (по умолчанию auto / default: auto)
-# BOSA_LOG_FORMAT=text|json|structured (по умолчанию text / default: text)
-# BOSA_LOG_TIMESTAMP=true|false (по умолчанию true / default: true)
+# BS_LOG_COLOR=auto|always|never (по умолчанию auto / default: auto)
+# BS_LOG_FORMAT=text|json|structured (по умолчанию text / default: text)
+# BS_LOG_TIMESTAMP=true|false (по умолчанию true / default: true)
 
 set -euo pipefail
 
 # Настройки по умолчанию / Default settings
-: "${BOSA_LOG_LEVEL:=INFO}"
-: "${BOSA_LOG_COLOR:=auto}"
-: "${BOSA_LOG_FORMAT:=text}"
-: "${BOSA_LOG_TIMESTAMP:=true}"
+: "${BS_LOG_LEVEL:=INFO}"
+: "${BS_LOG_COLOR:=auto}"
+: "${BS_LOG_FORMAT:=text}"
+: "${BS_LOG_TIMESTAMP:=true}"
 
 # ==========================================
 # Приватные вспомогательные функции / Private helper functions
@@ -38,7 +38,7 @@ set -euo pipefail
 # @return Timestamp in format YYYY-MM-DD HH:MM:SS / Метка времени в формате ГГГГ-ММ-ДД
 # ЧЧ:ММ:СС
 log::__timestamp() {
-    if [[ "${BOSA_LOG_TIMESTAMP}" == "true" ]]; then
+    if [[ "${BS_LOG_TIMESTAMP}" == "true" ]]; then
         date +"%Y-%m-%d %H:%M:%S"
     fi
 }
@@ -48,7 +48,7 @@ log::__timestamp() {
 # terminal
 # @return 0 if colors enabled, 1 otherwise / 0 если цвета разрешены, иначе 1
 log::__is_color_enabled() {
-    case "${BOSA_LOG_COLOR}" in
+    case "${BS_LOG_COLOR}" in
         always)
             return 0
             ;;
@@ -94,7 +94,7 @@ log::__is_level_allowed() {
     local msg_num cfg_num
     
     msg_num="$(log::__level_to_number "${msg_level}")"
-    cfg_num="$(log::__level_to_number "${BOSA_LOG_LEVEL}")"
+    cfg_num="$(log::__level_to_number "${BS_LOG_LEVEL}")"
     
     [[ "${msg_num}" -ge "${cfg_num}" ]]
 }
@@ -133,7 +133,7 @@ log::__format_message() {
     local timestamp
     timestamp="$(log::__timestamp)"
     
-    case "${BOSA_LOG_FORMAT}" in
+    case "${BS_LOG_FORMAT}" in
         json)
             # JSON формат / JSON format
             if [[ -n "$timestamp" ]]; then
@@ -368,4 +368,4 @@ fi
 # Отмечаем модуль как загруженный / Mark module as loaded
 declare -g LOGGER_LOADED="1"
 
-log::debug "Logger module initialized with level: ${BOSA_LOG_LEVEL}, color: ${BOSA_LOG_COLOR}" 2>/dev/null || true
+log::debug "Logger module initialized with level: ${BS_LOG_LEVEL}, color: ${BS_LOG_COLOR}" 2>/dev/null || true

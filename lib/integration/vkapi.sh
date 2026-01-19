@@ -1,5 +1,4 @@
 #!/usr/bin/env bs
-
 # vkapi.sh — VK API Integration Module for BS Framework
 # Модуль интеграции VK API для фреймворка BS
 #
@@ -26,7 +25,7 @@
 #   - base64 (for encoding)
 #
 # Usage:
-#   source "${BS_HOME}/boot.sh"
+#   source "${BS_ROOT}/boot.sh"
 #   bs::init
 #   vkapi::init "YOUR_APP_ID" "YOUR_APP_SECRET"
 #   vkapi::auth "USER_TOKEN"
@@ -43,10 +42,24 @@ if [[ -n "${BOSA_LIB_INTEGRATION_VK_API_LOADED:-}" ]]; then
 fi
 readonly BOSA_LIB_INTEGRATION_VK_API_LOADED=1
 
-# Import required modules
-source "${BS_HOME}/core/const.sh"
-source "${BS_HOME}/core/logger.sh"
-source "${BS_HOME}/core/errorhandler.sh"
+# Import required modules (use BS_ROOT if available, otherwise try to detect)
+if [[ -n "${BS_ROOT:-}" ]]; then
+    source "${BS_ROOT}/core/const.sh" 2>/dev/null || true
+    source "${BS_ROOT}/core/logger.sh" 2>/dev/null || true
+    source "${BS_ROOT}/core/errorhandler.sh" 2>/dev/null || true
+fi
+
+# Define error codes for VK API module (if not already defined)
+if [[ -z "${LIB_ERROR_FILE_OPERATION:-}" ]]; then
+    readonly LIB_ERROR_FILE_OPERATION=100
+    readonly LIB_ERROR_DEPENDENCY_MISSING=101
+    readonly LIB_ERROR_PLATFORM_UNSUPPORTED=102
+    readonly LIB_ERROR_INVALID_ARGS=103
+    readonly LIB_ERROR_INVALID_STATE=104
+    readonly LIB_ERROR_API_REQUEST=105
+    readonly LIB_ERROR_INVALID_RESPONSE=106
+    readonly LIB_ERROR_API_RESPONSE=107
+fi
 
 # VK API configuration constants
 readonly VK_API_VERSION="5.131"
@@ -61,7 +74,36 @@ VK_API_APP_ID=""
 VK_API_APP_SECRET=""
 VK_API_ACCESS_TOKEN=""
 VK_API_LAST_REQUEST_TIME=0
-VK_API_CACHE_DIR="/tmp/vk_api_cache"
+VK_API_CACHE_DIR="${BS_ROOT:-/tmp}/vk_api_cache"
+
+# Ensure function_exists helper is available
+if ! command -v function_exists >/dev/null 2>&1; then
+  function_exists() { declare -F "$1" >/dev/null 2>&1; }
+fi
+
+# Namespaced wrappers to ensure consistent vkapi:: API
+vkapi::check_dependencies()       { check_dependencies "$@"; }
+vkapi::install_dependencies()     { install_dependencies "$@"; }
+vkapi::auth()                     { auth "$@"; }
+vkapi::rate_limit_delay()         { rate_limit_delay "$@"; }
+vkapi::get_cache_key()            { get_cache_key "$@"; }
+vkapi::get_cached_response()      { get_cached_response "$@"; }
+vkapi::cache_response()           { cache_response "$@"; }
+vkapi::api_request()              { api_request "$@"; }
+vkapi::parse_response()           { parse_response "$@"; }
+vkapi::api_call()                 { api_call "$@"; }
+
+# Helper function for error handling (since errorhandler::throw may not be available)
+_vkapi_error() {
+    local message="${1}"
+    local exit_code="${2:-1}"
+    if function_exists "log::error"; then
+        log::error "${message}"
+    else
+        echo "ERROR: ${message}" >&2
+    fi
+    return "${exit_code}"
+}
 
 # Module initialization
 vkapi::init() {
@@ -131,22 +173,43 @@ install_dependencies() {
     log::info "Installing missing dependencies: ${deps[*]}..."
     
     # Source platform check module
-    source "${BS_HOME}/lib/system/platformcheck.sh"
-    
-    if platformcheck::is_debian || platformcheck::is_ubuntu; then
+    source "${BS_ROOT}/lib/system/platformcheck.sh" 2>/dev/null || true
+
+    # Helper predicates with graceful fallbacks if platformcheck is unavailable
+    _vk_is_debian_like=false
+    _vk_is_rhel_like=false
+    _vk_is_macos=false
+
+    if command -v platformcheck::is_debian >/dev/null 2>&1 && platformcheck::is_debian || \
+       command -v platformcheck::is_ubuntu >/dev/null 2>&1 && platformcheck::is_ubuntu; then
+        _vk_is_debian_like=true
+    elif command -v platformcheck::is_alma >/dev/null 2>&1 && platformcheck::is_alma || \
+         command -v platformcheck::is_fedora >/dev/null 2>&1 && platformcheck::is_fedora; then
+        _vk_is_rhel_like=true
+    elif command -v platformcheck::is_macos >/dev/null 2>&1 && platformcheck::is_macos; then
+        _vk_is_macos=true
+    fi
+
+    if [[ "${_vk_is_debian_like}" == true ]]; then
         apt-get update
         apt-get install -y curl jq openssl coreutils
-    elif platformcheck::is_alma || platformcheck::is_fedora; then
+    elif [[ "${_vk_is_rhel_like}" == true ]]; then
         dnf install -y curl jq openssl coreutils
-    elif platformcheck::is_macos; then
+    elif [[ "${_vk_is_macos}" == true ]]; then
         if ! command -v brew >/dev/null 2>&1; then
-            errorhandler::throw "${func_name}" "Homebrew is required for macOS" \
-                "${LIB_ERROR_DEPENDENCY_MISSING}"
+            if command -v errorhandler::throw >/dev/null 2>&1; then
+                errorhandler::throw "${func_name}" "Homebrew is required for macOS" "${LIB_ERROR_DEPENDENCY_MISSING}"
+            else
+                _vkapi_error "Homebrew is required for macOS" "${LIB_ERROR_DEPENDENCY_MISSING}"
+            fi
         fi
         brew install curl jq openssl
     else
-        errorhandler::throw "${func_name}" "Unsupported platform for dependency installation" \
-            "${LIB_ERROR_PLATFORM_UNSUPPORTED}"
+        if command -v errorhandler::throw >/dev/null 2>&1; then
+            errorhandler::throw "${func_name}" "Unsupported or undetected platform for dependency installation" "${LIB_ERROR_PLATFORM_UNSUPPORTED}"
+        else
+            _vkapi_error "Unsupported or undetected platform for dependency installation" "${LIB_ERROR_PLATFORM_UNSUPPORTED}"
+        fi
     fi
     
     log::success "Dependencies installed successfully"

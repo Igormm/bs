@@ -180,7 +180,7 @@ jobs:
 
 ### Enable Debug Output
 ```bash
-export BOSA_LOG_LEVEL=DEBUG
+export BS_LOG_LEVEL=DEBUG
 ./runalltests.sh
 ```
 

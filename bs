@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ------------------------------------------------------------------
+# 
 #  BS Framework – STAGE-2 UNIFIED ENTRY-POINT / INTERPRETER
 #  Назначение / Purpose:
 #    - инициализировать окружение фреймворка;
@@ -7,19 +7,19 @@
 #    - работать как shebang-интерпретатор (#!/usr/bin/env bs).
 #  Зависимости: bash 4.0+, bootstrap/init.sh, структура каталогов
 #              core/, lib/ (опционально, но doctor ругается).
-# ------------------------------------------------------------------
+# 
 set -euo pipefail
 
-# 1. Версия фреймворка ---------------------
-readonly BS_VERSION='0.3.0'
-
-# 2. Проверка bash -------------------------
-if [[ ${BASH_VERSINFO[0]} -lt 4 ]]; then
+# Ensure running under Bash 4+
+if [[ -z "${BASH_VERSION:-}" || ${BASH_VERSINFO[0]} -lt 4 ]]; then
   printf 'ERROR: bash 4.0+ required\n' >&2
   exit 1
 fi
 
-# 3. Определение BS_ROOT (если ещё не задан) --
+# 1. Версия фреймворка 
+readonly BS_VERSION='0.3.0'
+
+# 3. Определение BS_ROOT (если ещё не задан) 
 if [[ -z "${BS_ROOT:-}" ]]; then
   # Если bs запущен из репо-корня, bootstrap/init.sh рядом
   BS_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
@@ -37,15 +37,14 @@ if [[ -z "${BS_ROOT:-}" ]]; then
   export BS_ROOT
 fi
 
-# 4. Загрузка ядра -------------------------
+# 4. Загрузка ядра 
 if [[ ! -f "${BS_ROOT}/bootstrap/init.sh" ]]; then
   printf 'ERROR: bootstrap/init.sh not found in BS_ROOT=%s\n' "$BS_ROOT" >&2
   exit 2
 fi
-# shellcheck source=/dev/null
 source "${BS_ROOT}/bootstrap/init.sh"
 
-# 5. Утилитные функции ---------------------
+# 5. Утилитные функции 
 die()  { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 help() {
   cat <<HELP
@@ -128,7 +127,7 @@ source "\${BS_ROOT}/bootstrap/init.sh"
 EOF
 }
 
-# 6. Shebang-режим -------------------------
+# 6. Shebang-режим 
 # Если скрипт вызван через #!/usr/bin/env bs, переменная BS_SHEBANG=1
 # экспортируется автоматически загрузчиком (bootstrap/init.sh).
 if [[ "${BS_SHEBANG:-0}" == "1" ]]; then
@@ -137,7 +136,7 @@ if [[ "${BS_SHEBANG:-0}" == "1" ]]; then
   # Функция run_cmd сама сделает exec, поэтому дальше не продолжаем.
 fi
 
-# 7. Обычный CLI-диспетчер -----------------
+# 7. Обычный CLI-диспетчер 
 case "${1:-help}" in
   help|-h|--help) help ;;
   version)        version ;;

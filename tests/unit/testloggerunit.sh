@@ -48,21 +48,21 @@ main() {
     testframework::section "Environment Variables / Переменные окружения"
     
     # Сохраняем исходные значения
-    local original_level="${BOSA_LOG_LEVEL:-INFO}"
-    local original_color="${BOSA_LOG_COLOR:-auto}"
+    local original_level="${BS_LOG_LEVEL:-INFO}"
+    local original_color="${BS_LOG_COLOR:-auto}"
     
     # Тестируем разные уровни
-    export BOSA_LOG_LEVEL=DEBUG
+    export BS_LOG_LEVEL=DEBUG
     output=$(log::debug "Should appear" 2>&1)
     testframework::assert_true "${#output} -gt 0" "Debug visible at DEBUG level"
     
-    export BOSA_LOG_LEVEL=ERROR
+    export BS_LOG_LEVEL=ERROR
     output=$(log::info "Should not appear" 2>&1)
     testframework::assert_equal "" "$output" "Info hidden at ERROR level"
     
     # Восстанавливаем исходные значения
-    export BOSA_LOG_LEVEL="$original_level"
-    export BOSA_LOG_COLOR="$original_color"
+    export BS_LOG_LEVEL="$original_level"
+    export BS_LOG_COLOR="$original_color"
     
     # Тест 5: Обработка ошибок
     testframework::section "Error Handling / Обработка ошибок"
