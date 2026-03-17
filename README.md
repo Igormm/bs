@@ -1,7 +1,7 @@
 # Установщик BS Framework
 # Bs or BOSA or Bourn shell again open source arhitecture framework
-# Getting Started with Bs or BOSA or Bourn shell again open source arhitecture framework
 
+## Getting Started
 Основная цель - обеспечить гибкую, надежную и легко поддерживаемую систему установки и удаления фреймворка.
 
 ## Структура каталога
