@@ -1,0 +1,254 @@
+#!/usr/bin/env bash
+#
+# bootstrap/loader.sh — модуль загрузки с ленивой загрузкой и предотвращением повторного подключения
+# bootstrap/loader.sh — loading module with lazy loading and duplicate loading prevention
+#
+
+set -euo pipefail
+IFS=$'\n\t'
+
+# Ensure running under Bash 4+ (associative arrays required)
+if [[ -z "${BASH_VERSION:-}" || ${BASH_VERSINFO[0]} -lt 4 ]]; then
+  echo "BS: ERROR: Bash 4.0+ required for loader" >&2
+  # Корректная обработка sourced vs executed контекста
+  if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+    return 1
+  else
+    exit 1
+  fi
+fi
+
+# ============================================================================
+# ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ / GLOBAL VARIABLES
+# ============================================================================
+
+# Ассоциативный массив для отслеживания загруженных модулей
+# Associative array for tracking loaded modules
+declare -g -A BS_LOADED_MODULES
+
+# Ассоциативный массив для отслеживания модулей, ожидающих ленивой загрузки
+# Associative array for tracking modules pending lazy loading
+declare -g -A BS_LAZY_MODULES
+
+# Ассоциативный массив для отслеживания функций, связанных с модулями
+# Associative array for tracking functions associated with modules
+declare -g -A BS_MODULE_FUNCTIONS
+
+# Глобальный стек загрузки для обнаружения циклов
+# Global loading stack for cycle detection
+declare -g -a BS_LOAD_STACK=()
+
+# ============================================================================
+# ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ / HELPER FUNCTIONS
+# ============================================================================
+
+# @private
+# @description Проверяет, доступна ли функция логирования
+# @description Checks if logging function is available
+log::available() {
+    declare -f "$1" >/dev/null 2>&1
+}
+
+# @private
+# @description Проверить циклические зависимости
+# @description Check for circular dependencies
+# @param $1 Путь к модулю
+# @param $1 Module path
+load::__check_circular_dependency() {
+    local module_path="${1:?Missing module path}"
+    
+    # Проверяем, находится ли модуль уже в стеке загрузки
+    # Check if module is already in loading stack
+    local item
+    for item in "${BS_LOAD_STACK[@]}"; do
+        if [[ "${item}" == "${module_path}" ]]; then
+            echo "BS: error: circular dependency detected: ${BS_LOAD_STACK[*]} -> ${module_path}" >&2
+            return 1
+        fi
+    done
+    
+    return 0
+}
+
+# @private
+# @description Загрузить зависимости модуля
+# @description Load module dependencies
+# @param $1 Путь к модулю
+# @param $1 Module path
+load::__load_dependencies() {
+    local module_path="${1:?Missing module path}"
+    local module_file="${BS_ROOT}/${module_path}.sh"
+    
+    # Парсим комментарии вида: # @depends core/logger, lib/system/utils
+    # Parse comments like: # @depends core/logger, lib/system/utils
+    local depends_line
+    depends_line=$(grep -m1 "^[[:space:]]*#.*@depends" "${module_file}" 2>/dev/null || echo "")
+    
+    if [[ -z "${depends_line}" ]]; then
+        return 0  # Нет зависимостей / No dependencies
+    fi
+    
+    # Извлекаем список зависимостей
+    # Extract dependency list
+    local deps
+    deps=$(echo "${depends_line}" | sed 's/.*@depends[[:space:]]*//; s/[[:space:]]*$//')
+    
+    # Загружаем каждую зависимость
+    # Load each dependency
+    local dep
+    for dep in ${deps//,/ }; do
+        dep=$(echo "${dep}" | xargs)  # Trim whitespace
+        if [[ -z "${dep}" ]]; then
+            continue
+        fi
+        
+        if [[ -z "${BS_LOADED_MODULES["${dep}"]:-}" ]]; then
+            if ! load "${dep}"; then
+                echo "BS: error: failed to load dependency '${dep}' for module '${module_path}'" >&2
+                return 1
+            fi
+        fi
+    done
+    
+    return 0
+}
+
+# @private
+# @description Регистрировать функции модуля для ленивой загрузки
+# @description Register module functions for lazy loading
+# @param $1 Путь к модулю
+# @param $1 Module path
+# @param $2 Список функций через запятую
+# @param $2 List of functions separated by comma
+load::__register_lazy_functions() {
+    local module_path="${1:?Missing module path}"
+    local module_functions="${2:?Missing module functions}"
+    
+    # Парсим список функций
+    # Parse function list
+    local func
+    for func in ${module_functions//,/ }; do
+        func=$(echo "${func}" | xargs)  # Trim whitespace
+        if [[ -z "${func}" ]]; then
+            continue
+        fi
+        
+        # Регистрируем функцию
+        # Register function
+        BS_MODULE_FUNCTIONS["${func}"]="${module_path}"
+        
+        # Создаем wrapper для автоматической загрузки при вызове
+        # Create wrapper for automatic loading on call
+        eval "
+            ${func}() {
+                # Загружаем модуль, если не загружен
+                # Load module if not loaded
+                if [[ -z \"\${BS_LOADED_MODULES['${module_path}']:-}\" ]]; then
+                    load '${module_path}' 'eager' || return 1
+                fi
+                # Вызываем оригинальную функцию
+                # Call the original function
+                ${func}_original \"\$@\"
+            }
+        "
+    done
+}
+
+# 
+# ОСНОВНАЯ ФУНКЦИЯ ЗАГРУЗКИ / MAIN LOADING FUNCTION
+# 
+
+# @description Загрузить модуль по пути относительно BS_ROOT (немедленная или ленивая загрузка)
+# @description Load module by path relative to BS_ROOT (immediate or lazy loading)
+# @param $1 Путь к модулю без расширения .sh (например: "core/logger")
+# @param $1 Module path without .sh extension (e.g.: "core/logger")
+# @param $2 Режим загрузки: "lazy" для ленивой загрузки (по умолчанию: "eager")
+# @param $2 Loading mode: "lazy" for lazy loading (default: "eager")
+# @param $3 Функции модуля, разделённые запятой (опционально, для ленивой загрузки)
+# @param $3 Module functions separated by comma (optional, for lazy loading)
+# @example
+#   load "core/logger"                    # Eager loading (default)
+#   load "core/logger" "eager"           # Explicit eager loading
+#   load "core/logger" "lazy"            # Lazy loading
+#   load "lib/data/algorithms" "lazy" "algorithms::sort,algorithms::search"
+load() {
+    local module_path="${1:?Missing module path}"
+    local mode="${2:-eager}"  # Default to eager loading for backward compatibility
+    local module_functions="${3:-}"
+    
+    # Валидация BS_ROOT
+    # Validate BS_ROOT
+    if [[ -z "${BS_ROOT:-}" ]]; then
+        echo "BS: error: BS_ROOT is not set" >&2
+        return 1
+    fi
+    
+    if [[ ! -d "${BS_ROOT}" ]]; then
+        echo "BS: error: BS_ROOT directory not found: ${BS_ROOT}" >&2
+        return 1
+    fi
+    
+    # Проверка формата списка функций при ленивой загрузке
+    # Validate function list format for lazy loading
+    if [[ "${mode}" == "lazy" && -n "${module_functions}" ]]; then
+        # Проверка корректности формата списка функций
+        # Validate function list format
+        if [[ ! "${module_functions}" =~ ^[a-zA-Z_][a-zA-Z0-9_:]*([,][a-zA-Z_][a-zA-Z0-9_:]*)*$ ]]; then
+            {
+                echo "BS: error: invalid function list format: ${module_functions}" >&2
+                echo "BS: hint: use format like 'func1,namespace::func2,other::func3'" >&2
+            } >&2
+            return 1
+        fi
+    fi
+    
+    # Проверка на повторную загрузку / Check for duplicate loading
+    if [[ -n "${BS_LOADED_MODULES["${module_path}"]:-}" ]]; then
+        return 0
+    fi
+    
+    # Проверка циклических зависимостей / Check for circular dependencies
+    if ! load::__check_circular_dependency "${module_path}"; then
+        return 1
+    fi
+    
+    # Добавляем модуль в стек загрузки / Add module to loading stack
+    BS_LOAD_STACK+=("${module_path}")
+    
+    # Загружаем зависимости модуля / Load module dependencies
+    if ! load::__load_dependencies "${module_path}"; then
+        return 1
+    fi
+    
+    # Загружаем файл модуля / Load module file
+    local module_file="${BS_ROOT}/${module_path}.sh"
+    if ! source "${module_file}"; then
+        echo "BS: error: failed to load module '${module_path}'" >&2
+        return 1
+    fi
+    
+    # Удаляем модуль из стека загрузки / Remove module from loading stack
+    BS_LOAD_STACK=("${BS_LOAD_STACK[@]:0:${#BS_LOAD_STACK[@]}-1}")
+    
+    # Регистрируем функции модуля для ленивой загрузки / Register module functions for lazy loading
+    if [[ "${mode}" == "lazy" && -n "${module_functions}" ]]; then
+        load::__register_lazy_functions "${module_path}" "${module_functions}"
+    fi
+    
+    # Помечаем модуль как загруженный / Mark module as loaded
+    BS_LOADED_MODULES["${module_path}"]=1
+    
+    return 0
+}
+
+# @description Полное имя функции для обратной совместимости
+# @description Full function name for backward compatibility
+bs::load() {
+    load "$@"
+}
+
+# @description Алиас для ленивой загрузки
+# @description Alias for lazy loading
+bs::load_lazy() {
+    load "$1" "lazy" "${2:-}"
+}

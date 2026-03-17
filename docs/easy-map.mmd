@@ -1,0 +1,76 @@
+graph TD
+    A[Start - BS Framework Initialization] --> B{Boot Method}
+    B -->|Library Mode| C[boot.sh execution]
+    B -->|CLI/Shebang Mode| D[bs script execution]
+    
+    C --> C1[Find BS_ROOT from script location]
+    C1 --> C2[Validate BS_ROOT and bs script existence]
+    C2 --> C3[Execute bs script with BS_ROOT set]
+    
+    D --> D1[Resolve BS_ROOT from various locations]
+    D1 --> D2[Check BS_SHEBANG flag]
+    D2 --> D3[Load bootstrap/init.sh]
+    
+    D3 --> E[bootstrap/init.sh - Framework Initialization]
+    E --> E1[Set BS_ROOT if not already set]
+    E1 --> E2[Add ~/.local/bin to PATH if needed]
+    E2 --> E3[Load bootstrap/loader.sh]
+    E3 --> E4[Load core modules via loader]
+    E4 --> E5[Mark as initialized with BS_INITIALIZED flag]
+    
+    E5 --> F[Module Loading via Loader]
+    F --> F1[Parse @depends comments for dependencies]
+    F1 --> F2[Circular dependency detection using BS_LOAD_STACK]
+    F2 --> F3[Track loaded modules in BS_LOADED_MODULES]
+    F3 --> F4[Support for eager/lazy loading]
+    
+    F4 --> G[Core Modules Loaded]
+    G --> G1[core/const.sh - Constants]
+    G1 --> G2[core/logger.sh - Logging System]
+    G2 --> G3[core/errorhandler.sh - Error Handling]
+    G3 --> G4[core/version.sh - Version Information]
+    G4 --> G5[core/utils.sh - Utility Functions]
+    
+    G5 --> H[System Operations]
+    H --> H1[System Commands via lib/system/ modules]
+    H1 --> H2[Package Management - Cross-distro support]
+    H2 --> H3[Service Management - systemd/init scripts]
+    H3 --> H4[User Management - Users, groups, permissions]
+    H4 --> H5[Network Configuration - Interfaces, routing]
+    
+    G5 --> I[UI Components via lib/ui/ modules]
+    I --> I1[Interactive UI helpers]
+    I1 --> I2[BOSA theme implementation]
+    I2 --> I3[Presentation functions]
+    
+    G5 --> J[Data Processing via lib/data/ modules]
+    J --> J1[Algorithms implementation]
+    J1 --> J2[Monad patterns in bash]
+    J2 --> J3[Functional programming concepts]
+    
+    G5 --> K[Integration Modules via lib/integration/]
+    K --> K1[VK API integration with caching]
+    K1 --> K2[Other third-party integrations]
+    K2 --> K3[Dependency checks and retries]
+    
+    D2 --> L{BS_SHEBANG Set?}
+    L -->|Yes| M[Execute user script directly]
+    L -->|No| N[Process CLI commands]
+    
+    M --> O[User script execution with framework loaded]
+    O --> P[Access to all BS modules and functions]
+    P --> Q[Script completion with cleanup]
+    
+    N --> N1[Help, Version, Environment commands]
+    N1 --> N2[List modules, Doctor diagnostics]
+    N2 --> N3[Run specific modules, Init shell]
+    
+    Q --> R[Cleanup via trap EXIT]
+    R --> S[Run cleanup stack functions]
+    S --> T[Exit with proper code]
+    
+    style A fill:#e1f5fe
+    style D fill:#f3e5f5
+    style G fill:#e8f5e8
+    style O fill:#fff3e0
+    style T fill:#ffebee

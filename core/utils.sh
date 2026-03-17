@@ -1,0 +1,194 @@
+#!/usr/bin/env bash
+#
+#
+#
+
+# lib/utils.sh
+set -euo pipefail
+IFS=$'\n\t'
+
+# Source Guard
+[[ -n "${__UTILS_SOURCED:-}" ]] && return 0
+readonly __UTILS_SOURCED=1
+
+# Устанавливает строгий режим.
+# @function utils::init
+utils::strict() {
+  set -euo pipefail
+  IFS=$'\n\t'
+}
+
+# Проверяет, был ли уже загружен модуль.
+# Возвращает 0 – если НЕ загружен (можно продолжать),
+#            1 – если уже загружён (нужно прервать весь скрипт).
+# Использование:
+#   if utils::guard "foo"; then return 0; fi
+#   readonly __FOO_SOURCED=1
+# @function utils::guard
+# @param $1 {string} Уникальное имя модуля (без __ и _SOURCED)
+# @returns 0  модуль ещё не загружался
+# @returns 1  модуль уже загружался
+utils::guard() {
+  local -r module="${1:?Module name required}"
+  local -r var="__${module^^}_SOURCED"  # FOO -> __FOO_SOURCED
+  # индирект-расширение имени переменной
+  [[ -n "${!var:-}" ]] && return 1 || return 0
+}
+
+# Проверяет существование файла-источника, загружает его и убеждается,
+# что требуемая функция появилась в окружении.
+# Возвращает 0 при успехе, 1 при любой ошибке.
+# Глобальные переменные не изменяются.
+#
+# Аргументы:
+#   $1  путь до файла (обязательный)
+#   $2  имя проверяемой функции (обязательный)
+# Вывод:
+#   Всё диагностическое пишет в STDERR
+# Load target file and confirm required function exists.
+#
+# @function utils::ensure_source
+# @param $1 {string} Absolute or relative path to file (must exist)
+# @param $2 {string} Function name to check after sourcing
+# @returns 0  If file loaded and function present
+# @returns 1  Missing file, failed source, or function absent
+# @stderr   Diagnostic messages
+# @example
+#   utils::ensure_source "${ROOT_DIR}/lib/math.sh" add_integers
+utils::ensure_source() {
+  local -r file="${1:?File path is required}"
+  local -r func="${2:?Function name is required}"
+
+  #  валидация аргументов 
+  [[ -n ${file} ]] || { printf 'ERROR: file argument is empty\n' >&2; return 1; }
+  [[ -n ${func} ]] || { printf 'ERROR: function argument is empty\n' >&2; return 1; }
+
+  if [[ ! -f "${file}" ]]; then
+    printf 'ERROR: file not found: %s\n' "${file}" >&2
+    return 1
+  fi
+
+  if ! source -- "${file}"; then
+    printf 'ERROR: failed to source file: %s\n' "${file}" >&2
+    return 1
+  fi
+
+  if ! declare -F -- "${func}" >/dev/null 2>&1; then
+    printf 'ERROR: required function %q not defined\n' "${func}" >&2
+    return 1
+  fi
+
+  return 0
+}
+
+# Function to check if current shell is at least the required version
+utils::ensure_shell_version() {
+    local required_version=${1:-4}  # Default to version 4 if not specified
+    
+    local shell_name=$(basename "$SHELL")
+
+    case "$shell_name" in
+        "bash")
+            if [[ -z "$BASH_VERSION" ]] || [[ "${BASH_VERSION%%.*}" -lt "$required_version" ]]; then
+                echo "Error: Bash version $required_version or higher is required but you have version $BASH_VERSION" >&2
+                return 1
+            fi
+            ;;
+        "zsh")
+            if [[ -z "$ZSH_VERSION" ]] || [[ "${ZSH_VERSION%%.*}" -lt "$required_version" ]]; then
+                echo "Error: Zsh version $required_version or higher is required but you have version $ZSH_VERSION" >&2
+                return 1
+            fi
+            ;;
+        *)
+            echo "Warning: Unknown shell $shell_name, cannot verify version requirements" >&2
+            return 1
+            ;;
+    esac
+    
+    echo "Shell $shell_name meets version requirement (>= $required_version)"
+    return 0
+}
+
+## @brief Получение корневой директории фреймворка
+## @description Определяет путь независимо от способа вызова
+## @global Устанавливает FRAMEWORK_ROOT
+utils::detect_root() {
+    local script_source
+    
+    # 1. Пробуем получить из переменной окружения
+    if [[ -n "${FRAMEWORK_ROOT:-}" ]] && [[ -d "${FRAMEWORK_ROOT}" ]]; then
+        log::debug "FRAMEWORK_ROOT задан явно: ${FRAMEWORK_ROOT}"
+        return
+    fi
+    
+    # 2. Определяем путь к скрипту
+    if [[ "${BASH_SOURCE[0]+x}" == "x" ]]; then
+        script_source="${BASH_SOURCE[0]}"
+    else
+        script_source="$0"
+    fi
+    
+    # 3. Обработка симлинков
+    if [[ -L "${script_source}" ]]; then
+        script_source="$(readlink -f -- "${script_source}")"
+    fi
+    
+    # 4. Безопасное получение директории
+    local script_dir
+    script_dir="$(dirname -- "${script_source}")"
+    
+    # 5. Переход на уровень выше (если скрипт в bin/)
+    if [[ "$(basename -- "${script_dir}")" == "bin" ]]; then
+        script_dir="$(dirname -- "${script_dir}")"
+    fi
+    
+    # 6. Абсолютный путь
+    FRAMEWORK_ROOT="$(cd -- "${script_dir}" && pwd -P)"
+    export FRAMEWORK_ROOT
+    
+    log::info "Корень фреймворка: ${FRAMEWORK_ROOT}"
+}
+
+#bootdir
+utils::boot_dir() {
+  BOOT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+}
+
+# @description Проверяет, является ли строка числом
+# @param $1 строка для проверки
+# @return 0 если строка является числом, 1 в противном случае
+utils::is_number() {
+    local str="${1:-}"
+    if [[ $str =~ ^[0-9]+$ ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# @description Проверяет, является ли строка допустимым именем переменной
+# @param $1 строка для проверки
+# @return 0 если строка является допустимым именем переменной, 1 в противном случае
+utils::is_valid_var_name() {
+    local str="${1:-}"
+    if [[ $str =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# @description Проверяет, существует ли команда
+# @param $1 имя команды для проверки
+# @return 0 если команда существует, 1 в противном случае
+utils::command_exists() {
+    local cmd="${1:-}"
+    command -v "$cmd" >/dev/null 2>&1
+}
+
+# @description Проверяет, работает ли скрипт с правами root
+# @return 0 если работает с правами root, 1 в противном случае
+utils::is_root() {
+    [[ $EUID -eq 0 ]]
+}
