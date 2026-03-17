@@ -1,12 +1,12 @@
-# Установщик BS Framework
+# Установщик BS Framework 🫣
 # Bs or BOSA or Bourn shell again open source arhitecture framework
 
 ## Getting Started
 Основная цель - обеспечить гибкую, надежную и легко поддерживаемую систему установки и удаления фреймворка.
 
 ## Структура каталога
-
-- [main.sh](../install/main.sh) - Главный скрипт установки, координирующий выполнение всех этапов
+- [install.sh](../install.sh). - Скрипт запуска установки
+- [main.sh](../install/main.sh) - Скрипт установки, координирующий выполнение всех этапов
 - [utils.sh](../install/utils.sh) - Вспомогательные функции (подтверждение пользователя, вывод информации о PATH и т.д.)
 - [checks.sh](../install/checks.sh) - Функции проверки среды выполнения (тип оболочки, проверка на уже установленную версию)
 - [actions.sh](../install/actions.sh) - Реализация действий установки и удаления
@@ -118,13 +118,7 @@ bs/
 │   ├── logger.sh                # Logging system (enhanced)
 │   ├── errorhandler.sh         # Error handling
 │   └── version.sh               # Version management
-├── lib/
-│   └── system/
-│       ├── utils.sh             # Base utilities
-│       ├── distro.sh            # Distribution detection
-│       ├── ...
-│   └── module/ 
-│       ├── ...
+│   └── utils.sh               # core utils essential for install
 └── docs/
     ├── ...
 ```
@@ -470,7 +464,7 @@ EOF
 chmod +x deploy.sh
 ```
 
-#### Using in CI/CD
+#### Using in CI/CD 🫠
 
 ```yaml
 # .github/workflows/deploy.yml
@@ -496,29 +490,7 @@ jobs:
         ./deploy.sh
 ```
 
-### 7. Best Practices
-
-#### Code Organization
-
-```bash
-# Good organization
-my_project/
-├── bs/                      # BOSA framework (git submodule)
-├── lib/
-│   ├── project/              # Project-specific modules
-│   │   ├── config.sh
-│   │   ├── database.sh
-│   │   └── api.sh
-│   └── vendor/               # Third-party modules
-├── scripts/
-│   ├── deploy.sh
-│   ├── backup.sh
-│   └── monitor.sh
-├── tests/
-│   ├── unit/
-│   └── integration/
-└── docs/
-```
+### 7. Best Practices 
 
 #### Configuration Management
 
