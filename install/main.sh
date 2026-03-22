@@ -10,37 +10,6 @@ if [[ -z "${__UTILS_SOURCED:-}" ]]; then
     source "${SCRIPT_DIR}/../core/utils.sh"
 fi
 
-# проверка файлов actions.sh, path_manager.sh, функций do_install, print_path_hint и source
-utils::ensure_source "${INSTALLER_DIR}/actions.sh" "do_install"
-utils::ensure_source "${INSTALLER_DIR}/path_manager.sh" "print_path_hint"
-
-# Help message
-usage() {
-  cat <<'HELP'
-BS installer
-
-Usage:
-  ./install.sh [--local] [install|uninstall] [--path|--update-path]
-  sudo ./install.sh [install|uninstall]
-
-Notes:
-  --path and --update-path are valid only with --local.
-  --path и --update-path работают только с --local.
-
-Examples:
-  sudo ./install.sh
-  sudo ./install.sh install
-  sudo ./install.sh uninstall
-
-  ./install.sh --local
-  sudo ./install.sh --local install
-  ./install.sh --local uninstall
-
-  ./install.sh --local --path
-  ./install.sh --local --update-path
-HELP
-}
-
 # Дефолтные значения для параметров \ Parse arguments
 MODE="system"        # system|local
 ACTION="install"     # install|uninstall
@@ -57,7 +26,7 @@ while [[ $# -gt 0 ]]; do
     --update-path)
       FLAG_UPDATE_PATH="1"; shift ;;
     -h|--help)
-      usage; exit 0 ;;
+      helper::usage; exit 0 ;;
     install|uninstall|remove|uninstall)
       ACTION="$1"; shift ;;
     *)
@@ -87,21 +56,21 @@ TARGET_BIN="${BIN_DIR}/bs"  # wrapper executable
 
 # PATH flags (local only)
 if [[ "${MODE}" == "local" && "${FLAG_PATH}" == "1" ]]; then
-  print_path_hint
+  helper::print_path_hint
   exit 0
 fi
 
 if [[ "${MODE}" == "local" && "${FLAG_UPDATE_PATH}" == "1" ]]; then
-  auto_update_path
+  actions::auto_update_path
   exit 0
 fi
 
 # Execute action
 case "${ACTION}" in
   install)
-    do_install ;;
+    actions::do_install ;;
   uninstall|remove)
-    do_uninstall ;;
+    actions::do_uninstall ;;
   *)
     printf "ERROR: Неизвестное действие: %s\n" "${ACTION}" >&2
     exit 1 ;;

@@ -9,12 +9,6 @@ if [[ -z "${__UTILS_SOURCED:-}" ]]; then
 fi
 
 # Check if already installed
-is_already_installed() {
+checks::is_already_installed() {
   [[ -d "${TARGET_LIB}" && -f "${TARGET_BIN}" ]]
-}
-
-# Check shell environment
-check_shell_environment() {
-  # Use the utility function instead of duplicating code
-  utils::ensure_shell_version 4
 }

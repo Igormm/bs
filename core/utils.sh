@@ -81,32 +81,31 @@ utils::ensure_source() {
   return 0
 }
 
-# Function to check if current shell is at least the required version
 utils::ensure_shell_version() {
-    local required_version=${1:-4}  # Default to version 4 if not specified
-    
-    local shell_name=$(basename "$SHELL")
+    # Если $1 не передан, скрипт завершится с вашей ошибкой
+    local required_version="${1?:Ошибка: версия оболочки не указана}"
 
-    case "$shell_name" in
-        "bash")
-            if [[ -z "$BASH_VERSION" ]] || [[ "${BASH_VERSION%%.*}" -lt "$required_version" ]]; then
-                echo "Error: Bash version $required_version or higher is required but you have version $BASH_VERSION" >&2
-                return 1
-            fi
-            ;;
-        "zsh")
-            if [[ -z "$ZSH_VERSION" ]] || [[ "${ZSH_VERSION%%.*}" -lt "$required_version" ]]; then
-                echo "Error: Zsh version $required_version or higher is required but you have version $ZSH_VERSION" >&2
-                return 1
-            fi
-            ;;
-        *)
-            echo "Warning: Unknown shell $shell_name, cannot verify version requirements" >&2
-            return 1
-            ;;
-    esac
-    
-    echo "Shell $shell_name meets version requirement (>= $required_version)"
+    # Определяем текущую оболочку
+    if [ -n "${BASH_VERSION:-}" ]; then
+        local current_version="${BASH_VERSION%%.*}"
+        local name="Bash"
+    elif [ -n "${ZSH_VERSION:-}" ]; then
+        local current_version="${ZSH_VERSION%%.*}"
+        local name="Zsh"
+    else
+        echo "Error: Unknown shell, cannot verify version" >&2
+        return 1
+    fi
+
+    printf "Current version ${name}: ${current_version}; Required version: ${required_version}\n"
+
+    if (( "$current_version" <= "$required_version" )); then
+        echo "Error: $name version $required_version+ required (found ${BASH_VERSION:-$ZSH_VERSION})" >&2
+        return 1
+    fi
+
+    echo "$name version $current_version meets requirement (>= $required_version)"
+
     return 0
 }
 

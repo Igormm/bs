@@ -2,17 +2,21 @@
 
 # Installation and uninstallation functions
 
+source core/helper.sh
+source install/checks.sh
+
 # Install
-do_install() {
+actions::do_install() {
   # Root required for system mode
   if [[ "${MODE}" == "system" ]]; then
     if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
       printf "ERROR: Нужны права root. Запустите: sudo ./install.sh\n" >&2
+      helper::usage
       exit 1
     fi
   fi
 
-  if is_already_installed; then
+  if checks::is_already_installed; then
     printf "Предупреждение: BS уже установлена в %s\n" "${TARGET_LIB}"
     printf "Удалите сначала старую версию: ./install.sh %s uninstall\n" "${MODE:+--$MODE}"
     printf "Или используйте переопределения: PREFIX=... BIN_DIR=... LIB_DIR=...\n"
@@ -64,7 +68,7 @@ WRAP
 }
 
 # Uninstall
-do_uninstall() {
+actions::do_uninstall() {
   # Root required for system mode
   if [[ "${MODE}" == "system" ]]; then
     if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
@@ -106,4 +110,51 @@ do_uninstall() {
   fi
 
   printf "Готово.\n"
+}
+
+# Update ~/.bashrc with PATH line (with confirmation) / Добавление PATH в ~/.bashrc (с подтверждением)
+actions::update_path_bashrc() {
+  local bashrc="${HOME}/.bashrc"
+  local line='export PATH="$HOME/.local/bin:$PATH"'
+
+  [[ -f "${bashrc}" ]] || touch "${bashrc}"
+
+  if grep -Fqx "${line}" "${bashrc}"; then
+    printf "PATH уже настроен в %s\n" "${bashrc}"
+    return 0
+  fi
+
+  if confirm "Добавить PATH в ${bashrc}?"; then
+    printf "\n%s\n" "${line}" >> "${bashrc}"
+    printf "Добавлено. Применить: source ~/.bashrc\n"
+  else
+    printf "Пропущено.\n"
+  fi
+}
+
+# Auto add PATH to bash/zsh (idempotent) / Авто-добавление PATH в bash/zsh (идемпотентно)
+actions::auto_update_path() {
+  local bashrc="${HOME}/.bashrc"
+  local zshrc="${HOME}/.zshrc"
+  local line='export PATH="$HOME/.local/bin:$PATH"'
+
+  # bashrc
+  if [[ -f "${bashrc}" || ! -f "${zshrc}" ]]; then
+    if ! grep -Fqx "${line}" "${bashrc}" 2>/dev/null; then
+      printf "\n%s\n" "${line}" >> "${bashrc}"
+      printf "Автоматически добавлено ~/.local/bin в PATH в %s\n" "${bashrc}"
+    else
+      printf "PATH уже настроен в %s\n" "${bashrc}"
+    fi
+  fi
+
+  # zshrc
+  if [[ -f "${zshrc}" ]]; then
+    if ! grep -Fqx "${line}" "${zshrc}" 2>/dev/null; then
+      printf "\n%s\n" "${line}" >> "${zshrc}"
+      printf "Автоматически добавлено ~/.local/bin в PATH в %s\n" "${zshrc}"
+    else
+      printf "PATH уже настроен в %s\n" "${zshrc}"
+    fi
+  fi
 }
