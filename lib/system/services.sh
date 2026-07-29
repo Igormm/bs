@@ -240,8 +240,11 @@ function service::restart() {
     fi
 
     local -r service="${1}"
-    local -r os_type
-    os_type=$(os::detect)
+    # Определяем дистрибутив через system::distro (результат в DISTRO_ID)
+    # Detect distribution via system::distro (result in DISTRO_ID)
+    load "lib/system/distro"
+    system::distro::detect
+    local -r os_type="${DISTRO_ID}"
     local -i exit_code=0
 
     log::info "${FN}: перезапуск ${service} (${os_type})..."
@@ -249,7 +252,7 @@ function service::restart() {
     # Dry-run
     if [[ "${FRAMEWORK_DRY_RUN}" == "true" ]]; then
         log::info "${FN}: [DRY-RUN] перезапуск ${service}"
-        return ${LIB_SUCCESS}
+        return ${E_SUCCESS}
     fi
 
     # Дистрибутивная логика
@@ -295,7 +298,7 @@ function service::restart() {
                 fi
             fi
             ;;
-        alt)
+        alt|altlinux)
             # Для ALT Linux использовать service или chkconfig
             if command -v service >/dev/null 2>&1; then
                 service "${service}" restart 2>/dev/null || exit_code=$?

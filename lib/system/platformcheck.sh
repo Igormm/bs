@@ -7,7 +7,8 @@
 # This module checks framework compatibility with various platforms:
 # macOS, AlmaLinux, Debian, Ubuntu, Fedora, ALT Linux
 
-set -euo pipefail
+# Примечание: строгий режим (set -euo pipefail) задаётся только в точках входа
+# Note: strict mode (set -euo pipefail) is set only in entry points
 
 declare -g PLATFORM_CHECK_VERSION="1.0.0"
 declare -g -A PLATFORM_CHECK_RESULTS
@@ -168,18 +169,18 @@ platformcheck::get_report() {
     
     report+="Compatibility Check / Проверка совместимости:\n"
     if platformcheck::is_compatible; then
-        report+="  ${GREEN}✓ Supported platform / Поддерживаемая платформа${NC}\n"
+        report+="  ${COLOR_GREEN}✓ Supported platform / Поддерживаемая платформа${COLOR_RESET}\n"
     else
-        report+="  ${RED}✗ Unsupported platform / Неподдерживаемая платформа${NC}\n"
+        report+="  ${COLOR_RED}✗ Unsupported platform / Неподдерживаемая платформа${COLOR_RESET}\n"
     fi
     
     report+="\nPlatform Detection / Обнаружение платформы:\n"
-    platformcheck::is_macos && report+="  ${GREEN}✓ macOS${NC}\n" || report+="  ${RED}✗ macOS${NC}\n"
-    platformcheck::is_alma && report+="  ${GREEN}✓ AlmaLinux${NC}\n" || report+="  ${RED}✗ AlmaLinux${NC}\n"
-    platformcheck::is_ubuntu && report+="  ${GREEN}✓ Ubuntu${NC}\n" || report+="  ${RED}✗ Ubuntu${NC}\n"
-    platformcheck::is_debian && report+="  ${GREEN}✓ Debian${NC}\n" || report+="  ${RED}✗ Debian${NC}\n"
-    platformcheck::is_fedora && report+="  ${GREEN}✓ Fedora${NC}\n" || report+="  ${RED}✗ Fedora${NC}\n"
-    platformcheck::is_altlinux && report+="  ${GREEN}✓ ALT Linux${NC}\n" || report+="  ${RED}✗ ALT Linux${NC}\n"
+    platformcheck::is_macos && report+="  ${COLOR_GREEN}✓ macOS${COLOR_RESET}\n" || report+="  ${COLOR_RED}✗ macOS${COLOR_RESET}\n"
+    platformcheck::is_alma && report+="  ${COLOR_GREEN}✓ AlmaLinux${COLOR_RESET}\n" || report+="  ${COLOR_RED}✗ AlmaLinux${COLOR_RESET}\n"
+    platformcheck::is_ubuntu && report+="  ${COLOR_GREEN}✓ Ubuntu${COLOR_RESET}\n" || report+="  ${COLOR_RED}✗ Ubuntu${COLOR_RESET}\n"
+    platformcheck::is_debian && report+="  ${COLOR_GREEN}✓ Debian${COLOR_RESET}\n" || report+="  ${COLOR_RED}✗ Debian${COLOR_RESET}\n"
+    platformcheck::is_fedora && report+="  ${COLOR_GREEN}✓ Fedora${COLOR_RESET}\n" || report+="  ${COLOR_RED}✗ Fedora${COLOR_RESET}\n"
+    platformcheck::is_altlinux && report+="  ${COLOR_GREEN}✓ ALT Linux${COLOR_RESET}\n" || report+="  ${COLOR_RED}✗ ALT Linux${COLOR_RESET}\n"
     
     echo -e "$report"
 }
@@ -340,22 +341,22 @@ platformcheck::show_report() {
     platformcheck::get_report
     
     echo
-    echo -e "${BLUE}Dependency Check / Проверка зависимостей:${NC}"
+    echo -e "${COLOR_BLUE}Dependency Check / Проверка зависимостей:${COLOR_RESET}"
     if platformcheck::check_dependencies; then
-        echo -e "  ${GREEN}✓ All dependencies satisfied / Все зависимости удовлетворены${NC}"
+        echo -e "  ${COLOR_GREEN}✓ All dependencies satisfied / Все зависимости удовлетворены${COLOR_RESET}"
     else
-        echo -e "  ${RED}✗ Some dependencies missing / Некоторые зависимости отсутствуют${NC}"
+        echo -e "  ${COLOR_RED}✗ Some dependencies missing / Некоторые зависимости отсутствуют${COLOR_RESET}"
         platformcheck::install_dependencies
     fi
     
     echo
-    echo -e "${BLUE}Platform Support / Поддержка платформ:${NC}"
-    platformcheck::is_macos && echo -e "  ${GREEN}✓ macOS support available / Поддержка macOS доступна${NC}" || echo -e "  ${RED}✗ macOS support missing / Поддержка macOS отсутствует${NC}"
-    platformcheck::is_alma && echo -e "  ${GREEN}✓ AlmaLinux support available / Поддержка AlmaLinux доступна${NC}" || echo -e "  ${RED}✗ AlmaLinux support missing / Поддержка AlmaLinux отсутствует${NC}"
-    platformcheck::is_ubuntu && echo -e "  ${GREEN}✓ Ubuntu support available / Поддержка Ubuntu доступна${NC}" || echo -e "  ${RED}✗ Ubuntu support missing / Поддержка Ubuntu отсутствует${NC}"
-    platformcheck::is_debian && echo -e "  ${GREEN}✓ Debian support available / Поддержка Debian доступна${NC}" || echo -e "  ${RED}✗ Debian support missing / Поддержка Debian отсутствует${NC}"
-    platformcheck::is_fedora && echo -e "  ${GREEN}✓ Fedora support available / Поддержка Fedora доступна${NC}" || echo -e "  ${RED}✗ Fedora support missing / Поддержка Fedora отсутствует${NC}"
-    platformcheck::is_altlinux && echo -e "  ${GREEN}✓ ALT Linux support available / Поддержка ALT Linux доступна${NC}" || echo -e "  ${RED}✗ ALT Linux support missing / Поддержка ALT Linux отсутствует${NC}"
+    echo -e "${COLOR_BLUE}Platform Support / Поддержка платформ:${COLOR_RESET}"
+    platformcheck::is_macos && echo -e "  ${COLOR_GREEN}✓ macOS support available / Поддержка macOS доступна${COLOR_RESET}" || echo -e "  ${COLOR_RED}✗ macOS support missing / Поддержка macOS отсутствует${COLOR_RESET}"
+    platformcheck::is_alma && echo -e "  ${COLOR_GREEN}✓ AlmaLinux support available / Поддержка AlmaLinux доступна${COLOR_RESET}" || echo -e "  ${COLOR_RED}✗ AlmaLinux support missing / Поддержка AlmaLinux отсутствует${COLOR_RESET}"
+    platformcheck::is_ubuntu && echo -e "  ${COLOR_GREEN}✓ Ubuntu support available / Поддержка Ubuntu доступна${COLOR_RESET}" || echo -e "  ${COLOR_RED}✗ Ubuntu support missing / Поддержка Ubuntu отсутствует${COLOR_RESET}"
+    platformcheck::is_debian && echo -e "  ${COLOR_GREEN}✓ Debian support available / Поддержка Debian доступна${COLOR_RESET}" || echo -e "  ${COLOR_RED}✗ Debian support missing / Поддержка Debian отсутствует${COLOR_RESET}"
+    platformcheck::is_fedora && echo -e "  ${COLOR_GREEN}✓ Fedora support available / Поддержка Fedora доступна${COLOR_RESET}" || echo -e "  ${COLOR_RED}✗ Fedora support missing / Поддержка Fedora отсутствует${COLOR_RESET}"
+    platformcheck::is_altlinux && echo -e "  ${COLOR_GREEN}✓ ALT Linux support available / Поддержка ALT Linux доступна${COLOR_RESET}" || echo -e "  ${COLOR_RED}✗ ALT Linux support missing / Поддержка ALT Linux отсутствует${COLOR_RESET}"
 }
 
 # ==========================================

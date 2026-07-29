@@ -95,6 +95,10 @@ system::users::delete() {
 # @param $1 Username / Имя пользователя
 # @param $2 [optional] Password (if not provided, will prompt) / [опционально] Пароль
 # (если не указан, будет запрошен)
+# @warning Passing the password as an argument exposes it in plain text: it is visible
+# in the process list and shell history. Prefer interactive mode (omit $2).
+# @warning Передача пароля аргументом раскрывает его открытым текстом: он виден в
+# списке процессов и истории shell. Предпочтительнее интерактивный режим (без $2).
 # @example
 #   system::users::set_password "username" "newpassword"
 system::users::set_password() {

@@ -1,9 +1,18 @@
 #!/usr/bin/env bs
+#
 # version.sh — Framework version information / Информация о версии фреймворка
+#
+
+# Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
+# Note: strict mode (set -euo pipefail) and IFS are set only in entry points
 
 # @description BS Framework Version / Версия фреймворка BS
 # @export BS_VERSION The current version of BS / Текущая версия BS
-export BS_VERSION="0.3.0"
+# Владелец переменной — скрипт bs (readonly); здесь задаём только если пусто
+# Owner of the variable is the bs script (readonly); set here only if empty
+if [[ -z "${BS_VERSION:-}" ]]; then
+  export BS_VERSION="0.3.0"
+fi
 
 # @description BS Framework Name / Имя фреймворка BS
 # @export BS_NAME The name of the BS framework / Имя фреймворка BS
@@ -11,7 +20,7 @@ export BS_NAME="BS (Bash Open Source Architecture) BOSA Framework"
 
 # @description Print version information / Вывести информацию о версии
 # @example
-#   BS::version::print
+#   bs::version::print
 bs::version::print() {
     echo "${BS_NAME} ${BS_VERSION}"
 }
@@ -36,9 +45,12 @@ bs::version::compare() {
     local ver1="${1}"
     local ver2="${2}"
     
-    # Split versions into arrays
-    local v1_parts=(${ver1//./ })
-    local v2_parts=(${ver2//./ })
+    # Split versions into arrays (локальный IFS, глобальный не трогаем)
+    # Split versions into arrays (local IFS, global IFS untouched)
+    local IFS='.'
+    local -a v1_parts v2_parts
+    read -ra v1_parts <<< "${ver1}"
+    read -ra v2_parts <<< "${ver2}"
     
     # Determine max number of parts to compare
     local max_parts

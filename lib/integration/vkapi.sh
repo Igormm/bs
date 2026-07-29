@@ -37,29 +37,28 @@
 
 # Check if module is already loaded
 if [[ -n "${BOSA_LIB_INTEGRATION_VK_API_LOADED:-}" ]]; then
-    log::debug "VK API module already loaded" 2>/dev/null || true
+    utils::ignore log::debug "VK API module already loaded"
     return 0
 fi
 readonly BOSA_LIB_INTEGRATION_VK_API_LOADED=1
 
 # Import required modules (use BS_ROOT if available, otherwise try to detect)
 if [[ -n "${BS_ROOT:-}" ]]; then
-    source "${BS_ROOT}/core/const.sh" 2>/dev/null || true
-    source "${BS_ROOT}/core/logger.sh" 2>/dev/null || true
-    source "${BS_ROOT}/core/errorhandler.sh" 2>/dev/null || true
+    utils::ignore source "${BS_ROOT}/core/const.sh"
+    utils::ignore source "${BS_ROOT}/core/logger.sh"
+    utils::ignore source "${BS_ROOT}/core/errorhandler.sh"
 fi
 
-# Define error codes for VK API module (if not already defined)
-if [[ -z "${LIB_ERROR_FILE_OPERATION:-}" ]]; then
-    readonly LIB_ERROR_FILE_OPERATION=100
-    readonly LIB_ERROR_DEPENDENCY_MISSING=101
-    readonly LIB_ERROR_PLATFORM_UNSUPPORTED=102
-    readonly LIB_ERROR_INVALID_ARGS=103
-    readonly LIB_ERROR_INVALID_STATE=104
-    readonly LIB_ERROR_API_REQUEST=105
-    readonly LIB_ERROR_INVALID_RESPONSE=106
-    readonly LIB_ERROR_API_RESPONSE=107
-fi
+# Error codes fallbacks (no readonly): values live in core/const.sh;
+# assign defaults only when const.sh was not loaded (standalone mode).
+: "${LIB_ERROR_INVALID_ARGS:=3}"
+: "${LIB_ERROR_FILE_OPERATION:=100}"
+: "${LIB_ERROR_DEPENDENCY_MISSING:=101}"
+: "${LIB_ERROR_PLATFORM_UNSUPPORTED:=102}"
+: "${LIB_ERROR_INVALID_STATE:=104}"
+: "${LIB_ERROR_API_REQUEST:=105}"
+: "${LIB_ERROR_INVALID_RESPONSE:=106}"
+: "${LIB_ERROR_API_RESPONSE:=107}"
 
 # VK API configuration constants
 readonly VK_API_VERSION="5.131"
@@ -77,21 +76,9 @@ VK_API_LAST_REQUEST_TIME=0
 VK_API_CACHE_DIR="${BS_ROOT:-/tmp}/vk_api_cache"
 
 # Ensure function_exists helper is available
-if ! command -v function_exists >/dev/null 2>&1; then
-  function_exists() { declare -F "$1" >/dev/null 2>&1; }
+if ! utils::has function_exists; then
+  function_exists() { utils::quiet declare -F "$1"; }
 fi
-
-# Namespaced wrappers to ensure consistent vkapi:: API
-vkapi::check_dependencies()       { check_dependencies "$@"; }
-vkapi::install_dependencies()     { install_dependencies "$@"; }
-vkapi::auth()                     { auth "$@"; }
-vkapi::rate_limit_delay()         { rate_limit_delay "$@"; }
-vkapi::get_cache_key()            { get_cache_key "$@"; }
-vkapi::get_cached_response()      { get_cached_response "$@"; }
-vkapi::cache_response()           { cache_response "$@"; }
-vkapi::api_request()              { api_request "$@"; }
-vkapi::parse_response()           { parse_response "$@"; }
-vkapi::api_call()                 { api_call "$@"; }
 
 # Helper function for error handling (since errorhandler::throw may not be available)
 _vkapi_error() {
@@ -130,29 +117,29 @@ vkapi::init() {
 }
 
 # Check VK API dependencies
-check_dependencies() {
+vkapi::check_dependencies() {
     local func_name="vkapi::check_dependencies"
     local missing_deps=()
     
     log::debug "Checking VK API dependencies..."
     
     # Check for curl
-    if ! command -v curl >/dev/null 2>&1; then
+    if ! utils::has curl; then
         missing_deps+=("curl")
     fi
     
     # Check for jq
-    if ! command -v jq >/dev/null 2>&1; then
+    if ! utils::has jq; then
         missing_deps+=("jq")
     fi
     
     # Check for openssl
-    if ! command -v openssl >/dev/null 2>&1; then
+    if ! utils::has openssl; then
         missing_deps+=("openssl")
     fi
     
     # Check for base64
-    if ! command -v base64 >/dev/null 2>&1; then
+    if ! utils::has base64; then
         missing_deps+=("coreutils")
     fi
     
@@ -166,27 +153,27 @@ check_dependencies() {
 }
 
 # Install missing dependencies
-install_dependencies() {
+vkapi::install_dependencies() {
     local func_name="vkapi::install_dependencies"
     local deps=("$@")
     
     log::info "Installing missing dependencies: ${deps[*]}..."
     
     # Source platform check module
-    source "${BS_ROOT}/lib/system/platformcheck.sh" 2>/dev/null || true
+    utils::ignore source "${BS_ROOT}/lib/system/platformcheck.sh"
 
     # Helper predicates with graceful fallbacks if platformcheck is unavailable
     _vk_is_debian_like=false
     _vk_is_rhel_like=false
     _vk_is_macos=false
 
-    if command -v platformcheck::is_debian >/dev/null 2>&1 && platformcheck::is_debian || \
-       command -v platformcheck::is_ubuntu >/dev/null 2>&1 && platformcheck::is_ubuntu; then
+    if utils::has platformcheck::is_debian && platformcheck::is_debian || \
+       utils::has platformcheck::is_ubuntu && platformcheck::is_ubuntu; then
         _vk_is_debian_like=true
-    elif command -v platformcheck::is_alma >/dev/null 2>&1 && platformcheck::is_alma || \
-         command -v platformcheck::is_fedora >/dev/null 2>&1 && platformcheck::is_fedora; then
+    elif utils::has platformcheck::is_alma && platformcheck::is_alma || \
+         utils::has platformcheck::is_fedora && platformcheck::is_fedora; then
         _vk_is_rhel_like=true
-    elif command -v platformcheck::is_macos >/dev/null 2>&1 && platformcheck::is_macos; then
+    elif utils::has platformcheck::is_macos && platformcheck::is_macos; then
         _vk_is_macos=true
     fi
 
@@ -196,8 +183,8 @@ install_dependencies() {
     elif [[ "${_vk_is_rhel_like}" == true ]]; then
         dnf install -y curl jq openssl coreutils
     elif [[ "${_vk_is_macos}" == true ]]; then
-        if ! command -v brew >/dev/null 2>&1; then
-            if command -v errorhandler::throw >/dev/null 2>&1; then
+        if ! utils::has brew; then
+            if utils::has errorhandler::throw; then
                 errorhandler::throw "${func_name}" "Homebrew is required for macOS" "${LIB_ERROR_DEPENDENCY_MISSING}"
             else
                 _vkapi_error "Homebrew is required for macOS" "${LIB_ERROR_DEPENDENCY_MISSING}"
@@ -205,7 +192,7 @@ install_dependencies() {
         fi
         brew install curl jq openssl
     else
-        if command -v errorhandler::throw >/dev/null 2>&1; then
+        if utils::has errorhandler::throw; then
             errorhandler::throw "${func_name}" "Unsupported or undetected platform for dependency installation" "${LIB_ERROR_PLATFORM_UNSUPPORTED}"
         else
             _vkapi_error "Unsupported or undetected platform for dependency installation" "${LIB_ERROR_PLATFORM_UNSUPPORTED}"
@@ -216,7 +203,7 @@ install_dependencies() {
 }
 
 # Set access token
-auth() {
+vkapi::auth() {
     local func_name="vkapi::auth"
     local access_token="${1:-}"
     
@@ -230,7 +217,7 @@ auth() {
 }
 
 # Rate limiting delay
-rate_limit_delay() {
+vkapi::rate_limit_delay() {
     local current_time
     current_time=$(date +%s.%N)
     
@@ -247,7 +234,7 @@ rate_limit_delay() {
 }
 
 # Generate cache key for request
-get_cache_key() {
+vkapi::get_cache_key() {
     local method="${1:-}"
     local params="${2:-}"
     
@@ -255,7 +242,7 @@ get_cache_key() {
 }
 
 # Check if cached response exists and is valid
-get_cached_response() {
+vkapi::get_cached_response() {
     local func_name="vkapi::get_cached_response"
     local cache_key="${1:-}"
     
@@ -263,7 +250,7 @@ get_cached_response() {
     
     if [[ -f "${cache_file}" ]]; then
         local file_age
-        file_age=$(echo "$(date +%s) - $(stat -c %Y "${cache_file}" 2>/dev/null || stat -f %m "${cache_file}" 2>/dev/null)" | bc)
+        file_age=$(echo "$(date +%s) - $(utils::quiet_err stat -c %Y "${cache_file}" || utils::quiet_err stat -f %m "${cache_file}")" | bc)
         
         if [[ "${file_age}" -lt "${VK_API_CACHE_TTL}" ]]; then
             cat "${cache_file}"
@@ -277,7 +264,7 @@ get_cached_response() {
 }
 
 # Cache API response
-cache_response() {
+vkapi::cache_response() {
     local func_name="vkapi::cache_response"
     local cache_key="${1:-}"
     local response="${2:-}"
@@ -287,7 +274,7 @@ cache_response() {
 }
 
 # Make API request
-api_request() {
+vkapi::api_request() {
     local func_name="vkapi::api_request"
     local method="${1:-}"
     local params="${2:-}"
@@ -336,7 +323,7 @@ api_request() {
         log::debug "Making API request to ${method} (attempt $((retry_count + 1)))"
         
         # Make curl request
-        response=$(curl -s -w "%{http_code}" -d "${data}" "${url}" 2>/dev/null)
+        response=$(utils::quiet_err curl -s -w "%{http_code}" -d "${data}" "${url}")
         http_code=$(echo "${response}" | tail -n1)
         response=$(echo "${response}" | head -n-1)
         
@@ -374,7 +361,7 @@ api_request() {
 }
 
 # Parse API response
-parse_response() {
+vkapi::parse_response() {
     local func_name="vkapi::parse_response"
     local response="${1:-}"
     
@@ -399,7 +386,7 @@ parse_response() {
 }
 
 # Generic API method caller
-api_call() {
+vkapi::api_call() {
     local func_name="vkapi::api_call"
     local method="${1:-}"
     local params="${2:-}"
@@ -414,14 +401,14 @@ api_call() {
 }
 
 # User management methods
-users.get() {
+vkapi::users.get() {
     local func_name="vkapi::users.get"
     local params="${1:-}"
     
     vkapi::api_call "users.get" "${params}"
 }
 
-users.search() {
+vkapi::users.search() {
     local func_name="vkapi::users.search"
     local params="${1:-}"
     
@@ -429,14 +416,14 @@ users.search() {
 }
 
 # Friends methods
-friends.get() {
+vkapi::friends.get() {
     local func_name="vkapi::friends.get"
     local params="${1:-}"
     
     vkapi::api_call "friends.get" "${params}"
 }
 
-friends.getOnline() {
+vkapi::friends.getOnline() {
     local func_name="vkapi::friends.getOnline"
     local params="${1:-}"
     
@@ -444,14 +431,14 @@ friends.getOnline() {
 }
 
 # Groups methods
-groups.get() {
+vkapi::groups.get() {
     local func_name="vkapi::groups.get"
     local params="${1:-}"
     
     vkapi::api_call "groups.get" "${params}"
 }
 
-groups.getById() {
+vkapi::groups.getById() {
     local func_name="vkapi::groups.getById"
     local params="${1:-}"
     
@@ -459,14 +446,14 @@ groups.getById() {
 }
 
 # Wall methods
-wall.get() {
+vkapi::wall.get() {
     local func_name="vkapi::wall.get"
     local params="${1:-}"
     
     vkapi::api_call "wall.get" "${params}"
 }
 
-wall.post() {
+vkapi::wall.post() {
     local func_name="vkapi::wall.post"
     local params="${1:-}"
     
@@ -474,21 +461,21 @@ wall.post() {
 }
 
 # Messages methods
-messages.getConversations() {
+vkapi::messages.getConversations() {
     local func_name="vkapi::messages.getConversations"
     local params="${1:-}"
     
     vkapi::api_call "messages.getConversations" "${params}"
 }
 
-messages.getHistory() {
+vkapi::messages.getHistory() {
     local func_name="vkapi::messages.getHistory"
     local params="${1:-}"
     
     vkapi::api_call "messages.getHistory" "${params}"
 }
 
-messages.send() {
+vkapi::messages.send() {
     local func_name="vkapi::messages.send"
     local params="${1:-}"
     
@@ -496,14 +483,14 @@ messages.send() {
 }
 
 # Photos methods
-photos.get() {
+vkapi::photos.get() {
     local func_name="vkapi::photos.get"
     local params="${1:-}"
     
     vkapi::api_call "photos.get" "${params}"
 }
 
-photos.getWallUploadServer() {
+vkapi::photos.getWallUploadServer() {
     local func_name="vkapi::photos.getWallUploadServer"
     local params="${1:-}"
     
@@ -511,14 +498,14 @@ photos.getWallUploadServer() {
 }
 
 # Status methods
-status.get() {
+vkapi::status.get() {
     local func_name="vkapi::status.get"
     local params="${1:-}"
     
     vkapi::api_call "status.get" "${params}"
 }
 
-status.set() {
+vkapi::status.set() {
     local func_name="vkapi::status.set"
     local params="${1:-}"
     
@@ -526,7 +513,7 @@ status.set() {
 }
 
 # Board methods (for groups)
-board.getTopics() {
+vkapi::board.getTopics() {
     local func_name="vkapi::board.getTopics"
     local params="${1:-}"
     
@@ -534,7 +521,7 @@ board.getTopics() {
 }
 
 # Market methods
-market.get() {
+vkapi::market.get() {
     local func_name="vkapi::market.get"
     local params="${1:-}"
     
@@ -542,7 +529,7 @@ market.get() {
 }
 
 # Polls methods
-polls.getById() {
+vkapi::polls.getById() {
     local func_name="vkapi::polls.getById"
     local params="${1:-}"
     
@@ -550,7 +537,7 @@ polls.getById() {
 }
 
 # Secure methods for app authentication
-secure.checkToken() {
+vkapi::secure.checkToken() {
     local func_name="vkapi::secure.checkToken"
     local token="${1:-}"
     local ip="${2:-}"
@@ -564,14 +551,14 @@ secure.checkToken() {
 }
 
 # Account methods
-account.getInfo() {
+vkapi::account.getInfo() {
     local func_name="vkapi::account.getInfo"
     local params="${1:-}"
     
     vkapi::api_call "account.getInfo" "${params}"
 }
 
-account.setOnline() {
+vkapi::account.setOnline() {
     local func_name="vkapi::account.setOnline"
     local params="${1:-}"
     
@@ -579,14 +566,14 @@ account.setOnline() {
 }
 
 # Database methods
-database.getCountries() {
+vkapi::database.getCountries() {
     local func_name="vkapi::database.getCountries"
     local params="${1:-}"
     
     vkapi::api_call "database.getCountries" "${params}" "true"  # Cache this
 }
 
-database.getCities() {
+vkapi::database.getCities() {
     local func_name="vkapi::database.getCities"
     local params="${1:-}"
     
@@ -594,7 +581,7 @@ database.getCities() {
 }
 
 # Execute method (for generic API calls)
-execute() {
+vkapi::execute() {
     local func_name="vkapi::execute"
     local code="${1:-}"
     
@@ -608,14 +595,14 @@ execute() {
 
 # Utility functions for common operations
 # Get current user's profile
-get_my_profile() {
+vkapi::get_my_profile() {
     local func_name="vkapi::get_my_profile"
     
     vkapi::users.get "fields=photo_200,status,last_seen,online"
 }
 
 # Get user profile by ID
-get_user_profile() {
+vkapi::get_user_profile() {
     local func_name="vkapi::get_user_profile"
     local user_id="${1:-}"
     
@@ -628,7 +615,7 @@ get_user_profile() {
 }
 
 # Search for users
-search_users() {
+vkapi::search_users() {
     local func_name="vkapi::search_users"
     local query="${1:-}"
     local count="${2:-10}"
@@ -642,7 +629,7 @@ search_users() {
 }
 
 # Get user's groups
-get_user_groups() {
+vkapi::get_user_groups() {
     local func_name="vkapi::get_user_groups"
     local user_id="${1:-}"
     local extended="${2:-1}"
@@ -656,7 +643,7 @@ get_user_groups() {
 }
 
 # Get group information
-get_group_info() {
+vkapi::get_group_info() {
     local func_name="vkapi::get_group_info"
     local group_id="${1:-}"
     
@@ -669,7 +656,7 @@ get_group_info() {
 }
 
 # Get wall posts
-get_wall_posts() {
+vkapi::get_wall_posts() {
     local func_name="vkapi::get_wall_posts"
     local owner_id="${1:-}"
     local count="${2:-10}"
@@ -684,7 +671,7 @@ get_wall_posts() {
 }
 
 # Post to wall
-post_to_wall() {
+vkapi::post_to_wall() {
     local func_name="vkapi::post_to_wall"
     local message="${1:-}"
     local owner_id="${2:-}"
@@ -703,7 +690,7 @@ post_to_wall() {
 }
 
 # Send message
-send_message() {
+vkapi::send_message() {
     local func_name="vkapi::send_message"
     local user_id="${1:-}"
     local message="${2:-}"
@@ -718,7 +705,7 @@ send_message() {
 }
 
 # Get conversations
-get_conversations() {
+vkapi::get_conversations() {
     local func_name="vkapi::get_conversations"
     local count="${1:-20}"
     local offset="${2:-0}"
@@ -727,7 +714,7 @@ get_conversations() {
 }
 
 # Get message history
-get_message_history() {
+vkapi::get_message_history() {
     local func_name="vkapi::get_message_history"
     local peer_id="${1:-}"
     local count="${2:-20}"
@@ -742,7 +729,7 @@ get_message_history() {
 }
 
 # Get online friends
-get_online_friends() {
+vkapi::get_online_friends() {
     local func_name="vkapi::get_online_friends"
     local online_mobile="${1:-1}"
     local order="${2:-random}"
@@ -751,7 +738,7 @@ get_online_friends() {
 }
 
 # Set status
-set_status() {
+vkapi::set_status() {
     local func_name="vkapi::set_status"
     local text="${1:-}"
     
@@ -764,7 +751,7 @@ set_status() {
 }
 
 # Get current status
-get_status() {
+vkapi::get_status() {
     local func_name="vkapi::get_status"
     local user_id="${1:-}"
     
@@ -777,7 +764,7 @@ get_status() {
 }
 
 # Get countries list (cached)
-get_countries() {
+vkapi::get_countries() {
     local func_name="vkapi::get_countries"
     local need_all="${1:-1}"
     local count="${2:-1000}"
@@ -786,7 +773,7 @@ get_countries() {
 }
 
 # Clear cache
-clear_cache() {
+vkapi::clear_cache() {
     local func_name="vkapi::clear_cache"
     
     log::info "Clearing VK API cache..."
@@ -797,7 +784,7 @@ clear_cache() {
 }
 
 # Get API usage statistics
-get_stats() {
+vkapi::get_stats() {
     local func_name="vkapi::get_stats"
     
     local cache_count
@@ -815,7 +802,7 @@ EOF
 }
 
 # Module info
-info() {
+vkapi::info() {
     cat << EOF
 VK API Integration Module v1.0.0
 

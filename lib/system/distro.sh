@@ -17,20 +17,23 @@ system::distro::detect() {
     # Try /etc/os-release first (modern standard) / Попробовать /etc/os-release сначала
     # (современный стандарт)
     if [[ -f /etc/os-release ]]; then
-        source /etc/os-release
-        DISTRO_ID="${ID:-unknown}"
-        DISTRO_NAME="${NAME:-Unknown}"
-        DISTRO_VERSION="${VERSION_ID:-unknown}"
+        # Parse without sourcing into current shell / Парсим без source в текущий shell
+        DISTRO_ID=$(sed -n 's/^ID=//p' /etc/os-release | head -1 | tr -d '"')
+        DISTRO_NAME=$(sed -n 's/^NAME=//p' /etc/os-release | head -1 | tr -d '"')
+        DISTRO_VERSION=$(sed -n 's/^VERSION_ID=//p' /etc/os-release | head -1 | tr -d '"')
+        DISTRO_ID="${DISTRO_ID:-unknown}"
+        DISTRO_NAME="${DISTRO_NAME:-Unknown}"
+        DISTRO_VERSION="${DISTRO_VERSION:-unknown}"
     # Try lsb_release / Попробовать lsb_release
-    elif command -v lsb_release >/dev/null 2>&1; then
+    elif utils::has lsb_release; then
         DISTRO_ID=$(lsb_release -si 2>/dev/null | tr '[:upper:]' '[:lower:]')
-        DISTRO_NAME=$(lsb_release -sd 2>/dev/null)
-        DISTRO_VERSION=$(lsb_release -sr 2>/dev/null)
+        DISTRO_NAME=$(utils::quiet_err lsb_release -sd)
+        DISTRO_VERSION=$(utils::quiet_err lsb_release -sr)
     # Fallback to /etc/*-release files / Резервный вариант файлы /etc/*-release
     elif [[ -f /etc/debian_version ]]; then
         DISTRO_ID="debian"
         DISTRO_NAME="Debian"
-        DISTRO_VERSION=$(cat /etc/debian_version 2>/dev/null)
+        DISTRO_VERSION=$(utils::quiet_err cat /etc/debian_version)
     elif [[ -f /etc/redhat-release ]]; then
         DISTRO_ID="rhel"
         DISTRO_NAME=$(cat /etc/redhat-release 2>/dev/null | sed 's/ release.*//')
@@ -55,7 +58,7 @@ system::distro::detect() {
             DISTRO_FAMILY="redhat"
             DISTRO_PACKAGE_MANAGER="dnf"
             # Check for yum on older systems / Проверить yum на старых системах
-            if ! command -v dnf >/dev/null 2>&1 && command -v yum >/dev/null 2>&1; then
+            if ! utils::has dnf && utils::has yum; then
                 DISTRO_PACKAGE_MANAGER="yum"
             fi
             ;;
@@ -228,16 +231,30 @@ system::distro::install_package() {
         return 1
     fi
 
-    local install_cmd
-    install_cmd=$(system::distro::package_command "install")
-
-    if [[ "${install_cmd}" == "install" ]]; then
-        log::error "Cannot determine package manager for installation"
-        return 1
+    # Detect if not already done / Определить если еще не сделано
+    if [[ -z "${DISTRO_PACKAGE_MANAGER}" ]]; then
+        system::distro::detect
     fi
 
+    # Build command as array to avoid quoting issues / Команда массивом во избежание
+    # проблем с квотированием
+    local -a install_cmd=()
+    case "${DISTRO_PACKAGE_MANAGER}" in
+        apt)    install_cmd=(apt-get install -y) ;;
+        dnf)    install_cmd=(dnf install -y) ;;
+        yum)    install_cmd=(yum install -y) ;;
+        zypper) install_cmd=(zypper install -y) ;;
+        pacman) install_cmd=(pacman -S --noconfirm) ;;
+        apk)    install_cmd=(apk add) ;;
+        emerge) install_cmd=(emerge) ;;
+        *)
+            log::error "Cannot determine package manager for installation"
+            return 1
+            ;;
+    esac
+
     log::info "Installing packages: $*"
-    if ${install_cmd} "$@"; then
+    if "${install_cmd[@]}" "$@"; then
         log::info "Packages installed successfully"
         return 0
     else
@@ -270,23 +287,23 @@ system::distro::is_package_installed() {
             dpkg -l "${package}" 2>/dev/null | grep -q "^ii"
             ;;
         dnf|yum)
-            rpm -q "${package}" >/dev/null 2>&1
+            utils::quiet rpm -q "${package}"
             ;;
         zypper)
-            rpm -q "${package}" >/dev/null 2>&1
+            utils::quiet rpm -q "${package}"
             ;;
         pacman)
-            pacman -Q "${package}" >/dev/null 2>&1
+            utils::quiet pacman -Q "${package}"
             ;;
         apk)
-            apk info -e "${package}" >/dev/null 2>&1
+            utils::quiet apk info -e "${package}"
             ;;
         emerge)
-            equery list "${package}" >/dev/null 2>&1
+            utils::quiet equery list "${package}"
             ;;
         *)
             # Generic check using which / Общая проверка с помощью which
-            command -v "${package}" >/dev/null 2>&1
+            utils::has "${package}"
             ;;
     esac
 }

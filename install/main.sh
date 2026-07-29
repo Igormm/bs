@@ -1,16 +1,13 @@
 #!/usr/bin/env bash
-
+#
 # Main installer script that orchestrates the installation process
 # Uses modular approach to keep code organized
+#
 
-set -euo pipefail
-
-# Source utility functions
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/utils.sh"
-source "${SCRIPT_DIR}/checks.sh"
-source "${SCRIPT_DIR}/actions.sh"
-source "${SCRIPT_DIR}/path_manager.sh"
+# проверка файлов actions.sh, checks.sh, path_manager.sh и функций do_install, is_already_installed, print_path_hint
+utils::ensure_source "${INSTALLER_DIR}/actions.sh" "do_install"
+utils::ensure_source "${INSTALLER_DIR}/checks.sh" "is_already_installed"
+utils::ensure_source "${INSTALLER_DIR}/path_manager.sh" "print_path_hint"
 
 # Help message
 usage() {
@@ -39,12 +36,13 @@ Examples:
 HELP
 }
 
-# Parse arguments
+# Дефолтные значения для параметров \ Parse arguments
 MODE="system"        # system|local
 ACTION="install"     # install|uninstall
 FLAG_PATH="0"        # 0|1
 FLAG_UPDATE_PATH="0" # 0|1
 
+# Parse arguments /
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --local)
@@ -63,14 +61,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Alias: remove -> uninstall
-if [[ "${ACTION}" == "remove" ]]; then
-  ACTION="uninstall"
-fi
-
 # Resolve paths
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-SOURCE_ROOT="$(dirname "${SCRIPT_DIR}")/.."
+SOURCE_ROOT="${SCRIPT_DIR}"
 
 # Choose PREFIX based on mode
 if [[ "${MODE}" == "local" ]]; then
@@ -102,7 +94,7 @@ fi
 case "${ACTION}" in
   install)
     do_install ;;
-  uninstall)
+  uninstall|remove)
     do_uninstall ;;
   *)
     printf "ERROR: Неизвестное действие: %s\n" "${ACTION}" >&2

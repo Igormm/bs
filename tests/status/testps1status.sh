@@ -16,10 +16,17 @@ readonly BS_PROJECT_ROOT="$(cd "${TEST_SCRIPT_DIR}/../.." && pwd)"
 
 # Source test framework
 source "${TEST_SCRIPT_DIR}/../testframework.sh"
-source "${BS_PROJECT_ROOT}/boot.sh"
 
-# Initialize BS framework
-bs::init
+# Initialize BS framework (bootstrap; BS_HOME нужен lib-модулям — pre-existing расхождение BS_ROOT/BS_HOME)
+# Initialize BS framework (bootstrap; BS_HOME is needed by lib modules — pre-existing BS_ROOT/BS_HOME mismatch)
+export BS_SILENT=1
+source "${BS_PROJECT_ROOT}/bootstrap/init.sh"
+export BS_HOME="${BS_PROJECT_ROOT}"
+
+# Изолированный HOME: модуль создаёт ~/.config/ps1status (readonly-путь вычисляется из HOME при source)
+# Isolated HOME: the module creates ~/.config/ps1status (readonly path computed from HOME at source time)
+TEST_HOME="$(mktemp -d)"
+export HOME="${TEST_HOME}"
 
 # Test results tracking
 TESTS_RUN=0
@@ -29,18 +36,18 @@ FAILED_TESTS=()
 
 # Test counter functions
 test_increment() {
-    ((TESTS_RUN++))
+    ((++TESTS_RUN))
 }
 
 test_pass() {
     test_increment
-    ((TESTS_PASSED++))
+    ((++TESTS_PASSED))
     log::success "✓ ${FUNCNAME[1]}"
 }
 
 test_fail() {
     test_increment
-    ((TESTS_FAILED++))
+    ((++TESTS_FAILED))
     FAILED_TESTS+=("${FUNCNAME[1]}")
     log::error "✗ ${FUNCNAME[1]}"
 }
@@ -273,9 +280,24 @@ test_module_info() {
 cleanup() {
     log::info "Cleaning up test artifacts..."
     
-    # Clean up test files
-    rm -rf "${PS1_STATUS_CONFIG_DIR}" 2>/dev/null || true
-    rm -rf "${PS1_STATUS_CACHE_DIR}" 2>/dev/null || true
+    # Останавливаем фоновый мониторинг, запущенный ps1status::init (бесконечный цикл);
+    # SIGTERM доходит с задержкой (цикл занят ping/sleep), поэтому страхуемся SIGKILL
+    # Stop the background monitoring started by ps1status::init (infinite loop);
+    # SIGTERM arrives with a delay (the loop is busy in ping/sleep), so back it up with SIGKILL
+    local monitor_pid=""
+    if [[ -n "${PS1_STATUS_CONFIG_DIR:-}" ]] && \
+       [[ -f "${PS1_STATUS_CONFIG_DIR}/monitor.pid" ]]; then
+        monitor_pid=$(cat "${PS1_STATUS_CONFIG_DIR}/monitor.pid")
+    fi
+    ps1status::stop_monitoring >/dev/null 2>&1 || true
+    if [[ -n "${monitor_pid}" ]] && kill -0 "${monitor_pid}" 2>/dev/null; then
+        sleep 1
+        kill -9 "${monitor_pid}" 2>/dev/null || true
+    fi
+    
+    # Clean up test files (изолированный HOME + кэш в /tmp / isolated HOME + /tmp cache)
+    rm -rf "${TEST_HOME:-}" 2>/dev/null || true
+    rm -rf "${PS1_STATUS_CACHE_DIR:-}" 2>/dev/null || true
     
     log::debug "Cleanup completed"
 }
@@ -306,20 +328,20 @@ main() {
     # Register cleanup on exit
     trap cleanup EXIT
     
-    # Run tests
-    test_module_initialization
-    test_directory_creation
-    test_component_initialization
-    test_component_management
-    test_wireguard_status
-    test_network_status
-    test_speed_status
-    test_audio_status
-    test_system_status
-    test_ps1_construction
-    test_equalizer_status
-    test_equalizer_availability
-    test_module_info
+    # Run tests (|| true: падение одного теста не прерывает прогон / a failing test does not abort the run)
+    test_module_initialization || true
+    test_directory_creation || true
+    test_component_initialization || true
+    test_component_management || true
+    test_wireguard_status || true
+    test_network_status || true
+    test_speed_status || true
+    test_audio_status || true
+    test_system_status || true
+    test_ps1_construction || true
+    test_equalizer_status || true
+    test_equalizer_availability || true
+    test_module_info || true
     
     # Print summary
     print_summary

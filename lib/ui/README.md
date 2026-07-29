@@ -51,41 +51,13 @@ ps1config::list_themes()
 ps1config::demo()
 ```
 
-### displaysettings.sh
-Display configuration and settings management.
+### bosatheme.sh
+BS prompt theme (clean, informative bash-it style prompt).
 
 **Usage:**
 ```bash
-load "lib/ui/displaysettings"
-displaysettings::get_resolution
-displaysettings::set_brightness 75
-```
-
-### interactiveui.sh
-Interactive user interface components.
-
-**Features:**
-- Menu systems
-- Input validation
-- Interactive prompts
-- Progress bars
-- Status indicators
-
-**Usage:**
-```bash
-load "lib/ui/interactiveui"
-interactiveui::menu "Select option" "Option 1" "Option 2" "Option 3"
-interactiveui::confirm "Are you sure?"
-```
-
-### bosa_theme.sh
-Theme management for BOSA framework.
-
-**Usage:**
-```bash
-load "lib/ui/bosa_theme"
-bosa_theme::set_theme "dark"
-bosa_theme::list_themes
+load "lib/ui/bosatheme"
+bosatheme::apply   # apply the prompt to the current shell
 ```
 
 ## Features
@@ -157,23 +129,6 @@ load lib/ui/ps1config
 
 # Set your preferred theme
 ps1config::set_theme "powerline"
-```
-
-### Interactive Theme Selection
-```bash
-#!/usr/bin/env bash
-source "./boot.sh"
-bosa::init
-
-load "lib/ui/ps1config"
-load "lib/ui/interactiveui"
-
-# Let user choose theme
-theme=$(interactiveui::menu "Choose PS1 theme" \
-    "default" "powerline" "minimal" "time" "rainbow")
-
-ps1config::set_theme "$theme"
-logger::success "PS1 theme set to: $theme"
 ```
 
 ## Best Practices

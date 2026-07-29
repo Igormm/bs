@@ -11,11 +11,11 @@ system::display::server() {
     case "${server_type}" in
         x11)
             # For systems with X11
-            if command -v Xorg >/dev/null 2>&1; then
+            if utils::has Xorg; then
                 log::info "X11 display server available"
                 # Check if xorg.conf exists, if not, generate one
                 if [[ ! -f "/etc/X11/xorg.conf" ]]; then
-                    if command -v Xorg >/dev/null 2>&1; then
+                    if utils::has Xorg; then
                         # This would typically require root privileges and is better done
                         # manually
                         log::info "X11 configuration file can be generated with 'Xorg -configure'"
@@ -28,7 +28,7 @@ system::display::server() {
             ;;
         wayland)
             # For systems with Wayland
-            if command -v weston >/dev/null 2>&1 || command -v sway >/dev/null 2>&1; then
+            if utils::has weston || utils::has sway; then
                 log::info "Wayland display server available"
             else
                 log::warn "Wayland not installed"
@@ -55,11 +55,11 @@ system::display::desktop() {
     case "${de}" in
         gnome)
             # Check if GNOME is installed
-            if command -v gnome-shell >/dev/null 2>&1; then
+            if utils::has gnome-shell; then
                 log::info "GNOME desktop environment available"
                 # Set GNOME as default
-                if command -v systemctl >/dev/null 2>&1; then
-                    systemctl set-default graphical.target 2>/dev/null || true
+                if utils::has systemctl; then
+                    utils::quiet_err systemctl set-default graphical.target
                 fi
             else
                 log::warn "GNOME not installed"
@@ -68,11 +68,11 @@ system::display::desktop() {
             ;;
         kde)
             # Check if KDE is installed
-            if command -v startkde >/dev/null 2>&1; then
+            if utils::has startkde; then
                 log::info "KDE desktop environment available"
                 # Set KDE as default
-                if command -v systemctl >/dev/null 2>&1; then
-                    systemctl set-default graphical.target 2>/dev/null || true
+                if utils::has systemctl; then
+                    utils::quiet_err systemctl set-default graphical.target
                 fi
             else
                 log::warn "KDE not installed"
@@ -81,11 +81,11 @@ system::display::desktop() {
             ;;
         xfce)
             # Check if XFCE is installed
-            if command -v startxfce4 >/dev/null 2>&1; then
+            if utils::has startxfce4; then
                 log::info "XFCE desktop environment available"
                 # Set XFCE as default
-                if command -v systemctl >/dev/null 2>&1; then
-                    systemctl set-default graphical.target 2>/dev/null || true
+                if utils::has systemctl; then
+                    utils::quiet_err systemctl set-default graphical.target
                 fi
             else
                 log::warn "XFCE not installed"
@@ -94,11 +94,11 @@ system::display::desktop() {
             ;;
         mate)
             # Check if MATE is installed
-            if command -v mate-session >/dev/null 2>&1; then
+            if utils::has mate-session; then
                 log::info "MATE desktop environment available"
                 # Set MATE as default
-                if command -v systemctl >/dev/null 2>&1; then
-                    systemctl set-default graphical.target 2>/dev/null || true
+                if utils::has systemctl; then
+                    utils::quiet_err systemctl set-default graphical.target
                 fi
             else
                 log::warn "MATE not installed"
@@ -107,11 +107,11 @@ system::display::desktop() {
             ;;
         cinnamon)
             # Check if Cinnamon is installed
-            if command -v cinnamon-session >/dev/null 2>&1; then
+            if utils::has cinnamon-session; then
                 log::info "Cinnamon desktop environment available"
                 # Set Cinnamon as default
-                if command -v systemctl >/dev/null 2>&1; then
-                    systemctl set-default graphical.target 2>/dev/null || true
+                if utils::has systemctl; then
+                    utils::quiet_err systemctl set-default graphical.target
                 fi
             else
                 log::warn "Cinnamon not installed"
@@ -120,11 +120,11 @@ system::display::desktop() {
             ;;
         lxde)
             # Check if LXDE is installed
-            if command -v startlxde >/dev/null 2>&1; then
+            if utils::has startlxde; then
                 log::info "LXDE desktop environment available"
                 # Set LXDE as default
-                if command -v systemctl >/dev/null 2>&1; then
-                    systemctl set-default graphical.target 2>/dev/null || true
+                if utils::has systemctl; then
+                    utils::quiet_err systemctl set-default graphical.target
                 fi
             else
                 log::warn "LXDE not installed"
@@ -134,8 +134,8 @@ system::display::desktop() {
         none)
             log::info "No desktop environment configured"
             # Set to text mode
-            if command -v systemctl >/dev/null 2>&1; then
-                systemctl set-default multi-user.target 2>/dev/null || true
+            if utils::has systemctl; then
+                utils::quiet_err systemctl set-default multi-user.target
             fi
             ;;
         *)
@@ -155,19 +155,19 @@ system::display::manager() {
     local dm="${1:-none}"
     
     # Stop any existing display manager
-    if command -v systemctl >/dev/null 2>&1; then
-        systemctl stop display-manager 2>/dev/null || true
+    if utils::has systemctl; then
+        utils::quiet_err systemctl stop display-manager
     fi
     
     case "${dm}" in
         gdm)
             # Check if GDM is installed
-            if command -v gdm >/dev/null 2>&1; then
+            if utils::has gdm; then
                 log::info "GDM display manager available"
                 # Enable GDM
-                if command -v systemctl >/dev/null 2>&1; then
-                    systemctl enable gdm 2>/dev/null || true
-                    systemctl set-default graphical.target 2>/dev/null || true
+                if utils::has systemctl; then
+                    utils::quiet_err systemctl enable gdm
+                    utils::quiet_err systemctl set-default graphical.target
                 fi
             else
                 log::warn "GDM not installed"
@@ -176,12 +176,12 @@ system::display::manager() {
             ;;
         sddm)
             # Check if SDDM is installed
-            if command -v sddm >/dev/null 2>&1; then
+            if utils::has sddm; then
                 log::info "SDDM display manager available"
                 # Enable SDDM
-                if command -v systemctl >/dev/null 2>&1; then
-                    systemctl enable sddm 2>/dev/null || true
-                    systemctl set-default graphical.target 2>/dev/null || true
+                if utils::has systemctl; then
+                    utils::quiet_err systemctl enable sddm
+                    utils::quiet_err systemctl set-default graphical.target
                 fi
             else
                 log::warn "SDDM not installed"
@@ -190,12 +190,12 @@ system::display::manager() {
             ;;
         lightdm)
             # Check if LightDM is installed
-            if command -v lightdm >/dev/null 2>&1; then
+            if utils::has lightdm; then
                 log::info "LightDM display manager available"
                 # Enable LightDM
-                if command -v systemctl >/dev/null 2>&1; then
-                    systemctl enable lightdm 2>/dev/null || true
-                    systemctl set-default graphical.target 2>/dev/null || true
+                if utils::has systemctl; then
+                    utils::quiet_err systemctl enable lightdm
+                    utils::quiet_err systemctl set-default graphical.target
                 fi
             else
                 log::warn "LightDM not installed"
@@ -204,12 +204,12 @@ system::display::manager() {
             ;;
         lxdm)
             # Check if LXDM is installed
-            if command -v lxdm >/dev/null 2>&1; then
+            if utils::has lxdm; then
                 log::info "LXDM display manager available"
                 # Enable LXDM
-                if command -v systemctl >/dev/null 2>&1; then
-                    systemctl enable lxdm 2>/dev/null || true
-                    systemctl set-default graphical.target 2>/dev/null || true
+                if utils::has systemctl; then
+                    utils::quiet_err systemctl enable lxdm
+                    utils::quiet_err systemctl set-default graphical.target
                 fi
             else
                 log::warn "LXDM not installed"
@@ -219,9 +219,9 @@ system::display::manager() {
         none)
             log::info "No display manager configured"
             # Disable display manager
-            if command -v systemctl >/dev/null 2>&1; then
-                systemctl disable display-manager 2>/dev/null || true
-                systemctl set-default multi-user.target 2>/dev/null || true
+            if utils::has systemctl; then
+                utils::quiet_err systemctl disable display-manager
+                utils::quiet_err systemctl set-default multi-user.target
             fi
             ;;
         *)
@@ -248,20 +248,20 @@ system::display::resolution() {
     fi
     
     # For X11 systems
-    if command -v xrandr >/dev/null 2>&1; then
+    if utils::has xrandr; then
         if [[ -n "${output}" ]]; then
-            xrandr --output "${output}" --mode "${resolution}" 2>/dev/null || true
+            utils::quiet_err xrandr --output "${output}" --mode "${resolution}"
         else
             # Apply to primary display
             local primary=$(xrandr --query | grep " connected" | head -n 1 | awk '{print $1}')
             if [[ -n "${primary}" ]]; then
-                xrandr --output "${primary}" --mode "${resolution}" 2>/dev/null || true
+                utils::quiet_err xrandr --output "${primary}" --mode "${resolution}"
             else
                 # Apply to all connected displays
-                xrandr --output eDP-1 --mode "${resolution}" 2>/dev/null || true
-                xrandr --output HDMI-1 --mode "${resolution}" 2>/dev/null || true
-                xrandr --output VGA-1 --mode "${resolution}" 2>/dev/null || true
-                xrandr --output DP-1 --mode "${resolution}" 2>/dev/null || true
+                utils::quiet_err xrandr --output eDP-1 --mode "${resolution}"
+                utils::quiet_err xrandr --output HDMI-1 --mode "${resolution}"
+                utils::quiet_err xrandr --output VGA-1 --mode "${resolution}"
+                utils::quiet_err xrandr --output DP-1 --mode "${resolution}"
             fi
         fi
         log::info "Display resolution set to ${resolution}"
@@ -286,20 +286,20 @@ system::display::refresh() {
     fi
     
     # For X11 systems
-    if command -v xrandr >/dev/null 2>&1; then
+    if utils::has xrandr; then
         if [[ -n "${output}" ]]; then
-            xrandr --output "${output}" --rate "${rate}" 2>/dev/null || true
+            utils::quiet_err xrandr --output "${output}" --rate "${rate}"
         else
             # Apply to primary display
             local primary=$(xrandr --query | grep " connected" | head -n 1 | awk '{print $1}')
             if [[ -n "${primary}" ]]; then
-                xrandr --output "${primary}" --rate "${rate}" 2>/dev/null || true
+                utils::quiet_err xrandr --output "${primary}" --rate "${rate}"
             else
                 # Apply to common outputs
-                xrandr --output eDP-1 --rate "${rate}" 2>/dev/null || true
-                xrandr --output HDMI-1 --rate "${rate}" 2>/dev/null || true
-                xrandr --output VGA-1 --rate "${rate}" 2>/dev/null || true
-                xrandr --output DP-1 --rate "${rate}" 2>/dev/null || true
+                utils::quiet_err xrandr --output eDP-1 --rate "${rate}"
+                utils::quiet_err xrandr --output HDMI-1 --rate "${rate}"
+                utils::quiet_err xrandr --output VGA-1 --rate "${rate}"
+                utils::quiet_err xrandr --output DP-1 --rate "${rate}"
             fi
         fi
         log::info "Display refresh rate set to ${rate}Hz"
@@ -314,8 +314,8 @@ system::display::refresh() {
 #   system::display::list_modes
 system::display::list_modes() {
     # For X11 systems
-    if command -v xrandr >/dev/null 2>&1; then
-        xrandr --query 2>/dev/null || true
+    if utils::has xrandr; then
+        utils::quiet_err xrandr --query || :
     else
         log::warn "xrandr not available, cannot list display modes"
         return 1
@@ -332,12 +332,12 @@ system::display::multi() {
     local primary="${2}"
     
     # For X11 systems
-    if command -v xrandr >/dev/null 2>&1; then
+    if utils::has xrandr; then
         case "${layout}" in
             extend)
                 # Extend displays
                 if [[ -n "${primary}" ]]; then
-                    xrandr --output "${primary}" --primary 2>/dev/null || true
+                    utils::quiet_err xrandr --output "${primary}" --primary
                 fi
                 log::info "Displays extended"
                 ;;
@@ -349,11 +349,11 @@ system::display::multi() {
             primary)
                 # Use only primary display
                 if [[ -n "${primary}" ]]; then
-                    xrandr --output "${primary}" --primary 2>/dev/null || true
+                    utils::quiet_err xrandr --output "${primary}" --primary
                     # Turn off other displays
                     local outputs=$(xrandr --query | grep " connected" | grep -v "${primary}" | awk '{print $1}')
                     for output in ${outputs}; do
-                        xrandr --output "${output}" --off 2>/dev/null || true
+                        utils::quiet_err xrandr --output "${output}" --off
                     done
                 fi
                 log::info "Primary display configured: ${primary}"

@@ -19,10 +19,17 @@ readonly BS_PROJECT_ROOT="$(cd "${TEST_SCRIPT_DIR}/../.." && pwd)"
 
 # Source test framework
 source "${TEST_SCRIPT_DIR}/../testframework.sh"
-source "${BS_PROJECT_ROOT}/boot.sh"
 
-# Initialize BS framework
-bs::init
+# Initialize BS framework (bootstrap; BS_HOME нужен lib-модулям — pre-existing расхождение BS_ROOT/BS_HOME)
+# Initialize BS framework (bootstrap; BS_HOME is needed by lib modules — pre-existing BS_ROOT/BS_HOME mismatch)
+export BS_SILENT=1
+source "${BS_PROJECT_ROOT}/bootstrap/init.sh"
+export BS_HOME="${BS_PROJECT_ROOT}"
+
+# Изолированный HOME: модуль создаёт ~/.config/systemaudit (readonly-путь вычисляется из HOME при source)
+# Isolated HOME: the module creates ~/.config/systemaudit (readonly path computed from HOME at source time)
+TEST_HOME="$(mktemp -d)"
+export HOME="${TEST_HOME}"
 
 # Test results tracking
 TESTS_RUN=0
@@ -32,18 +39,18 @@ FAILED_TESTS=()
 
 # Test counter functions
 test_increment() {
-    ((TESTS_RUN++))
+    ((++TESTS_RUN))
 }
 
 test_pass() {
     test_increment
-    ((TESTS_PASSED++))
+    ((++TESTS_PASSED))
     log::success "✓ ${FUNCNAME[1]}"
 }
 
 test_fail() {
     test_increment
-    ((TESTS_FAILED++))
+    ((++TESTS_FAILED))
     FAILED_TESTS+=("${FUNCNAME[1]}")
     log::error "✗ ${FUNCNAME[1]}"
 }
@@ -475,8 +482,8 @@ test_module_info() {
 cleanup() {
     log::info "Cleaning up test artifacts..."
     
-    # Clean up test files
-    rm -rf "${AUDIT_CONFIG_DIR}" 2>/dev/null || true
+    # Clean up test files (изолированный HOME / isolated HOME)
+    rm -rf "${TEST_HOME:-}" 2>/dev/null || true
     
     log::debug "Cleanup completed"
 }
@@ -507,22 +514,22 @@ main() {
     # Register cleanup on exit
     trap cleanup EXIT
     
-    # Run tests
-    test_module_initialization
-    test_directory_creation
-    test_finding_creation
-    test_score_calculation
-    test_quick_audit
-    test_full_audit
-    test_report_generation
-    test_security_audit
-    test_users_audit
-    test_network_audit
-    test_filesystem_audit
-    test_services_audit
-    test_compliance_audit
-    test_baseline_creation
-    test_module_info
+    # Run tests (|| true: падение одного теста не прерывает прогон / a failing test does not abort the run)
+    test_module_initialization || true
+    test_directory_creation || true
+    test_finding_creation || true
+    test_score_calculation || true
+    test_quick_audit || true
+    test_full_audit || true
+    test_report_generation || true
+    test_security_audit || true
+    test_users_audit || true
+    test_network_audit || true
+    test_filesystem_audit || true
+    test_services_audit || true
+    test_compliance_audit || true
+    test_baseline_creation || true
+    test_module_info || true
     
     # Print summary
     print_summary

@@ -19,6 +19,16 @@ declare -g tests_run=0
 declare -g tests_passed=0
 declare -g tests_failed=0
 
+# Заголовок
+# @description Print a header banner
+# @param $1 Header text / Текст заголовка
+print_header() {
+    echo -e "${BLUE}========================================${NC}"
+    echo -e "${BLUE}$1${NC}"
+    echo -e "${BLUE}========================================${NC}"
+    echo
+}
+
 # Функция инициализации тестов
 # @description Initialize test framework
 # @example testframework::init
@@ -31,23 +41,66 @@ testframework::init() {
 
 # Функция проверки условия
 # @description Assert that condition is true
-# @param $1 Condition to check / Условие для проверки
+# @param $1 Condition to check: "true"/"false" or a [[ ... ]] expression / Условие для проверки
 # @param $2 Test name / Название теста
 # @example testframework::assert_true "$result" "Test result"
 testframework::assert_true() {
     local condition="$1"
     local test_name="${2:-Unknown test}"
     
-    ((tests_run++))
+    ((++tests_run))
     
-    if [[ "$condition" == "true" ]] || [[ "$condition" -eq 0 ]] 2>/dev/null; then
+    # "true"/"false" обрабатываем явно, остальное — как выражение [[ ... ]]
+    # Handle "true"/"false" explicitly, anything else as a [[ ... ]] expression
+    local result=1
+    if [[ "$condition" == "true" ]]; then
+        result=0
+    elif [[ "$condition" == "false" ]]; then
+        result=1
+    elif eval "[[ ${condition} ]]" 2>/dev/null; then
+        result=0
+    fi
+    
+    if [[ $result -eq 0 ]]; then
         echo -e "  ${GREEN}✓ $test_name: PASSED${NC}"
-        ((tests_passed++))
+        ((++tests_passed))
         return 0
     else
         echo -e "  ${RED}✗ $test_name: FAILED${NC}"
         echo -e "    ${RED}Expected true, got: $condition${NC}"
-        ((tests_failed++))
+        ((++tests_failed))
+        return 1
+    fi
+}
+
+# Функция проверки, что команда завершается с ошибкой
+# @description Assert that command/condition fails
+# @param $1 Command to run (or "false"/"true") / Команда для выполнения
+# @param $2 Test name / Название теста
+# @example testframework::assert_false "platformcheck::is_macos" "Not macOS"
+testframework::assert_false() {
+    local condition="$1"
+    local test_name="${2:-Unknown test}"
+    
+    ((++tests_run))
+    
+    local result=1
+    if [[ "$condition" == "false" ]]; then
+        result=0
+    elif [[ "$condition" == "true" ]]; then
+        result=1
+    elif ! eval "${condition}" >/dev/null 2>&1; then
+        result=0
+    fi
+    
+    if [[ $result -eq 0 ]]; then
+        echo -e "  ${GREEN}✓ $test_name: PASSED${NC}"
+        ((++tests_passed))
+        return 0
+    else
+        echo -e "  ${RED}✗ $test_name: FAILED${NC}"
+        echo -e "    ${RED}Expected failure, but succeeded: $condition${NC}"
+        ((++tests_failed))
         return 1
     fi
 }
@@ -63,17 +116,17 @@ testframework::assert_equal() {
     local actual="$2"
     local test_name="${3:-Unknown test}"
     
-    ((tests_run++))
+    ((++tests_run))
     
     if [[ "$expected" == "$actual" ]]; then
         echo -e "  ${GREEN}✓ $test_name: PASSED${NC}"
-        ((tests_passed++))
+        ((++tests_passed))
         return 0
     else
         echo -e "  ${RED}✗ $test_name: FAILED${NC}"
         echo -e "    ${RED}Expected: '$expected'${NC}"
         echo -e "    ${RED}Got:      '$actual'${NC}"
-        ((tests_failed++))
+        ((++tests_failed))
         return 1
     fi
 }
@@ -152,19 +205,24 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     # Этот файл запущен напрямую, демонстрируем использование
     # This file is run directly, demonstrate usage
     
+    # Пути от расположения скрипта, чтобы демо работало из любого каталога
+    # Paths relative to the script location so the demo works from any directory
+    TESTFRAMEWORK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    BS_ROOT_DIR="$(cd "${TESTFRAMEWORK_DIR}/.." && pwd)"
+    
     print_header "Test Framework Demo / Демонстрация тестового фреймворка"
     
     testframework::init
     
     # Тесты файловой системы
     testframework::section "Filesystem Tests / Тесты файловой системы"
-    testframework::assert_file_exists "boot.sh" "Boot file exists"
-    testframework::assert_file_exists "BS" "Main entrypoint exists"
+    testframework::assert_file_exists "${BS_ROOT_DIR}/boot.sh" "Boot file exists"
+    testframework::assert_file_exists "${BS_ROOT_DIR}/bs" "Main entrypoint exists"
     testframework::assert_file_exists "nonexistent" "Non-existent file test"
     
     # Тесты команд
     testframework::section "Command Tests / Тесты команд"
-    testframework::assert_command "ls -la boot.sh" "List boot file"
+    testframework::assert_command "ls -la '${BS_ROOT_DIR}/boot.sh'" "List boot file"
     testframework::assert_command "pwd" "Print working directory"
     testframework::assert_command "false" "Failing command test"
     

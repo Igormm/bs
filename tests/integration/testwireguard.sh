@@ -24,10 +24,12 @@ readonly BS_PROJECT_ROOT="$(cd "${TEST_SCRIPT_DIR}/../.." && pwd)"
 
 # Source test framework
 source "${TEST_SCRIPT_DIR}/../testframework.sh"
-source "${BS_PROJECT_ROOT}/boot.sh"
 
-# Initialize BS framework
-bs::init
+# Initialize BS framework (bootstrap; BS_HOME нужен lib-модулям — pre-existing расхождение BS_ROOT/BS_HOME)
+# Initialize BS framework (bootstrap; BS_HOME is needed by lib modules — pre-existing BS_ROOT/BS_HOME mismatch)
+export BS_SILENT=1
+source "${BS_PROJECT_ROOT}/bootstrap/init.sh"
+export BS_HOME="${BS_PROJECT_ROOT}"
 
 # Test configuration
 readonly TEST_INTERFACE="wg_test"
@@ -42,18 +44,18 @@ FAILED_TESTS=()
 
 # Test counter functions
 test_increment() {
-    ((TESTS_RUN++))
+    ((++TESTS_RUN))
 }
 
 test_pass() {
     test_increment
-    ((TESTS_PASSED++))
+    ((++TESTS_PASSED))
     log::success "✓ ${FUNCNAME[1]}"
 }
 
 test_fail() {
     test_increment
-    ((TESTS_FAILED++))
+    ((++TESTS_FAILED))
     FAILED_TESTS+=("${FUNCNAME[1]}")
     log::error "✗ ${FUNCNAME[1]}"
 }
@@ -271,12 +273,12 @@ test_error_handling() {
     
     # Test invalid interface name
     if ! wireguard::create_interface "" "10.0.0.1/24" 2>/dev/null; then
-        ((error_caught++))
+        ((++error_caught))
     fi
     
     # Test invalid peer addition
     if ! wireguard::add_peer "nonexistent" "key" "" 2>/dev/null; then
-        ((error_caught++))
+        ((++error_caught))
     fi
     
     if [[ "${error_caught}" -ge 2 ]]; then
@@ -390,21 +392,21 @@ main() {
     # Register cleanup on exit
     trap cleanup EXIT
     
-    # Run tests
-    test_module_initialization
-    test_directory_creation
-    test_keypair_generation
-    test_interface_creation
-    test_configuration_validation
-    test_peer_management
-    test_interface_listing
-    test_backup_functionality
-    test_public_ip_detection
-    test_client_configuration
-    test_module_info
-    test_error_handling
-    test_key_permissions
-    test_configuration_permissions
+    # Run tests (|| true: падение одного теста не прерывает прогон / a failing test does not abort the run)
+    test_module_initialization || true
+    test_directory_creation || true
+    test_keypair_generation || true
+    test_interface_creation || true
+    test_configuration_validation || true
+    test_peer_management || true
+    test_interface_listing || true
+    test_backup_functionality || true
+    test_public_ip_detection || true
+    test_client_configuration || true
+    test_module_info || true
+    test_error_handling || true
+    test_key_permissions || true
+    test_configuration_permissions || true
     
     # Print summary
     print_summary

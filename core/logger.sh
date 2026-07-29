@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+#
 # core/logger.sh — модуль логирования фреймворка BS
 # core/logger.sh — BS framework logging module
 #
@@ -20,8 +21,10 @@
 # BS_LOG_COLOR=auto|always|never (по умолчанию auto / default: auto)
 # BS_LOG_FORMAT=text|json|structured (по умолчанию text / default: text)
 # BS_LOG_TIMESTAMP=true|false (по умолчанию true / default: true)
+#
 
-set -euo pipefail
+# Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
+# Note: strict mode (set -euo pipefail) and IFS are set only in entry points
 
 # Настройки по умолчанию / Default settings
 : "${BS_LOG_LEVEL:=INFO}"
@@ -120,6 +123,21 @@ log::__get_level_color() {
 }
 
 # @private
+# @description Экранировать строку для вставки в JSON
+# @description Escape string for embedding into JSON
+# @param $1 Raw string / Исходная строка
+# @return Escaped string / Экранированная строка
+log::__json_escape() {
+    local s="${1}"
+    s="${s//\\/\\\\}"      # Обратный слэш / Backslash
+    s="${s//\"/\\\"}"      # Кавычка / Quote
+    s="${s//$'\n'/\\n}"    # Перевод строки / Newline
+    s="${s//$'\r'/\\r}"    # Возврат каретки / Carriage return
+    s="${s//$'\t'/\\t}"    # Табуляция / Tab
+    printf '%s' "${s}"
+}
+
+# @private
 # @description Форматировать сообщение для вывода
 # @description Format message for output
 # @param $1 Log level / Уровень логирования
@@ -136,11 +154,13 @@ log::__format_message() {
     case "${BS_LOG_FORMAT}" in
         json)
             # JSON формат / JSON format
+            local escaped_text
+            escaped_text="$(log::__json_escape "${text}")"
             if [[ -n "$timestamp" ]]; then
                 printf '{"timestamp":"%s","level":"%s","message":"%s"}\n' \
-                    "$timestamp" "$level" "$text"
+                    "$timestamp" "$level" "$escaped_text"
             else
-                printf '{"level":"%s","message":"%s"}\n' "$level" "$text"
+                printf '{"level":"%s","message":"%s"}\n' "$level" "$escaped_text"
             fi
             ;;
         structured)
@@ -244,18 +264,23 @@ log::error() {
     log::__format_message "ERROR" "$@" >&2
 }
 
-# @description Вывести фатальное сообщение и завершить работу
-# @description Output FATAL level message and exit
+# @description Вывести фатальное сообщение и вернуть код ошибки
+# @description Output FATAL level message and return error code
 # @param $@ Message text / Текст сообщения
+# @return E_ERROR (или 1, если const.sh не загружен) / E_ERROR (or 1 if const.sh not
+# loaded)
 # @example
-#   log::fatal "Critical error, cannot continue"
+#   log::fatal "Critical error, cannot continue" || exit 1
 log::fatal() {
-    log::__is_level_allowed "FATAL" || return 0
-    log::__format_message "FATAL" "$@" >&2
+    if log::__is_level_allowed "FATAL"; then
+        log::__format_message "FATAL" "$@" >&2
+    fi
     
-    # Фатальные ошибки требуют немедленного выхода
-    # Fatal errors require immediate exit
-    exit 1
+    # Библиотечная функция не завершает чужой скрипт: возвращаем код,
+    # решение о выходе остаётся за вызывающим
+    # Library function must not exit the caller's script: return a code,
+    # the decision to exit is up to the caller
+    return "${E_ERROR:-1}"
 }
 
 # @description Алиас для log::info для обратной совместимости

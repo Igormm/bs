@@ -18,7 +18,7 @@ system::devices::mouse() {
     fi
     
     # For X11 systems / Для систем X11
-    if command -v xinput >/dev/null 2>&1; then
+    if utils::has xinput; then
         # Find mouse devices / Найти устройства мыши
         local mice=$(xinput list --name-only | grep -i mouse)
         
@@ -26,14 +26,14 @@ system::devices::mouse() {
             acceleration)
                 # Set mouse acceleration / Установить ускорение мыши
                 for mouse in ${mice}; do
-                    xinput set-prop "${mouse}" "libinput Accel Speed" "${value}" 2>/dev/null || true
+                    utils::quiet_err xinput set-prop "${mouse}" "libinput Accel Speed" "${value}" || :
                 done
                 log::info "Mouse acceleration set to ${value}"
                 ;;
             sensitivity)
                 # Set mouse sensitivity / Установить чувствительность мыши
                 for mouse in ${mice}; do
-                    xinput set-prop "${mouse}" "libinput Accel Speed" "${value}" 2>/dev/null || true
+                    utils::quiet_err xinput set-prop "${mouse}" "libinput Accel Speed" "${value}" || :
                 done
                 log::info "Mouse sensitivity set to ${value}"
                 ;;
@@ -46,7 +46,7 @@ system::devices::mouse() {
                 fi
                 
                 for mouse in ${mice}; do
-                    xinput set-prop "${mouse}" "libinput Natural Scrolling Enabled" "${scroll_value}" 2>/dev/null || true
+                    utils::quiet_err xinput set-prop "${mouse}" "libinput Natural Scrolling Enabled" "${scroll_value}" || :
                 done
                 log::info "Mouse natural scrolling set to ${value}"
                 ;;
@@ -78,10 +78,10 @@ system::devices::keyboard() {
     case "${setting}" in
         repeat-rate)
             # Set keyboard repeat rate
-            if command -v xset >/dev/null 2>&1; then
+            if utils::has xset; then
                 # Get current delay
                 local delay=$(xset q 2>/dev/null | grep rate | awk '{print $4}')
-                xset r rate "${delay}" "${value}" 2>/dev/null || true
+                utils::quiet_err xset r rate "${delay}" "${value}" || :
                 log::info "Keyboard repeat rate set to ${value}"
             else
                 log::warn "xset not available, cannot set keyboard repeat rate"
@@ -90,7 +90,7 @@ system::devices::keyboard() {
             ;;
         repeat-delay)
             # Set keyboard repeat delay
-            if command -v xset >/dev/null 2>&1; then
+            if utils::has xset; then
                 # Get current rate
                 local rate=$(xset q 2>/dev/null | grep rate | awk '{print $5}')
                 xset r rate "${value}" "${rate}" 2>/dev/null || true
@@ -102,7 +102,7 @@ system::devices::keyboard() {
             ;;
         layout)
             # Set keyboard layout
-            if command -v setxkbmap >/dev/null 2>&1; then
+            if utils::has setxkbmap; then
                 setxkbmap "${value}" 2>/dev/null || true
                 log::info "Keyboard layout set to ${value}"
             else
@@ -132,7 +132,7 @@ system::devices::touchpad() {
     fi
     
     # For X11 systems with libinput
-    if command -v xinput >/dev/null 2>&1; then
+    if utils::has xinput; then
         # Find touchpad devices
         local touchpads=$(xinput list --name-only | grep -i touchpad)
         
@@ -179,11 +179,11 @@ system::devices::touchpad() {
 #   system::devices::list
 system::devices::list() {
     # For X11 systems
-    if command -v xinput >/dev/null 2>&1; then
+    if utils::has xinput; then
         xinput list 2>/dev/null || true
     else
         # Fallback to lsinput if available
-        if command -v lsinput >/dev/null 2>&1; then
+        if utils::has lsinput; then
             lsinput 2>/dev/null || true
         else
             # Fallback to /proc/bus/input/devices
@@ -212,7 +212,7 @@ system::devices::audio() {
     fi
     
     # For systems with PulseAudio
-    if command -v pactl >/dev/null 2>&1; then
+    if utils::has pactl; then
         case "${setting}" in
             volume)
                 # Set volume
@@ -240,7 +240,7 @@ system::devices::audio() {
                 ;;
         esac
     # For systems with ALSA
-    elif command -v amixer >/dev/null 2>&1; then
+    elif utils::has amixer; then
         case "${setting}" in
             volume)
                 # Set volume
@@ -286,7 +286,7 @@ system::devices::display() {
         brightness)
             # Set display brightness
             # Try xrandr first
-            if command -v xrandr >/dev/null 2>&1; then
+            if utils::has xrandr; then
                 # Get primary output
                 local primary=$(xrandr --query | grep " connected" | head -n 1 | awk '{print $1}')
                 if [[ -n "${primary}" ]]; then
@@ -309,7 +309,7 @@ system::devices::display() {
             ;;
         primary)
             # Set primary display
-            if command -v xrandr >/dev/null 2>&1; then
+            if utils::has xrandr; then
                 xrandr --output "${value}" --primary 2>/dev/null || true
                 log::info "Primary display set to ${value}"
             else
@@ -319,7 +319,7 @@ system::devices::display() {
             ;;
         off)
             # Turn off display
-            if command -v xrandr >/dev/null 2>&1; then
+            if utils::has xrandr; then
                 xrandr --output "${value}" --off 2>/dev/null || true
                 log::info "Display ${value} turned off"
             else

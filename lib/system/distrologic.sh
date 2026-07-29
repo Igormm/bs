@@ -33,15 +33,15 @@ system::distrologic::pkg_install_debian() {
 system::distrologic::pkg_install_fedora() {
     if system::distro::is_family "redhat"; then
         local pkg_manager
-        if command -v dnf >/dev/null 2>&1; then
+        if utils::has dnf; then
             pkg_manager="dnf"
-        elif command -v yum >/dev/null 2>&1; then
+        elif utils::has yum; then
             pkg_manager="yum"
         else
             log::error "No supported package manager found"
             return 1
         fi
-        
+
         ${pkg_manager} install -y "$@"
     else
         log::warn "Not a RedHat-based system"
@@ -114,15 +114,15 @@ system::distrologic::pkg_remove_debian() {
 system::distrologic::pkg_remove_fedora() {
     if system::distro::is_family "redhat"; then
         local pkg_manager
-        if command -v dnf >/dev/null 2>&1; then
+        if utils::has dnf; then
             pkg_manager="dnf"
-        elif command -v yum >/dev/null 2>&1; then
+        elif utils::has yum; then
             pkg_manager="yum"
         else
             log::error "No supported package manager found"
             return 1
         fi
-        
+
         ${pkg_manager} remove -y "$@"
     else
         log::warn "Not a RedHat-based system"
@@ -139,7 +139,7 @@ system::distrologic::pkg_update_all() {
             apt-get update && apt-get upgrade -y
             ;;
         "redhat")
-            if command -v dnf >/dev/null 2>&1; then
+            if utils::has dnf; then
                 dnf check-update && dnf upgrade -y
             else
                 yum check-update && yum update -y
@@ -173,7 +173,7 @@ system::distrologic::pkg_search_cross() {
             apt-cache search "${package}"
             ;;
         "redhat")
-            if command -v dnf >/dev/null 2>&1; then
+            if utils::has dnf; then
                 dnf search "${package}"
             else
                 yum search "${package}"
@@ -204,7 +204,7 @@ system::distrologic::pkg_clean_all() {
             apt-get autoremove -y && apt-get autoclean
             ;;
         "redhat")
-            if command -v dnf >/dev/null 2>&1; then
+            if utils::has dnf; then
                 dnf autoremove -y && dnf clean all
             else
                 yum autoremove -y && yum clean all
@@ -217,7 +217,7 @@ system::distrologic::pkg_clean_all() {
             zypper clean --all
             ;;
         "alpine")
-            rm -rf /var/cache/apk/*
+            apk cache clean
             ;;
         *)
             log::warn "Unknown distribution family: ${DISTRO_FAMILY}"
@@ -231,13 +231,13 @@ system::distrologic::pkg_clean_all() {
 # @example
 #   manager=$(system::distrologic::service_manager_detect)
 system::distrologic::service_manager_detect() {
-    if command -v systemctl >/dev/null 2>&1; then
+    if utils::has systemctl; then
         echo "systemd"
     elif [[ -d /etc/init.d ]]; then
         echo "sysvinit"
-    elif command -v initctl >/dev/null 2>&1; then
+    elif utils::has initctl; then
         echo "upstart"
-    elif command -v rc-service >/dev/null 2>&1; then
+    elif utils::has rc-service; then
         echo "openrc"
     else
         echo "unknown"
@@ -287,7 +287,7 @@ system::distrologic::service_manage_openrc() {
     local service="${1}"
     local action="${2}"
     
-    if command -v rc-service >/dev/null 2>&1; then
+    if utils::has rc-service; then
         rc-service "${service}" "${action}"
         if [[ "${action}" == "enable" ]] || [[ "${action}" == "disable" ]]; then
             rc-update "${action}" "${service}"
@@ -336,7 +336,7 @@ system::distrologic::service_unmask() {
 # system::distrologic::network_configure_nmcli "con modify" "eth0"
 # "connection.autoconnect" "yes"
 system::distrologic::network_configure_nmcli() {
-    if command -v nmcli >/dev/null 2>&1; then
+    if utils::has nmcli; then
         nmcli "$@"
     else
         log::warn "nmcli not available"
@@ -351,7 +351,7 @@ system::distrologic::network_configure_nmcli() {
 system::distrologic::network_configure_netplan() {
     local config_file="${1}"
     
-    if command -v netplan >/dev/null 2>&1; then
+    if utils::has netplan; then
         if [[ -f "${config_file}" ]]; then
             netplan apply
         else
@@ -373,7 +373,7 @@ system::distrologic::security_configure_selinux() {
     local cmd="${1}"
     shift
     
-    if command -v "se${cmd}" >/dev/null 2>&1; then
+    if utils::has "se${cmd}"; then
         "se${cmd}" "$@"
     elif [[ -f /usr/sbin/sestatus ]] && [[ "${cmd}" == "setenforce" ]]; then
         /usr/sbin/sestatus -v | grep -q "SELinux status:.*enabled" && /usr/sbin/setenforce "$@"
@@ -392,17 +392,17 @@ system::distrologic::security_configure_apparmor() {
     local action="${1}"
     local profile="${2:-}"
     
-    if command -v apparmor_parser >/dev/null 2>&1; then
+    if utils::has apparmor_parser; then
         case "${action}" in
             "enable")
                 if [[ -n "${profile}" ]]; then
-                    ln -s "/etc/apparmor.d/${profile}" "/etc/apparmor.d/force-enabled/${profile}" 2>/dev/null || true
+                    utils::quiet_err ln -s "/etc/apparmor.d/${profile}" "/etc/apparmor.d/force-enabled/${profile}" || :
                 fi
                 systemctl start apparmor
                 ;;
             "disable")
                 if [[ -n "${profile}" ]]; then
-                    rm -f "/etc/apparmor.d/force-enabled/${profile}" 2>/dev/null || true
+                    utils::quiet_err rm -f "/etc/apparmor.d/force-enabled/${profile}" || :
                 fi
                 ;;
             "complain")
@@ -431,7 +431,7 @@ system::distrologic::security_configure_apparmor() {
 # @example
 #   system::distrologic::security_firewalld_setup "--permanent" "--add-port=80/tcp"
 system::distrologic::security_firewalld_setup() {
-    if command -v firewall-cmd >/dev/null 2>&1; then
+    if utils::has firewall-cmd; then
         firewall-cmd "$@"
         if [[ "$*" == *"--permanent"* ]]; then
             firewall-cmd --reload
@@ -447,7 +447,7 @@ system::distrologic::security_firewalld_setup() {
 # @example
 #   system::distrologic::security_ufw_setup "allow" "80/tcp"
 system::distrologic::security_ufw_setup() {
-    if command -v ufw >/dev/null 2>&1; then
+    if utils::has ufw; then
         ufw "$@"
     else
         log::warn "ufw not available"
@@ -461,7 +461,7 @@ system::distrologic::security_ufw_setup() {
 # system::distrologic::security_iptables_setup "-A" "INPUT" "-p" "tcp" "--dport" "80"
 # "-j" "ACCEPT"
 system::distrologic::security_iptables_setup() {
-    if command -v iptables >/dev/null 2>&1; then
+    if utils::has iptables; then
         iptables "$@"
     else
         log::warn "iptables not available"
@@ -476,7 +476,7 @@ system::distrologic::security_iptables_setup() {
 system::distrologic::time_sync_systemd() {
     local timezone="${1}"
     
-    if command -v timedatectl >/dev/null 2>&1; then
+    if utils::has timedatectl; then
         timedatectl set-timezone "${timezone}"
     else
         log::warn "timedatectl not available"
@@ -488,7 +488,7 @@ system::distrologic::time_sync_systemd() {
 # @example
 #   system::distrologic::hwclock_sync
 system::distrologic::hwclock_sync() {
-    if command -v hwclock >/dev/null 2>&1; then
+    if utils::has hwclock; then
         # Sync hardware clock to system clock
         hwclock --systohc
     else
@@ -504,7 +504,7 @@ system::distrologic::hwclock_sync() {
 system::distrologic::sudo_configure() {
     local username="${1}"
     
-    if command -v usermod >/dev/null 2>&1; then
+    if utils::has usermod; then
         case "${DISTRO_FAMILY}" in
             "debian")
                 usermod -aG sudo "${username}"
@@ -533,7 +533,7 @@ system::distrologic::sysctl_configure() {
     local param="${1}"
     local value="${2}"
     
-    if command -v sysctl >/dev/null 2>&1; then
+    if utils::has sysctl; then
         sysctl -w "${param}=${value}"
     else
         log::warn "sysctl not available"
@@ -551,8 +551,14 @@ system::distrologic::sysctl_persist() {
     local value="${2}"
     local config_file="/etc/sysctl.conf"
     
-    # Add to sysctl.conf to persist after reboot
-    echo "${param} = ${value}" >> "${config_file}"
+    # Add to sysctl.conf to persist after reboot (idempotent) / Добавить в sysctl.conf
+    # для сохранения после перезагрузки (идемпотентно)
+    local line="${param} = ${value}"
+    if [[ -f "${config_file}" ]] && utils::quiet_err grep -Fqx "${line}" "${config_file}"; then
+        log::info "sysctl parameter already persistent: ${line}"
+        return 0
+    fi
+    echo "${line}" >> "${config_file}"
 }
 
 # @description Format filesystem as ext4 / Форматировать файловую систему в ext4
@@ -562,7 +568,7 @@ system::distrologic::sysctl_persist() {
 system::distrologic::fs_format_ext4() {
     local device="${1}"
     
-    if command -v mkfs.ext4 >/dev/null 2>&1; then
+    if utils::has mkfs.ext4; then
         mkfs.ext4 "${device}"
     else
         log::warn "mkfs.ext4 not available"
@@ -577,7 +583,7 @@ system::distrologic::fs_format_ext4() {
 system::distrologic::fs_format_xfs() {
     local device="${1}"
     
-    if command -v mkfs.xfs >/dev/null 2>&1; then
+    if utils::has mkfs.xfs; then
         mkfs.xfs "${device}"
     else
         log::warn "mkfs.xfs not available"
@@ -592,25 +598,39 @@ system::distrologic::fs_format_xfs() {
 system::distrologic::fs_check() {
     local device="${1}"
     
-    case "${device}" in
-        *ext*|*.ext*)
-            if command -v fsck.ext4 >/dev/null 2>&1; then
-                fsck.ext4 -f "${device}"
+    # Determine filesystem type / Определить тип файловой системы
+    local fs_type=""
+    if utils::has blkid; then
+        fs_type=$(utils::quiet_err blkid -o value -s TYPE "${device}")
+    fi
+    # Fallback to findmnt / Резервный вариант findmnt
+    if [[ -z "${fs_type}" ]] && utils::has findmnt; then
+        fs_type=$(utils::quiet_err findmnt -n -o FSTYPE "${device}")
+    fi
+    # Fallback to df -T / Резервный вариант df -T
+    if [[ -z "${fs_type}" ]]; then
+        fs_type=$(df -T "${device}" 2>/dev/null | awk 'NR==2 {print $2}')
+    fi
+    
+    case "${fs_type}" in
+        ext2|ext3|ext4)
+            if utils::has "fsck.${fs_type}"; then
+                "fsck.${fs_type}" -f "${device}"
             else
                 log::warn "e2fsck not available"
                 return 1
             fi
             ;;
-        *xfs*|*.xfs*)
-            if command -v xfs_repair >/dev/null 2>&1; then
+        xfs)
+            if utils::has xfs_repair; then
                 xfs_repair "${device}"
             else
                 log::warn "xfs_repair not available"
                 return 1
             fi
             ;;
-        *btrfs*|*.btrfs*)
-            if command -v btrfs >/dev/null 2>&1; then
+        btrfs)
+            if utils::has btrfs; then
                 btrfs check "${device}"
             else
                 log::warn "btrfs not available"
@@ -618,7 +638,10 @@ system::distrologic::fs_check() {
             fi
             ;;
         *)
-            if command -v fsck >/dev/null 2>&1; then
+            if [[ -n "${fs_type}" ]]; then
+                log::warn "Unknown filesystem type '${fs_type}', using generic fsck"
+            fi
+            if utils::has fsck; then
                 fsck -f "${device}"
             else
                 log::warn "fsck not available"

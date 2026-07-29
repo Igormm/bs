@@ -40,7 +40,7 @@
 
 # Check if module is already loaded
 if [[ -n "${BOSA_LIB_INTEGRATION_VK_MUSIC_LOADED:-}" ]]; then
-    log::debug "VK Music module already loaded" 2>/dev/null || true
+    utils::ignore log::debug "VK Music module already loaded"
     return 0
 fi
 readonly BOSA_LIB_INTEGRATION_VK_MUSIC_LOADED=1
@@ -93,29 +93,29 @@ vkmusic::init() {
 }
 
 # Check VK Music dependencies
-check_dependencies() {
+vkmusic::check_dependencies() {
     local func_name="vkmusic::check_dependencies"
     local missing_deps=()
     
     log::debug "Checking VK Music dependencies..."
     
     # Check for curl
-    if ! command -v curl >/dev/null 2>&1; then
+    if ! utils::has curl; then
         missing_deps+=("curl")
     fi
     
     # Check for jq
-    if ! command -v jq >/dev/null 2>&1; then
+    if ! utils::has jq; then
         missing_deps+=("jq")
     fi
     
     # Check for ffmpeg
-    if ! command -v ffmpeg >/dev/null 2>&1; then
+    if ! utils::has ffmpeg; then
         missing_deps+=("ffmpeg")
     fi
     
     # Check for id3tag
-    if ! command -v id3tag >/dev/null 2>&1 && ! command -v eyeD3 >/dev/null 2>&1; then
+    if ! utils::has id3tag && ! utils::has eyeD3; then
         missing_deps+=("id3tag")
     fi
     
@@ -129,7 +129,7 @@ check_dependencies() {
 }
 
 # Install missing dependencies
-install_dependencies() {
+vkmusic::install_dependencies() {
     local func_name="vkmusic::install_dependencies"
     local deps=("$@")
     
@@ -144,7 +144,7 @@ install_dependencies() {
     elif platformcheck::is_alma || platformcheck::is_fedora; then
         dnf install -y curl jq ffmpeg eyed3
     elif platformcheck::is_macos; then
-        if ! command -v brew >/dev/null 2>&1; then
+        if ! utils::has brew; then
             errorhandler::throw "${func_name}" "Homebrew is required for macOS" \
                 "${LIB_ERROR_DEPENDENCY_MISSING}"
         fi
@@ -158,7 +158,7 @@ install_dependencies() {
 }
 
 # Authenticate with VK API
-auth() {
+vkmusic::auth() {
     local func_name="vkmusic::auth"
     local access_token="${1:-}"
     local user_id="${2:-}"
@@ -179,7 +179,7 @@ auth() {
 }
 
 # Search for audio tracks
-search() {
+vkmusic::search() {
     local func_name="vkmusic::search"
     local query="${1:-}"
     local count="${2:-10}"
@@ -226,7 +226,7 @@ search() {
 }
 
 # Display search results
-display_search_results() {
+vkmusic::display_search_results() {
     local func_name="vkmusic::display_search_results"
     
     if [[ ${#VK_MUSIC_LAST_SEARCH_RESULTS[@]} -eq 0 ]]; then
@@ -263,7 +263,7 @@ display_search_results() {
 }
 
 # Get audio by ID
-get_audio() {
+vkmusic::get_audio() {
     local func_name="vkmusic::get_audio"
     local owner_id="${1:-}"
     local audio_id="${2:-}"
@@ -283,7 +283,7 @@ get_audio() {
 }
 
 # Get user's audio
-tget_user_audio() {
+vkmusic::get_user_audio() {
     local func_name="vkmusic::get_user_audio"
     local user_id="${1:-}"
     local count="${2:-100}"
@@ -304,7 +304,7 @@ tget_user_audio() {
 }
 
 # Get recommendations
-get_recommendations() {
+vkmusic::get_recommendations() {
     local func_name="vkmusic::get_recommendations"
     local user_id="${1:-}"
     local count="${2:-20}"
@@ -323,7 +323,7 @@ get_recommendations() {
 }
 
 # Get popular tracks
-get_popular() {
+vkmusic::get_popular() {
     local func_name="vkmusic::get_popular"
     local genre_id="${1:-}"
     local count="${2:-20}"
@@ -342,7 +342,7 @@ get_popular() {
 }
 
 # Get audio genres
-get_genres() {
+vkmusic::get_genres() {
     local func_name="vkmusic::get_genres"
     
     log::info "Getting audio genres..."
@@ -354,7 +354,7 @@ get_genres() {
 }
 
 # Add audio to user page
-add_audio() {
+vkmusic::add_audio() {
     local func_name="vkmusic::add_audio"
     local owner_id="${1:-}"
     local audio_id="${2:-}"
@@ -375,7 +375,7 @@ add_audio() {
 }
 
 # Delete audio
-delete_audio() {
+vkmusic::delete_audio() {
     local func_name="vkmusic::delete_audio"
     local owner_id="${1:-}"
     local audio_id="${2:-}"
@@ -396,7 +396,7 @@ delete_audio() {
 }
 
 # Create playlist
-create_playlist() {
+vkmusic::create_playlist() {
     local func_name="vkmusic::create_playlist"
     local title="${1:-}"
     local description="${2:-}"
@@ -421,7 +421,7 @@ create_playlist() {
 }
 
 # Get user's playlists
-get_playlists() {
+vkmusic::get_playlists() {
     local func_name="vkmusic::get_playlists"
     local user_id="${1:-}"
     local count="${2:-50}"
@@ -441,8 +441,7 @@ get_playlists() {
 }
 
 # Download audio file
-download() {
-    local func_name="vkmusic::download"
+vkmusic::download() {
     local audio_info="${1:-}"
     local output_dir="${2:-${VK_MUSIC_DOWNLOAD_DIR}}"
     local filename="${3:-}"
@@ -524,7 +523,7 @@ download() {
 }
 
 # Add metadata to audio file
-add_metadata() {
+vkmusic::add_metadata() {
     local func_name="vkmusic::add_metadata"
     local file="${1:-}"
     local artist="${2:-}"
@@ -539,17 +538,17 @@ add_metadata() {
     log::debug "Adding metadata to: ${file}"
     
     # Use eyeD3 if available, otherwise try id3tag
-    if command -v eyeD3 >/dev/null 2>&1; then
-        eyeD3 --artist="${artist}" --title="${title}" "${file}" >/dev/null 2>&1
-    elif command -v id3tag >/dev/null 2>&1; then
-        id3tag --artist="${artist}" --title="${title}" "${file}" >/dev/null 2>&1
+    if utils::has eyeD3; then
+        utils::quiet eyeD3 --artist="${artist}" --title="${title}" "${file}"
+    elif utils::has id3tag; then
+        utils::quiet id3tag --artist="${artist}" --title="${title}" "${file}"
     else
         log::warn "No ID3 tagger found, skipping metadata"
     fi
 }
 
 # Batch download
-batch_download() {
+vkmusic::batch_download() {
     local func_name="vkmusic::batch_download"
     local audio_list="${1:-}"
     local output_dir="${2:-${VK_MUSIC_DOWNLOAD_DIR}}"
@@ -579,7 +578,7 @@ batch_download() {
 }
 
 # Search and download
-search_and_download() {
+vkmusic::search_and_download() {
     local func_name="vkmusic::search_and_download"
     local query="${1:-}"
     local count="${2:-5}"
@@ -611,7 +610,7 @@ search_and_download() {
 }
 
 # Get lyrics
-get_lyrics() {
+vkmusic::get_lyrics() {
     local func_name="vkmusic::get_lyrics"
     local owner_id="${1:-}"
     local audio_id="${2:-}"
@@ -631,7 +630,7 @@ get_lyrics() {
 }
 
 # Create playlist file
-create_playlist_file() {
+vkmusic::create_playlist_file() {
     local func_name="vkmusic::create_playlist_file"
     local playlist_name="${1:-}"
     local audio_ids="${2:-}"
@@ -681,7 +680,7 @@ create_playlist_file() {
 }
 
 # Get audio count
-get_audio_count() {
+vkmusic::get_audio_count() {
     local func_name="vkmusic::get_audio_count"
     local user_id="${1:-}"
     
@@ -698,7 +697,7 @@ get_audio_count() {
 }
 
 # Get audio upload server
-get_upload_server() {
+vkmusic::get_upload_server() {
     local func_name="vkmusic::get_upload_server"
     
     log::info "Getting audio upload server..."
@@ -710,7 +709,7 @@ get_upload_server() {
 }
 
 # Upload audio file
-upload_audio() {
+vkmusic::upload_audio() {
     local func_name="vkmusic::upload_audio"
     local file_path="${1:-}"
     local title="${2:-}"
@@ -763,7 +762,7 @@ upload_audio() {
 }
 
 # Clear cache
-clear_cache() {
+vkmusic::clear_cache() {
     local func_name="vkmusic::clear_cache"
     
     log::info "Clearing VK Music cache..."
@@ -774,7 +773,7 @@ clear_cache() {
 }
 
 # Get statistics
-get_stats() {
+vkmusic::get_stats() {
     local func_name="vkmusic::get_stats"
     
     local download_count
@@ -798,7 +797,7 @@ EOF
 }
 
 # Module info
-info() {
+vkmusic::info() {
     cat << EOF
 VK Music Integration Module v1.0.0
 

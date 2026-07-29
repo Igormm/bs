@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
-# BS bootstrap initializer / Инициализатор бутстрапа BS
+#
+# Bs bootstrap initializer / Инициализатор бутстрапа BS
 # Purpose: detect project root, export BS_ROOT, and load core via loader.
 # Назначение: определить корень проекта, экспортировать BS_ROOT и загрузить ядро через loader.
+#
 
-set -euo pipefail
-IFS=$'\n\t'
+# Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа,
+# этот файл подключается через source и не должен менять настройки чужого shell
+# Note: strict mode (set -euo pipefail) and IFS are set only in entry points;
+# this file is sourced and must not change the caller's shell settings
 
 # @description Show usage help. This file must be sourced.
 usage() {
@@ -57,6 +61,8 @@ append_local_bin_to_path() {
     *) export PATH="${needle}:${PATH}" ;;
   esac
 }
+
+# Add local bin to PATH
 append_local_bin_to_path
 
 # Load loader
@@ -76,6 +82,7 @@ load "core/const"
 load "core/logger"
 load "core/errorhandler"
 load "core/version"
+load "core/utils"
 
 # Mark as initialized
 export BS_INITIALIZED=1
@@ -84,5 +91,3 @@ export BS_INITIALIZED=1
 if [[ "${BS_SILENT:-0}" != 1 ]]; then
   printf 'BS bootstrap initialized from: %s\n' "${BS_ROOT}"
 fi
-
-# End of file

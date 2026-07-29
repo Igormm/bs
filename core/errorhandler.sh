@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+#
 # errorhandler.sh — единый EXIT-хендлер и cleanup-хуки / unified EXIT handler and cleanup
 # hooks
 #
@@ -7,6 +8,10 @@
 #     cleanup::add my_cleanup_function
 # - при завершении скрипта (даже при ошибке) cleanup выполнится / on script exit (even on
 # error) cleanup will execute
+#
+
+# Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
+# Note: strict mode (set -euo pipefail) and IFS are set only in entry points
 
 declare -ga BS_CLEANUP_STACK=()
 
@@ -31,13 +36,46 @@ cleanup::__run_all() {
 	for ((i = ${#BS_CLEANUP_STACK[@]} - 1; i >= 0; i--)); do
 		"${BS_CLEANUP_STACK[$i]}" || true
 	done
+	# Очищаем стек после прогона: повторный вызов (ручной + trap EXIT) безопасен
+	# Clear stack after run: repeated call (manual + EXIT trap) is safe
+	BS_CLEANUP_STACK=()
 }
 
 BS::__on_exit() {
 	cleanup::__run_all
 }
 
-trap 'BS::__on_exit' EXIT
+# @description Install EXIT trap running the cleanup stack (entry points only)
+# / Установить EXIT-trap, выполняющий стек очистки (только для точек входа)
+# @example
+#   errorhandler::setup_trap
+errorhandler::setup_trap() {
+	trap 'BS::__on_exit' EXIT
+}
+
+# @description Log an error and return its code without exiting
+# / Записать ошибку в лог и вернуть её код, не завершая скрипт
+# @param $1 Function name where the error occurred / Имя функции, где произошла ошибка
+# @param $2 Error message / Сообщение об ошибке
+# @param $3 [optional] Error code (default: E_ERROR) / Код ошибки (по умолчанию E_ERROR)
+# @return Error code / Код ошибки
+# @example
+#   errorhandler::throw "my::func" "Something failed" "${LIB_ERROR_FILE_NOT_FOUND}"
+errorhandler::throw() {
+	local func_name="${1:-unknown}"
+	local message="${2:-}"
+	local code="${3:-${E_ERROR:-1}}"
+
+	# Логируем через log::error, если logger загружен, иначе — в stderr
+	# Log via log::error if logger is loaded, otherwise to stderr
+	if declare -F log::error >/dev/null 2>&1; then
+		log::error "[${func_name}] ${message}"
+	else
+		printf 'ERROR [%s] %s\n' "${func_name}" "${message}" >&2
+	fi
+
+	return "${code}"
+}
 
 # @description Exit BS application with cleanup / Выход из приложения BS с очисткой
 # @param $1 [optional] Exit code (default: 0) / Код выхода (по умолчанию 0)

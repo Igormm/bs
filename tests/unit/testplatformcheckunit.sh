@@ -7,12 +7,21 @@
 
 set -euo pipefail
 
-# Подключаем тестовый фреймворк
-source "../testframework.sh"
+# Подключаем тестовый фреймворк (пути от расположения скрипта)
+# Source test framework (paths relative to the script location)
+readonly TEST_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly BS_PROJECT_ROOT="$(cd "${TEST_SCRIPT_DIR}/../.." && pwd)"
 
-# Подключаем тестируемый модуль
-source "../../../boot.sh"
-bs::init
+source "${TEST_SCRIPT_DIR}/../testframework.sh"
+
+# Подключаем bootstrap BS (ядро загружается через loader)
+# Source BS bootstrap (core is loaded via the loader)
+export BS_SILENT=1
+source "${BS_PROJECT_ROOT}/bootstrap/init.sh"
+
+# lib-модули подключают core через BS_HOME (pre-existing расхождение BS_ROOT/BS_HOME)
+# lib modules source core via BS_HOME (pre-existing BS_ROOT/BS_HOME mismatch)
+export BS_HOME="${BS_PROJECT_ROOT}"
 
 # Главная функция тестов
 main() {
@@ -34,7 +43,7 @@ main() {
     
     # Тестируем macOS
     export OSTYPE="darwin20.0"
-    testframework::assert_true "platformcheck::is_macos" "macOS detected"
+    testframework::assert_command "platformcheck::is_macos" "macOS detected"
     testframework::assert_false "platformcheck::is_linux" "Linux not detected on macOS"
     
     # Тестируем Linux

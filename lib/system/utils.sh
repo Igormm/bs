@@ -174,7 +174,10 @@ system::utils::get_system_architecture() {
 #   system::utils::process_start "sleep 100"
 system::utils::process_start() {
     local cmd="${1}"
-    eval "${cmd}" &
+    # Split command into arguments (no eval) / Разбиваем команду на аргументы (без eval)
+    local -a cmd_args
+    read -ra cmd_args <<< "${cmd}"
+    "${cmd_args[@]}" &
 }
 
 # @description Stop a process by PID / Остановить процесс по PID
@@ -426,8 +429,9 @@ system::utils::security_hash_password() {
     if command -v htpasswd >/dev/null 2>&1; then
         echo "${password}" | htpasswd -i -B -n testuser | cut -d: -f2
     else
-        log::warn "htpasswd not available, returning plain password"
-        echo "${password}"
+        # Never return the plain password / Никогда не возвращаем пароль открытым текстом
+        log::error "htpasswd not available, cannot hash password"
+        return 1
     fi
 }
 
@@ -641,7 +645,9 @@ system::utils::array_length() {
 system::utils::array_add() {
     local arr_name="${1}"
     local element="${2}"
-    eval "${arr_name}+=(\"${element}\")"
+    # Use nameref instead of eval / Nameref вместо eval
+    local -n arr_ref="${arr_name}"
+    arr_ref+=("${element}")
 }
 
 # @description Parse JSON using jq if available / Парсинг JSON

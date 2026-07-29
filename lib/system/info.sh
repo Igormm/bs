@@ -12,13 +12,17 @@ system::info::os() {
     # Try /etc/os-release first (modern standard) / Попробовать /etc/os-release сначала
     # (современный стандарт)
     if [[ -f /etc/os-release ]]; then
-        source /etc/os-release
-        echo "Name: ${NAME:-Unknown}"
-        echo "Version: ${VERSION:-Unknown}"
-        echo "ID: ${ID:-Unknown}"
-        echo "ID_LIKE: ${ID_LIKE:-Unknown}"
-        echo "Version ID: ${VERSION_ID:-Unknown}"
-        echo "Pretty Name: ${PRETTY_NAME:-Unknown}"
+        # Read in a subshell to avoid polluting current environment
+        # Читаем в подshell, чтобы не засорять текущее окружение
+        (
+            source /etc/os-release
+            echo "Name: ${NAME:-Unknown}"
+            echo "Version: ${VERSION:-Unknown}"
+            echo "ID: ${ID:-Unknown}"
+            echo "ID_LIKE: ${ID_LIKE:-Unknown}"
+            echo "Version ID: ${VERSION_ID:-Unknown}"
+            echo "Pretty Name: ${PRETTY_NAME:-Unknown}"
+        )
     # Fallback to lsb_release / Резервный вариант lsb_release
     elif command -v lsb_release >/dev/null 2>&1; then
         lsb_release -a 2>/dev/null
@@ -188,8 +192,12 @@ system::info::all() {
 system::info::version() {
     # Try /etc/os-release first / Попробовать /etc/os-release сначала
     if [[ -f /etc/os-release ]]; then
-        source /etc/os-release
-        echo "${PRETTY_NAME:-${NAME:-Unknown}} ${VERSION_ID:-Unknown}"
+        # Read in a subshell to avoid polluting current environment
+        # Читаем в подshell, чтобы не засорять текущее окружение
+        (
+            source /etc/os-release
+            echo "${PRETTY_NAME:-${NAME:-Unknown}} ${VERSION_ID:-Unknown}"
+        )
     # Try lsb_release / Попробовать lsb_release
     elif command -v lsb_release >/dev/null 2>&1; then
         lsb_release -d 2>/dev/null | cut -f2

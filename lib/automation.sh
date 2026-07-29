@@ -445,9 +445,9 @@ automation::network::check_gateway() {
 automation::display::check_display_server() {
     local display_server=""
     
-    if [[ -n "${DISPLAY}" ]]; then
+    if [[ -n "${DISPLAY:-}" ]]; then
         display_server="X11 (DISPLAY=${DISPLAY})"
-    elif [[ -n "${WAYLAND_DISPLAY}" ]]; then
+    elif [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
         display_server="Wayland (WAYLAND_DISPLAY=${WAYLAND_DISPLAY})"
     else
         # Check for running processes
@@ -510,7 +510,7 @@ automation::display::install_display_server() {
 automation::display::check_display_socket() {
     local socket_path=""
     
-    if [[ -n "${DISPLAY}" ]]; then
+    if [[ -n "${DISPLAY:-}" ]]; then
         socket_path="/tmp/.X11-unix/X${DISPLAY#*:}"
         if [[ -S "${socket_path}" ]]; then
             log::info "[OK] X11 socket available: ${socket_path}"
@@ -519,7 +519,7 @@ automation::display::check_display_socket() {
             log::warn "[FAIL] X11 socket not available: ${socket_path}"
             return 1
         fi
-    elif [[ -n "${WAYLAND_DISPLAY}" ]]; then
+    elif [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
         socket_path="/run/user/$UID/${WAYLAND_DISPLAY}"
         if [[ -S "${socket_path}" ]]; then
             log::info "[OK] Wayland socket available: ${socket_path}"

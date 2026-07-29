@@ -33,7 +33,7 @@
 
 # Check if module is already loaded
 if [[ -n "${BOSA_LIB_DATA_PROCESSOR_LOADED:-}" ]]; then
-    log::debug "Data Processor module already loaded" 2>/dev/null || true
+    utils::ignore log::debug "Data Processor module already loaded"
     return 0
 fi
 readonly BOSA_LIB_DATA_PROCESSOR_LOADED=1
@@ -82,28 +82,28 @@ dataprocessor::check_dependencies() {
     log::debug "Checking Data Processor dependencies..."
     
     # Check for jq (JSON)
-    if ! command -v jq >/dev/null 2>&1; then
+    if ! utils::has jq; then
         missing_deps+=("jq")
     fi
     
     # Check for xmllint (XML)
-    if ! command -v xmllint >/dev/null 2>&1; then
+    if ! utils::has xmllint; then
         missing_deps+=("libxml2-utils")
     fi
     
     # Check for xmlstarlet (XPath)
-    if ! command -v xmlstarlet >/dev/null 2>&1; then
+    if ! utils::has xmlstarlet; then
         missing_deps+=("xmlstarlet")
     fi
     
     # Check for csvkit (CSV)
-    if ! command -v csvkit >/dev/null 2>&1; then
+    if ! utils::has csvkit; then
         # csvkit is optional, we'll provide fallback
         log::debug "csvkit not found - CSV functionality will be limited"
     fi
     
     # Check for python3 (for advanced XPath)
-    if ! command -v python3 >/dev/null 2>&1; then
+    if ! utils::has python3; then
         missing_deps+=("python3")
     fi
     
@@ -132,7 +132,7 @@ dataprocessor::install_dependencies() {
     elif platformcheck::is_alma || platformcheck::is_fedora; then
         dnf install -y jq libxml2 xmlstarlet python3
     elif platformcheck::is_macos; then
-        if ! command -v brew >/dev/null 2>&1; then
+        if ! utils::has brew; then
             errorhandler::throw "${func_name}" "Homebrew is required for macOS" \
                 "${LIB_ERROR_DEPENDENCY_MISSING}"
         fi
@@ -279,7 +279,7 @@ dataprocessor::json::to_csv() {
     fi
     
     # Use csvkit if available, otherwise use jq
-    if command -v in2csv >/dev/null 2>&1; then
+    if utils::has in2csv; then
         echo "${json_data}" | in2csv --format json
     else
         # Fallback to jq
@@ -336,7 +336,7 @@ dataprocessor::xml::xpath() {
     fi
     
     # Try xmlstarlet first, then xmllint
-    if command -v xmlstarlet >/dev/null 2>&1; then
+    if utils::has xmlstarlet; then
         echo "${xml_data}" | xmlstarlet sel -t -v "${xpath_query}" - 2>/dev/null || {
             errorhandler::throw "${func_name}" "Invalid XPath query or XML data" \
                 "${LIB_ERROR_INVALID_DATA}"
@@ -360,7 +360,7 @@ dataprocessor::xml::to_json() {
     fi
     
     # Use xmltodict via python3 if available
-    if python3 -c "import xmltodict" 2>/dev/null; then
+    if utils::quiet_err python3 -c "import xmltodict"; then
         echo "${xml_data}" | python3 -c "
 import xmltodict, json, sys
 xml_data = sys.stdin.read()
@@ -455,7 +455,7 @@ dataprocessor::csv::to_json() {
     fi
     
     # Use csvkit if available
-    if command -v csvjson >/dev/null 2>&1; then
+    if utils::has csvjson; then
         echo "${csv_data}" | csvjson
     else
         # Fallback implementation
@@ -515,7 +515,7 @@ dataprocessor::csv::filter() {
     fi
     
     # Use csvkit if available
-    if command -v csvgrep >/dev/null 2>&1; then
+    if utils::has csvgrep; then
         echo "${csv_data}" | csvgrep -c "${column}" -m "${value}"
     else
         # Fallback implementation
@@ -559,7 +559,7 @@ dataprocessor::csv::sort() {
     fi
     
     # Use csvkit if available
-    if command -v csvsort >/dev/null 2>&1; then
+    if utils::has csvsort; then
         local sort_flag=""
         if [[ "${direction}" == "desc" ]]; then
             sort_flag="-r"
@@ -597,9 +597,9 @@ dataprocessor::yaml::to_json() {
     fi
     
     # Use yq if available, otherwise use python3 with pyyaml
-    if command -v yq >/dev/null 2>&1; then
+    if utils::has yq; then
         echo "${yaml_data}" | yq -j
-    elif python3 -c "import yaml" 2>/dev/null; then
+    elif utils::quiet_err python3 -c "import yaml"; then
         echo "${yaml_data}" | python3 -c "
 import yaml, json, sys
 yaml_data = sys.stdin.read()
@@ -627,9 +627,9 @@ dataprocessor::json::to_yaml() {
     fi
     
     # Use yq if available, otherwise use python3 with pyyaml
-    if command -v yq >/dev/null 2>&1; then
+    if utils::has yq; then
         echo "${json_data}" | yq -y
-    elif python3 -c "import yaml" 2>/dev/null; then
+    elif utils::quiet_err python3 -c "import yaml"; then
         echo "${json_data}" | python3 -c "
 import yaml, json, sys
 json_data = sys.stdin.read()
@@ -774,7 +774,10 @@ dataprocessor::jpath::to_jq() {
     jq_query="${jq_query//\$/}"
     jq_query="${jq_query//\./}"  # Remove leading dot
     jq_query="${jq_query//\[\*\]/[]}"  # Convert [*] to []
-    jq_query="${jq_query//\['/".}"  # Convert [' to "
+    # Convert [' to " (helper vars: quotes break the substitution parser inline)
+    local jpath_from="\['"
+    local jpath_to='".'
+    jq_query="${jq_query//${jpath_from}/${jpath_to}}"
     jq_query="${jq_query//\]/}"  # Convert '] to "
     
     echo "${jq_query}"
@@ -798,7 +801,7 @@ dataprocessor::xpath::query() {
     fi
     
     # Use python3 with lxml for advanced XPath if available
-    if python3 -c "import lxml.etree" 2>/dev/null; then
+    if utils::quiet_err python3 -c "import lxml.etree"; then
         echo "${xml_data}" | python3 -c "
 import lxml.etree as ET
 import sys
@@ -843,10 +846,10 @@ dataprocessor::file::info() {
     fi
     
     local file_size
-    file_size=$(stat -c %s "${file_path}" 2>/dev/null || stat -f %z "${file_path}" 2>/dev/null)
+    file_size=$(utils::quiet_err stat -c %s "${file_path}" || utils::quiet_err stat -f %z "${file_path}")
     
     local file_type
-    file_type=$(file -b "${file_path}" 2>/dev/null || echo "unknown")
+    file_type=$(utils::quiet_err file -b "${file_path}" || echo "unknown")
     
     local first_bytes
     first_bytes=$(head -c 100 "${file_path}" | od -c 2>/dev/null | head -1 || echo "")

@@ -2,6 +2,34 @@
 
 # PATH management functions
 
+# Ask a yes/no question, default is "No" / Вопрос да/нет, по умолчанию «нет»
+confirm() {
+  local prompt="${1:-Are you sure?}"
+  local answer
+  printf "%s [y/N] " "${prompt}" >&2
+  read -r answer || return 1
+  case "${answer}" in
+    [yY]|[yY][eE][sS]) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# Print PATH hint after local install / Подсказка про PATH после локальной установки
+print_path_hint() {
+  cat <<EOF
+Добавьте каталог с bs в PATH / Add the bs bin directory to PATH:
+
+  export PATH="${BIN_DIR}:\$PATH"
+
+Например, для bash / For bash, for example:
+  echo 'export PATH="${BIN_DIR}:\$PATH"' >> ~/.bashrc
+  source ~/.bashrc
+
+Или выполните авто-настройку / Or run the automatic setup:
+  ./install.sh --local --update-path
+EOF
+}
+
 # Update ~/.bashrc with PATH line (with confirmation)
 update_path_bashrc() {
   local bashrc="${HOME}/.bashrc"

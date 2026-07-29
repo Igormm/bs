@@ -7,9 +7,18 @@
 
 set -euo pipefail
 
-# Подключаем фреймворк
-source "../../../boot.sh"
-bs::init
+# Подключаем фреймворк (пути от расположения скрипта)
+# Source framework (paths relative to the script location)
+readonly TEST_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly BS_PROJECT_ROOT="$(cd "${TEST_SCRIPT_DIR}/../.." && pwd)"
+
+source "${TEST_SCRIPT_DIR}/../testframework.sh"
+
+export BS_SILENT=1
+source "${BS_PROJECT_ROOT}/bootstrap/init.sh"
+
+# lib-модули подключают core через BS_HOME (pre-existing расхождение BS_ROOT/BS_HOME)
+export BS_HOME="${BS_PROJECT_ROOT}"
 
 # Подключаем модуль
 load "lib/ui/ps1config"

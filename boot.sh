@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ------------------------------------------------------------------
+# 
 #  BS Framework – STAGE-1 BOOT-LOADER
 #  Назначение / Purpose:
 #    - проверить среду (bash≥4);
@@ -9,13 +9,21 @@
 #    0 – успешный запуск bs;
 #    1 – bash слишком старый;
 #    2 – не найден BS_ROOT или отсутствует bs.
-# ------------------------------------------------------------------
-set -euo pipefail
+# 
 
-# 2. Определяем каталог, где лежит boot.sh --
+set -euo pipefail
+IFS=$'\n\t'
+
+# 1. Проверка среды: требуется bash 4+
+if [[ -z "${BASH_VERSION:-}" || ${BASH_VERSINFO[0]} -lt 4 ]]; then
+  printf 'ERROR: bash 4.0+ required\n' >&2
+  exit 1
+fi
+
+# 2. Определяем каталог, где лежит boot.sh
 BOOT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 
-# 3. BS_ROOT: приоритет поиска --------------
+# 3. BS_ROOT: приоритет поиска
 #  1) Уже экспортирован внешним скриптом
 #  2) Рядом лежит файл «bs» и bootstrap/init.sh
 #  3) Системные/пользовательские префиксы
@@ -32,7 +40,7 @@ if [[ -z "${BS_ROOT:-}" ]]; then
   fi
 fi
 
-# 4. Валидация -----------------------------
+# 4. Валидация
 if [[ -z "${BS_ROOT:-}" ]]; then
   printf 'Error: BS framework not found (searched: repo, ~/.local/lib/bs, /usr/local/lib/bs)\n' >&2
   exit 2

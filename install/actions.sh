@@ -39,20 +39,13 @@ do_install() {
   cp -a "${SOURCE_ROOT}/bs"        "${TARGET_LIB}/"   # main launcher
   cp -a "${SOURCE_ROOT}/lib"       "${TARGET_LIB}/"
 
-  # Create wrapper
-  if [[ "${MODE}" == "local" ]]; then
-    cat >"${TARGET_BIN}" <<'WRAP'
+  # Create wrapper with real paths from the chosen PREFIX
+  # Создать wrapper с реальными путями из выбранного PREFIX
+  cat >"${TARGET_BIN}" <<WRAP
 #!/usr/bin/env bash
-export BS_ROOT="$HOME/.local/lib/bs"
-exec "$BS_ROOT/bs" "$@"
+export BS_ROOT="${TARGET_LIB}"
+exec "\${BS_ROOT}/bs" "\$@"
 WRAP
-  else
-    cat >"${TARGET_BIN}" <<'WRAP'
-#!/usr/bin/env bash
-export BS_ROOT="/usr/local/lib/bs"
-exec "$BS_ROOT/bs" "$@"
-WRAP
-  fi
   chmod 0755 "${TARGET_BIN}"
 
   printf "Готово.\n"

@@ -62,135 +62,53 @@ system::date_time() {
     log::info "System timezone set to ${timezone}"
 }
 
-# @description Configure input devices / Настроить устройства ввода
-# @example
-#   system::input_devices
-system::input_devices() {
-    # This is a placeholder for input device configuration / Это заглушка для конфигурации
-    # устройств ввода
-    # Actual implementation would depend on the system and device types / Реальная
-    # реализация зависит от системы и типов устройств
-    log::info "Input devices configuration placeholder"
-}
-
-# @description Configure output devices / Настроить устройства вывода
-# @example
-#   system::output_devices
-system::output_devices() {
-    # This is a placeholder for output device configuration / Это заглушка для
-    # конфигурации устройств вывода
-    # Actual implementation would depend on the system and device types / Реальная
-    # реализация зависит от системы и типов устройств
-    log::info "Output devices configuration placeholder"
-}
-
-# @description Configure network devices / Настроить сетевые устройства
-# @example
-#   system::network_devices
-system::network_devices() {
-    # This is a placeholder for network device configuration / Это заглушка для
-    # конфигурации сетевых устройств
-    # Actual implementation would depend on the system and network setup / Реальная
-    # реализация зависит от системы и сетевой настройки
-    log::info "Network devices configuration placeholder"
-}
-
 # @description Configure display server / Настроить сервер отображения
+# @param $1 Display server type ("x11", "wayland") / Тип сервера отображения
 # @example
-#   system::display_server
+#   system::display_server "x11"
 system::display_server() {
-    # This is a placeholder for display server configuration / Это заглушка для
-    # конфигурации сервера отображения
-    # Actual implementation would depend on the system and display server used / Реальная
-    # реализация зависит от системы и используемого сервера отображения
-    log::info "Display server configuration placeholder"
+    # Delegate to display module / Делегирование модулю display
+    load "lib/system/display"
+    system::display::server "$@"
 }
 
 # @description Configure desktop environment / Настроить окружение рабочего стола
+# @param $1 Desktop environment ("gnome", "kde", "xfce", ...) / Окружение рабочего стола
 # @example
-#   system::desktop_environment
+#   system::desktop_environment "gnome"
 system::desktop_environment() {
-    # This is a placeholder for desktop environment configuration / Это заглушка для
-    # конфигурации окружения рабочего стола
-    # Actual implementation would depend on the system and DE used / Реальная реализация
-    # зависит от системы и используемого DE
-    log::info "Desktop environment configuration placeholder"
+    # Delegate to display module / Делегирование модулю display
+    load "lib/system/display"
+    system::display::desktop "$@"
 }
 
 # @description Configure display manager / Настроить менеджер отображения
+# @param $1 Display manager ("gdm", "sddm", "lightdm", ...) / Менеджер отображения
 # @example
-#   system::display_manager
+#   system::display_manager "gdm"
 system::display_manager() {
-    # This is a placeholder for display manager configuration / Это заглушка для
-    # конфигурации менеджера отображения
-    # Actual implementation would depend on the system and DM used / Реальная реализация
-    # зависит от системы и используемого DM
-    log::info "Display manager configuration placeholder"
+    # Delegate to display module / Делегирование модулю display
+    load "lib/system/display"
+    system::display::manager "$@"
 }
 
 # @description Configure routing table / Настроить таблицу маршрутизации
+# @param $1 Table name or number / Имя или номер таблицы
+# @param $2 Action ("add", "delete", "show") / Действие
 # @example
-#   system::routing_table
+#   system::routing_table "100" "show"
 system::routing_table() {
-    # This is a placeholder for routing table configuration / Это заглушка для
-    # конфигурации таблицы маршрутизации
-    # Actual implementation would depend on the system and network setup / Реальная
-    # реализация зависит от системы и сетевой настройки
-    log::info "Routing table configuration placeholder"
-}
-
-# @description Configure service management system / Настроить систему управления
-# сервисами
-# @example
-#   system::service_management
-system::service_management() {
-    # This is a placeholder for service management configuration / Это заглушка для
-    # конфигурации управления сервисами
-    # Actual implementation would depend on the system and init system used / Реальная
-    # реализация зависит от системы и используемой init системы
-    log::info "Service management configuration placeholder"
-}
-
-# @description Configure package manager / Настроить менеджер пакетов
-# @example
-#   system::package_manager
-system::package_manager() {
-    # This is a placeholder for package manager configuration / Это заглушка для
-    # конфигурации менеджера пакетов
-    # Actual implementation would depend on the system and package manager used / Реальная
-    # реализация зависит от системы и используемого менеджера пакетов
-    log::info "Package manager configuration placeholder"
-}
-
-# @description Configure repository list / Настроить список репозиториев
-# @example
-#   system::repository_list
-system::repository_list() {
-    # This is a placeholder for repository list configuration / Это заглушка для
-    # конфигурации списка репозиториев
-    # Actual implementation would depend on the system and package manager used / Реальная
-    # реализация зависит от системы и используемого менеджера пакетов
-    log::info "Repository list configuration placeholder"
-}
-
-# @description Configure security settings / Настроить параметры безопасности
-# @example
-#   system::security
-system::security() {
-    # This is a placeholder for security configuration / Это заглушка для конфигурации
-    # безопасности
-    # Actual implementation would depend on the system and security requirements /
-    # Реальная реализация зависит от системы и требований безопасности
-    log::info "Security configuration placeholder"
+    # Delegate to routing module / Делегирование модулю routing
+    load "lib/system/routing"
+    system::routing::table "$@"
 }
 
 # @description Configure logging settings / Настроить параметры логирования
+# @param $1 Log level (e.g., "info", "warn", "error") / Уровень логирования
 # @example
-#   system::logging
+#   system::logging "info"
 system::logging() {
-    # This is a placeholder for logging configuration / Это заглушка для конфигурации
-    # логирования
-    # Actual implementation would depend on the system and logging setup / Реальная
-    # реализация зависит от системы и настройки логирования
-    log::info "Logging configuration placeholder"
+    # Delegate to logging module / Делегирование модулю logging
+    load "lib/system/logging"
+    system::logging::configure "$@"
 }

@@ -255,7 +255,6 @@ system::logging::clean() {
     
     # Find and remove old log files
     find "${directory}" -name "*.log.*" -type f -mtime +${age} -delete 2>/dev/null || true
-    find "${directory}" -name "*.log.*)" -type f -mtime +${age} -delete 2>/dev/null || true
     
     log::info "Old log files cleaned from ${directory} (older than ${age} days)"
 }

@@ -7,20 +7,20 @@
 #   system::packages::update
 system::packages::update() {
     # Detect package manager / Определить менеджер пакетов
-    if command -v apt >/dev/null 2>&1; then
-        apt update 2>/dev/null || true
+    if utils::has apt; then
+        utils::quiet_err apt update || :
         log::info "APT package list updated"
-    elif command -v yum >/dev/null 2>&1; then
-        yum check-update 2>/dev/null || true
+    elif utils::has yum; then
+        utils::quiet_err yum check-update || :
         log::info "YUM package list updated"
-    elif command -v dnf >/dev/null 2>&1; then
-        dnf check-update 2>/dev/null || true
+    elif utils::has dnf; then
+        utils::quiet_err dnf check-update || :
         log::info "DNF package list updated"
-    elif command -v pacman >/dev/null 2>&1; then
-        pacman -Sy 2>/dev/null || true
+    elif utils::has pacman; then
+        utils::quiet_err pacman -Sy || :
         log::info "Pacman package list updated"
-    elif command -v zypper >/dev/null 2>&1; then
-        zypper refresh 2>/dev/null || true
+    elif utils::has zypper; then
+        utils::quiet_err zypper refresh || :
         log::info "Zypper package list updated"
     else
         log::warn "No supported package manager found"
@@ -39,20 +39,20 @@ system::packages::install() {
     fi
     
     # Detect package manager / Определить менеджер пакетов
-    if command -v apt >/dev/null 2>&1; then
-        apt install -y "$@" 2>/dev/null || true
+    if utils::has apt; then
+        utils::quiet_err apt install -y "$@"
         log::info "Packages installed with APT: $*"
-    elif command -v yum >/dev/null 2>&1; then
-        yum install -y "$@" 2>/dev/null || true
+    elif utils::has yum; then
+        utils::quiet_err yum install -y "$@"
         log::info "Packages installed with YUM: $*"
-    elif command -v dnf >/dev/null 2>&1; then
-        dnf install -y "$@" 2>/dev/null || true
+    elif utils::has dnf; then
+        utils::quiet_err dnf install -y "$@"
         log::info "Packages installed with DNF: $*"
-    elif command -v pacman >/dev/null 2>&1; then
-        pacman -S --noconfirm "$@" 2>/dev/null || true
+    elif utils::has pacman; then
+        utils::quiet_err pacman -S --noconfirm "$@"
         log::info "Packages installed with Pacman: $*"
-    elif command -v zypper >/dev/null 2>&1; then
-        zypper install -y "$@" 2>/dev/null || true
+    elif utils::has zypper; then
+        utils::quiet_err zypper install -y "$@"
         log::info "Packages installed with Zypper: $*"
     else
         log::warn "No supported package manager found"
@@ -71,20 +71,20 @@ system::packages::remove() {
     fi
     
     # Detect package manager / Определить менеджер пакетов
-    if command -v apt >/dev/null 2>&1; then
-        apt remove -y "$@" 2>/dev/null || true
+    if utils::has apt; then
+        utils::quiet_err apt remove -y "$@"
         log::info "Packages removed with APT: $*"
-    elif command -v yum >/dev/null 2>&1; then
-        yum remove -y "$@" 2>/dev/null || true
+    elif utils::has yum; then
+        utils::quiet_err yum remove -y "$@"
         log::info "Packages removed with YUM: $*"
-    elif command -v dnf >/dev/null 2>&1; then
-        dnf remove -y "$@" 2>/dev/null || true
+    elif utils::has dnf; then
+        utils::quiet_err dnf remove -y "$@"
         log::info "Packages removed with DNF: $*"
-    elif command -v pacman >/dev/null 2>&1; then
-        pacman -R --noconfirm "$@" 2>/dev/null || true
+    elif utils::has pacman; then
+        utils::quiet_err pacman -R --noconfirm "$@"
         log::info "Packages removed with Pacman: $*"
-    elif command -v zypper >/dev/null 2>&1; then
-        zypper remove -y "$@" 2>/dev/null || true
+    elif utils::has zypper; then
+        utils::quiet_err zypper remove -y "$@"
         log::info "Packages removed with Zypper: $*"
     else
         log::warn "No supported package manager found"
@@ -97,20 +97,20 @@ system::packages::remove() {
 #   system::packages::upgrade
 system::packages::upgrade() {
     # Detect package manager / Определить менеджер пакетов
-    if command -v apt >/dev/null 2>&1; then
-        apt upgrade -y 2>/dev/null || true
+    if utils::has apt; then
+        utils::quiet_err apt upgrade -y
         log::info "Packages upgraded with APT"
-    elif command -v yum >/dev/null 2>&1; then
-        yum update -y 2>/dev/null || true
+    elif utils::has yum; then
+        utils::quiet_err yum update -y
         log::info "Packages upgraded with YUM"
-    elif command -v dnf >/dev/null 2>&1; then
-        dnf upgrade -y 2>/dev/null || true
+    elif utils::has dnf; then
+        utils::quiet_err dnf upgrade -y
         log::info "Packages upgraded with DNF"
-    elif command -v pacman >/dev/null 2>&1; then
-        pacman -Syu --noconfirm 2>/dev/null || true
+    elif utils::has pacman; then
+        utils::quiet_err pacman -Syu --noconfirm
         log::info "Packages upgraded with Pacman"
-    elif command -v zypper >/dev/null 2>&1; then
-        zypper update -y 2>/dev/null || true
+    elif utils::has zypper; then
+        utils::quiet_err zypper update -y
         log::info "Packages upgraded with Zypper"
     else
         log::warn "No supported package manager found"
@@ -131,16 +131,16 @@ system::packages::search() {
     fi
     
     # Detect package manager / Определить менеджер пакетов
-    if command -v apt >/dev/null 2>&1; then
-        apt search "${search_term}" 2>/dev/null || true
-    elif command -v yum >/dev/null 2>&1; then
-        yum search "${search_term}" 2>/dev/null || true
-    elif command -v dnf >/dev/null 2>&1; then
-        dnf search "${search_term}" 2>/dev/null || true
-    elif command -v pacman >/dev/null 2>&1; then
-        pacman -Ss "${search_term}" 2>/dev/null || true
-    elif command -v zypper >/dev/null 2>&1; then
-        zypper search "${search_term}" 2>/dev/null || true
+    if utils::has apt; then
+        utils::quiet_err apt search "${search_term}" || :
+    elif utils::has yum; then
+        utils::quiet_err yum search "${search_term}" || :
+    elif utils::has dnf; then
+        utils::quiet_err dnf search "${search_term}" || :
+    elif utils::has pacman; then
+        utils::quiet_err pacman -Ss "${search_term}" || :
+    elif utils::has zypper; then
+        utils::quiet_err zypper search "${search_term}" || :
     else
         log::warn "No supported package manager found"
         return 1
@@ -152,16 +152,16 @@ system::packages::search() {
 #   system::packages::list
 system::packages::list() {
     # Detect package manager
-    if command -v apt >/dev/null 2>&1; then
-        apt list --installed 2>/dev/null || true
-    elif command -v yum >/dev/null 2>&1; then
-        yum list installed 2>/dev/null || true
-    elif command -v dnf >/dev/null 2>&1; then
-        dnf list installed 2>/dev/null || true
-    elif command -v pacman >/dev/null 2>&1; then
-        pacman -Q 2>/dev/null || true
-    elif command -v zypper >/dev/null 2>&1; then
-        zypper search -i 2>/dev/null || true
+    if utils::has apt; then
+        utils::quiet_err apt list --installed || :
+    elif utils::has yum; then
+        utils::quiet_err yum list installed || :
+    elif utils::has dnf; then
+        utils::quiet_err dnf list installed || :
+    elif utils::has pacman; then
+        utils::quiet_err pacman -Q || :
+    elif utils::has zypper; then
+        utils::quiet_err zypper search -i || :
     else
         log::warn "No supported package manager found"
         return 1
@@ -181,18 +181,18 @@ system::packages::add_repo() {
     fi
     
     # Detect package manager / Определить менеджер пакетов
-    if command -v apt >/dev/null 2>&1; then
+    if utils::has apt; then
         if [[ "${repo}" == ppa:* ]]; then
-            apt-add-repository -y "${repo}" 2>/dev/null || true
+            utils::quiet_err apt-add-repository -y "${repo}"
         else
             echo "${repo}" >> /etc/apt/sources.list
         fi
         log::info "Repository added for APT: ${repo}"
-    elif command -v yum >/dev/null 2>&1; then
-        yum-config-manager --add-repo "${repo}" 2>/dev/null || true
+    elif utils::has yum; then
+        utils::quiet_err yum-config-manager --add-repo "${repo}"
         log::info "Repository added for YUM: ${repo}"
-    elif command -v dnf >/dev/null 2>&1; then
-        dnf config-manager --add-repo "${repo}" 2>/dev/null || true
+    elif utils::has dnf; then
+        utils::quiet_err dnf config-manager --add-repo "${repo}"
         log::info "Repository added for DNF: ${repo}"
     else
         log::warn "Repository management not implemented for this package manager"
@@ -213,28 +213,28 @@ system::packages::remove_repo() {
     fi
     
     # Detect package manager / Определить менеджер пакетов
-    if command -v apt >/dev/null 2>&1; then
+    if utils::has apt; then
         if [[ "${repo}" == ppa:* ]]; then
-            apt-add-repository -r -y "${repo}" 2>/dev/null || true
+            utils::quiet_err apt-add-repository -r -y "${repo}"
         else
             # Remove from sources.list / Удалить из sources.list
-            sed -i "\|${repo}|d" /etc/apt/sources.list 2>/dev/null || true
+            utils::quiet_err sed -i "\|${repo}|d" /etc/apt/sources.list
         fi
         log::info "Repository removed for APT: ${repo}"
-    elif command -v yum >/dev/null 2>&1; then
+    elif utils::has yum; then
         # For YUM, we need to find and remove the repo file / Для YUM нужно найти и
         # удалить файл репозитория
-        local repo_file=$(find /etc/yum.repos.d/ -name "*.repo" -exec grep -l "${repo}" {} \; 2>/dev/null)
+        local repo_file=$(utils::quiet_err find /etc/yum.repos.d/ -name "*.repo" -exec grep -l "${repo}" {} \;)
         if [[ -n "${repo_file}" ]]; then
-            rm -f "${repo_file}" 2>/dev/null || true
+            utils::quiet_err rm -f "${repo_file}"
             log::info "Repository file removed for YUM: ${repo_file}"
         fi
-    elif command -v dnf >/dev/null 2>&1; then
+    elif utils::has dnf; then
         # For DNF, we need to find and remove the repo file / Для DNF нужно найти и
         # удалить файл репозитория
-        local repo_file=$(find /etc/yum.repos.d/ -name "*.repo" -exec grep -l "${repo}" {} \; 2>/dev/null)
+        local repo_file=$(utils::quiet_err find /etc/yum.repos.d/ -name "*.repo" -exec grep -l "${repo}" {} \;)
         if [[ -n "${repo_file}" ]]; then
-            rm -f "${repo_file}" 2>/dev/null || true
+            utils::quiet_err rm -f "${repo_file}"
             log::info "Repository file removed for DNF: ${repo_file}"
         fi
     else

@@ -20,10 +20,24 @@ readonly BS_PROJECT_ROOT="$(cd "${TEST_SCRIPT_DIR}/../.." && pwd)"
 
 # Source test framework
 source "${TEST_SCRIPT_DIR}/../testframework.sh"
-source "${BS_PROJECT_ROOT}/boot.sh"
 
-# Initialize BS framework
-bs::init
+# Initialize BS framework (bootstrap; BS_HOME нужен lib-модулям — pre-existing расхождение BS_ROOT/BS_HOME)
+# Initialize BS framework (bootstrap; BS_HOME is needed by lib modules — pre-existing BS_ROOT/BS_HOME mismatch)
+export BS_SILENT=1
+source "${BS_PROJECT_ROOT}/bootstrap/init.sh"
+export BS_HOME="${BS_PROJECT_ROOT}"
+
+# Изолированный HOME: модуль создаёт ~/Music/VK и ~/.config/vkmusic (readonly-пути вычисляются из HOME при source)
+# Isolated HOME: the module creates ~/Music/VK and ~/.config/vkmusic (readonly paths computed from HOME at source time)
+TEST_HOME="$(mktemp -d)"
+export HOME="${TEST_HOME}"
+
+# Заглушка id3tag: иначе vkmusic::init пытается ставить пакеты через dnf (pre-existing: автоустановка зависимостей)
+# id3tag stub: otherwise vkmusic::init tries to install packages via dnf (pre-existing auto-install)
+mkdir -p "${TEST_HOME}/bin"
+printf '#!/bin/sh\nexit 0\n' > "${TEST_HOME}/bin/id3tag"
+chmod +x "${TEST_HOME}/bin/id3tag"
+export PATH="${TEST_HOME}/bin:${PATH}"
 
 # Test configuration
 readonly TEST_ACCESS_TOKEN="test_token"
@@ -73,22 +87,34 @@ setup_mocks() {
         esac
     }
     
-    # Mock curl
+    # Mock curl (поддерживает -o FILE, как в vkmusic::download)
+    # Mock curl (supports -o FILE, as used by vkmusic::download)
     curl() {
         local args=("$@")
         local url=""
+        local out_file=""
+        local i
         
-        for arg in "${args[@]}"; do
-            if [[ "${arg}" == "http://example.com"* ]]; then
-                url="${arg}"
-            fi
+        for ((i=0; i<${#args[@]}; i++)); do
+            case "${args[$i]}" in
+                -o)
+                    out_file="${args[$((i+1))]}"
+                    ;;
+                http://example.com*)
+                    url="${args[$i]}"
+                    ;;
+            esac
         done
         
         if [[ "${url}" == "http://example.com/audio.mp3" ]] || \
            [[ "${url}" == "http://example.com/rec.mp3" ]] || \
            [[ "${url}" == "http://example.com/pop.mp3" ]]; then
             # Create a small valid MP3 file
-            printf '\xff\xfb\x90\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+            if [[ -n "${out_file}" ]]; then
+                printf '\xff\xfb\x90\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > "${out_file}"
+            else
+                printf '\xff\xfb\x90\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+            fi
         else
             return 1
         fi
@@ -99,18 +125,18 @@ setup_mocks() {
 
 # Test counter functions
 test_increment() {
-    ((TESTS_RUN++))
+    ((++TESTS_RUN))
 }
 
 test_pass() {
     test_increment
-    ((TESTS_PASSED++))
+    ((++TESTS_PASSED))
     log::success "✓ ${FUNCNAME[1]}"
 }
 
 test_fail() {
     test_increment
-    ((TESTS_FAILED++))
+    ((++TESTS_FAILED))
     FAILED_TESTS+=("${FUNCNAME[1]}")
     log::error "✗ ${FUNCNAME[1]}"
 }
@@ -121,6 +147,12 @@ test_module_initialization() {
     
     # Source the module
     source "${BS_PROJECT_ROOT}/lib/integration/vkmusic.sh"
+    
+    # Кэш vkapi в изолированный каталог: vkmusic::auth вызывает vkapi::init,
+    # который создаёт ${BS_ROOT}/vk_api_cache (pre-existing: дефолтный путь в корне проекта)
+    # Isolate the vkapi cache: vkmusic::auth calls vkapi::init,
+    # which creates ${BS_ROOT}/vk_api_cache (pre-existing: default path in the project root)
+    VK_API_CACHE_DIR="${TEST_HOME}/vk_api_cache"
     
     # Test initialization
     if vkmusic::init; then
@@ -311,14 +343,14 @@ test_download_audio() {
     local result
     result=$(vkmusic::download "${test_audio}" "${temp_dir}" "test.mp3")
     
-    if [[ -f "${result}" ]]; then
+    # stdout замусорен логами, проверяем сам файл / stdout is polluted by logs, check the file itself
+    if [[ -f "${temp_dir}/test.mp3" ]]; then
         test_pass
-        rm -f "${result}"
     else
         test_fail
     fi
     
-    rmdir "${temp_dir}"
+    rm -rf "${temp_dir}"
 }
 
 # Test 14: Add metadata
@@ -327,7 +359,7 @@ test_add_metadata() {
     
     # Create temporary file
     local temp_file
-    temp_file=$(mktemp).mp3
+    temp_file=$(mktemp --suffix=.mp3)
     
     # Write minimal MP3 header
     printf '\xff\xfb\x90\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > "${temp_file}"
@@ -387,25 +419,18 @@ test_get_lyrics() {
 test_create_playlist_file() {
     log::info "Testing create playlist file..."
     
-    local temp_dir
-    temp_dir=$(mktemp -d)
-    
-    # Override playlist directory for test
-    local old_playlist_dir
-    old_playlist_dir="${VK_MUSIC_PLAYLIST_DIR}"
-    VK_MUSIC_PLAYLIST_DIR="${temp_dir}"
-    
+    # VK_MUSIC_PLAYLIST_DIR — readonly и уже изолирован (TEST_HOME), переопределять нельзя
+    # VK_MUSIC_PLAYLIST_DIR is readonly and already isolated (TEST_HOME), cannot override
     local result
     result=$(vkmusic::create_playlist_file "test_playlist" "1_1\n2_2" "m3u")
     
-    if [[ -f "${result}" ]]; then
+    # stdout замусорен логами, проверяем наличие файла в каталоге плейлистов
+    # stdout is polluted by logs, check for the file in the playlist directory
+    if [[ -n "$(find "${VK_MUSIC_PLAYLIST_DIR}" -name 'test_playlist*' -print -quit)" ]]; then
         test_pass
     else
         test_fail
     fi
-    
-    rm -rf "${temp_dir}"
-    VK_MUSIC_PLAYLIST_DIR="${old_playlist_dir}"
 }
 
 # Test 18: Get audio count
@@ -480,11 +505,8 @@ test_search_and_download() {
     local temp_dir
     temp_dir=$(mktemp -d)
     
-    # Override download directory for test
-    local old_download_dir
-    old_download_dir="${VK_MUSIC_DOWNLOAD_DIR}"
-    VK_MUSIC_DOWNLOAD_DIR="${temp_dir}"
-    
+    # VK_MUSIC_DOWNLOAD_DIR — readonly и уже изолирован (TEST_HOME), переопределять нельзя
+    # VK_MUSIC_DOWNLOAD_DIR is readonly and already isolated (TEST_HOME), cannot override
     # Test search and download
     vkmusic::search_and_download "test" 1 "${temp_dir}"
     
@@ -498,17 +520,14 @@ test_search_and_download() {
     fi
     
     rm -rf "${temp_dir}"
-    VK_MUSIC_DOWNLOAD_DIR="${old_download_dir}"
 }
 
 # Cleanup function
 cleanup() {
     log::info "Cleaning up test artifacts..."
     
-    # Clean up test files
-    rm -f /tmp/*.mp3 2>/dev/null || true
-    rm -f /tmp/test_cache 2>/dev/null || true
-    rm -rf /tmp/tmp.* 2>/dev/null || true
+    # Clean up test files (изолированный HOME / isolated HOME)
+    rm -rf "${TEST_HOME:-}" 2>/dev/null || true
     
     log::debug "Cleanup completed"
 }
@@ -539,29 +558,29 @@ main() {
     # Register cleanup on exit
     trap cleanup EXIT
     
-    # Run tests
-    test_module_initialization
-    test_directory_creation
-    test_authentication
-    test_search_functionality
-    test_display_search_results
-    test_get_audio_by_id
-    test_get_user_audio
-    test_get_recommendations
-    test_get_popular_tracks
-    test_get_genres
-    test_create_playlist
-    test_get_playlists
-    test_download_audio
-    test_add_metadata
-    test_batch_download
-    test_get_lyrics
-    test_create_playlist_file
-    test_get_audio_count
-    test_clear_cache
-    test_statistics
-    test_module_info
-    test_search_and_download
+    # Run tests (|| true: падение одного теста не прерывает прогон / a failing test does not abort the run)
+    test_module_initialization || true
+    test_directory_creation || true
+    test_authentication || true
+    test_search_functionality || true
+    test_display_search_results || true
+    test_get_audio_by_id || true
+    test_get_user_audio || true
+    test_get_recommendations || true
+    test_get_popular_tracks || true
+    test_get_genres || true
+    test_create_playlist || true
+    test_get_playlists || true
+    test_download_audio || true
+    test_add_metadata || true
+    test_batch_download || true
+    test_get_lyrics || true
+    test_create_playlist_file || true
+    test_get_audio_count || true
+    test_clear_cache || true
+    test_statistics || true
+    test_module_info || true
+    test_search_and_download || true
     
     # Print summary
     print_summary

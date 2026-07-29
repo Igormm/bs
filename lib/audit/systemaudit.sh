@@ -23,7 +23,7 @@
 
 # Check if module is already loaded
 if [[ -n "${BOSA_LIB_AUDIT_SYSTEM_LOADED:-}" ]]; then
-    log::debug "System Audit module already loaded" 2>/dev/null || true
+    utils::ignore log::debug "System Audit module already loaded"
     return 0
 fi
 readonly BOSA_LIB_AUDIT_SYSTEM_LOADED=1
@@ -90,33 +90,33 @@ systemaudit::check_dependencies() {
     log::debug "Checking System Audit dependencies..."
     
     # Core tools
-    if ! command -v uname >/dev/null 2>&1; then
+    if ! utils::has uname; then
         missing_deps+=("coreutils")
     fi
     
-    if ! command -v ps >/dev/null 2>&1; then
+    if ! utils::has ps; then
         missing_deps+=("procps")
     fi
     
-    if ! command -v netstat >/dev/null 2>&1 && ! command -v ss >/dev/null 2>&1; then
+    if ! utils::has netstat && ! utils::has ss; then
         missing_deps+=("net-tools" "iproute2")
     fi
     
     # Security tools
-    if ! command -v lsof >/dev/null 2>&1; then
+    if ! utils::has lsof; then
         missing_deps+=("lsof")
     fi
     
-    if ! command -v find >/dev/null 2>&1; then
+    if ! utils::has find; then
         missing_deps+=("findutils")
     fi
     
     # Optional but recommended
-    if ! command -v awk >/dev/null 2>&1; then
+    if ! utils::has awk; then
         missing_deps+=("gawk")
     fi
     
-    if ! command -v sed >/dev/null 2>&1; then
+    if ! utils::has sed; then
         missing_deps+=("sed")
     fi
     
@@ -145,7 +145,7 @@ systemaudit::install_dependencies() {
     elif platformcheck::is_alma || platformcheck::is_fedora; then
         dnf install -y coreutils procps net-tools iproute lsof findutils gawk sed
     elif platformcheck::is_macos; then
-        if ! command -v brew >/dev/null 2>&1; then
+        if ! utils::has brew; then
             errorhandler::throw "${func_name}" "Homebrew is required for macOS" \
                 "${LIB_ERROR_DEPENDENCY_MISSING}"
         fi
@@ -355,21 +355,21 @@ systemaudit::security::check_firewall_status() {
     local firewall_active=false
     
     # Check UFW (Ubuntu/Debian)
-    if command -v ufw >/dev/null 2>&1; then
+    if utils::has ufw; then
         if ufw status | grep -q "Status: active"; then
             firewall_active=true
         fi
     fi
     
     # Check firewalld (RHEL/CentOS/Fedora)
-    if command -v firewall-cmd >/dev/null 2>&1; then
+    if utils::has firewall-cmd; then
         if firewall-cmd --state 2>/dev/null | grep -q "running"; then
             firewall_active=true
         fi
     fi
     
     # Check iptables
-    if command -v iptables >/dev/null 2>&1; then
+    if utils::has iptables; then
         if iptables -L 2>/dev/null | grep -q "ACCEPT\|DROP\|REJECT"; then
             firewall_active=true
         fi
@@ -391,9 +391,9 @@ systemaudit::security::check_selinux_apparmor() {
     local finding=""
     
     # Check SELinux
-    if command -v getenforce >/dev/null 2>&1; then
+    if utils::has getenforce; then
         local selinux_status
-        selinux_status=$(getenforce 2>/dev/null || echo "Disabled")
+        selinux_status=$(utils::quiet_err getenforce || echo "Disabled")
         
         if [[ "${selinux_status}" == "Disabled" ]]; then
             finding=$(systemaudit::create_finding \
@@ -407,7 +407,7 @@ systemaudit::security::check_selinux_apparmor() {
     fi
     
     # Check AppArmor
-    if command -v aa-status >/dev/null 2>&1; then
+    if utils::has aa-status; then
         if ! aa-status 2>/dev/null | grep -q "profiles are loaded"; then
             finding=$(systemaudit::create_finding \
                 "AppArmor is not active" \
@@ -568,7 +568,7 @@ systemaudit::users::check_locked_accounts() {
     
     # Check for accounts with empty passwords
     local empty_passwords
-    empty_passwords=$(awk -F: '($2 == "" ) {print $1}' /etc/shadow 2>/dev/null || true)
+    empty_passwords=$(utils::quiet_err awk -F: '($2 == "" ) {print $1}' /etc/shadow || true)
     
     if [[ -n "${empty_passwords}" ]]; then
         finding=$(systemaudit::create_finding \
@@ -643,9 +643,9 @@ systemaudit::network::check_open_ports() {
     
     # Get listening ports
     local listening_ports
-    if command -v ss >/dev/null 2>&1; then
+    if utils::has ss; then
         listening_ports=$(ss -tuln | grep LISTEN | wc -l)
-    elif command -v netstat >/dev/null 2>&1; then
+    elif utils::has netstat; then
         listening_ports=$(netstat -tuln | grep LISTEN | wc -l)
     else
         listening_ports=0
@@ -663,9 +663,9 @@ systemaudit::network::check_open_ports() {
     
     # Check for insecure services
     local insecure_ports
-    if command -v ss >/dev/null 2>&1; then
+    if utils::has ss; then
         insecure_ports=$(ss -tuln | grep -E ":23|:21|:135|:139|:445" | wc -l)
-    elif command -v netstat >/dev/null 2>&1; then
+    elif utils::has netstat; then
         insecure_ports=$(netstat -tuln | grep -E ":23|:21|:135|:139|:445" | wc -l)
     else
         insecure_ports=0
@@ -688,9 +688,9 @@ systemaudit::network::check_listening_services() {
     
     # Check for services that shouldn't be exposed
     local exposed_services
-    if command -v ss >/dev/null 2>&1; then
+    if utils::has ss; then
         exposed_services=$(ss -tuln | grep -E "0.0.0.0|:::" | wc -l)
-    elif command -v netstat >/dev/null 2>&1; then
+    elif utils::has netstat; then
         exposed_services=$(netstat -tuln | grep -E "0.0.0.0|:::" | wc -l)
     else
         exposed_services=0
@@ -818,7 +818,7 @@ systemaudit::filesystem::check_sticky_bits() {
     for dir in "${public_dirs[@]}"; do
         if [[ -d "${dir}" ]]; then
             local perms
-            perms=$(stat -c %a "${dir}" 2>/dev/null || echo "000")
+            perms=$(utils::quiet_err stat -c %a "${dir}" || echo "000")
             
             if [[ "${perms}" != "17""${perms#???}" ]]; then
                 finding=$(systemaudit::create_finding \
@@ -839,7 +839,7 @@ systemaudit::filesystem::check_dot_files() {
     
     # Check for .rhosts and .netrc files
     local dot_files
-    dot_files=$(find /home -name ".rhosts" -o -name ".netrc" 2>/dev/null)
+    dot_files=$(utils::quiet_err find /home -name ".rhosts" -o -name ".netrc")
     
     if [[ -n "${dot_files}" ]]; then
         finding=$(systemaudit::create_finding \
@@ -878,7 +878,7 @@ systemaudit::services::check_running_services() {
     local unnecessary_services=("telnet" "ftp" "rsh" "rlogin" "rexec")
     
     for service in "${unnecessary_services[@]}"; do
-        if pgrep -x "${service}" >/dev/null 2>&1; then
+        if utils::quiet pgrep -x "${service}"; then
             finding=$(systemaudit::create_finding \
                 "Unnecessary service running: ${service}" \
                 "Legacy services are insecure" \
@@ -918,7 +918,7 @@ systemaudit::services::check_service_permissions() {
     # Check systemd service files
     if [[ -d /etc/systemd/system ]]; then
         local world_writable_services
-        world_writable_services=$(find /etc/systemd/system -type f -perm -o+w 2>/dev/null)
+        world_writable_services=$(utils::quiet_err find /etc/systemd/system -type f -perm -o+w)
         
         if [[ -n "${world_writable_services}" ]]; then
             finding=$(systemaudit::create_finding \
@@ -976,7 +976,7 @@ systemaudit::compliance::check_audit_logging() {
     local finding=""
     
     # Check if auditd is running
-    if ! pgrep -x auditd >/dev/null 2>&1; then
+    if ! utils::quiet pgrep -x auditd; then
         finding=$(systemaudit::create_finding \
             "Audit daemon not running" \
             "Audit logging is required for security compliance" \
@@ -993,7 +993,7 @@ systemaudit::compliance::check_updates() {
     
     # This is a basic check - in production, you'd want more sophisticated update checking
     local last_update
-    last_update=$(stat -c %Y /var/cache/apt/pkgcache.bin 2>/dev/null || echo "0")
+    last_update=$(utils::quiet_err stat -c %Y /var/cache/apt/pkgcache.bin || echo "0")
     local current_time
     current_time=$(date +%s)
     local days_since_update
@@ -1015,7 +1015,7 @@ systemaudit::compliance::check_cis_benchmarks() {
     local finding=""
     
     # Check for prelink
-    if command -v prelink >/dev/null 2>&1; then
+    if utils::has prelink; then
         finding=$(systemaudit::create_finding \
             "Prelink is installed" \
             "Prelink can interfere with security features" \
@@ -1026,7 +1026,7 @@ systemaudit::compliance::check_cis_benchmarks() {
     fi
     
     # Check for unnecessary compilers
-    if command -v gcc >/dev/null 2>&1; then
+    if utils::has gcc; then
         finding=$(systemaudit::create_finding \
             "Compiler tools are installed" \
             "Compilers should not be on production systems" \

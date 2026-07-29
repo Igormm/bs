@@ -115,7 +115,7 @@ ps1config::list_themes() {
     log::info "Available PS1 themes:" 2>/dev/null || true
     for theme in "${themes[@]}"; do
         if [[ "$theme" == "$PS1_CONFIG_CURRENT_THEME" ]]; then
-            echo -e "  ${GREEN}● $theme (current)${NC}"
+            echo -e "  ${COLOR_GREEN}● $theme (current)${COLOR_RESET}"
         else
             echo -e "  ○ $theme"
         fi
@@ -259,7 +259,7 @@ ps1config::setup_prompt_command() {
     # Add to existing PROMPT_COMMAND
     if [[ -z "${PROMPT_COMMAND:-}" ]]; then
         PROMPT_COMMAND="ps1config::update_prompt"
-    else
+    elif [[ "${PROMPT_COMMAND}" != *"ps1config::update_prompt"* ]]; then
         PROMPT_COMMAND="$PROMPT_COMMAND; ps1config::update_prompt"
     fi
 }
@@ -296,19 +296,19 @@ ps1config::demo() {
     log::header "Демо конфигурации PS1" 2>/dev/null || true
     
     echo
-    echo -e "${BLUE}Available themes / Доступные темы:${NC}"
+    echo -e "${COLOR_BLUE}Available themes / Доступные темы:${COLOR_RESET}"
     ps1config::list_themes
     
     echo
-    echo -e "${BLUE}Current theme / Текущая тема:${NC}"
+    echo -e "${COLOR_BLUE}Current theme / Текущая тема:${COLOR_RESET}"
     echo "Current: $(ps1config::get_current_theme)"
     
     echo
-    echo -e "${BLUE}Testing themes / Тестирование тем:${NC}"
+    echo -e "${COLOR_BLUE}Testing themes / Тестирование тем:${COLOR_RESET}"
     
     local themes=("default" "powerline" "minimal" "time" "rainbow")
     for theme in "${themes[@]}"; do
-        echo -e "\n${YELLOW}Theme: $theme${NC}"
+        echo -e "\n${COLOR_YELLOW}Theme: $theme${COLOR_RESET}"
         ps1config::set_theme "$theme"
         echo "PS1: $PS1"
     done

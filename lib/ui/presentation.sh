@@ -2,17 +2,6 @@
 # presentation.sh — Main presentation module for BS
 # This module provides beautiful terminal output styling capabilities
 
-# @description Load the presentation module
-# @example
-#   load "lib/presentation"
-presentation::init() {
-    # Load the main presentation functionality
-    load "lib/presentation/main"
-}
-
-# Initialize the presentation module by default
-presentation::init
-
 # Define common color codes
 export PRESENTATION_COLOR_RESET=$'\033[0m'
 export PRESENTATION_COLOR_BLACK=$'\033[30m'

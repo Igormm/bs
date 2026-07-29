@@ -1,7 +1,7 @@
 # 📘 Project Best Practices
 
 ## 1. Project Purpose
-BS (Bash Open Source Architecture) is a modular Bash framework for building maintainable CLI tools and shell-based systems. It provides a unified entrypoint (bs), bootstrap orchestration, a robust module loader, structured logging, error handling, and a library of reusable modules (system, UI, data integrations). It targets Bash 4+ while keeping zsh compatibility for user shells invoking the tools.
+BS (Bash Open Source Architecture or BOSA) is a modular Bash framework for building maintainable CLI tools and shell-based systems. It provides a unified entrypoint (bs), bootstrap orchestration, a robust module loader, structured logging, error handling, and a library of reusable modules (system, UI, data integrations). It targets Bash 4+ while keeping zsh compatibility for user shells invoking the tools.
 
 ## 2. Project Structure
 - bootstrap/

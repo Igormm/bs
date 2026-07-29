@@ -1,223 +1,181 @@
-# BOSA Framework Test Suite
+# BS Framework Test Suite
 
-## Overview
+## Overview / Обзор
 
-This directory contains comprehensive tests for the BOSA framework, organized by test type and functionality.
+This directory contains the test suite for the BS framework, organized by test type.
+В этом каталоге находятся тесты фреймворка BS, сгруппированные по типам.
 
-## Test Structure
+## Test Structure / Структура
 
 ```
 tests/
-├── runalltests.sh              # Main test runner
-├── validatesyntax.sh             # Syntax validation
-├── testframework.sh              # Test framework utilities
-├── unit/                          # Unit tests
-│   ├── test_logger_unit.sh
-│   └── ...
-├── integration/                   # Integration tests
-│   ├── test_basic_functionality.sh
-│   ├── test_shebang_mode.sh
-│   ├── test_core_modules.sh
-│   ├── test_installation.sh
-│   ├── test_error_handling.sh
-│   └── ...
-└── demos/                         # Demo and example tests
-    ├── test_telegram_integration_demo.sh
-    ├── test_bash_it_integration_demo.sh
-    ├── test_display_settings_demo.sh
-    └── ...
+├── runalltests.sh                 # Main test runner / Основной запуск тестов
+├── validatesyntax.sh              # Syntax validation / Проверка синтаксиса
+├── testframework.sh               # Test framework utilities / Утилиты тестового фреймворка
+├── unit/                          # Unit tests / Модульные тесты
+│   ├── testconstunit.sh           # core/const: коды ошибок, const::error_description
+│   ├── testerrorhandlerunit.sh    # core/errorhandler: errorhandler::throw, cleanup-стек
+│   ├── testversionunit.sh         # core/version: bs::version::compare
+│   ├── testloaderunit.sh          # bootstrap/loader: load, повторы, ошибки
+│   ├── testloggerunit.sh          # core/logger: уровни, форматирование
+│   ├── testplatformcheckunit.sh   # lib/system/platformcheck
+│   └── testps1configunit.sh       # lib/ui/ps1config
+├── integration/                   # Integration tests (mocked) / Интеграционные тесты (на моках)
+│   ├── testvkapi.sh               # lib/integration/vkapi (мок curl)
+│   ├── testvkmusic.sh             # lib/integration/vkmusic (моки curl/vkapi, изолированный HOME)
+│   └── testwireguard.sh           # lib/integration/wireguard — ROOT, см. ниже
+├── data/
+│   └── testdataprocessor.sh       # lib/data/dataprocessor (jq/xmllint/pyyaml)
+├── frameworks/
+│   └── testframeworksintegration.sh # lib/frameworks/frameworksintegration
+├── network/
+│   └── testsshnetwork.sh          # lib/network/sshnetwork (моки ssh/scp/rsync/nmap)
+├── status/
+│   └── testps1status.sh           # lib/status/ps1status
+├── audit/
+│   └── testsystemaudit.sh         # lib/audit/systemaudit — ROOT, см. ниже
+└── demos/
+    └── testps1configdemo.sh       # Демо модуля ps1config
 ```
 
-## Running Tests
+## Running Tests / Запуск тестов
 
-### Run All Tests
+Запускать можно из любого каталога — пути вычисляются от расположения скриптов.
+Tests can be run from any directory — paths are resolved from the script locations.
+
+### Run All Tests / Запуск всех тестов
 ```bash
-./runalltests.sh
+bash tests/runalltests.sh        # из корня проекта / from the project root
+cd tests && bash runalltests.sh  # или из каталога tests / or from tests/
 ```
 
-### Validate Syntax
-```bash
-./validatesyntax.sh
-```
+Общий прогон не требует root и не пишет ничего в `/etc` или реальный `~/.config`
+(модули, работающие с домашним каталогом, тестируются в изолированном временном HOME).
 
-### Run Specific Test Categories
-```bash
-# Unit tests
-./unit/test_logger_unit.sh
+The default run needs no root and writes nothing to `/etc` or the real `~/.config`
+(modules that use the home directory are tested in an isolated temporary HOME).
 
-# Integration tests
-./integration/test_basic_functionality.sh
+### Destructive / root-requiring tests / Деструктивные тесты
 
-# Demo tests
-./demos/test_presentation.sh
-```
+По умолчанию пропускаются с явным сообщением (skip):
+Skipped by default with an explicit message:
 
-### Run Framework Comprehensive Test
-```bash
-./run_comprehensive_test.sh
-```
+- `integration/testwireguard.sh` — пишет в `/etc/wireguard`, `/var/backups/wireguard`,
+  поднимает сетевые интерфейсы; требует root.
+- `audit/testsystemaudit.sh` — подменяет `/etc/ssh/sshd_config` и
+  `/etc/security/pwquality.conf`; требует root.
 
-## Test Categories
-
-### Unit Tests
-- **Purpose:** Test individual functions and modules in isolation
-- **Characteristics:** Fast, focused, no external dependencies
-- **Examples:** Logger module tests, utility function tests
-
-### Integration Tests
-- **Purpose:** Test interaction between modules and framework components
-- **Characteristics:** Test module loading, framework initialization, error handling
-- **Examples:** Basic functionality, shebang mode, installation process
-
-### Demo Tests
-- **Purpose:** Demonstrate module functionality and usage
-- **Characteristics:** Show real-world examples, interactive demonstrations
-- **Examples:** Telegram integration, UI components, data processing
-
-## Writing Tests
-
-### Using the Test Framework
+Запуск — только явно и только под root:
+Run them only explicitly and only as root:
 
 ```bash
-#!/usr/bin/env bash
-source "../testframework.sh"
-
-# Initialize test framework
-testframework::init
-
-# Test section
-testframework::section "Testing Logger"
-
-# Run tests
-testframework::assert_true "true" "True condition"
-testframework::assert_equal "expected" "$result" "String comparison"
-testframework::assert_file_exists "boot.sh" "File exists"
-testframework::assert_command "ls boot.sh" "Command succeeds"
-
-# Summary
-testframework::summary
+sudo bash tests/runalltests.sh --with-root
 ```
 
-### Test Best Practices
+`network/testsshnetwork.sh` в общий прогон включён: он полностью на моках
+(ssh/scp/rsync/nmap/ssh-keygen) и работает в изолированном HOME.
+`network/testsshnetwork.sh` is part of the default run: it is fully mocked
+(ssh/scp/rsync/nmap/ssh-keygen) and runs in an isolated HOME.
 
-1. **Clear Test Names:** Describe what is being tested
-2. **Isolated Tests:** Each test should be independent
-3. **Proper Setup/Teardown:** Clean up after tests
-4. **Meaningful Assertions:** Test behavior, not implementation
-5. **Bilingual Comments:** Use Russian and English
-
-## Test Coverage
-
-### Core Modules
-- ✅ Logger (all levels, formats)
-- ✅ Error Handling (codes, cleanup)
-- ✅ Module Loading (loading, duplicates)
-- ✅ Constants (error codes, descriptions)
-
-### System Modules
-- ✅ System Utilities (info, operations)
-- ✅ Distribution Logic (detection, packages)
-- ✅ Network (interfaces, connectivity)
-- ✅ Services (start, stop, status)
-- ✅ Users (creation, permissions)
-
-### Integration Modules
-- ✅ Telegram Integration (messages, bots)
-- ✅ UI Components (presentation, themes)
-- ✅ Data Processing (algorithms, formatting)
-- ✅ External Tools (docker, git)
-
-## Test Requirements
-
-### Dependencies
-- BOSA framework initialized
-- Test framework loaded
-- Appropriate permissions
-- External tools (when testing integrations)
-
-### Environment Setup
+### Validate Syntax / Проверка синтаксиса
 ```bash
-# Make test scripts executable
-chmod +x tests/*.sh
-chmod +x tests/*/*.sh
+bash tests/validatesyntax.sh
+```
+Проверяет `bash -n` для `bs`, `boot.sh`, `install.sh`, `bootstrap/`, `core/`, `lib/`,
+`install/`, `tests/`. Exit 1, если есть ошибки синтаксиса или
+отсутствующие обязательные файлы.
+Runs `bash -n` over `bs`, `boot.sh`, `install.sh`, `bootstrap/`, `core/`, `lib/`,
+`install/`, `tests/`. Exit 1 on syntax errors or missing required files.
 
-# Run from project root
-cd bosa_project
-./tests/runalltests.sh
+### Run a Single Test / Запуск одного теста
+```bash
+bash tests/unit/testloggerunit.sh     # из корня / from the root
+cd tests/unit && bash testloggerunit.sh  # или из каталога теста / or from its directory
 ```
 
-## Adding New Tests
+## Test Coverage / Покрытие
 
-1. **Choose appropriate directory** (unit, integration, or demos)
-2. **Follow naming convention** (test_*.sh)
-3. **Use test framework functions**
-4. **Add bilingual documentation**
-5. **Test both success and failure cases**
+### Core (unit)
+- `core/const` — базовые коды возврата (E_SUCCESS/E_ERROR/E_INVALID),
+  `const::error_description`, `const::is_valid_error_code`, `const::version`
+- `core/errorhandler` — `errorhandler::throw` (код возврата, лог, без exit),
+  идемпотентность cleanup-стека, `log::fatal` возвращает код
+- `core/version` — `bs::version::compare` (меньше/равно/больше, включая 0.3.0 < 0.10.0)
+- `core/logger` — уровни, форматирование, fallback невалидного уровня
+- `bootstrap/loader` — загрузка модулей, защита от повторной загрузки,
+  ошибка на несуществующем модуле без ложного circular dependency
 
-## CI/CD Integration
+### Lib (integration-style, на моках / mocked)
+- `lib/system/platformcheck`, `lib/ui/ps1config`, `lib/status/ps1status`
+- `lib/integration/vkapi`, `lib/integration/vkmusic` (мок curl, без реальных API-вызовов)
+- `lib/network/sshnetwork` (моки ssh/scp/rsync/nmap/ssh-keygen)
+- `lib/data/dataprocessor` (jq, xmllint, python3+pyyaml)
+- `lib/frameworks/frameworksintegration` (bash-it/bashinator/bashly/shellspec/mbfl)
 
-### GitHub Actions Example
-```yaml
-name: Test BOSA Framework
-on: [push, pull_request]
+### Только с `--with-root` и под root
+- `lib/integration/wireguard`, `lib/audit/systemaudit`
 
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: Run tests
-      run: |
-        cd tests
-        ./runalltests.sh
-    - name: Validate syntax
-      run: |
-        cd tests
-        ./validatesyntax.sh
+## Writing Tests / Написание тестов
+
+### Using the Test Framework / Использование тестового фреймворка
+
+```bash
+#!/usr/bin/env bs
+set -euo pipefail
+
+readonly TEST_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly BS_PROJECT_ROOT="$(cd "${TEST_SCRIPT_DIR}/../.." && pwd)"
+
+source "${TEST_SCRIPT_DIR}/../testframework.sh"
+
+export BS_SILENT=1
+source "${BS_PROJECT_ROOT}/bootstrap/init.sh"
+export BS_HOME="${BS_PROJECT_ROOT}"   # нужен lib-модулям / needed by lib modules
+
+main() {
+    print_header "My Tests / Мои тесты"
+    testframework::init
+
+    testframework::section "Section / Раздел"
+    testframework::assert_true "true" "True condition"
+    testframework::assert_false "some::failing_command" "Command fails"
+    testframework::assert_equal "expected" "${result}" "Equality"
+    testframework::assert_file_exists "${BS_PROJECT_ROOT}/bs" "File exists"
+    testframework::assert_command "ls /tmp" "Command succeeds"
+
+    testframework::summary
+}
+
+main "$@"
 ```
 
-## Debugging Tests
+Замечания / Notes:
+- Счётчики инкрементируйте как `((++var))`: `((var++))` возвращает код 1 при
+  нулевом значении и убивает скрипт с `set -e`.
+  Increment counters as `((++var))`: `((var++))` returns status 1 at zero
+  and kills the script under `set -e`.
+- Если модуль пишет в `~/.config` или `~/Music`, экспортируйте изолированный
+  `HOME=$(mktemp -d)` ДО source модуля (readonly-пути вычисляются из HOME).
+  If a module writes to `~/.config` or `~/Music`, export an isolated
+  `HOME=$(mktemp -d)` BEFORE sourcing the module (readonly paths derive from HOME).
+- Двуязычные сообщения (RU/EN) приветствуются / Bilingual messages (RU/EN) are welcome.
 
-### Enable Debug Output
+## Debugging Tests / Отладка
+
 ```bash
 export BS_LOG_LEVEL=DEBUG
-./runalltests.sh
+bash tests/runalltests.sh
+
+bash -x tests/unit/testloggerunit.sh
 ```
 
-### Run with Bash Debug
-```bash
-bash -x ./tests/unit/test_logger_unit.sh
-```
+## Test Results / Формат результатов
 
-### Check Individual Test Output
-```bash
-./tests/integration/test_basic_functionality.sh 2>&1 | less
-```
-
-## Test Results
-
-Tests output results in the following format:
-- ✓ PASSED — Green checkmark
-- ✗ FAILED — Red X
-- ⚠ WARNING — Yellow warning
-- ▶ RUNNING — Blue arrow
-
-## Performance
-
-- Unit tests: ~0.1s per test
-- Integration tests: ~0.5s per test
-- Demo tests: ~1-2s per test
-- Full suite: ~10-30s total
-
-## Contributing
-
-When adding new tests:
-1. Follow existing patterns
-2. Add bilingual comments
-3. Test both positive and negative cases
-4. Update this README if needed
-5. Ensure tests are idempotent
+- ✓ PASSED — зелёная галочка / green checkmark
+- ✗ FAILED — красный крест / red cross
+- ⊘ SKIP — жёлтый знак пропуска с причиной / yellow skip with a reason
+- ▶ RUNNING — синяя стрелка / blue arrow
 
 ## License
 
-Tests are part of the BOSA framework and follow the same licensing terms.
+Tests are part of the BS framework and follow the same licensing terms.

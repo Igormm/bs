@@ -8,7 +8,10 @@
 #  Зависимости: bash 4.0+, bootstrap/init.sh, структура каталогов
 #              core/, lib/ (опционально, но doctor ругается).
 # 
+
+# strict
 set -euo pipefail
+IFS=$'\n\t'
 
 # Ensure running under Bash 4+
 if [[ -z "${BASH_VERSION:-}" || ${BASH_VERSINFO[0]} -lt 4 ]]; then
@@ -44,8 +47,14 @@ if [[ ! -f "${BS_ROOT}/bootstrap/init.sh" ]]; then
 fi
 source "${BS_ROOT}/bootstrap/init.sh"
 
+# EXIT-trap для стека cleanup (ядро при source trap больше не ставит)
+# EXIT trap for the cleanup stack (core no longer sets it when sourced)
+errorhandler::setup_trap
+
 # 5. Утилитные функции 
 die()  { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+
+
 help() {
   cat <<HELP
 BS Framework ${BS_VERSION} – command launcher & shebang interpreter
@@ -89,7 +98,7 @@ doctor_cmd() {
   echo "BS doctor report"
   echo "BS_ROOT: $BS_ROOT"
 
-  local req=(bootstrap/init.sh core/logger.sh core/errorhandler.sh lib/utils.sh)
+  local req=(bootstrap/init.sh core/logger.sh core/errorhandler.sh core/utils.sh)
   for f in "${req[@]}"; do
     if [[ -f "${BS_ROOT}/${f}" ]]; then
       echo "  [OK] ${f}"
@@ -112,10 +121,13 @@ run_cmd() {
   local script=$1; shift
   [[ -f "$script" ]] || die "run: file not found: $script"
   # Запускаем скрипт в новом bash с уже загруженным BS-окружением
+  # Сбрасываем унаследованный BS_INITIALIZED, иначе init.sh пропустит загрузку
   exec bash -c '
     set -euo pipefail
+    unset BS_INITIALIZED
     source "'"${BS_ROOT}/bootstrap/init.sh"'"
-    source "$1"
+    script=$1; shift
+    source "$script" "$@"
   ' bash "$script" "$@"
 }
 
@@ -128,8 +140,14 @@ EOF
 }
 
 # 6. Shebang-режим 
-# Если скрипт вызван через #!/usr/bin/env bs, переменная BS_SHEBANG=1
-# экспортируется автоматически загрузчиком (bootstrap/init.sh).
+# Если bs вызван как интерпретатор shebang'а (#!/usr/bin/env bs),
+# первый аргумент — путь к существующему скрипту, а не команда.
+if [[ $# -ge 1 && -f "$1" ]]; then
+  case "$1" in
+    help|-h|--help|version|env|list|doctor|run|init-shell) : ;;
+    *) BS_SHEBANG=1 ;;
+  esac
+fi
 if [[ "${BS_SHEBANG:-0}" == "1" ]]; then
   [[ $# -ge 1 ]] || die "shebang mode: script path required"
   run_cmd "$@"
