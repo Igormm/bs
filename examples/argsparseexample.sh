@@ -8,21 +8,14 @@
 # and get validation + help automatically.
 #
 # Попробуйте / Try it:
-#   bash examples/argsparseexample.sh deploy now
-#   bash examples/argsparseexample.sh now          # ошибка уровня / level error
-#   bash examples/argsparseexample.sh fly          # неизвестный параметр / unknown
-#   bash examples/argsparseexample.sh --help
+#   bs run examples/argsparseexample.sh deploy now
+#   bs run examples/argsparseexample.sh now          # ошибка уровня / level error
+#   bs run examples/argsparseexample.sh fly          # неизвестный параметр / unknown
+#   bs run examples/argsparseexample.sh --help
 
-set -euo pipefail
-
-# Подключаем BS bootstrap (пути от расположения скрипта)
-# Source BS bootstrap (paths relative to the script location)
-readonly EXAMPLE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly BS_PROJECT_ROOT="$(cd "${EXAMPLE_DIR}/.." && pwd)"
-
-export BS_SILENT=1
-source "${BS_PROJECT_ROOT}/bootstrap/init.sh"
-export BS_HOME="${BS_PROJECT_ROOT}"
+# Запуск / Run:
+#   bs run examples/argsparseexample.sh [args]
+#   ./examples/argsparseexample.sh            # bs должен быть в PATH / bs must be in PATH
 
 # Подключаем модуль параметров / Load the args module
 load "core/args"
@@ -60,7 +53,7 @@ main() {
     # Скрытый служебный флаг: печать completion для source
     # Hidden utility flag: print completion for sourcing
     # Установка (одна строка в ~/.bashrc) / Install (one line in ~/.bashrc):
-    #   source <(bash examples/argsparseexample.sh --emit-completion)
+    #   source <(bs run examples/argsparseexample.sh --emit-completion)
     if [[ "${1:-}" == "--emit-completion" ]]; then
         args::completion "$(basename "$0")"
         exit "${E_SUCCESS}"
@@ -104,13 +97,19 @@ main() {
     # ==========================================
     log::header "Bash completion / Автодополнение Bash"
 
-    log::info "Install: source <(bash $0 --emit-completion)"
+    # BASH_SOURCE[0]: под 'bs run' $0 — это "bash", а не путь скрипта
+    # BASH_SOURCE[0]: under 'bs run' $0 is "bash", not the script path
+    log::info "Install: source <(bs run ${BASH_SOURCE[0]} --emit-completion)"
     # Показываем первые строки сгенерированного кода
+    # sed читает весь поток до EOF — в отличие от head не закрывает pipe
+    # раньше времени и не ловит SIGPIPE под pipefail
     # Show the first lines of the generated code
-    args::completion "argsparseexample.sh" | head -5
+    # sed reads the whole stream until EOF — unlike head it does not close
+    # the pipe early and does not hit SIGPIPE under pipefail
+    args::completion "argsparseexample.sh" | sed -n '1,5p'
 
     # ==========================================
-    # 4. Линейный вариант: args::define
+    # 5. Линейный вариант: args::define
     #    Linear variant: args::define
     # ==========================================
     log::header "Linear chain demo / Демонстрация линейной цепочки"

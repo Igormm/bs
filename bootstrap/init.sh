@@ -65,6 +65,11 @@ append_local_bin_to_path() {
 # Add local bin to PATH
 append_local_bin_to_path
 
+# BS_HOME: историческое расхождение с BS_ROOT в lib-модулях
+# BS_HOME: historical mismatch with BS_ROOT in lib modules
+: "${BS_HOME:=${BS_ROOT}}"
+export BS_HOME
+
 # Load loader
 if [[ -f "${BS_ROOT}/bootstrap/loader.sh" ]]; then
   # shellcheck disable=SC1090

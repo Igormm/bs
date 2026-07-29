@@ -40,6 +40,18 @@ if [[ -z "${BS_ROOT:-}" ]]; then
   export BS_ROOT
 fi
 
+# BS_HOME: историческое расхождение с BS_ROOT в lib-модулях;
+# задаём единообразно, чтобы скриптам не приходилось экспортировать его руками
+# BS_HOME: historical mismatch with BS_ROOT in lib modules;
+# set it uniformly so scripts do not have to export it by hand
+: "${BS_HOME:=${BS_ROOT}}"
+export BS_HOME
+
+# По умолчанию не шумим при загрузке ядра: вывод скрипта важнее
+# Quiet by default when loading core: the script's own output matters more
+: "${BS_SILENT:=1}"
+export BS_SILENT
+
 # 4. Загрузка ядра 
 if [[ ! -f "${BS_ROOT}/bootstrap/init.sh" ]]; then
   printf 'ERROR: bootstrap/init.sh not found in BS_ROOT=%s\n' "$BS_ROOT" >&2

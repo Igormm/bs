@@ -12,16 +12,9 @@
 # Demonstrates in practice: process substitution, /dev/fd, can_read,
 # read_line from an arbitrary FD, command pipes.
 
-set -euo pipefail
-
-# Подключаем BS bootstrap (пути от расположения скрипта)
-# Source BS bootstrap (paths relative to the script location)
-readonly EXAMPLE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly BS_PROJECT_ROOT="$(cd "${EXAMPLE_DIR}/.." && pwd)"
-
-export BS_SILENT=1
-source "${BS_PROJECT_ROOT}/bootstrap/init.sh"
-export BS_HOME="${BS_PROJECT_ROOT}"
+# Запуск / Run:
+#   bs run examples/logmonitorexample.sh [args]
+#   ./examples/logmonitorexample.sh            # bs должен быть в PATH / bs must be in PATH
 
 load "lib/io/streams"
 

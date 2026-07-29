@@ -8,20 +8,13 @@
 # and a strength estimate. Help and completion come from the args tree.
 #
 # Попробуйте / Try it:
-#   bash examples/passwordgenexample.sh
-#   bash examples/passwordgenexample.sh --length 24 --count 5
-#   bash examples/passwordgenexample.sh --hex --length 32
+#   bs run examples/passwordgenexample.sh
+#   bs run examples/passwordgenexample.sh --length 24 --count 5
+#   bs run examples/passwordgenexample.sh --hex --length 32
 
-set -euo pipefail
-
-# Подключаем BS bootstrap (пути от расположения скрипта)
-# Source BS bootstrap (paths relative to the script location)
-readonly EXAMPLE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly BS_PROJECT_ROOT="$(cd "${EXAMPLE_DIR}/.." && pwd)"
-
-export BS_SILENT=1
-source "${BS_PROJECT_ROOT}/bootstrap/init.sh"
-export BS_HOME="${BS_PROJECT_ROOT}"
+# Запуск / Run:
+#   bs run examples/passwordgenexample.sh [args]
+#   ./examples/passwordgenexample.sh            # bs должен быть в PATH / bs must be in PATH
 
 load "core/args"
 load "lib/io/streams"

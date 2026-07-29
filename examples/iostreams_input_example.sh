@@ -12,16 +12,9 @@
 # The example is non-interactive: here-strings and pipes are used
 # instead of a real stdin, but the functions work with keyboard input too.
 
-set -euo pipefail
-
-# Подключаем BS bootstrap (пути от расположения скрипта)
-# Source BS bootstrap (paths relative to the script location)
-readonly EXAMPLE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly BS_PROJECT_ROOT="$(cd "${EXAMPLE_DIR}/.." && pwd)"
-
-export BS_SILENT=1
-source "${BS_PROJECT_ROOT}/bootstrap/init.sh"
-export BS_HOME="${BS_PROJECT_ROOT}"
+# Запуск / Run:
+#   bs run examples/iostreams_input_example.sh [args]
+#   ./examples/iostreams_input_example.sh            # bs должен быть в PATH / bs must be in PATH
 
 # Подключаем модуль потоков / Load the streams module
 load "lib/io/streams"

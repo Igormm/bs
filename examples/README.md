@@ -55,7 +55,7 @@ over I/O streams, file descriptors and redirections:
 **Usage:**
 ```bash
 # Each example runs standalone and non-interactively
-bash examples/iostreams_output_example.sh
+bs run examples/iostreams_output_example.sh
 ```
 
 ### Args Parse Example
@@ -77,10 +77,10 @@ parameter trees with automatic validation and help generation:
 
 **Usage:**
 ```bash
-bash examples/argsparseexample.sh deploy now --env production --dry-run
-bash examples/argsparseexample.sh now      # level error + help
-bash examples/argsparseexample.sh --help
-source <(bash examples/argsparseexample.sh --emit-completion)  # bash completion
+bs run examples/argsparseexample.sh deploy now --env production --dry-run
+bs run examples/argsparseexample.sh now      # level error + help
+bs run examples/argsparseexample.sh --help
+source <(bs run examples/argsparseexample.sh --emit-completion)  # bash completion
 ```
 
 ### Combo Examples (args + io::streams)
@@ -103,10 +103,10 @@ Small complete tools showing both modules working together:
 
 **Usage:**
 ```bash
-bash examples/deploytoolexample.sh deploy --env production --dry-run
-bash examples/passwordgenexample.sh --length 24 --count 5
-bash examples/logmonitorexample.sh
-bash examples/quizgameexample.sh          # best in a real terminal
+bs run examples/deploytoolexample.sh deploy --env production --dry-run
+bs run examples/passwordgenexample.sh --length 24 --count 5
+bs run examples/logmonitorexample.sh
+bs run examples/quizgameexample.sh          # best in a real terminal
 ```
 
 ## How to Use Examples

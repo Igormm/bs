@@ -8,20 +8,13 @@
 # bash completion and deploy-section logging to a file via FD save/restore.
 #
 # Попробуйте / Try it:
-#   bash examples/deploytoolexample.sh deploy --env production --dry-run
-#   bash examples/deploytoolexample.sh rollback --env staging
-#   bash examples/deploytoolexample.sh --help
+#   bs run examples/deploytoolexample.sh deploy --env production --dry-run
+#   bs run examples/deploytoolexample.sh rollback --env staging
+#   bs run examples/deploytoolexample.sh --help
 
-set -euo pipefail
-
-# Подключаем BS bootstrap (пути от расположения скрипта)
-# Source BS bootstrap (paths relative to the script location)
-readonly EXAMPLE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly BS_PROJECT_ROOT="$(cd "${EXAMPLE_DIR}/.." && pwd)"
-
-export BS_SILENT=1
-source "${BS_PROJECT_ROOT}/bootstrap/init.sh"
-export BS_HOME="${BS_PROJECT_ROOT}"
+# Запуск / Run:
+#   bs run examples/deploytoolexample.sh [args]
+#   ./examples/deploytoolexample.sh            # bs должен быть в PATH / bs must be in PATH
 
 # Наши два модуля / Our two modules
 load "core/args"
@@ -57,7 +50,7 @@ main() {
     args::flag_describe dry-run "Plan only, no changes"
 
     # Служебный флаг для установки completion / Utility flag for completion install
-    #   source <(bash examples/deploytoolexample.sh --emit-completion)
+    #   source <(bs run examples/deploytoolexample.sh --emit-completion)
     if [[ "${1:-}" == "--emit-completion" ]]; then
         args::completion "$(basename "$0")"
         exit "${E_SUCCESS}"
