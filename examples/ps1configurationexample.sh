@@ -170,7 +170,7 @@ setup_ps1_professional() {
     
     # Включаем все функции
     # Enable all features
-    ps1config::enable_advanced()
+    ps1config::enable_advanced
     
     # Добавляем SSH индикатор
     # Add SSH indicator

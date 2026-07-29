@@ -1,5 +1,5 @@
 #!/usr/bin/env bs
-
+#
 # core/const.sh 
 # — константы ошибок и кодов возврата фреймворка BS
 # — error constants and return codes for BS framework
@@ -9,8 +9,10 @@
 #
 # This module defines standard return codes and constants used
 # throughout the framework to ensure consistency.
+#
 
-set -euo pipefail
+# Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
+# Note: strict mode (set -euo pipefail) and IFS are set only in entry points
 
 #
 # Базовые коды возврата / Basic return codes
@@ -30,28 +32,37 @@ readonly E_INVALID=2
 # 
 
 # Неверные аргументы функции / Invalid function arguments
-declare -r LIB_ERROR_INVALID_ARGS=3
+readonly LIB_ERROR_INVALID_ARGS=3
 
 # Неверный входной формат данных / Invalid input data format
-declare -r LIB_ERROR_INVALID_INPUT=4
+readonly LIB_ERROR_INVALID_INPUT=4
 
 # Файл не найден / File not found
-declare -r LIB_ERROR_FILE_NOT_FOUND=5
+readonly LIB_ERROR_FILE_NOT_FOUND=5
 
 # Отказано в доступе / Permission denied
-declare -r LIB_ERROR_PERMISSION_DENIED=6
+readonly LIB_ERROR_PERMISSION_DENIED=6
 
 # Ошибка зависимости / Dependency error
-declare -r LIB_ERROR_DEPENDENCY=7
+readonly LIB_ERROR_DEPENDENCY=7
 
 # Неподдерживаемая операционная система / Unsupported operating system
-declare -r LIB_ERROR_UNSUPPORTED_OS=8
+readonly LIB_ERROR_UNSUPPORTED_OS=8
 
 # Таймаут операции / Operation timeout
-declare -r LIB_ERROR_TIMEOUT=9
+readonly LIB_ERROR_TIMEOUT=9
 
 # Конфликт ресурсов / Resource conflict
-declare -r LIB_ERROR_CONFLICT=10
+readonly LIB_ERROR_CONFLICT=10
+
+# Ошибка файловой операции / File operation error
+readonly LIB_ERROR_FILE_OPERATION=100
+
+# Отсутствует зависимость / Dependency missing
+readonly LIB_ERROR_DEPENDENCY_MISSING=101
+
+# Платформа не поддерживается / Platform unsupported
+readonly LIB_ERROR_PLATFORM_UNSUPPORTED=102
 
 # 
 # Глобальные переменные фреймворка / Framework global variables
@@ -64,7 +75,11 @@ declare -g FRAMEWORK_DEBUG=false
 declare -g FRAMEWORK_DRY_RUN=false
 
 # Версия фреймворка / Framework version
-declare -g BS_VERSION="0.3.0"
+# Владелец переменной — скрипт bs (readonly); здесь задаём только если пусто
+# Owner of the variable is the bs script (readonly); set here only if empty
+if [[ -z "${BS_VERSION:-}" ]]; then
+  declare -g BS_VERSION="0.3.0"
+fi
 
 # 
 # Константы для цветового вывода / Color output constants

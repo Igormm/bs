@@ -1,0 +1,12 @@
+# Резервные копии и временные файлы редакторов
+# Backup copies and editor temporary files
+*.bak
+*.autosave
+*.kate-swp
+*.swp
+*~
+
+# IDE
+# IDE
+.kdev4/
+.qodo/

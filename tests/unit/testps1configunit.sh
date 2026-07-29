@@ -7,12 +7,21 @@
 
 set -euo pipefail
 
-# Подключаем тестовый фреймворк
-source "../testframework.sh"
+# Подключаем тестовый фреймворк (пути от расположения скрипта)
+# Source test framework (paths relative to the script location)
+readonly TEST_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly BS_PROJECT_ROOT="$(cd "${TEST_SCRIPT_DIR}/../.." && pwd)"
 
-# Подключаем тестируемый модуль
-source "../../../boot.sh"
-bs::init
+source "${TEST_SCRIPT_DIR}/../testframework.sh"
+
+# Подключаем bootstrap BS (ядро загружается через loader)
+# Source BS bootstrap (core is loaded via the loader)
+export BS_SILENT=1
+source "${BS_PROJECT_ROOT}/bootstrap/init.sh"
+
+# lib-модули подключают core через BS_HOME (pre-existing расхождение BS_ROOT/BS_HOME)
+# lib modules source core via BS_HOME (pre-existing BS_ROOT/BS_HOME mismatch)
+export BS_HOME="${BS_PROJECT_ROOT}"
 
 # Главная функция тестов
 main() {
@@ -46,9 +55,8 @@ main() {
     pushd "$temp_dir" >/dev/null 2>&1
     
     git init >/dev/null 2>&1 || {
+        # popd и rm выполняются ниже в любом случае / popd and rm happen below anyway
         log::warn "Git not available, skipping git tests" 2>/dev/null || true
-        popd >/dev/null 2>&1
-        rm -rf "$temp_dir"
     }
     
     if [[ -d .git ]]; then
@@ -57,10 +65,13 @@ main() {
         git_info=$(ps1config::git_info)
         testframework::assert_true "${#git_info} -gt 0" "Git info returned"
         
-        # Создаем файл и коммитим
+        # Создаем файл и коммитим (identity только для этого коммита:
+        # в чистых окружениях/контейнерах user.name не настроен)
+        # Create a file and commit (identity scoped to this commit only:
+        # clean environments/containers have no user.name configured)
         echo "test" > test.txt
         git add test.txt >/dev/null 2>&1
-        git commit -m "Test commit" >/dev/null 2>&1
+        git -c user.name="BS Test" -c user.email="bs-test@localhost" commit -m "Test commit" >/dev/null 2>&1
         
         git_info=$(ps1config::git_info)
         testframework::assert_true "${#git_info} -gt 0" "Git info with commit"

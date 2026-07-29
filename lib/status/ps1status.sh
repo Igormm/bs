@@ -1,21 +1,5 @@
 #!/usr/bin/env bs
-
-#
-# BS Framework - Enhanced Bash Scripting
-# Фреймворк BS - Расширенное bash-скриптование
-#
-# НАЗНАЧЕНИЕ: Главный entrypoint фреймворка BS
-# PURPOSE: Main entrypoint for BS framework
-#
-# ЗАВИСИМОСТИ: bash 4.0+, стандартные утилиты Linux
-# DEPENDENCIES: bash 4.0+, standard Linux utilities
-#
-# ИСПОЛЬЗУЕТСЯ: Для инициализации фреймворка и загрузки модулей
-# USAGE: For framework initialization and module loading
-#
 # shellcheck disable=SC2155
-
-
 
 # ps1status.sh — PS1 Status Monitoring Module for BS Framework
 
@@ -59,26 +43,17 @@
 
 # @version 1.0.0
 
-
-
 # Check if module is already loaded
 
 if [[ -n "${BOSA_LIB_STATUS_PS1_LOADED:-}" ]]; then
 
-    log::debug "PS1 Status module already loaded" 2>/dev/null || true
+    utils::ignore log::debug "PS1 Status module already loaded"
 
     return 0
 
 fi
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# readonly BOSA_LIB_STATUS_PS1_LOADED - [Описание переменной]
-# readonly BOSA_LIB_STATUS_PS1_LOADED - [Variable description]
-#
 readonly BOSA_LIB_STATUS_PS1_LOADED=1
-
-
 
 # Import required modules
 
@@ -103,40 +78,16 @@ source "${BS_HOME}/core/logger.sh"
 #
 source "${BS_HOME}/core/errorhandler.sh"
 
-
-
 # PS1 Status configuration
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# readonly PS1_STATUS_CONFIG_DIR - [Описание переменной]
-# readonly PS1_STATUS_CONFIG_DIR - [Variable description]
-#
 readonly PS1_STATUS_CONFIG_DIR="${HOME}/.config/ps1status"
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# readonly PS1_STATUS_CACHE_DIR - [Описание переменной]
-# readonly PS1_STATUS_CACHE_DIR - [Variable description]
-#
 readonly PS1_STATUS_CACHE_DIR="/tmp/ps1_status_cache"
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# readonly PS1_STATUS_UPDATE_INTERVAL - [Описание переменной]
-# readonly PS1_STATUS_UPDATE_INTERVAL - [Variable description]
-#
 readonly PS1_STATUS_UPDATE_INTERVAL=5  # seconds
-
-
 
 # Status components state
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1_STATUS_COMPONENTS - [Описание переменной]
-# PS1_STATUS_COMPONENTS - [Variable description]
-#
 PS1_STATUS_COMPONENTS=(
 
     "wireguard"
@@ -151,13 +102,6 @@ PS1_STATUS_COMPONENTS=(
 
 )
 
-
-
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1_STATUS_ENABLED_COMPONENTS - [Описание переменной]
-# PS1_STATUS_ENABLED_COMPONENTS - [Variable description]
-#
 PS1_STATUS_ENABLED_COMPONENTS=(
 
     "wireguard"
@@ -168,81 +112,27 @@ PS1_STATUS_ENABLED_COMPONENTS=(
 
 )
 
-
-
 # Color definitions for status indicators
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# readonly PS1_STATUS_COLOR_WIREGUARD_UP - [Описание переменной]
-# readonly PS1_STATUS_COLOR_WIREGUARD_UP - [Variable description]
-#
 readonly PS1_STATUS_COLOR_WIREGUARD_UP="\033[0;32m"    # Green
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# readonly PS1_STATUS_COLOR_WIREGUARD_DOWN - [Описание переменной]
-# readonly PS1_STATUS_COLOR_WIREGUARD_DOWN - [Variable description]
-#
 readonly PS1_STATUS_COLOR_WIREGUARD_DOWN="\033[0;31m"  # Red
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# readonly PS1_STATUS_COLOR_NETWORK_UP - [Описание переменной]
-# readonly PS1_STATUS_COLOR_NETWORK_UP - [Variable description]
-#
 readonly PS1_STATUS_COLOR_NETWORK_UP="\033[0;32m"      # Green
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# readonly PS1_STATUS_COLOR_NETWORK_DOWN - [Описание переменной]
-# readonly PS1_STATUS_COLOR_NETWORK_DOWN - [Variable description]
-#
 readonly PS1_STATUS_COLOR_NETWORK_DOWN="\033[0;31m"    # Red
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# readonly PS1_STATUS_COLOR_SPEED_GOOD - [Описание переменной]
-# readonly PS1_STATUS_COLOR_SPEED_GOOD - [Variable description]
-#
 readonly PS1_STATUS_COLOR_SPEED_GOOD="\033[0;32m"      # Green
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# readonly PS1_STATUS_COLOR_SPEED_MEDIUM - [Описание переменной]
-# readonly PS1_STATUS_COLOR_SPEED_MEDIUM - [Variable description]
-#
 readonly PS1_STATUS_COLOR_SPEED_MEDIUM="\033[0;33m"    # Yellow
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# readonly PS1_STATUS_COLOR_SPEED_SLOW - [Описание переменной]
-# readonly PS1_STATUS_COLOR_SPEED_SLOW - [Variable description]
-#
 readonly PS1_STATUS_COLOR_SPEED_SLOW="\033[0;31m"      # Red
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# readonly PS1_STATUS_COLOR_AUDIO_ON - [Описание переменной]
-# readonly PS1_STATUS_COLOR_AUDIO_ON - [Variable description]
-#
 readonly PS1_STATUS_COLOR_AUDIO_ON="\033[0;35m"        # Magenta
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# readonly PS1_STATUS_COLOR_AUDIO_OFF - [Описание переменной]
-# readonly PS1_STATUS_COLOR_AUDIO_OFF - [Variable description]
-#
 readonly PS1_STATUS_COLOR_AUDIO_OFF="\033[0;37m"       # Gray
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# readonly PS1_STATUS_COLOR_RESET - [Описание переменной]
-# readonly PS1_STATUS_COLOR_RESET - [Variable description]
-#
 readonly PS1_STATUS_COLOR_RESET="\033[0m"              # Reset
-
-
 
 # Module initialization
 
@@ -305,8 +195,6 @@ ps1status::init() {
 
 }
 
-
-
 # Check dependencies
 
 ps1status::check_dependencies() {
@@ -333,33 +221,23 @@ ps1status::check_dependencies() {
 
     # Check for basic network tools
 
-    if ! command -v ping >/dev/null 2>&1; then
+    if ! utils::has ping; then
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# missing_deps+ - [Описание переменной]
-# missing_deps+ - [Variable description]
-#
         missing_deps+=("iputils-ping")
 
     fi
 
     
 
-    if ! command -v curl >/dev/null 2>&1; then
+    if ! utils::has curl; then
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# missing_deps+ - [Описание переменной]
-# missing_deps+ - [Variable description]
-#
         missing_deps+=("curl")
 
     fi
 
     
 
-    if ! command -v wg >/dev/null 2>&1; then
+    if ! utils::has wg; then
 
         log::debug "WireGuard tools not found - WireGuard status will be disabled"
 
@@ -367,7 +245,7 @@ ps1status::check_dependencies() {
 
     
 
-    if ! command -v pactl >/dev/null 2>&1 && ! command -v amixer >/dev/null 2>&1; then
+    if ! utils::has pactl && ! utils::has amixer; then
 
         log::debug "Audio tools not found - Audio status will be disabled"
 
@@ -390,8 +268,6 @@ ps1status::check_dependencies() {
     fi
 
 }
-
-
 
 # Install dependencies
 
@@ -440,7 +316,7 @@ ps1status::install_dependencies() {
 
     elif platformcheck::is_macos; then
 
-        if ! command -v brew >/dev/null 2>&1; then
+        if ! utils::has brew; then
 
             errorhandler::throw "${func_name}" "Homebrew is required for macOS" \
 
@@ -463,8 +339,6 @@ ps1status::install_dependencies() {
     log::success "Dependencies installed successfully"
 
 }
-
-
 
 # Initialize status components
 
@@ -516,8 +390,6 @@ ps1status::init_components() {
     log::debug "All PS1 status components initialized"
 
 }
-
-
 
 # Start background monitoring
 
@@ -578,8 +450,6 @@ ps1status::start_monitoring() {
 
 }
 
-
-
 # Main monitoring loop
 
 ps1status::monitor_loop() {
@@ -590,7 +460,7 @@ ps1status::monitor_loop() {
 
         for component in "${PS1_STATUS_ENABLED_COMPONENTS[@]}"; do
 
-            "ps1status::${component}::update" 2>/dev/null || true
+            utils::ignore "ps1status::${component}::update"
 
         done
 
@@ -601,8 +471,6 @@ ps1status::monitor_loop() {
     done
 
 }
-
-
 
 # Stop monitoring
 
@@ -635,16 +503,11 @@ ps1status::stop_monitoring() {
 #
         local monitor_pid
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# monitor_pid - [Описание переменной]
-# monitor_pid - [Variable description]
-#
         monitor_pid=$(cat "${pid_file}")
 
         
 
-        if kill "${monitor_pid}" 2>/dev/null; then
+        if utils::quiet_err kill "${monitor_pid}"; then
 
             rm -f "${pid_file}"
 
@@ -664,8 +527,6 @@ ps1status::stop_monitoring() {
 
 }
 
-
-
 # ============================================================================
 
 # WIREGUARD STATUS COMPONENT
@@ -674,55 +535,31 @@ ps1status::stop_monitoring() {
 
 # ============================================================================
 
-
-
 ps1status::wireguard::init() {
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1_STATUS_WIREGUARD_INTERFACES - [Описание переменной]
-# PS1_STATUS_WIREGUARD_INTERFACES - [Variable description]
-#
     PS1_STATUS_WIREGUARD_INTERFACES=()
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1_STATUS_WIREGUARD_LAST_STATUS - [Описание переменной]
-# PS1_STATUS_WIREGUARD_LAST_STATUS - [Variable description]
-#
     PS1_STATUS_WIREGUARD_LAST_STATUS="unknown"
 
     
 
     # Find active WireGuard interfaces
 
-    if command -v wg >/dev/null 2>&1; then
+    if utils::has wg; then
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# while IFS - [Описание переменной]
-# while IFS - [Variable description]
-#
         while IFS= read -r interface; do
 
             if [[ -n "${interface}" ]]; then
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1_STATUS_WIREGUARD_INTERFACES+ - [Описание переменной]
-# PS1_STATUS_WIREGUARD_INTERFACES+ - [Variable description]
-#
                 PS1_STATUS_WIREGUARD_INTERFACES+=("${interface}")
 
             fi
 
-        done < <(wg show interfaces 2>/dev/null)
+        done < <(utils::quiet_err wg show interfaces)
 
     fi
 
 }
-
-
 
 ps1status::wireguard::update() {
 
@@ -750,13 +587,8 @@ ps1status::wireguard::update() {
 
         for interface in "${PS1_STATUS_WIREGUARD_INTERFACES[@]}"; do
 
-            if wg show "${interface}" >/dev/null 2>&1; then
+            if utils::quiet wg show "${interface}"; then
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# status - [Описание переменной]
-# status - [Variable description]
-#
                 status="up"
 
                 break
@@ -769,11 +601,6 @@ ps1status::wireguard::update() {
 
     
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1_STATUS_WIREGUARD_LAST_STATUS - [Описание переменной]
-# PS1_STATUS_WIREGUARD_LAST_STATUS - [Variable description]
-#
     PS1_STATUS_WIREGUARD_LAST_STATUS="${status}"
 
     
@@ -783,8 +610,6 @@ ps1status::wireguard::update() {
     echo "${status}" > "${PS1_STATUS_CACHE_DIR}/wireguard.status"
 
 }
-
-
 
 ps1status::wireguard::get_status() {
 
@@ -806,11 +631,6 @@ ps1status::wireguard::get_status() {
 
     if [[ -f "${status_file}" ]]; then
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# status - [Описание переменной]
-# status - [Variable description]
-#
         status=$(cat "${status_file}")
 
     fi
@@ -841,8 +661,6 @@ ps1status::wireguard::get_status() {
 
 }
 
-
-
 # ============================================================================
 
 # NETWORK STATUS COMPONENT
@@ -851,15 +669,8 @@ ps1status::wireguard::get_status() {
 
 # ============================================================================
 
-
-
 ps1status::network::init() {
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1_STATUS_NETWORK_TEST_HOSTS - [Описание переменной]
-# PS1_STATUS_NETWORK_TEST_HOSTS - [Variable description]
-#
     PS1_STATUS_NETWORK_TEST_HOSTS=(
 
         "8.8.8.8"      # Google DNS
@@ -870,23 +681,11 @@ ps1status::network::init() {
 
     )
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1_STATUS_NETWORK_LAST_STATUS - [Описание переменной]
-# PS1_STATUS_NETWORK_LAST_STATUS - [Variable description]
-#
     PS1_STATUS_NETWORK_LAST_STATUS="unknown"
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1_STATUS_NETWORK_LAST_LATENCY - [Описание переменной]
-# PS1_STATUS_NETWORK_LAST_LATENCY - [Variable description]
-#
     PS1_STATUS_NETWORK_LAST_LATENCY="0"
 
 }
-
-
 
 ps1status::network::update() {
 
@@ -926,13 +725,8 @@ ps1status::network::update() {
 
     for host in "${PS1_STATUS_NETWORK_TEST_HOSTS[@]}"; do
 
-        if ping -c 1 -W 1 "${host}" >/dev/null 2>&1; then
+        if utils::quiet ping -c 1 -W 1 "${host}"; then
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# status - [Описание переменной]
-# status - [Variable description]
-#
             status="up"
 
             ((successful_pings++))
@@ -975,18 +769,8 @@ ps1status::network::update() {
 
     
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1_STATUS_NETWORK_LAST_STATUS - [Описание переменной]
-# PS1_STATUS_NETWORK_LAST_STATUS - [Variable description]
-#
     PS1_STATUS_NETWORK_LAST_STATUS="${status}"
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1_STATUS_NETWORK_LAST_LATENCY - [Описание переменной]
-# PS1_STATUS_NETWORK_LAST_LATENCY - [Variable description]
-#
     PS1_STATUS_NETWORK_LAST_LATENCY="${avg_latency}"
 
     
@@ -998,8 +782,6 @@ ps1status::network::update() {
     echo "${avg_latency}" > "${PS1_STATUS_CACHE_DIR}/network.latency"
 
 }
-
-
 
 ps1status::network::get_status() {
 
@@ -1035,11 +817,6 @@ ps1status::network::get_status() {
 
     if [[ -f "${status_file}" ]]; then
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# status - [Описание переменной]
-# status - [Variable description]
-#
         status=$(cat "${status_file}")
 
     fi
@@ -1048,11 +825,6 @@ ps1status::network::get_status() {
 
     if [[ -f "${latency_file}" ]]; then
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# latency - [Описание переменной]
-# latency - [Variable description]
-#
         latency=$(cat "${latency_file}")
 
     fi
@@ -1095,8 +867,6 @@ ps1status::network::get_status() {
 
 }
 
-
-
 # ============================================================================
 
 # SPEED MONITORING COMPONENT
@@ -1105,41 +875,17 @@ ps1status::network::get_status() {
 
 # ============================================================================
 
-
-
 ps1status::speed::init() {
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1_STATUS_SPEED_TEST_URL - [Описание переменной]
-# PS1_STATUS_SPEED_TEST_URL - [Variable description]
-#
     PS1_STATUS_SPEED_TEST_URL="https://speed.cloudflare.com/__down?bytes=1048576"  # 1MB
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1_STATUS_SPEED_LAST_DOWNLOAD - [Описание переменной]
-# PS1_STATUS_SPEED_LAST_DOWNLOAD - [Variable description]
-#
     PS1_STATUS_SPEED_LAST_DOWNLOAD="0"
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1_STATUS_SPEED_LAST_UPLOAD - [Описание переменной]
-# PS1_STATUS_SPEED_LAST_UPLOAD - [Variable description]
-#
     PS1_STATUS_SPEED_LAST_UPLOAD="0"
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1_STATUS_SPEED_LAST_TEST - [Описание переменной]
-# PS1_STATUS_SPEED_LAST_TEST - [Variable description]
-#
     PS1_STATUS_SPEED_LAST_TEST=0
 
 }
-
-
 
 ps1status::speed::update() {
 
@@ -1169,11 +915,6 @@ ps1status::speed::update() {
 
     
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1_STATUS_SPEED_LAST_TEST - [Описание переменной]
-# PS1_STATUS_SPEED_LAST_TEST - [Variable description]
-#
     PS1_STATUS_SPEED_LAST_TEST="${current_time}"
 
     
@@ -1189,7 +930,7 @@ ps1status::speed::update() {
 
     
 
-    if curl -s -o /dev/null --max-time 10 "${PS1_STATUS_SPEED_TEST_URL}" 2>/dev/null; then
+    if utils::quiet_err curl -s -o /dev/null --max-time 10 "${PS1_STATUS_SPEED_TEST_URL}"; then
 
 #
 # ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
@@ -1218,20 +959,10 @@ ps1status::speed::update() {
 
         
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1_STATUS_SPEED_LAST_DOWNLOAD - [Описание переменной]
-# PS1_STATUS_SPEED_LAST_DOWNLOAD - [Variable description]
-#
         PS1_STATUS_SPEED_LAST_DOWNLOAD="${speed}"
 
     else
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1_STATUS_SPEED_LAST_DOWNLOAD - [Описание переменной]
-# PS1_STATUS_SPEED_LAST_DOWNLOAD - [Variable description]
-#
         PS1_STATUS_SPEED_LAST_DOWNLOAD="0"
 
     fi
@@ -1243,8 +974,6 @@ ps1status::speed::update() {
     echo "${PS1_STATUS_SPEED_LAST_DOWNLOAD}" > "${PS1_STATUS_CACHE_DIR}/speed.download"
 
 }
-
-
 
 ps1status::speed::get_status() {
 
@@ -1266,11 +995,6 @@ ps1status::speed::get_status() {
 
     if [[ -f "${speed_file}" ]]; then
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# speed - [Описание переменной]
-# speed - [Variable description]
-#
         speed=$(cat "${speed_file}")
 
     fi
@@ -1297,8 +1021,6 @@ ps1status::speed::get_status() {
 
 }
 
-
-
 # ============================================================================
 
 # AUDIO STATUS COMPONENT
@@ -1307,34 +1029,15 @@ ps1status::speed::get_status() {
 
 # ============================================================================
 
-
-
 ps1status::audio::init() {
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1_STATUS_AUDIO_LAST_STATUS - [Описание переменной]
-# PS1_STATUS_AUDIO_LAST_STATUS - [Variable description]
-#
     PS1_STATUS_AUDIO_LAST_STATUS="unknown"
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1_STATUS_AUDIO_LAST_VOLUME - [Описание переменной]
-# PS1_STATUS_AUDIO_LAST_VOLUME - [Variable description]
-#
     PS1_STATUS_AUDIO_LAST_VOLUME="0"
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1_STATUS_AUDIO_LAST_MUTED - [Описание переменной]
-# PS1_STATUS_AUDIO_LAST_MUTED - [Variable description]
-#
     PS1_STATUS_AUDIO_LAST_MUTED="false"
 
 }
-
-
 
 ps1status::audio::update() {
 
@@ -1365,7 +1068,7 @@ ps1status::audio::update() {
 
     # Try PulseAudio first
 
-    if command -v pactl >/dev/null 2>&1; then
+    if utils::has pactl; then
 
 #
 # ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
@@ -1405,11 +1108,6 @@ ps1status::audio::update() {
 
             if pactl list sinks 2>/dev/null | grep -A 10 "${sink_info}" | grep -q "Mute: yes"; then
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# muted - [Описание переменной]
-# muted - [Variable description]
-#
                 muted="true"
 
             fi
@@ -1418,7 +1116,7 @@ ps1status::audio::update() {
 
     # Fallback to ALSA
 
-    elif command -v amixer >/dev/null 2>&1; then
+    elif utils::has amixer; then
 
 #
 # ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
@@ -1427,7 +1125,7 @@ ps1status::audio::update() {
 #
         local mixer_info
 
-        mixer_info=$(amixer get Master 2>/dev/null || amixer get PCM 2>/dev/null)
+        mixer_info=$(utils::quiet_err amixer get Master || utils::quiet_err amixer get PCM)
 
         
 
@@ -1443,11 +1141,6 @@ ps1status::audio::update() {
 
             if echo "${mixer_info}" | grep -q "\[off\]"; then
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# muted - [Описание переменной]
-# muted - [Variable description]
-#
                 muted="true"
 
             fi
@@ -1458,18 +1151,8 @@ ps1status::audio::update() {
 
     
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1_STATUS_AUDIO_LAST_VOLUME - [Описание переменной]
-# PS1_STATUS_AUDIO_LAST_VOLUME - [Variable description]
-#
     PS1_STATUS_AUDIO_LAST_VOLUME="${volume}"
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1_STATUS_AUDIO_LAST_MUTED - [Описание переменной]
-# PS1_STATUS_AUDIO_LAST_MUTED - [Variable description]
-#
     PS1_STATUS_AUDIO_LAST_MUTED="${muted}"
 
     
@@ -1481,8 +1164,6 @@ ps1status::audio::update() {
     echo "${muted}" > "${PS1_STATUS_CACHE_DIR}/audio.muted"
 
 }
-
-
 
 ps1status::audio::get_status() {
 
@@ -1518,11 +1199,6 @@ ps1status::audio::get_status() {
 
     if [[ -f "${volume_file}" ]]; then
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# volume - [Описание переменной]
-# volume - [Variable description]
-#
         volume=$(cat "${volume_file}")
 
     fi
@@ -1531,11 +1207,6 @@ ps1status::audio::get_status() {
 
     if [[ -f "${muted_file}" ]]; then
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# muted - [Описание переменной]
-# muted - [Variable description]
-#
         muted=$(cat "${muted_file}")
 
     fi
@@ -1566,8 +1237,6 @@ ps1status::audio::get_status() {
 
 }
 
-
-
 # Toggle audio mute
 
 ps1status::audio::toggle_mute() {
@@ -1581,13 +1250,13 @@ ps1status::audio::toggle_mute() {
 
     
 
-    if command -v pactl >/dev/null 2>&1; then
+    if utils::has pactl; then
 
         pactl set-sink-mute @DEFAULT_SINK@ toggle
 
-    elif command -v amixer >/dev/null 2>&1; then
+    elif utils::has amixer; then
 
-        amixer set Master toggle >/dev/null 2>&1 || amixer set PCM toggle >/dev/null 2>&1
+        utils::quiet amixer set Master toggle || utils::quiet amixer set PCM toggle
 
     else
 
@@ -1596,8 +1265,6 @@ ps1status::audio::toggle_mute() {
     fi
 
 }
-
-
 
 # Adjust volume
 
@@ -1619,13 +1286,13 @@ ps1status::audio::adjust_volume() {
 
     
 
-    if command -v pactl >/dev/null 2>&1; then
+    if utils::has pactl; then
 
         pactl set-sink-volume @DEFAULT_SINK@ "${delta}%+"
 
-    elif command -v amixer >/dev/null 2>&1; then
+    elif utils::has amixer; then
 
-        amixer set Master "${delta}%+" >/dev/null 2>&1 || amixer set PCM "${delta}%+" >/dev/null 2>&1
+        utils::quiet amixer set Master "${delta}%+" || utils::quiet amixer set PCM "${delta}%+"
 
     else
 
@@ -1635,8 +1302,6 @@ ps1status::audio::adjust_volume() {
 
 }
 
-
-
 # ============================================================================
 
 # SYSTEM STATUS COMPONENT
@@ -1645,34 +1310,15 @@ ps1status::audio::adjust_volume() {
 
 # ============================================================================
 
-
-
 ps1status::system::init() {
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1_STATUS_SYSTEM_LAST_CPU - [Описание переменной]
-# PS1_STATUS_SYSTEM_LAST_CPU - [Variable description]
-#
     PS1_STATUS_SYSTEM_LAST_CPU="0"
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1_STATUS_SYSTEM_LAST_MEM - [Описание переменной]
-# PS1_STATUS_SYSTEM_LAST_MEM - [Variable description]
-#
     PS1_STATUS_SYSTEM_LAST_MEM="0"
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1_STATUS_SYSTEM_LAST_LOAD - [Описание переменной]
-# PS1_STATUS_SYSTEM_LAST_LOAD - [Variable description]
-#
     PS1_STATUS_SYSTEM_LAST_LOAD="0"
 
 }
-
-
 
 ps1status::system::update() {
 
@@ -1707,17 +1353,12 @@ ps1status::system::update() {
 #
     local mem_usage
 
-    if command -v free >/dev/null 2>&1; then
+    if utils::has free; then
 
         mem_usage=$(free | grep Mem | awk '{printf("%.1f", $3/$2 * 100.0)}' 2>/dev/null || echo "0")
 
     else
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# mem_usage - [Описание переменной]
-# mem_usage - [Variable description]
-#
         mem_usage="0"
 
     fi
@@ -1737,25 +1378,10 @@ ps1status::system::update() {
 
     
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1_STATUS_SYSTEM_LAST_CPU - [Описание переменной]
-# PS1_STATUS_SYSTEM_LAST_CPU - [Variable description]
-#
     PS1_STATUS_SYSTEM_LAST_CPU="${cpu_usage}"
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1_STATUS_SYSTEM_LAST_MEM - [Описание переменной]
-# PS1_STATUS_SYSTEM_LAST_MEM - [Variable description]
-#
     PS1_STATUS_SYSTEM_LAST_MEM="${mem_usage}"
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1_STATUS_SYSTEM_LAST_LOAD - [Описание переменной]
-# PS1_STATUS_SYSTEM_LAST_LOAD - [Variable description]
-#
     PS1_STATUS_SYSTEM_LAST_LOAD="${load_avg}"
 
     
@@ -1769,8 +1395,6 @@ ps1status::system::update() {
     echo "${load_avg}" > "${PS1_STATUS_CACHE_DIR}/system.load"
 
 }
-
-
 
 ps1status::system::get_status() {
 
@@ -1822,11 +1446,6 @@ ps1status::system::get_status() {
 
     if [[ -f "${cpu_file}" ]]; then
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# cpu - [Описание переменной]
-# cpu - [Variable description]
-#
         cpu=$(cat "${cpu_file}")
 
     fi
@@ -1835,11 +1454,6 @@ ps1status::system::get_status() {
 
     if [[ -f "${mem_file}" ]]; then
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# mem - [Описание переменной]
-# mem - [Variable description]
-#
         mem=$(cat "${mem_file}")
 
     fi
@@ -1848,11 +1462,6 @@ ps1status::system::get_status() {
 
     if [[ -f "${load_file}" ]]; then
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# load - [Описание переменной]
-# load - [Variable description]
-#
         load=$(cat "${load_file}")
 
     fi
@@ -1879,29 +1488,14 @@ ps1status::system::get_status() {
 
     if (( $(echo "${cpu} > 80" | bc -l 2>/dev/null || echo "0") )); then
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# cpu_indicator - [Описание переменной]
-# cpu_indicator - [Variable description]
-#
         cpu_indicator="${PS1_STATUS_COLOR_SPEED_SLOW}▪${PS1_STATUS_COLOR_RESET}"
 
     elif (( $(echo "${cpu} > 50" | bc -l 2>/dev/null || echo "0") )); then
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# cpu_indicator - [Описание переменной]
-# cpu_indicator - [Variable description]
-#
         cpu_indicator="${PS1_STATUS_COLOR_SPEED_MEDIUM}▪${PS1_STATUS_COLOR_RESET}"
 
     else
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# cpu_indicator - [Описание переменной]
-# cpu_indicator - [Variable description]
-#
         cpu_indicator="${PS1_STATUS_COLOR_SPEED_GOOD}▪${PS1_STATUS_COLOR_RESET}"
 
     fi
@@ -1910,29 +1504,14 @@ ps1status::system::get_status() {
 
     if (( $(echo "${mem} > 80" | bc -l 2>/dev/null || echo "0") )); then
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# mem_indicator - [Описание переменной]
-# mem_indicator - [Variable description]
-#
         mem_indicator="${PS1_STATUS_COLOR_SPEED_SLOW}▪${PS1_STATUS_COLOR_RESET}"
 
     elif (( $(echo "${mem} > 50" | bc -l 2>/dev/null || echo "0") )); then
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# mem_indicator - [Описание переменной]
-# mem_indicator - [Variable description]
-#
         mem_indicator="${PS1_STATUS_COLOR_SPEED_MEDIUM}▪${PS1_STATUS_COLOR_RESET}"
 
     else
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# mem_indicator - [Описание переменной]
-# mem_indicator - [Variable description]
-#
         mem_indicator="${PS1_STATUS_COLOR_SPEED_GOOD}▪${PS1_STATUS_COLOR_RESET}"
 
     fi
@@ -1943,8 +1522,6 @@ ps1status::system::get_status() {
 
 }
 
-
-
 # ============================================================================
 
 # COMPONENT MANAGEMENT
@@ -1952,8 +1529,6 @@ ps1status::system::get_status() {
 # Управление компонентами
 
 # ============================================================================
-
-
 
 # Enable status component
 
@@ -1987,7 +1562,7 @@ ps1status::enable_component() {
 
     # Check if component exists
 
-    if ! command -v "ps1status::${component}::get_status" >/dev/null 2>&1; then
+    if ! utils::has "ps1status::${component}::get_status"; then
 
         errorhandler::throw "${func_name}" "Unknown component: ${component}" \
 
@@ -1999,13 +1574,8 @@ ps1status::enable_component() {
 
     # Add to enabled components if not already there
 
-    if [[ ! " ${PS1_STATUS_ENABLED_COMPONENTS[@]} " =~ " ${component} " ]]; then
+    if [[ ! " ${PS1_STATUS_ENABLED_COMPONENTS[*]} " =~ " ${component} " ]]; then
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1_STATUS_ENABLED_COMPONENTS+ - [Описание переменной]
-# PS1_STATUS_ENABLED_COMPONENTS+ - [Variable description]
-#
         PS1_STATUS_ENABLED_COMPONENTS+=("${component}")
 
         log::info "Enabled PS1 status component: ${component}"
@@ -2017,8 +1587,6 @@ ps1status::enable_component() {
     fi
 
 }
-
-
 
 # Disable status component
 
@@ -2063,11 +1631,6 @@ ps1status::disable_component() {
 
         if [[ "${enabled_component}" != "${component}" ]]; then
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# new_components+ - [Описание переменной]
-# new_components+ - [Variable description]
-#
             new_components+=("${enabled_component}")
 
         fi
@@ -2078,11 +1641,6 @@ ps1status::disable_component() {
 
     if [[ ${#new_components[@]} -ne ${#PS1_STATUS_ENABLED_COMPONENTS[@]} ]]; then
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1_STATUS_ENABLED_COMPONENTS - [Описание переменной]
-# PS1_STATUS_ENABLED_COMPONENTS - [Variable description]
-#
         PS1_STATUS_ENABLED_COMPONENTS=("${new_components[@]}")
 
         log::info "Disabled PS1 status component: ${component}"
@@ -2095,8 +1653,6 @@ ps1status::disable_component() {
 
 }
 
-
-
 # Get enabled components
 
 ps1status::get_enabled_components() {
@@ -2105,8 +1661,6 @@ ps1status::get_enabled_components() {
 
 }
 
-
-
 # ============================================================================
 
 # PS1 CONSTRUCTION
@@ -2114,8 +1668,6 @@ ps1status::get_enabled_components() {
 # Формирование PS1
 
 # ============================================================================
-
-
 
 # Build PS1 status line
 
@@ -2143,7 +1695,7 @@ ps1status::build_ps1() {
 
     for component in "${PS1_STATUS_ENABLED_COMPONENTS[@]}"; do
 
-        if command -v "ps1status::${component}::get_status" >/dev/null 2>&1; then
+        if utils::has "ps1status::${component}::get_status"; then
 
 #
 # ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
@@ -2152,18 +1704,8 @@ ps1status::build_ps1() {
 #
             local component_status
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# component_status - [Описание переменной]
-# component_status - [Variable description]
-#
             component_status=$("ps1status::${component}::get_status")
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# status_line - [Описание переменной]
-# status_line - [Variable description]
-#
             status_line="${status_line}${component_status} "
 
         fi
@@ -2199,11 +1741,6 @@ ps1status::build_ps1() {
 
     # Construct final PS1
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PS1 - [Описание переменной]
-# PS1 - [Variable description]
-#
     PS1="${status_line}${user_host}:${working_dir} ${prompt_char} "
 
     
@@ -2211,8 +1748,6 @@ ps1status::build_ps1() {
     export PS1
 
 }
-
-
 
 # Enable PS1 status (install in PROMPT_COMMAND)
 
@@ -2231,11 +1766,6 @@ ps1status::enable() {
 
     if [[ ! "${PROMPT_COMMAND:-}" =~ ps1status::build_ps1 ]]; then
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PROMPT_COMMAND - [Описание переменной]
-# PROMPT_COMMAND - [Variable description]
-#
         PROMPT_COMMAND="ps1status::build_ps1${PROMPT_COMMAND:+; $PROMPT_COMMAND}"
 
         export PROMPT_COMMAND
@@ -2249,8 +1779,6 @@ ps1status::enable() {
     fi
 
 }
-
-
 
 # Disable PS1 status
 
@@ -2269,25 +1797,10 @@ ps1status::disable() {
 
     if [[ "${PROMPT_COMMAND:-}" =~ ps1status::build_ps1 ]]; then
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PROMPT_COMMAND - [Описание переменной]
-# PROMPT_COMMAND - [Variable description]
-#
         PROMPT_COMMAND="${PROMPT_COMMAND//ps1status::build_ps1/}"
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PROMPT_COMMAND - [Описание переменной]
-# PROMPT_COMMAND - [Variable description]
-#
         PROMPT_COMMAND="${PROMPT_COMMAND#; }"
 
-#
-# ПЕРЕМЕННАЯ / VARIABLE:
-# PROMPT_COMMAND - [Описание переменной]
-# PROMPT_COMMAND - [Variable description]
-#
         PROMPT_COMMAND="${PROMPT_COMMAND%; }"
 
         export PROMPT_COMMAND
@@ -2298,8 +1811,6 @@ ps1status::disable() {
 
 }
 
-
-
 # ============================================================================
 
 # AUDIO EQUALIZER CONTROL (Bonus Feature)
@@ -2308,17 +1819,15 @@ ps1status::disable() {
 
 # ============================================================================
 
-
-
 # Check if equalizer is available
 
 ps1status::equalizer::is_available() {
 
-    if command -v pulseeffects >/dev/null 2>&1 || \
+    if utils::has pulseeffects || \
 
-       command -v pulseaudio-equalizer >/dev/null 2>&1 || \
+       utils::has pulseaudio-equalizer || \
 
-       command -v alsaequal >/dev/null 2>&1; then
+       utils::has alsaequal; then
 
         return 0
 
@@ -2330,8 +1839,6 @@ ps1status::equalizer::is_available() {
 
 }
 
-
-
 # Get equalizer status
 
 ps1status::equalizer::get_status() {
@@ -2340,9 +1847,9 @@ ps1status::equalizer::get_status() {
 
         # Simple check - in real implementation, this would check actual equalizer state
 
-        if systemctl --user is-active --quiet pulseeffects 2>/dev/null || \
+        if utils::quiet_err systemctl --user is-active --quiet pulseeffects || \
 
-           pgrep -x "pulseeffects" >/dev/null 2>&1; then
+           utils::quiet pgrep -x "pulseeffects"; then
 
             echo -e "${PS1_STATUS_COLOR_AUDIO_ON}EQ♪${PS1_STATUS_COLOR_RESET}"
 
@@ -2360,8 +1867,6 @@ ps1status::equalizer::get_status() {
 
 }
 
-
-
 # Toggle equalizer
 
 ps1status::equalizer::toggle() {
@@ -2375,9 +1880,9 @@ ps1status::equalizer::toggle() {
 
     
 
-    if command -v pulseeffects >/dev/null 2>&1; then
+    if utils::has pulseeffects; then
 
-        if pgrep -x "pulseeffects" >/dev/null 2>&1; then
+        if utils::quiet pgrep -x "pulseeffects"; then
 
             pkill pulseeffects
 
@@ -2399,8 +1904,6 @@ ps1status::equalizer::toggle() {
 
 }
 
-
-
 # ============================================================================
 
 # MODULE INFO
@@ -2409,15 +1912,11 @@ ps1status::equalizer::toggle() {
 
 # ============================================================================
 
-
-
 ps1status::info() {
 
     cat << EOF
 
 PS1 Status Module v1.0.0
-
-
 
 Available Components:
 
@@ -2432,8 +1931,6 @@ Available Components:
   system       - CPU and memory usage
 
   equalizer    - Audio equalizer status (bonus)
-
-
 
 Available Functions:
 
@@ -2463,8 +1960,6 @@ Available Functions:
 
   ps1status::equalizer::toggle       - Toggle equalizer
 
-
-
 Status Indicators:
 
   WireGuard: WG↑ (up), WG↓ (down), WG? (unknown)
@@ -2477,8 +1972,6 @@ Status Indicators:
 
   System: ●● (CPU/Memory indicators)
 
-
-
 Configuration:
 
   Config directory: ${PS1_STATUS_CONFIG_DIR}
@@ -2486,8 +1979,6 @@ Configuration:
   Cache directory: ${PS1_STATUS_CACHE_DIR}
 
   Update interval: ${PS1_STATUS_UPDATE_INTERVAL}s
-
-
 
 Usage:
 

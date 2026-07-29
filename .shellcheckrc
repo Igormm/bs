@@ -1,0 +1,12 @@
+# .shellcheckrc — настройки ShellCheck для BS framework
+# .shellcheckrc — ShellCheck settings for the BS framework
+
+# Подхватывать source-файлы при анализе
+# Follow sourced files during analysis
+external-sources=true
+
+# Динамические пути source (${BS_ROOT}/..., "${file}") не проверяются —
+# это штатный механизм загрузчика фреймворка
+# Dynamic source paths (${BS_ROOT}/..., "${file}") cannot be verified —
+# this is the framework loader's normal mechanism
+disable=SC1090,SC1091

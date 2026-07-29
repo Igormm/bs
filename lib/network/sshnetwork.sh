@@ -41,7 +41,7 @@
 
 # Check if module is already loaded
 if [[ -n "${BOSA_LIB_NETWORK_SSH_LOADED:-}" ]]; then
-    log::debug "SSH Network module already loaded" 2>/dev/null || true
+    utils::ignore log::debug "SSH Network module already loaded"
     return 0
 fi
 readonly BOSA_LIB_NETWORK_SSH_LOADED=1
@@ -101,39 +101,39 @@ sshnetwork::init() {
 }
 
 # Check SSH Network dependencies
-check_dependencies() {
+sshnetwork::check_dependencies() {
     local func_name="sshnetwork::check_dependencies"
     local missing_deps=()
     
     log::debug "Checking SSH Network dependencies..."
     
     # Check for ssh
-    if ! command -v ssh >/dev/null 2>&1; then
+    if ! utils::has ssh; then
         missing_deps+=("openssh-client")
     fi
     
     # Check for scp
-    if ! command -v scp >/dev/null 2>&1; then
+    if ! utils::has scp; then
         missing_deps+=("openssh-client")
     fi
     
     # Check for rsync
-    if ! command -v rsync >/dev/null 2>&1; then
+    if ! utils::has rsync; then
         missing_deps+=("rsync")
     fi
     
     # Check for nmap
-    if ! command -v nmap >/dev/null 2>&1; then
+    if ! utils::has nmap; then
         missing_deps+=("nmap")
     fi
     
     # Check for ping
-    if ! command -v ping >/dev/null 2>&1; then
+    if ! utils::has ping; then
         missing_deps+=("iputils-ping")
     fi
     
     # Check for ssh-keygen
-    if ! command -v ssh-keygen >/dev/null 2>&1; then
+    if ! utils::has ssh-keygen; then
         missing_deps+=("openssh-client")
     fi
     
@@ -147,7 +147,7 @@ check_dependencies() {
 }
 
 # Install missing dependencies
-install_dependencies() {
+sshnetwork::install_dependencies() {
     local func_name="sshnetwork::install_dependencies"
     local deps=("$@")
     
@@ -162,7 +162,7 @@ install_dependencies() {
     elif platformcheck::is_alma || platformcheck::is_fedora; then
         dnf install -y openssh rsync nmap iputils
     elif platformcheck::is_macos; then
-        if ! command -v brew >/dev/null 2>&1; then
+        if ! utils::has brew; then
             errorhandler::throw "${func_name}" "Homebrew is required for macOS" \
                 "${LIB_ERROR_DEPENDENCY_MISSING}"
         fi
@@ -176,7 +176,7 @@ install_dependencies() {
 }
 
 # Generate SSH keys for BS
-generate_ssh_keys() {
+sshnetwork::generate_ssh_keys() {
     local func_name="sshnetwork::generate_ssh_keys"
     
     if [[ ! -f "${SSH_NETWORK_SSH_KEY_PATH}" ]]; then
@@ -197,7 +197,7 @@ generate_ssh_keys() {
 }
 
 # Discover SSH-enabled devices in network
-discover_devices() {
+sshnetwork::discover_devices() {
     local func_name="sshnetwork::discover_devices"
     local network_range="${1:-}"
     local port="${2:-${SSH_NETWORK_DEFAULT_PORT}}"
@@ -250,13 +250,19 @@ discover_devices() {
 }
 
 # Get local network range
-get_local_network() {
+sshnetwork::get_local_network() {
     local func_name="sshnetwork::get_local_network"
     
     # Try to get network information using ip command
-    if command -v ip >/dev/null 2>&1; then
+    if utils::has ip; then
         local subnet
         subnet=$(ip route show | grep -E "src [0-9]+\.[0-9]+\.[0-9]+\.[0-9]+" | head -1 | awk '{print $1}' || true)
+        
+        # Маршрут без src (контейнеры, VM): берём сеть scope link
+        # Route without src (containers, VMs): take the scope link network
+        if [[ -z "${subnet}" ]]; then
+            subnet=$(ip -4 route show scope link 2>/dev/null | head -1 | awk '{print $1}' || true)
+        fi
         
         if [[ -n "${subnet}" ]]; then
             echo "${subnet}"
@@ -273,7 +279,7 @@ get_local_network() {
     )
     
     for network in "${common_networks[@]}"; do
-        if ping -c 1 -W 1 "${network%.*}.1" >/dev/null 2>&1; then
+        if utils::quiet ping -c 1 -W 1 "${network%.*}.1"; then
             echo "${network}"
             return 0
         fi
@@ -283,7 +289,7 @@ get_local_network() {
 }
 
 # Test SSH connection
-test_connection() {
+sshnetwork::test_connection() {
     local func_name="sshnetwork::test_connection"
     local host="${1:-}"
     local port="${2:-${SSH_NETWORK_DEFAULT_PORT}}"
@@ -296,7 +302,7 @@ test_connection() {
     log::debug "Testing SSH connection to ${host}:${port}..."
     
     # Test with timeout
-    timeout "${SSH_NETWORK_CONNECT_TIMEOUT}" bash -c "</dev/tcp/${host}/${port}" 2>/dev/null
+    utils::quiet_err timeout "${SSH_NETWORK_CONNECT_TIMEOUT}" bash -c "</dev/tcp/${host}/${port}"
     
     if [[ "$?" -eq 0 ]]; then
         log::debug "Connection successful to ${host}:${port}"
@@ -308,7 +314,7 @@ test_connection() {
 }
 
 # Save discovered devices to file
-save_discovered_devices() {
+sshnetwork::save_discovered_devices() {
     local func_name="sshnetwork::save_discovered_devices"
     
     if [[ ${#SSH_NETWORK_DISCOVERED_DEVICES[@]} -eq 0 ]]; then
@@ -328,7 +334,7 @@ save_discovered_devices() {
 }
 
 # Load known devices from file
-load_known_devices() {
+sshnetwork::load_known_devices() {
     local func_name="sshnetwork::load_known_devices"
     
     if [[ ! -f "${SSH_NETWORK_KNOWN_HOSTS_FILE}" ]]; then
@@ -348,7 +354,7 @@ load_known_devices() {
 }
 
 # Execute remote command
-execute_remote() {
+sshnetwork::execute_remote() {
     local func_name="sshnetwork::execute_remote"
     local host="${1:-}"
     local command="${2:-}"
@@ -386,7 +392,7 @@ execute_remote() {
 }
 
 # Transfer file using scp
-transfer_file() {
+sshnetwork::transfer_file() {
     local func_name="sshnetwork::transfer_file"
     local source="${1:-}"
     local destination="${2:-}"
@@ -418,7 +424,7 @@ transfer_file() {
 }
 
 # Transfer file using rsync (more efficient)
-transfer_file_rsync() {
+sshnetwork::transfer_file_rsync() {
     local func_name="sshnetwork::transfer_file_rsync"
     local source="${1:-}"
     local destination="${2:-}"
@@ -451,7 +457,7 @@ transfer_file_rsync() {
 }
 
 # Synchronize directories
-sync_directories() {
+sshnetwork::sync_directories() {
     local func_name="sshnetwork::sync_directories"
     local source_dir="${1:-}"
     local destination_dir="${2:-}"
@@ -482,7 +488,7 @@ sync_directories() {
 }
 
 # Copy SSH public key to remote host
-setup_passwordless_auth() {
+sshnetwork::setup_passwordless_auth() {
     local func_name="sshnetwork::setup_passwordless_auth"
     local host="${1:-}"
     local user="${2:-$(whoami)}"
@@ -496,13 +502,13 @@ setup_passwordless_auth() {
     log::info "Setting up passwordless authentication for ${user}@${host}"
     
     # Check if we can connect with key first
-    if ssh -o "PasswordAuthentication=no" -o "BatchMode=yes" -p "${port}" -i "${SSH_NETWORK_SSH_KEY_PATH}" "${user}@${host}" "echo" 2>/dev/null; then
+    if utils::quiet_err ssh -o "PasswordAuthentication=no" -o "BatchMode=yes" -p "${port}" -i "${SSH_NETWORK_SSH_KEY_PATH}" "${user}@${host}" "echo"; then
         log::info "Passwordless authentication already configured"
         return 0
     fi
     
     # Use ssh-copy-id or manual method
-    if command -v ssh-copy-id >/dev/null 2>&1; then
+    if utils::has ssh-copy-id; then
         ssh-copy-id -p "${port}" -i "${SSH_NETWORK_SSH_PUBLIC_KEY_PATH}" "${user}@${host}" || {
             errorhandler::throw "${func_name}" "Failed to copy SSH key" \
                 "${LIB_ERROR_COMMAND_FAILED}"
@@ -519,7 +525,7 @@ setup_passwordless_auth() {
 }
 
 # Execute command on multiple hosts
-execute_batch() {
+sshnetwork::execute_batch() {
     local func_name="sshnetwork::execute_batch"
     local hosts=("$@")
     local command=""
@@ -573,7 +579,7 @@ execute_batch() {
 }
 
 # Get system information from remote host
-get_remote_info() {
+sshnetwork::get_remote_info() {
     local func_name="sshnetwork::get_remote_info"
     local host="${1:-}"
     local user="${2:-$(whoami)}"
@@ -616,7 +622,7 @@ get_remote_info() {
 }
 
 # Monitor network connectivity
-monitor_network() {
+sshnetwork::monitor_network() {
     local func_name="sshnetwork::monitor_network"
     local hosts=("$@")
     local interval="${1:-60}"
@@ -650,7 +656,7 @@ monitor_network() {
             local status="DOWN"
             local response_time="N/A"
             
-            if ping -c 1 -W 1 "${host}" >/dev/null 2>&1; then
+            if utils::quiet ping -c 1 -W 1 "${host}"; then
                 status="UP"
                 response_time=$(ping -c 1 -W 1 "${host}" 2>/dev/null | grep "time=" | sed 's/.*time=\([0-9.]*\).*/\1/' || echo "N/A")
             fi
@@ -664,7 +670,7 @@ monitor_network() {
 }
 
 # Get network topology
-get_topology() {
+sshnetwork::get_topology() {
     local func_name="sshnetwork::get_topology"
     
     log::info "Analyzing network topology..."
@@ -672,7 +678,7 @@ get_topology() {
     local topology_info=()
     
     # Get local network info
-    if command -v ip >/dev/null 2>&1; then
+    if utils::has ip; then
         topology_info+=("=== Local Network Interfaces ===")
         topology_info+=("$(ip addr show)")
         topology_info+=("")
@@ -683,10 +689,10 @@ get_topology() {
     fi
     
     # Get ARP table
-    if command -v ip >/dev/null 2>&1; then
+    if utils::has ip; then
         topology_info+=("=== ARP Table ===")
         topology_info+=("$(ip neigh show)")
-    elif command -v arp >/dev/null 2>&1; then
+    elif utils::has arp; then
         topology_info+=("=== ARP Table ===")
         topology_info+=("$(arp -a)")
     fi
@@ -696,7 +702,7 @@ get_topology() {
 }
 
 # Create SSH tunnel
-create_tunnel() {
+sshnetwork::create_tunnel() {
     local func_name="sshnetwork::create_tunnel"
     local local_port="${1:-}"
     local remote_host="${2:-}"
@@ -734,7 +740,7 @@ create_tunnel() {
 }
 
 # Close SSH tunnel
-close_tunnel() {
+sshnetwork::close_tunnel() {
     local func_name="sshnetwork::close_tunnel"
     local local_port="${1:-}"
     
@@ -750,7 +756,7 @@ close_tunnel() {
     ssh_pid=$(ps aux | grep "ssh.*-L.*${local_port}:" | grep -v grep | awk '{print $2}' || true)
     
     if [[ -n "${ssh_pid}" ]]; then
-        kill "${ssh_pid}" 2>/dev/null || true
+        utils::ignore kill "${ssh_pid}"
         log::success "SSH tunnel closed on port ${local_port}"
     else
         log::warn "No SSH tunnel found on port ${local_port}"
@@ -758,7 +764,7 @@ close_tunnel() {
 }
 
 # Get active tunnels
-get_active_tunnels() {
+sshnetwork::get_active_tunnels() {
     local func_name="sshnetwork::get_active_tunnels"
     
     log::info "Active SSH tunnels:"
@@ -769,7 +775,7 @@ get_active_tunnels() {
 }
 
 # Log network activity
-log_activity() {
+sshnetwork::log_activity() {
     local func_name="sshnetwork::log_activity"
     local message="${1:-}"
     
@@ -784,7 +790,7 @@ log_activity() {
 }
 
 # Get network statistics
-get_network_stats() {
+sshnetwork::get_network_stats() {
     local func_name="sshnetwork::get_network_stats"
     local host="${1:-}"
     
@@ -829,7 +835,7 @@ EOF
 }
 
 # Module info
-info() {
+sshnetwork::info() {
     cat << EOF
 SSH Network Module v1.0.0
 

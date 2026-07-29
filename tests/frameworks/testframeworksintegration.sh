@@ -14,16 +14,27 @@
 
 set -euo pipefail
 
+# command -v видит alias'ы только с expand_aliases (плагины bash-it задают alias'ы)
+# command -v only sees aliases with expand_aliases (bash-it plugins define aliases)
+shopt -s expand_aliases
+
 # Test framework setup
 readonly TEST_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly BS_PROJECT_ROOT="$(cd "${TEST_SCRIPT_DIR}/../.." && pwd)"
 
 # Source test framework
 source "${TEST_SCRIPT_DIR}/../testframework.sh"
-source "${BS_PROJECT_ROOT}/boot.sh"
 
-# Initialize BS framework
-bs::init
+# Initialize BS framework (bootstrap; BS_HOME нужен lib-модулям — pre-existing расхождение BS_ROOT/BS_HOME)
+# Initialize BS framework (bootstrap; BS_HOME is needed by lib modules — pre-existing BS_ROOT/BS_HOME mismatch)
+export BS_SILENT=1
+source "${BS_PROJECT_ROOT}/bootstrap/init.sh"
+export BS_HOME="${BS_PROJECT_ROOT}"
+
+# Изолированный HOME: модуль создаёт ~/.config/bs_frameworks (readonly-путь вычисляется из HOME при source)
+# Isolated HOME: the module creates ~/.config/bs_frameworks (readonly path computed from HOME at source time)
+TEST_HOME="$(mktemp -d)"
+export HOME="${TEST_HOME}"
 
 # Test results tracking
 TESTS_RUN=0
@@ -33,18 +44,18 @@ FAILED_TESTS=()
 
 # Test counter functions
 test_increment() {
-    ((TESTS_RUN++))
+    ((++TESTS_RUN))
 }
 
 test_pass() {
     test_increment
-    ((TESTS_PASSED++))
+    ((++TESTS_PASSED))
     log::success "✓ ${FUNCNAME[1]}"
 }
 
 test_fail() {
     test_increment
-    ((TESTS_FAILED++))
+    ((++TESTS_FAILED))
     FAILED_TESTS+=("${FUNCNAME[1]}")
     log::error "✗ ${FUNCNAME[1]}"
 }
@@ -98,7 +109,7 @@ test_bashit_plugin_loading() {
     # Test loading base plugin
     if frameworks::bashit::load_plugin "base"; then
         # Check if plugin was added to loaded plugins
-        if [[ " ${FRAMEWORKS_BASHIT_PLUGINS[@]} " =~ " base " ]]; then
+        if [[ " ${FRAMEWORKS_BASHIT_PLUGINS[*]} " =~ " base " ]]; then
             test_pass
         else
             test_fail
@@ -475,9 +486,9 @@ test_frameworks_info() {
 cleanup() {
     log::info "Cleaning up test artifacts..."
     
-    # Clean up test files
-    rm -rf "${FRAMEWORKS_CONFIG_DIR}" 2>/dev/null || true
-    rm -rf /tmp/test_frameworks_* 2>/dev/null || true
+    # Clean up test files (изолированный HOME / isolated HOME)
+    rm -rf "${TEST_HOME:-}" 2>/dev/null || true
+    rm -rf "${FRAMEWORKS_CACHE_DIR:-}" 2>/dev/null || true
     
     log::debug "Cleanup completed"
 }
@@ -508,37 +519,37 @@ main() {
     # Register cleanup on exit
     trap cleanup EXIT
     
-    # Run tests
-    test_module_initialization
-    test_directory_creation
-    test_bashit_init
-    test_bashit_plugin_loading
-    test_bashit_base_plugin
-    test_bashit_git_plugin
-    test_bashit_history_plugin
-    test_bashit_extract_function
-    test_bashinator_init
-    test_bashinator_log_message
-    test_bashly_init
-    test_bashly_argument_parsing
-    test_bashly_help_generation
-    test_shellspec_init
-    test_shellspec_describe
-    test_shellspec_it
-    test_shellspec_matchers
-    test_shellspec_contain_matcher
-    test_shellspec_be_empty_matcher
-    test_shellspec_exist_matcher
-    test_mbfl_init
-    test_mbfl_function_definition
-    test_mbfl_variable_setting
-    test_mbfl_string_functions
-    test_mbfl_array_functions
-    test_mbfl_file_functions
-    test_mbfl_directory_functions
-    test_frameworks_status
-    test_frameworks_clear
-    test_frameworks_info
+    # Run tests (|| true: падение одного теста не прерывает прогон / a failing test does not abort the run)
+    test_module_initialization || true
+    test_directory_creation || true
+    test_bashit_init || true
+    test_bashit_plugin_loading || true
+    test_bashit_base_plugin || true
+    test_bashit_git_plugin || true
+    test_bashit_history_plugin || true
+    test_bashit_extract_function || true
+    test_bashinator_init || true
+    test_bashinator_log_message || true
+    test_bashly_init || true
+    test_bashly_argument_parsing || true
+    test_bashly_help_generation || true
+    test_shellspec_init || true
+    test_shellspec_describe || true
+    test_shellspec_it || true
+    test_shellspec_matchers || true
+    test_shellspec_contain_matcher || true
+    test_shellspec_be_empty_matcher || true
+    test_shellspec_exist_matcher || true
+    test_mbfl_init || true
+    test_mbfl_function_definition || true
+    test_mbfl_variable_setting || true
+    test_mbfl_string_functions || true
+    test_mbfl_array_functions || true
+    test_mbfl_file_functions || true
+    test_mbfl_directory_functions || true
+    test_frameworks_status || true
+    test_frameworks_clear || true
+    test_frameworks_info || true
     
     # Print summary
     print_summary

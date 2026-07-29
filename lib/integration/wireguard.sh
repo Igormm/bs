@@ -36,7 +36,7 @@
 
 # Check if module is already loaded
 if [[ -n "${BOSA_LIB_INTEGRATION_WIREGUARD_LOADED:-}" ]]; then
-    log::debug "WireGuard module already loaded" 2>/dev/null || true
+    utils::ignore log::debug "WireGuard module already loaded"
     return 0
 fi
 readonly BOSA_LIB_INTEGRATION_WIREGUARD_LOADED=1
@@ -75,29 +75,29 @@ wireguard::init() {
 }
 
 # Check WireGuard dependencies
-check_dependencies() {
+wireguard::check_dependencies() {
     local func_name="wireguard::check_dependencies"
     local missing_deps=()
     
     log::debug "Checking WireGuard dependencies..."
     
     # Check for wg command
-    if ! command -v wg >/dev/null 2>&1; then
+    if ! utils::has wg; then
         missing_deps+=("wireguard-tools")
     fi
     
     # Check for wg-quick command
-    if ! command -v wg-quick >/dev/null 2>&1; then
+    if ! utils::has wg-quick; then
         missing_deps+=("wireguard-tools")
     fi
     
     # Check for openssl
-    if ! command -v openssl >/dev/null 2>&1; then
+    if ! utils::has openssl; then
         missing_deps+=("openssl")
     fi
     
     # Check for ip command
-    if ! command -v ip >/dev/null 2>&1; then
+    if ! utils::has ip; then
         missing_deps+=("iproute2")
     fi
     
@@ -111,7 +111,7 @@ check_dependencies() {
 }
 
 # Install missing dependencies
-install_dependencies() {
+wireguard::install_dependencies() {
     local func_name="wireguard::install_dependencies"
     local deps=("$@")
     
@@ -121,17 +121,17 @@ install_dependencies() {
         apt-get update
         apt-get install -y "${deps[@]}"
     elif platformcheck::is_alma || platformcheck::is_fedora; then
-        if [[ " ${deps[@]} " =~ " wireguard-tools " ]]; then
+        if [[ " ${deps[*]} " =~ " wireguard-tools " ]]; then
             dnf install -y wireguard-tools
         fi
-        if [[ " ${deps[@]} " =~ " openssl " ]]; then
+        if [[ " ${deps[*]} " =~ " openssl " ]]; then
             dnf install -y openssl
         fi
-        if [[ " ${deps[@]} " =~ " iproute2 " ]]; then
+        if [[ " ${deps[*]} " =~ " iproute2 " ]]; then
             dnf install -y iproute
         fi
     elif platformcheck::is_macos; then
-        if ! command -v brew >/dev/null 2>&1; then
+        if ! utils::has brew; then
             errorhandler::throw "${func_name}" "Homebrew is required for macOS" \
                 "${LIB_ERROR_DEPENDENCY_MISSING}"
         fi
@@ -145,7 +145,7 @@ install_dependencies() {
 }
 
 # Create necessary directories
-create_directories() {
+wireguard::create_directories() {
     local func_name="wireguard::create_directories"
     
     log::debug "Creating WireGuard directories..."
@@ -174,7 +174,7 @@ create_directories() {
 }
 
 # Generate WireGuard key pair
-generate_keypair() {
+wireguard::generate_keypair() {
     local func_name="wireguard::generate_keypair"
     local interface="${1:-}"
     
@@ -210,16 +210,23 @@ generate_keypair() {
 }
 
 # Create WireGuard interface configuration
-create_interface() {
+wireguard::create_interface() {
     local func_name="wireguard::create_interface"
     local interface="${1:-}"
     local address="${2:-}"
     local listen_port="${3:-${WIREGUARD_DEFAULT_PORT}}"
     local dns="${4:-1.1.1.1,8.8.8.8}"
+    local wan_interface="${5:-}"
     
     if [[ -z "${interface}" ]] || [[ -z "${address}" ]]; then
         errorhandler::throw "${func_name}" "Interface name and address are required" \
             "${LIB_ERROR_INVALID_ARGS}"
+    fi
+    
+    # Autodetect WAN interface from the default route if not specified
+    if [[ -z "${wan_interface}" ]]; then
+        wan_interface=$(ip route show default 2>/dev/null | awk '/^default/ {print $5; exit}')
+        wan_interface="${wan_interface:-eth0}"
     fi
     
     local config_file="${WIREGUARD_CONFIG_DIR}/${interface}.conf"
@@ -249,13 +256,9 @@ DNS = ${dns}
 # Save configuration
 SaveConfig = true
 
-# Default firewall rules
-PostUp = ufw route allow in on ${interface} out on eth0
-PostDown = ufw route delete allow in on ${interface} out on eth0
-
-# NAT for internet access
-PostUp = iptables -A FORWARD -i ${interface} -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
-PostDown = iptables -D FORWARD -i ${interface} -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE
+# Firewall rules and NAT for internet access
+PostUp = ufw route allow in on ${interface} out on ${wan_interface}; iptables -A FORWARD -i ${interface} -j ACCEPT; iptables -t nat -A POSTROUTING -o ${wan_interface} -j MASQUERADE
+PostDown = ufw route delete allow in on ${interface} out on ${wan_interface}; iptables -D FORWARD -i ${interface} -j ACCEPT; iptables -t nat -D POSTROUTING -o ${wan_interface} -j MASQUERADE
 
 EOF
     
@@ -271,7 +274,7 @@ EOF
 }
 
 # Add peer to interface
-add_peer() {
+wireguard::add_peer() {
     local func_name="wireguard::add_peer"
     local interface="${1:-}"
     local peer_pubkey="${2:-}"
@@ -319,7 +322,7 @@ EOF
 }
 
 # Remove peer from interface
-remove_peer() {
+wireguard::remove_peer() {
     local func_name="wireguard::remove_peer"
     local interface="${1:-}"
     local peer_pubkey="${2:-}"
@@ -360,7 +363,7 @@ remove_peer() {
 }
 
 # Start WireGuard interface
-start_interface() {
+wireguard::start_interface() {
     local func_name="wireguard::start_interface"
     local interface="${1:-}"
     
@@ -372,7 +375,7 @@ start_interface() {
     log::info "Starting WireGuard interface: ${interface}"
     
     # Check if interface is already running
-    if wg show "${interface}" >/dev/null 2>&1; then
+    if utils::quiet wg show "${interface}"; then
         log::warn "Interface ${interface} is already running"
         return 0
     fi
@@ -387,7 +390,7 @@ start_interface() {
 }
 
 # Stop WireGuard interface
-stop_interface() {
+wireguard::stop_interface() {
     local func_name="wireguard::stop_interface"
     local interface="${1:-}"
     
@@ -399,7 +402,7 @@ stop_interface() {
     log::info "Stopping WireGuard interface: ${interface}"
     
     # Check if interface is running
-    if ! wg show "${interface}" >/dev/null 2>&1; then
+    if ! utils::quiet wg show "${interface}"; then
         log::warn "Interface ${interface} is not running"
         return 0
     fi
@@ -414,7 +417,7 @@ stop_interface() {
 }
 
 # Get interface status
-get_interface_status() {
+wireguard::get_interface_status() {
     local func_name="wireguard::get_interface_status"
     local interface="${1:-}"
     
@@ -426,7 +429,7 @@ get_interface_status() {
     log::debug "Getting status for interface: ${interface}"
     
     # Check if interface exists
-    if ! wg show "${interface}" >/dev/null 2>&1; then
+    if ! utils::quiet wg show "${interface}"; then
         log::info "Interface ${interface} is not running"
         return 1
     fi
@@ -436,13 +439,13 @@ get_interface_status() {
 }
 
 # List all WireGuard interfaces
-list_interfaces() {
+wireguard::list_interfaces() {
     local func_name="wireguard::list_interfaces"
     
     log::debug "Listing all WireGuard interfaces..."
     
     # Get interfaces using wg command
-    if command -v wg >/dev/null 2>&1; then
+    if utils::has wg; then
         wg show interfaces
     else
         # Fallback: list config files
@@ -451,7 +454,7 @@ list_interfaces() {
 }
 
 # Backup WireGuard configuration
-backup_config() {
+wireguard::backup_config() {
     local func_name="wireguard::backup_config"
     local interface="${1:-}"
     local backup_name="${2:-backup_$(date +%Y%m%d_%H%M%S)}"
@@ -494,7 +497,7 @@ backup_config() {
 }
 
 # Restore WireGuard configuration
-restore_config() {
+wireguard::restore_config() {
     local func_name="wireguard::restore_config"
     local interface="${1:-}"
     local backup_file="${2:-}"
@@ -512,7 +515,7 @@ restore_config() {
     log::info "Restoring configuration for interface: ${interface}"
     
     # Stop interface if running
-    if wg show "${interface}" >/dev/null 2>&1; then
+    if utils::quiet wg show "${interface}"; then
         wireguard::stop_interface "${interface}"
     fi
     
@@ -526,7 +529,7 @@ restore_config() {
 }
 
 # Generate QR code for mobile clients (requires qrencode)
-generate_qr() {
+wireguard::generate_qr() {
     local func_name="wireguard::generate_qr"
     local interface="${1:-}"
     
@@ -536,7 +539,7 @@ generate_qr() {
     fi
     
     # Check if qrencode is installed
-    if ! command -v qrencode >/dev/null 2>&1; then
+    if ! utils::has qrencode; then
         log::warn "qrencode is not installed. Installing..."
         
         if platformcheck::is_debian || platformcheck::is_ubuntu; then
@@ -567,7 +570,7 @@ generate_qr() {
 }
 
 # Enable automatic startup
-enable_autostart() {
+wireguard::enable_autostart() {
     local func_name="wireguard::enable_autostart"
     local interface="${1:-}"
     
@@ -596,7 +599,7 @@ enable_autostart() {
 }
 
 # Disable automatic startup
-disable_autostart() {
+wireguard::disable_autostart() {
     local func_name="wireguard::disable_autostart"
     local interface="${1:-}"
     
@@ -625,7 +628,7 @@ disable_autostart() {
 }
 
 # Get public IP address for endpoint
-get_public_ip() {
+wireguard::get_public_ip() {
     local func_name="wireguard::get_public_ip"
     
     log::debug "Getting public IP address..."
@@ -639,7 +642,7 @@ get_public_ip() {
     
     for service in "${ip_services[@]}"; do
         local ip
-        ip=$(curl -s --connect-timeout 5 --max-time 10 "${service}" 2>/dev/null)
+        ip=$(utils::quiet_err curl -s --connect-timeout 5 --max-time 10 "${service}")
         
         if [[ -n "${ip}" ]] && [[ "${ip}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "${ip}"
@@ -652,7 +655,7 @@ get_public_ip() {
 }
 
 # Create client configuration for road warrior setup
-create_client_config() {
+wireguard::create_client_config() {
     local func_name="wireguard::create_client_config"
     local client_name="${1:-}"
     local server_pubkey="${2:-}"

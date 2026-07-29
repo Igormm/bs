@@ -34,7 +34,7 @@
 
 # Check if module is already loaded
 if [[ -n "${BS_LIB_FRAMEWORKS_INTEGRATION_LOADED:-}" ]]; then
-    log::debug "Frameworks Integration module already loaded" 2>/dev/null || true
+    utils::ignore log::debug "Frameworks Integration module already loaded"
     return 0
 fi
 readonly BS_LIB_FRAMEWORKS_INTEGRATION_LOADED=1
@@ -116,7 +116,7 @@ frameworks::bashit::load_plugin() {
     log::info "Loading Bash-it plugin: ${plugin_name}"
     
     # Check if plugin is already loaded
-    if [[ " ${FRAMEWORKS_BASHIT_PLUGINS[@]} " =~ " ${plugin_name} " ]]; then
+    if [[ " ${FRAMEWORKS_BASHIT_PLUGINS[*]} " =~ " ${plugin_name} " ]]; then
         log::warn "Plugin ${plugin_name} is already loaded"
         return 0
     fi
@@ -216,7 +216,7 @@ frameworks::bashit::plugins::alias::load() {
     alias du='du -h'
     
     # Tree command
-    if command -v tree >/dev/null 2>&1; then
+    if utils::has tree; then
         alias tree='tree -C'
     else
         alias tree='find . -print | sed -e "s;[^/]*/;|____;g;s;____|; |;g"'
@@ -264,7 +264,7 @@ frameworks::bashit::plugins::battery::info() {
         local status
         status=$(cat /sys/class/power_supply/BAT0/status)
         echo "Battery: ${capacity}% (${status})"
-    elif command -v pmset >/dev/null 2>&1; then
+    elif utils::has pmset; then
         pmset -g batt
     else
         echo "Battery information not available"
@@ -283,17 +283,17 @@ frameworks::bashit::plugins::docker::load() {
     alias dcl='docker system prune -f'
     
     # Docker bash completion
-    if command -v docker >/dev/null 2>&1 && command -v docker-compose >/dev/null 2>&1; then
-        source <(docker completion bash) 2>/dev/null || true
-        source <(docker-compose completion bash) 2>/dev/null || true
+    if utils::has docker && utils::has docker-compose; then
+        utils::ignore source <(docker completion bash)
+        utils::ignore source <(docker-compose completion bash)
     fi
 }
 
 # Editor plugin
 frameworks::bashit::plugins::editor::load() {
-    export EDITOR='${EDITOR:-nano}'
-    alias edit='${EDITOR}'
-    alias e='${EDITOR}'
+    export EDITOR="${EDITOR:-nano}"
+    alias edit="${EDITOR}"
+    alias e="${EDITOR}"
 }
 
 # Git plugin
@@ -318,7 +318,7 @@ frameworks::bashit::plugins::git::load() {
     
     # Git functions
     git_current_branch() {
-        git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown"
+        utils::quiet_err git rev-parse --abbrev-ref HEAD || echo "unknown"
     }
     
     git_current_sha() {
@@ -369,7 +369,7 @@ frameworks::bashit::plugins::projects::load() {
     export PROJECTS_HOME="${PROJECTS_HOME:-${HOME}/Projects}"
     
     proj() {
-        cd "${PROJECTS_HOME}/${1}" 2>/dev/null || echo "Project not found: ${1}"
+        utils::quiet_err cd "${PROJECTS_HOME}/${1}" || echo "Project not found: ${1}"
     }
     
     proj_list() {
@@ -384,7 +384,7 @@ frameworks::bashit::plugins::ssh::load() {
     
     # SSH with common options
     ssh_copy_id() {
-        if command -v ssh-copy-id >/dev/null 2>&1; then
+        if utils::has ssh-copy-id; then
             command ssh-copy-id "$@"
         else
             echo "ssh-copy-id not available"
@@ -401,8 +401,8 @@ frameworks::bashit::plugins::tmux::load() {
     alias tmk='tmux kill-session -t'
     
     # Auto-attach to tmux session
-    if command -v tmux >/dev/null 2>&1 && [[ -z "${TMUX}" ]]; then
-        if tmux has-session 2>/dev/null; then
+    if utils::has tmux && [[ -z "${TMUX}" ]]; then
+        if utils::quiet_err tmux has-session; then
             tmux attach-session
         fi
     fi
@@ -460,6 +460,7 @@ frameworks::bashinator::log_message() {
             ;;
         ALERT|EMERGENCY)
             log::fatal "[${component}] ${message}"
+            return "${?}"
             ;;
         *)
             log::info "[${component}] ${message}"
@@ -765,7 +766,7 @@ frameworks::mbfl::set_var() {
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
-    eval "${var_name}='${value}'"
+    printf -v "${var_name}" '%s' "${value}"
 }
 
 # MBFL-style error handling
@@ -774,7 +775,7 @@ frameworks::mbfl::die() {
     local exit_code="${2:-1}"
     
     log::fatal "${message}"
-    exit "${exit_code}"
+    return "${exit_code}"
 }
 
 # MBFL-style argument parsing
@@ -797,13 +798,13 @@ frameworks::mbfl::parse_args() {
             --*)
                 local option="${1#--}"
                 local value="${2:-}"
-                eval "mbfl_option_${option}='${value}'"
+                printf -v "mbfl_option_${option}" '%s' "${value}"
                 shift 2
                 ;;
             -*)
                 local option="${1#-}"
                 local value="${2:-}"
-                eval "mbfl_flag_${option}='${value}'"
+                printf -v "mbfl_flag_${option}" '%s' "${value}"
                 shift 2
                 ;;
             *)

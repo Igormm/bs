@@ -1,5 +1,5 @@
 #!/usr/bin/env bs
-# bosa_theme.sh — BS theme for BS bash-it integration
+# bosatheme.sh — BS theme for BS bash-it integration
 
 # BS theme - A clean, informative prompt
 _bosa_prompt() {
@@ -15,9 +15,9 @@ _bosa_prompt() {
     # Get git branch if in a git repository
     local git_branch=""
     if command -v git &> /dev/null && git rev-parse --git-dir > /dev/null 2>&1; then
-        git_branch=" $(git branch 2>/dev/null | grep '^*' | colrm 1 2)"
+        git_branch=" $(git branch 2>/dev/null | grep '^*' | cut -c3-)"
         if [[ -n "$git_branch" ]]; then
-            git_branch="$purple[$git_branch]$reset_color"
+            git_branch="${purple}[${git_branch}]${reset_color}"
         fi
     fi
     
@@ -31,5 +31,7 @@ _bosa_prompt() {
     PS1="$user_host:$current_dir$git_branch \$ $reset_color"
 }
 
-# Apply the prompt
-_bosa_prompt
+# Apply the prompt to the current shell
+bosatheme::apply() {
+    _bosa_prompt
+}

@@ -1,0 +1,64 @@
+# .github/workflows/ci.yml — CI для BS framework
+# .github/workflows/ci.yml — CI for the BS framework
+#
+# Два job:
+#   lint  — синтаксис bash + ShellCheck (уровень error обязателен)
+#   tests — полный прогон тестов в контейнерах поддерживаемых дистрибутивов
+#           (almalinux:8 покрывает bash 4.4 — минимальную версию фреймворка)
+# Two jobs:
+#   lint  — bash syntax + ShellCheck (error severity is mandatory)
+#   tests — full test run in containers of supported distributions
+#           (almalinux:8 covers bash 4.4 — the framework minimum version)
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    name: Syntax + ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Bash syntax validation
+        run: bash tests/validatesyntax.sh
+
+      - name: ShellCheck validation
+        run: bash tests/validateshellcheck.sh
+
+  tests:
+    name: Tests (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    container: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "ubuntu, bash 5.x"
+            image: ubuntu:latest
+            install_deps: "apt-get update && apt-get install -y git procps jq curl openssl python3-yaml iproute2 iputils-ping nmap rsync openssh-client bc"
+          - name: "debian stable, bash 5.x"
+            image: debian:stable
+            install_deps: "apt-get update && apt-get install -y git procps jq curl openssl python3-yaml iproute2 iputils-ping nmap rsync openssh-client bc"
+          - name: "almalinux 9, bash 5.1"
+            image: almalinux:9
+            install_deps: "dnf install -y --allowerasing git procps-ng jq curl openssl python3 python3-pyyaml iproute iputils nmap rsync openssh-clients bc"
+          - name: "almalinux 8, bash 4.4 (minimum)"
+            image: almalinux:8
+            install_deps: "dnf install -y --allowerasing git procps-ng jq curl openssl python3 python3-pyyaml iproute iputils nmap rsync openssh-clients bc"
+    steps:
+      # actions/checkout требует git внутри контейнера
+      # actions/checkout requires git inside the container
+      - name: Install dependencies
+        run: ${{ matrix.install_deps }}
+
+      - uses: actions/checkout@v4
+
+      - name: Run test suite
+        run: bash tests/runalltests.sh
