@@ -28,7 +28,7 @@ readonly __IO_STREAMS_SOURCED=1
 
 # Подключаем core, если логгер ещё не загружен
 # Source core if the logger is not loaded yet
-if ! declare -F log::info >/dev/null 2>&1; then
+if ! utils::quiet declare -F log::info; then
     if [[ -n "${BS_HOME:-}" ]]; then
         source "${BS_HOME}/core/const.sh"
         source "${BS_HOME}/core/logger.sh"
@@ -382,7 +382,7 @@ io::streams::run_line_buffered() {
         log::warn "Command not specified"
         return "${E_ERROR:-1}"
     fi
-    if ! command -v stdbuf >/dev/null 2>&1; then
+    if ! utils::has stdbuf; then
         log::warn "stdbuf not available, cannot change buffering"
         return "${E_ERROR:-1}"
     fi
@@ -400,7 +400,7 @@ io::streams::run_unbuffered() {
         log::warn "Command not specified"
         return "${E_ERROR:-1}"
     fi
-    if ! command -v stdbuf >/dev/null 2>&1; then
+    if ! utils::has stdbuf; then
         log::warn "stdbuf not available, cannot change buffering"
         return "${E_ERROR:-1}"
     fi
@@ -442,7 +442,7 @@ io::streams::can_read() {
         log::warn "Invalid file descriptor: ${fd}"
         return "${E_ERROR:-1}"
     fi
-    read -t 0 -u "${fd}" 2>/dev/null
+    utils::quiet_err read -t 0 -u "${fd}"
 }
 
 # @description Ждать готовности FD к чтению с таймаутом (poll/select аналог)
@@ -468,7 +468,8 @@ io::streams::wait_readable() {
     fi
 
     local byte
-    IFS= read -r -t "${timeout}" -u "${fd}" -n 1 byte 2>/dev/null
+    local IFS=""
+    utils::quiet_err read -r -t "${timeout}" -u "${fd}" -n 1 byte
 }
 
 # ==========================================
@@ -532,9 +533,9 @@ io::streams::fd_path() {
 #   io::streams::list_fds
 io::streams::list_fds() {
     if [[ -d "/proc/self/fd" ]]; then
-        ls -l /proc/self/fd 2>/dev/null
+        utils::quiet_err ls -l /proc/self/fd
     elif [[ -d "/dev/fd" ]]; then
-        ls -l /dev/fd 2>/dev/null
+        utils::quiet_err ls -l /dev/fd
     else
         log::warn "No method available to list file descriptors"
         return "${E_ERROR:-1}"
@@ -548,4 +549,4 @@ io::streams::list_fds() {
 # Отмечаем модуль как загруженный / Mark module as loaded
 declare -g IO_STREAMS_LOADED="1"
 
-log::debug "IO streams module initialized, version: ${IO_STREAMS_VERSION}" 2>/dev/null || true
+utils::quiet_err log::debug "IO streams module initialized, version: ${IO_STREAMS_VERSION}" || true

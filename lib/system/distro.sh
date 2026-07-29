@@ -26,7 +26,7 @@ system::distro::detect() {
         DISTRO_VERSION="${DISTRO_VERSION:-unknown}"
     # Try lsb_release / Попробовать lsb_release
     elif utils::has lsb_release; then
-        DISTRO_ID=$(lsb_release -si 2>/dev/null | tr '[:upper:]' '[:lower:]')
+        DISTRO_ID=$(utils::quiet_err lsb_release -si | tr '[:upper:]' '[:lower:]')
         DISTRO_NAME=$(utils::quiet_err lsb_release -sd)
         DISTRO_VERSION=$(utils::quiet_err lsb_release -sr)
     # Fallback to /etc/*-release files / Резервный вариант файлы /etc/*-release
@@ -36,12 +36,12 @@ system::distro::detect() {
         DISTRO_VERSION=$(utils::quiet_err cat /etc/debian_version)
     elif [[ -f /etc/redhat-release ]]; then
         DISTRO_ID="rhel"
-        DISTRO_NAME=$(cat /etc/redhat-release 2>/dev/null | sed 's/ release.*//')
-        DISTRO_VERSION=$(cat /etc/redhat-release 2>/dev/null | sed 's/.*release \([0-9]\+\).*/\1/')
+        DISTRO_NAME=$(utils::quiet_err cat /etc/redhat-release | sed 's/ release.*//')
+        DISTRO_VERSION=$(utils::quiet_err cat /etc/redhat-release | sed 's/.*release \([0-9]\+\).*/\1/')
     elif [[ -f /etc/SuSE-release ]]; then
         DISTRO_ID="suse"
         DISTRO_NAME="openSUSE"
-        DISTRO_VERSION=$(grep VERSION /etc/SuSE-release 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
+        DISTRO_VERSION=$(utils::quiet_err grep VERSION /etc/SuSE-release | cut -d'=' -f2 | tr -d ' ')
     else
         DISTRO_ID="unknown"
         DISTRO_NAME="Unknown"
@@ -284,7 +284,7 @@ system::distro::is_package_installed() {
 
     case "${DISTRO_PACKAGE_MANAGER}" in
         apt)
-            dpkg -l "${package}" 2>/dev/null | grep -q "^ii"
+            utils::quiet_err dpkg -l "${package}" | grep -q "^ii"
             ;;
         dnf|yum)
             utils::quiet rpm -q "${package}"

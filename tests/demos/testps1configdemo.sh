@@ -55,8 +55,8 @@ main() {
     
     echo
     echo -e "${BLUE}6. Git информация / Git info:${NC}"
-    if [[ -d .git ]] || git rev-parse --git-dir >/dev/null 2>&1; then
-        echo -e "   Git branch: $(git symbolic-ref --short HEAD 2>/dev/null || echo 'unknown')"
+    if [[ -d .git ]] || utils::quiet git rev-parse --git-dir; then
+        echo -e "   Git branch: $(utils::quiet_err git symbolic-ref --short HEAD || echo 'unknown')"
         echo -e "   Git info in PS1: $(ps1config::git_info)"
     else
         echo -e "   Not in git repository"

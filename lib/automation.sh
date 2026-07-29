@@ -16,9 +16,9 @@
 # @example
 #   automation::locale::check_keyboard_layout
 automation::locale::check_keyboard_layout() {
-    if command -v setxkbmap >/dev/null 2>&1; then
+    if utils::has setxkbmap; then
         log::info "Current keyboard layout: $(setxkbmap -query | grep layout | awk '{print $2}')"
-    elif command -v localectl >/dev/null 2>&1; then
+    elif utils::has localectl; then
         log::info "Current keyboard layout: $(localectl status | grep "X11 Layout" | awk '{print $3}')"
     else
         log::warn "No keyboard layout tool available"
@@ -34,13 +34,13 @@ automation::locale::set_keyboard_layout() {
     local layout="${1:-us}"
     
     # For systemd-based systems / Для систем на базе systemd
-    if command -v localectl >/dev/null 2>&1; then
-        localectl set-keymap "${layout}" 2>/dev/null || true
+    if utils::has localectl; then
+        utils::quiet_err localectl set-keymap "${layout}" || true
     fi
     
     # For X11 systems / Для систем X11
-    if command -v setxkbmap >/dev/null 2>&1; then
-        setxkbmap "${layout}" 2>/dev/null || true
+    if utils::has setxkbmap; then
+        utils::quiet_err setxkbmap "${layout}" || true
     fi
     
     log::info "Keyboard layout set to ${layout}"
@@ -54,9 +54,9 @@ automation::locale::verify_keyboard_layout() {
     local expected_layout="${1:-us}"
     local current_layout
     
-    if command -v setxkbmap >/dev/null 2>&1; then
+    if utils::has setxkbmap; then
         current_layout=$(setxkbmap -query | grep layout | awk '{print $2}')
-    elif command -v localectl >/dev/null 2>&1; then
+    elif utils::has localectl; then
         current_layout=$(localectl status | grep "X11 Layout" | awk '{print $3}' | tr -d '()')
     else
         log::warn "No keyboard layout tool available"
@@ -77,7 +77,7 @@ automation::locale::verify_keyboard_layout() {
 #   automation::locale::check_locale
 automation::locale::check_locale() {
     log::info "Current locale: $LANG"
-    if command -v localectl >/dev/null 2>&1; then
+    if utils::has localectl; then
         localectl status | grep "System Locale"
     fi
 }
@@ -95,7 +95,7 @@ automation::locale::set_locale() {
         # Check if locale exists in available locales
         if grep -q "^${target_locale}" /etc/locale.gen; then
             # Uncomment the locale if it's commented
-            sed -i "s/# ${target_locale}/${target_locale}/" /etc/locale.gen 2>/dev/null || \
+            utils::quiet_err sed -i "s/# ${target_locale}/${target_locale}/" /etc/locale.gen || \
             sed -i "s/#${target_locale}/${target_locale}/" /etc/locale.gen
         else
             # Add the locale to the list if it doesn't exist
@@ -106,7 +106,7 @@ automation::locale::set_locale() {
         update-locale LANG="${target_locale}"
     # For Fedora/ALT systems / Для систем Fedora/ALT
     elif [[ -f /etc/fedora-release ]] || [[ -f /etc/altlinux-release ]]; then
-        if command -v localectl >/dev/null 2>&1; then
+        if utils::has localectl; then
             localectl set-locale LANG="${target_locale}"
         else
             log::warn "localectl not available, setting locale manually"
@@ -155,10 +155,10 @@ automation::locale::verify_locale() {
 # @example
 #   automation::locale::check_timezone
 automation::locale::check_timezone() {
-    if command -v timedatectl >/dev/null 2>&1; then
+    if utils::has timedatectl; then
         timedatectl status | grep -E "(Time zone|Local time|Universal time)"
     else
-        log::info "Current timezone: $(cat /etc/timezone 2>/dev/null || readlink /etc/localtime | cut -d/ -f5-6)"
+        log::info "Current timezone: $(utils::quiet_err cat /etc/timezone || readlink /etc/localtime | cut -d/ -f5-6)"
     fi
 }
 
@@ -170,13 +170,13 @@ automation::locale::check_timezone() {
 automation::locale::set_timezone() {
     local timezone="${1:-UTC}"
     
-    if command -v timedatectl >/dev/null 2>&1; then
+    if utils::has timedatectl; then
         timedatectl set-timezone "${timezone}"
         timedatectl set-ntp true
     else
         # Manual method for systems without timedatectl
         ln -sf "/usr/share/zoneinfo/${timezone}" /etc/localtime
-        if command -v hwclock >/dev/null 2>&1; then
+        if utils::has hwclock; then
             hwclock --systohc
         fi
     fi
@@ -193,7 +193,7 @@ automation::locale::verify_timezone() {
     local expected_tz="${1}"
     local current_tz
     
-    if command -v timedatectl >/dev/null 2>&1; then
+    if utils::has timedatectl; then
         current_tz=$(timedatectl status | grep "Time zone" | awk '{print $3}')
     else
         current_tz=$(readlink /etc/localtime | rev | cut -d/ -f1-2 | rev)
@@ -212,10 +212,10 @@ automation::locale::verify_timezone() {
 # @example
 #   automation::hardware::scan_input_devices
 automation::hardware::scan_input_devices() {
-    if command -v xinput >/dev/null 2>&1; then
+    if utils::has xinput; then
         log::info "Input devices via xinput:"
         xinput list
-    elif command -v lsinput >/dev/null 2>&1; then
+    elif utils::has lsinput; then
         log::info "Input devices via lsinput:"
         lsinput
     else
@@ -236,7 +236,7 @@ automation::hardware::set_input_device() {
     local property="${2}"
     local value="${3}"
     
-    if command -v xinput >/dev/null 2>&1; then
+    if utils::has xinput; then
         local device_id=$(xinput list | grep -i "${device_name}" | grep -oP 'id=\K\d+' | head -n 1)
         if [[ -n "${device_id}" ]]; then
             xinput set-prop "${device_id}" "${property}" "${value}"
@@ -258,7 +258,7 @@ automation::hardware::set_input_device() {
 automation::hardware::check_input_device() {
     local device_name="${1}"
     
-    if command -v xinput >/dev/null 2>&1; then
+    if utils::has xinput; then
         if xinput list | grep -qi "${device_name}"; then
             log::info "[OK] Device ${device_name} is connected"
             return 0
@@ -276,7 +276,7 @@ automation::hardware::check_input_device() {
 # @example
 #   automation::hardware::detect_monitors
 automation::hardware::detect_monitors() {
-    if command -v xrandr >/dev/null 2>&1; then
+    if utils::has xrandr; then
         log::info "Active monitors:"
         xrandr --query | grep " connected"
     else
@@ -298,7 +298,7 @@ automation::hardware::set_display_mode() {
     local resolution="${2}"
     local orientation="${3:-normal}"
     
-    if command -v xrandr >/dev/null 2>&1; then
+    if utils::has xrandr; then
         xrandr --output "${monitor}" --mode "${resolution}" --rotate "${orientation}"
         log::info "Set ${monitor} to ${resolution} with ${orientation} orientation"
     else
@@ -314,7 +314,7 @@ automation::hardware::set_display_mode() {
 automation::hardware::check_display_mode() {
     local monitor="${1}"
     
-    if command -v xrandr >/dev/null 2>&1; then
+    if utils::has xrandr; then
         local mode_info=$(xrandr --query | grep -A 1 "${monitor}" | tail -n 1)
         if [[ -n "${mode_info}" ]]; then
             log::info "[OK] Monitor ${monitor} is in mode: ${mode_info}"
@@ -375,8 +375,8 @@ automation::network::manage_interface() {
 automation::network::check_interface_status() {
     local interface="${1}"
     
-    local link_status=$(ip link show "${interface}" 2>/dev/null | grep -o "LOWER_UP\|DOWN" | head -n 1)
-    local ip_status=$(ip addr show "${interface}" 2>/dev/null | grep "inet" | head -n 1)
+    local link_status=$(utils::quiet_err ip link show "${interface}" | grep -o "LOWER_UP\|DOWN" | head -n 1)
+    local ip_status=$(utils::quiet_err ip addr show "${interface}" | grep "inet" | head -n 1)
     
     if [[ -n "${link_status}" ]] && [[ "${link_status}" == "LOWER_UP" ]]; then
         log::info "[OK] Interface ${interface} is UP"
@@ -430,7 +430,7 @@ automation::network::manage_route() {
 automation::network::check_gateway() {
     local gateway="${1}"
     
-    if ping -c 1 -W 5 "${gateway}" >/dev/null 2>&1; then
+    if utils::quiet ping -c 1 -W 5 "${gateway}"; then
         log::info "[OK] Gateway ${gateway} is reachable"
         return 0
     else
@@ -724,15 +724,15 @@ automation::display::check_graphical_login() {
     local dm_service=""
     
     # Determine which DM is enabled
-    if systemctl is-enabled --quiet gdm 2>/dev/null; then
+    if utils::quiet_err systemctl is-enabled --quiet gdm; then
         dm_service="gdm"
-    elif systemctl is-enabled --quiet lightdm 2>/dev/null; then
+    elif utils::quiet_err systemctl is-enabled --quiet lightdm; then
         dm_service="lightdm"
-    elif systemctl is-enabled --quiet sddm 2>/dev/null; then
+    elif utils::quiet_err systemctl is-enabled --quiet sddm; then
         dm_service="sddm"
-    elif systemctl is-enabled --quiet kdm 2>/dev/null; then
+    elif utils::quiet_err systemctl is-enabled --quiet kdm; then
         dm_service="kdm"
-    elif systemctl is-enabled --quiet lxdm 2>/dev/null; then
+    elif utils::quiet_err systemctl is-enabled --quiet lxdm; then
         dm_service="lxdm"
     fi
     
@@ -818,19 +818,19 @@ automation::system::verify_service_status() {
 # @example
 #   automation::system::detect_package_manager
 automation::system::detect_package_manager() {
-    if command -v apt >/dev/null 2>&1; then
+    if utils::has apt; then
         log::info "Detected package manager: APT (Debian/Ubuntu based)"
         echo "apt"
-    elif command -v dnf >/dev/null 2>&1; then
+    elif utils::has dnf; then
         log::info "Detected package manager: DNF (Fedora/RHEL based)"
         echo "dnf"
-    elif command -v yum >/dev/null 2>&1; then
+    elif utils::has yum; then
         log::info "Detected package manager: YUM (older RHEL based)"
         echo "yum"
-    elif command -v zypper >/dev/null 2>&1; then
+    elif utils::has zypper; then
         log::info "Detected package manager: Zypper (openSUSE based)"
         echo "zypper"
-    elif command -v pacman >/dev/null 2>&1; then
+    elif utils::has pacman; then
         log::info "Detected package manager: Pacman (Arch based)"
         echo "pacman"
     else
@@ -843,7 +843,7 @@ automation::system::detect_package_manager() {
 # @example
 #   automation::system::update_package_cache
 automation::system::update_package_cache() {
-    case "$(automation::system::detect_package_manager 2>/dev/null)" in
+    case "$(utils::quiet_err automation::system::detect_package_manager)" in
         "apt")
             apt update
             ;;
@@ -880,7 +880,7 @@ automation::system::manage_packages() {
     
     case "${action}" in
         "install")
-            case "$(automation::system::detect_package_manager 2>/dev/null)" in
+            case "$(utils::quiet_err automation::system::detect_package_manager)" in
                 "apt")
                     apt install -y "${packages[@]}"
                     ;;
@@ -903,7 +903,7 @@ automation::system::manage_packages() {
             esac
             ;;
         "remove")
-            case "$(automation::system::detect_package_manager 2>/dev/null)" in
+            case "$(utils::quiet_err automation::system::detect_package_manager)" in
                 "apt")
                     apt remove -y "${packages[@]}"
                     ;;
@@ -941,18 +941,18 @@ automation::system::manage_packages() {
 automation::system::check_package_version() {
     local package="${1}"
     
-    case "$(automation::system::detect_package_manager 2>/dev/null)" in
+    case "$(utils::quiet_err automation::system::detect_package_manager)" in
         "apt")
-            dpkg -l "${package}" 2>/dev/null | grep "^ii" | awk '{print $2 ": " $3}'
+            utils::quiet_err dpkg -l "${package}" | grep "^ii" | awk '{print $2 ": " $3}'
             ;;
         "dnf"|"yum")
-            rpm -q "${package}" 2>/dev/null || echo "${package} not installed"
+            utils::quiet_err rpm -q "${package}" || echo "${package} not installed"
             ;;
         "zypper")
-            rpm -q "${package}" 2>/dev/null || echo "${package} not installed"
+            utils::quiet_err rpm -q "${package}" || echo "${package} not installed"
             ;;
         "pacman")
-            pacman -Q "${package}" 2>/dev/null || echo "${package} not installed"
+            utils::quiet_err pacman -Q "${package}" || echo "${package} not installed"
             ;;
         *)
             log::warn "Unsupported package manager"
@@ -965,10 +965,10 @@ automation::system::check_package_version() {
 # @example
 #   automation::system::list_repositories
 automation::system::list_repositories() {
-    case "$(automation::system::detect_package_manager 2>/dev/null)" in
+    case "$(utils::quiet_err automation::system::detect_package_manager)" in
         "apt")
             cat /etc/apt/sources.list
-            ls /etc/apt/sources.list.d/ 2>/dev/null | xargs -I {} echo "/etc/apt/sources.list.d/{}"
+            utils::quiet_err ls /etc/apt/sources.list.d/ | xargs -I {} echo "/etc/apt/sources.list.d/{}"
             ;;
         "dnf"|"yum")
             ls /etc/yum.repos.d/ | xargs -I {} echo "/etc/yum.repos.d/{}"
@@ -993,7 +993,7 @@ automation::system::list_repositories() {
 automation::system::add_repository() {
     local repo="${1}"
     
-    case "$(automation::system::detect_package_manager 2>/dev/null)" in
+    case "$(utils::quiet_err automation::system::detect_package_manager)" in
         "apt")
             add-apt-repository "${repo}" -y
             ;;
@@ -1013,7 +1013,7 @@ automation::system::add_repository() {
 # @example
 #   automation::system::check_repository_validity
 automation::system::check_repository_validity() {
-    case "$(automation::system::detect_package_manager 2>/dev/null)" in
+    case "$(utils::quiet_err automation::system::detect_package_manager)" in
         "apt")
             apt update --dry-run
             ;;
@@ -1035,11 +1035,11 @@ automation::system::check_repository_validity() {
 automation::security::check_firewall_status() {
     local fw_status=""
     
-    if command -v ufw >/dev/null 2>&1 && ufw status >/dev/null 2>&1; then
+    if utils::has ufw && utils::quiet ufw status; then
         fw_status="UFW: $(ufw status | head -n 1)"
-    elif command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld; then
-        fw_status="Firewalld: $(firewall-cmd --state 2>/dev/null || echo 'inactive')"
-    elif command -v iptables >/dev/null 2>&1; then
+    elif utils::has firewall-cmd && systemctl is-active --quiet firewalld; then
+        fw_status="Firewalld: $(utils::quiet_err firewall-cmd --state || echo 'inactive')"
+    elif utils::has iptables; then
         fw_status="IPTables: $(iptables -L | head -n 1)"
     fi
     
@@ -1061,7 +1061,7 @@ automation::security::configure_firewall() {
     local action="${1}"
     local rule="${2}"
     
-    if command -v ufw >/dev/null 2>&1; then
+    if utils::has ufw; then
         case "${action}" in
             "allow")
                 ufw allow "${rule}"
@@ -1080,7 +1080,7 @@ automation::security::configure_firewall() {
                 return 1
                 ;;
         esac
-    elif command -v firewall-cmd >/dev/null 2>&1; then
+    elif utils::has firewall-cmd; then
         case "${action}" in
             "allow")
                 firewall-cmd --permanent --add-port="${rule}"
@@ -1114,7 +1114,7 @@ automation::security::configure_firewall() {
 automation::security::check_sudo_access() {
     local username="${1:-$USER}"
     
-    if sudo -l -U "${username}" 2>/dev/null | grep -q "(ALL : ALL)"; then
+    if utils::quiet_err sudo -l -U "${username}" | grep -q "(ALL : ALL)"; then
         log::info "[OK] User ${username} has sudo access"
         return 0
     else
@@ -1165,7 +1165,7 @@ ${log_file} {
     compress
     delaycompress
     notifempty
-    create 640 $(stat -c "%U" "${log_file}" 2>/dev/null || echo "root") $(stat -c "%G" "${log_file}" 2>/dev/null || echo "adm")
+    create 640 $(utils::quiet_err stat -c "%U" "${log_file}" || echo "root") $(utils::quiet_err stat -c "%G" "${log_file}" || echo "adm")
     postrotate
         systemctl reload rsyslog > /dev/null 2>&1 || true
     endscript
@@ -1185,7 +1185,7 @@ automation::security::test_log_writing() {
     local log_file="${2:-/tmp/test.log}"
     
     # Create the log file if it doesn't exist
-    touch "${log_file}" 2>/dev/null || {
+    utils::quiet_err touch "${log_file}" || {
         log::warn "Cannot write to ${log_file}"
         return 1
     }

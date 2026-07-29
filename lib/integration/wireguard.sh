@@ -225,7 +225,7 @@ wireguard::create_interface() {
     
     # Autodetect WAN interface from the default route if not specified
     if [[ -z "${wan_interface}" ]]; then
-        wan_interface=$(ip route show default 2>/dev/null | awk '/^default/ {print $5; exit}')
+        wan_interface=$(utils::quiet_err ip route show default | awk '/^default/ {print $5; exit}')
         wan_interface="${wan_interface:-eth0}"
     fi
     

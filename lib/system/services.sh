@@ -15,18 +15,18 @@ system::services::start() {
     fi
     
     # Try systemd first / Попробовать systemd сначала
-    if command -v systemctl >/dev/null 2>&1; then
-        systemctl start "${service}" 2>/dev/null || true
+    if utils::has systemctl; then
+        utils::ignore systemctl start "${service}"
         log::info "Service ${service} started (systemd)"
     else
         # Fallback to service command / Резервный вариант команды service
-        if command -v service >/dev/null 2>&1; then
-            service "${service}" start 2>/dev/null || true
+        if utils::has service; then
+            utils::ignore service "${service}" start
             log::info "Service ${service} started (service)"
         else
             # Fallback to direct init script / Резервный вариант прямого init скрипта
             if [[ -x "/etc/init.d/${service}" ]]; then
-                "/etc/init.d/${service}" start 2>/dev/null || true
+                utils::ignore "/etc/init.d/${service}" start
                 log::info "Service ${service} started (init.d)"
             else
                 log::warn "No suitable method to start service ${service}"
@@ -49,18 +49,18 @@ system::services::stop() {
     fi
     
     # Try systemd first / Попробовать systemd сначала
-    if command -v systemctl >/dev/null 2>&1; then
-        systemctl stop "${service}" 2>/dev/null || true
+    if utils::has systemctl; then
+        utils::ignore systemctl stop "${service}"
         log::info "Service ${service} stopped (systemd)"
     else
         # Fallback to service command / Резервный вариант команды service
-        if command -v service >/dev/null 2>&1; then
-            service "${service}" stop 2>/dev/null || true
+        if utils::has service; then
+            utils::ignore service "${service}" stop
             log::info "Service ${service} stopped (service)"
         else
             # Fallback to direct init script / Резервный вариант прямого init скрипта
             if [[ -x "/etc/init.d/${service}" ]]; then
-                "/etc/init.d/${service}" stop 2>/dev/null || true
+                utils::ignore "/etc/init.d/${service}" stop
                 log::info "Service ${service} stopped (init.d)"
             else
                 log::warn "No suitable method to stop service ${service}"
@@ -84,17 +84,17 @@ system::services::enable() {
     fi
     
     # Try systemd first / Попробовать systemd сначала
-    if command -v systemctl >/dev/null 2>&1; then
-        systemctl enable "${service}" 2>/dev/null || true
+    if utils::has systemctl; then
+        utils::ignore systemctl enable "${service}"
         log::info "Service ${service} enabled (systemd)"
     else
         # Fallback to update-rc.d or chkconfig / Резервный вариант update-rc.d или
         # chkconfig
-        if command -v update-rc.d >/dev/null 2>&1; then
-            update-rc.d "${service}" defaults 2>/dev/null || true
+        if utils::has update-rc.d; then
+            utils::ignore update-rc.d "${service}" defaults
             log::info "Service ${service} enabled (update-rc.d)"
-        elif command -v chkconfig >/dev/null 2>&1; then
-            chkconfig "${service}" on 2>/dev/null || true
+        elif utils::has chkconfig; then
+            utils::ignore chkconfig "${service}" on
             log::info "Service ${service} enabled (chkconfig)"
         else
             log::warn "No suitable method to enable service ${service}"
@@ -117,17 +117,17 @@ system::services::disable() {
     fi
     
     # Try systemd first / Попробовать systemd сначала
-    if command -v systemctl >/dev/null 2>&1; then
-        systemctl disable "${service}" 2>/dev/null || true
+    if utils::has systemctl; then
+        utils::ignore systemctl disable "${service}"
         log::info "Service ${service} disabled (systemd)"
     else
         # Fallback to update-rc.d or chkconfig / Резервный вариант update-rc.d или
         # chkconfig
-        if command -v update-rc.d >/dev/null 2>&1; then
-            update-rc.d -f "${service}" remove 2>/dev/null || true
+        if utils::has update-rc.d; then
+            utils::ignore update-rc.d -f "${service}" remove
             log::info "Service ${service} disabled (update-rc.d)"
-        elif command -v chkconfig >/dev/null 2>&1; then
-            chkconfig "${service}" off 2>/dev/null || true
+        elif utils::has chkconfig; then
+            utils::ignore chkconfig "${service}" off
             log::info "Service ${service} disabled (chkconfig)"
         else
             log::warn "No suitable method to disable service ${service}"
@@ -149,18 +149,18 @@ system::services::restart() {
     fi
     
     # Try systemd first / Попробовать systemd сначала
-    if command -v systemctl >/dev/null 2>&1; then
-        systemctl restart "${service}" 2>/dev/null || true
+    if utils::has systemctl; then
+        utils::ignore systemctl restart "${service}"
         log::info "Service ${service} restarted (systemd)"
     else
         # Fallback to service command / Резервный вариант команды service
-        if command -v service >/dev/null 2>&1; then
-            service "${service}" restart 2>/dev/null || true
+        if utils::has service; then
+            utils::ignore service "${service}" restart
             log::info "Service ${service} restarted (service)"
         else
             # Fallback to direct init script / Резервный вариант прямого init скрипта
             if [[ -x "/etc/init.d/${service}" ]]; then
-                "/etc/init.d/${service}" restart 2>/dev/null || true
+                utils::ignore "/etc/init.d/${service}" restart
                 log::info "Service ${service} restarted (init.d)"
             else
                 log::warn "No suitable method to restart service ${service}"
@@ -184,8 +184,8 @@ system::services::status() {
     fi
     
     # Try systemd first / Попробовать systemd сначала
-    if command -v systemctl >/dev/null 2>&1; then
-        if systemctl is-active --quiet "${service}" 2>/dev/null; then
+    if utils::has systemctl; then
+        if utils::quiet_err systemctl is-active --quiet "${service}"; then
             log::info "Service ${service} is running"
             return 0
         else
@@ -194,12 +194,12 @@ system::services::status() {
         fi
     else
         # Fallback to service command / Резервный вариант команды service
-        if command -v service >/dev/null 2>&1; then
-            service "${service}" status 2>/dev/null || true
+        if utils::has service; then
+            utils::ignore service "${service}" status
         else
             # Fallback to direct init script / Резервный вариант прямого init скрипта
             if [[ -x "/etc/init.d/${service}" ]]; then
-                "/etc/init.d/${service}" status 2>/dev/null || true
+                utils::ignore "/etc/init.d/${service}" status
             else
                 log::warn "No suitable method to check status of service ${service}"
                 return 1
@@ -213,12 +213,12 @@ system::services::status() {
 #   system::services::list
 system::services::list() {
     # Try systemd first / Попробовать systemd сначала
-    if command -v systemctl >/dev/null 2>&1; then
-        systemctl list-units --type=service --all 2>/dev/null | grep -E "^[a-zA-Z]" | awk '{print $1}'
+    if utils::has systemctl; then
+        utils::quiet_err systemctl list-units --type=service --all | grep -E "^[a-zA-Z]" | awk '{print $1}'
     else
         # Fallback to listing init scripts / Резервный вариант списка init скриптов
         if [[ -d "/etc/init.d" ]]; then
-            ls -1 /etc/init.d/ 2>/dev/null | grep -v "README"
+            utils::quiet_err ls -1 /etc/init.d/ | grep -v "README"
         else
             log::warn "No suitable method to list services"
             return 1
@@ -259,20 +259,20 @@ function service::restart() {
     case "${os_type}" in
         debian|ubuntu)
             # Попробовать systemd сначала
-            if command -v systemctl >/dev/null 2>&1; then
-                if systemctl is-active --quiet "${service}" 2>/dev/null; then
-                    systemctl restart "${service}" 2>/dev/null || exit_code=$?
+            if utils::has systemctl; then
+                if utils::quiet_err systemctl is-active --quiet "${service}"; then
+                    utils::quiet_err systemctl restart "${service}" || exit_code=$?
                 else
-                    systemctl start "${service}" 2>/dev/null || exit_code=$?
+                    utils::quiet_err systemctl start "${service}" || exit_code=$?
                 fi
             else
                 # Fallback to service command
-                if command -v service >/dev/null 2>&1; then
-                    service "${service}" restart 2>/dev/null || exit_code=$?
+                if utils::has service; then
+                    utils::quiet_err service "${service}" restart || exit_code=$?
                 else
                     # Fallback to direct init script
                     if [[ -x "/etc/init.d/${service}" ]]; then
-                        "/etc/init.d/${service}" restart 2>/dev/null || exit_code=$?
+                        utils::quiet_err "/etc/init.d/${service}" restart || exit_code=$?
                     else
                         log::error "${FN}: метод перезапуска не найден для ${service}"
                         return ${LIB_ERROR_DEPENDENCY}
@@ -282,16 +282,16 @@ function service::restart() {
             ;;
         fedora|rhel|centos)
             # Попробовать systemd сначала
-            if command -v systemctl >/dev/null 2>&1; then
-                if systemctl is-active --quiet "${service}" 2>/dev/null; then
-                    systemctl restart "${service}" 2>/dev/null || exit_code=$?
+            if utils::has systemctl; then
+                if utils::quiet_err systemctl is-active --quiet "${service}"; then
+                    utils::quiet_err systemctl restart "${service}" || exit_code=$?
                 else
-                    systemctl start "${service}" 2>/dev/null || exit_code=$?
+                    utils::quiet_err systemctl start "${service}" || exit_code=$?
                 fi
             else
                 # Fallback to service command
-                if command -v service >/dev/null 2>&1; then
-                    service "${service}" restart 2>/dev/null || exit_code=$?
+                if utils::has service; then
+                    utils::quiet_err service "${service}" restart || exit_code=$?
                 else
                     log::error "${FN}: метод перезапуска не найден для ${service}"
                     return ${LIB_ERROR_DEPENDENCY}
@@ -300,8 +300,8 @@ function service::restart() {
             ;;
         alt|altlinux)
             # Для ALT Linux использовать service или chkconfig
-            if command -v service >/dev/null 2>&1; then
-                service "${service}" restart 2>/dev/null || exit_code=$?
+            if utils::has service; then
+                utils::quiet_err service "${service}" restart || exit_code=$?
             else
                 log::error "${FN}: метод перезапуска не найден для ${service}"
                 return ${LIB_ERROR_DEPENDENCY}

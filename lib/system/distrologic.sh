@@ -609,7 +609,7 @@ system::distrologic::fs_check() {
     fi
     # Fallback to df -T / Резервный вариант df -T
     if [[ -z "${fs_type}" ]]; then
-        fs_type=$(df -T "${device}" 2>/dev/null | awk 'NR==2 {print $2}')
+        fs_type=$(utils::quiet_err df -T "${device}" | awk 'NR==2 {print $2}')
     fi
     
     case "${fs_type}" in

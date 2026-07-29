@@ -218,7 +218,7 @@ sshnetwork::discover_devices() {
     
     # Use nmap to find SSH services
     local nmap_output
-    nmap_output=$(nmap -p "${port}" --open -oG - "${network_range}" 2>/dev/null | grep "open/" || true)
+    nmap_output=$(utils::quiet_err nmap -p "${port}" --open -oG - "${network_range}" | grep "open/" || true)
     
     if [[ -z "${nmap_output}" ]]; then
         log::warn "No SSH devices found in network: ${network_range}"
@@ -261,7 +261,7 @@ sshnetwork::get_local_network() {
         # Маршрут без src (контейнеры, VM): берём сеть scope link
         # Route without src (containers, VMs): take the scope link network
         if [[ -z "${subnet}" ]]; then
-            subnet=$(ip -4 route show scope link 2>/dev/null | head -1 | awk '{print $1}' || true)
+            subnet=$(utils::quiet_err ip -4 route show scope link | head -1 | awk '{print $1}' || true)
         fi
         
         if [[ -n "${subnet}" ]]; then
@@ -658,7 +658,7 @@ sshnetwork::monitor_network() {
             
             if utils::quiet ping -c 1 -W 1 "${host}"; then
                 status="UP"
-                response_time=$(ping -c 1 -W 1 "${host}" 2>/dev/null | grep "time=" | sed 's/.*time=\([0-9.]*\).*/\1/' || echo "N/A")
+                response_time=$(utils::quiet_err ping -c 1 -W 1 "${host}" | grep "time=" | sed 's/.*time=\([0-9.]*\).*/\1/' || echo "N/A")
             fi
             
             echo "  ${host}:${port} - ${status} (${response_time}ms)"

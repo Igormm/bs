@@ -29,18 +29,18 @@ main() {
     testframework::section "Throw Return Codes / Коды возврата throw"
     
     local rc=0
-    errorhandler::throw "test::func" "Test error" 5 2>/dev/null || rc=$?
+    utils::quiet_err errorhandler::throw "test::func" "Test error" 5 || rc=$?
     testframework::assert_equal "5" "$rc" "throw returns the given code"
     
     rc=0
-    errorhandler::throw "test::func" "Test error" 2>/dev/null || rc=$?
+    utils::quiet_err errorhandler::throw "test::func" "Test error" || rc=$?
     testframework::assert_equal "1" "$rc" "throw defaults to E_ERROR (1)"
     
     # Тест 2: errorhandler::throw не завершает shell
     testframework::section "Throw Does Not Exit / throw не завершает shell"
     
     local marker=""
-    errorhandler::throw "test::func" "Test error" 7 2>/dev/null || true
+    utils::quiet_err errorhandler::throw "test::func" "Test error" 7 || true
     marker="still alive"
     testframework::assert_equal "still alive" "$marker" "Shell continues after throw"
     
@@ -83,11 +83,11 @@ main() {
     testframework::section "Fatal Returns Code / fatal возвращает код"
     
     rc=0
-    log::fatal "Test fatal message" 2>/dev/null || rc=$?
+    utils::quiet_err log::fatal "Test fatal message" || rc=$?
     testframework::assert_equal "1" "$rc" "log::fatal returns E_ERROR"
     
     marker=""
-    log::fatal "Test fatal message" 2>/dev/null || true
+    utils::quiet_err log::fatal "Test fatal message" || true
     marker="still alive"
     testframework::assert_equal "still alive" "$marker" "Shell continues after log::fatal"
     

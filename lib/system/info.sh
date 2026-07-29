@@ -24,11 +24,11 @@ system::info::os() {
             echo "Pretty Name: ${PRETTY_NAME:-Unknown}"
         )
     # Fallback to lsb_release / Резервный вариант lsb_release
-    elif command -v lsb_release >/dev/null 2>&1; then
-        lsb_release -a 2>/dev/null
+    elif utils::has lsb_release; then
+        utils::quiet_err lsb_release -a
     # Fallback to uname / Резервный вариант uname
-    elif command -v uname >/dev/null 2>&1; then
-        uname -a 2>/dev/null
+    elif utils::has uname; then
+        utils::quiet_err uname -a
     else
         log::warn "Cannot determine OS information"
         return 1
@@ -41,7 +41,7 @@ system::info::os() {
 system::info::kernel() {
     echo "=== Kernel Information ==="
     
-    if command -v uname >/dev/null 2>&1; then
+    if utils::has uname; then
         echo "Kernel: $(uname -s)"
         echo "Release: $(uname -r)"
         echo "Version: $(uname -v)"
@@ -61,16 +61,16 @@ system::info::kernel() {
 system::info::hostname() {
     echo "=== Hostname Information ==="
     
-    if command -v hostname >/dev/null 2>&1; then
-        echo "Hostname: $(hostname 2>/dev/null)"
-        echo "FQDN: $(hostname -f 2>/dev/null || hostname)"
-        echo "Short: $(hostname -s 2>/dev/null || hostname)"
+    if utils::has hostname; then
+        echo "Hostname: $(utils::quiet_err hostname)"
+        echo "FQDN: $(utils::quiet_err hostname -f || hostname)"
+        echo "Short: $(utils::quiet_err hostname -s || hostname)"
     # Try hostnamectl (systemd) / Попробовать hostnamectl (systemd)
-    elif command -v hostnamectl >/dev/null 2>&1; then
-        hostnamectl 2>/dev/null
+    elif utils::has hostnamectl; then
+        utils::quiet_err hostnamectl
     # Fallback to /etc/hostname / Резервный вариант /etc/hostname
     elif [[ -f /etc/hostname ]]; then
-        echo "Hostname: $(cat /etc/hostname 2>/dev/null)"
+        echo "Hostname: $(utils::quiet_err cat /etc/hostname)"
     else
         log::warn "Cannot determine hostname"
         return 1
@@ -83,12 +83,12 @@ system::info::hostname() {
 system::info::uptime() {
     echo "=== System Uptime ==="
     
-    if command -v uptime >/dev/null 2>&1; then
-        uptime 2>/dev/null
+    if utils::has uptime; then
+        utils::quiet_err uptime
     # Fallback to /proc/uptime / Резервный вариант /proc/uptime
     elif [[ -r /proc/uptime ]]; then
         local uptime_seconds
-        uptime_seconds=$(cut -d' ' -f1 /proc/uptime 2>/dev/null | cut -d. -f1)
+        uptime_seconds=$(utils::quiet_err cut -d' ' -f1 /proc/uptime | cut -d. -f1)
         if [[ -n "${uptime_seconds}" ]]; then
             local days=$((uptime_seconds / 86400))
             local hours=$(((uptime_seconds % 86400) / 3600))
@@ -109,14 +109,14 @@ system::info::cpu() {
     
     # Try /proc/cpuinfo / Попробовать /proc/cpuinfo
     if [[ -r /proc/cpuinfo ]]; then
-        echo "Model: $(grep -m1 "model name" /proc/cpuinfo 2>/dev/null | cut -d: -f2 | sed 's/^[ \t]*//')"
-        echo "Cores: $(grep -c "^processor" /proc/cpuinfo 2>/dev/null)"
-        echo "Physical CPUs: $(grep "physical id" /proc/cpuinfo 2>/dev/null | sort -u | wc -l)"
-        echo "CPU MHz: $(grep -m1 "cpu MHz" /proc/cpuinfo 2>/dev/null | cut -d: -f2 | sed 's/^[ \t]*//')"
-        echo "Cache: $(grep -m1 "cache size" /proc/cpuinfo 2>/dev/null | cut -d: -f2 | sed 's/^[ \t]*//')"
+        echo "Model: $(utils::quiet_err grep -m1 "model name" /proc/cpuinfo | cut -d: -f2 | sed 's/^[ \t]*//')"
+        echo "Cores: $(utils::quiet_err grep -c "^processor" /proc/cpuinfo)"
+        echo "Physical CPUs: $(utils::quiet_err grep "physical id" /proc/cpuinfo | sort -u | wc -l)"
+        echo "CPU MHz: $(utils::quiet_err grep -m1 "cpu MHz" /proc/cpuinfo | cut -d: -f2 | sed 's/^[ \t]*//')"
+        echo "Cache: $(utils::quiet_err grep -m1 "cache size" /proc/cpuinfo | cut -d: -f2 | sed 's/^[ \t]*//')"
     # Try lscpu (modern alternative) / Попробовать lscpu (современная альтернатива)
-    elif command -v lscpu >/dev/null 2>&1; then
-        lscpu 2>/dev/null
+    elif utils::has lscpu; then
+        utils::quiet_err lscpu
     else
         log::warn "Cannot determine CPU information"
         return 1
@@ -130,20 +130,20 @@ system::info::memory() {
     echo "=== Memory Information ==="
     
     # Try free command first / Попробовать команду free сначала
-    if command -v free >/dev/null 2>&1; then
-        free -h 2>/dev/null
+    if utils::has free; then
+        utils::quiet_err free -h
         echo ""
         echo "Detailed:"
-        free -m 2>/dev/null
+        utils::quiet_err free -m
     # Fallback to /proc/meminfo / Резервный вариант /proc/meminfo
     elif [[ -r /proc/meminfo ]]; then
-        echo "Total: $(grep MemTotal /proc/meminfo 2>/dev/null | awk '{print $2 $3}')"
-        echo "Free: $(grep MemFree /proc/meminfo 2>/dev/null | awk '{print $2 $3}')"
-        echo "Available: $(grep MemAvailable /proc/meminfo 2>/dev/null | awk '{print $2 $3}')"
-        echo "Buffers: $(grep Buffers /proc/meminfo 2>/dev/null | awk '{print $2 $3}')"
-        echo "Cached: $(grep -E '^Cached:' /proc/meminfo 2>/dev/null | awk '{print $2 $3}')"
-        echo "Swap Total: $(grep SwapTotal /proc/meminfo 2>/dev/null | awk '{print $2 $3}')"
-        echo "Swap Free: $(grep SwapFree /proc/meminfo 2>/dev/null | awk '{print $2 $3}')"
+        echo "Total: $(utils::quiet_err grep MemTotal /proc/meminfo | awk '{print $2 $3}')"
+        echo "Free: $(utils::quiet_err grep MemFree /proc/meminfo | awk '{print $2 $3}')"
+        echo "Available: $(utils::quiet_err grep MemAvailable /proc/meminfo | awk '{print $2 $3}')"
+        echo "Buffers: $(utils::quiet_err grep Buffers /proc/meminfo | awk '{print $2 $3}')"
+        echo "Cached: $(utils::quiet_err grep -E '^Cached:' /proc/meminfo | awk '{print $2 $3}')"
+        echo "Swap Total: $(utils::quiet_err grep SwapTotal /proc/meminfo | awk '{print $2 $3}')"
+        echo "Swap Free: $(utils::quiet_err grep SwapFree /proc/meminfo | awk '{print $2 $3}')"
     else
         log::warn "Cannot determine memory information"
         return 1
@@ -156,11 +156,11 @@ system::info::memory() {
 system::info::disk() {
     echo "=== Disk Usage ==="
     
-    if command -v df >/dev/null 2>&1; then
-        df -h 2>/dev/null
+    if utils::has df; then
+        utils::quiet_err df -h
         echo ""
         echo "Inodes:"
-        df -i 2>/dev/null | head -10
+        utils::quiet_err df -i | head -10
     else
         log::warn "df command not found"
         return 1
@@ -199,11 +199,11 @@ system::info::version() {
             echo "${PRETTY_NAME:-${NAME:-Unknown}} ${VERSION_ID:-Unknown}"
         )
     # Try lsb_release / Попробовать lsb_release
-    elif command -v lsb_release >/dev/null 2>&1; then
-        lsb_release -d 2>/dev/null | cut -f2
+    elif utils::has lsb_release; then
+        utils::quiet_err lsb_release -d | cut -f2
     # Fallback to uname / Резервный вариант uname
-    elif command -v uname >/dev/null 2>&1; then
-        uname -r 2>/dev/null
+    elif utils::has uname; then
+        utils::quiet_err uname -r
     else
         echo "Unknown"
         return 1
@@ -216,12 +216,12 @@ system::info::version() {
 system::info::load() {
     echo "=== System Load Average ==="
     
-    if command -v uptime >/dev/null 2>&1; then
-        uptime 2>/dev/null | awk -F'load average:' '{print $2}'
+    if utils::has uptime; then
+        utils::quiet_err uptime | awk -F'load average:' '{print $2}'
     # Fallback to /proc/loadavg / Резервный вариант /proc/loadavg
     elif [[ -r /proc/loadavg ]]; then
         local load
-        load=$(cat /proc/loadavg 2>/dev/null)
+        load=$(utils::quiet_err cat /proc/loadavg)
         echo "1 min: $(echo ${load} | awk '{print $1}')"
         echo "5 min: $(echo ${load} | awk '{print $2}')"
         echo "15 min: $(echo ${load} | awk '{print $3}')"
@@ -238,11 +238,11 @@ system::info::interfaces() {
     echo "=== Network Interfaces ==="
     
     # Try ip command (modern) / Попробовать команду ip (современная)
-    if command -v ip >/dev/null 2>&1; then
-        ip addr show 2>/dev/null
+    if utils::has ip; then
+        utils::quiet_err ip addr show
     # Fallback to ifconfig / Резервный вариант ifconfig
-    elif command -v ifconfig >/dev/null 2>&1; then
-        ifconfig 2>/dev/null
+    elif utils::has ifconfig; then
+        utils::quiet_err ifconfig
     else
         log::warn "Cannot show network interfaces (ip/ifconfig not found)"
         return 1
@@ -253,10 +253,10 @@ system::info::interfaces() {
 # @example
 #   system::info::arch
 system::info::arch() {
-    if command -v uname >/dev/null 2>&1; then
-        uname -m 2>/dev/null
-    elif command -v arch >/dev/null 2>&1; then
-        arch 2>/dev/null
+    if utils::has uname; then
+        utils::quiet_err uname -m
+    elif utils::has arch; then
+        utils::quiet_err arch
     else
         log::warn "Cannot determine architecture"
         return 1

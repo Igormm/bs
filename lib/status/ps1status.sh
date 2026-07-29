@@ -742,9 +742,9 @@ ps1status::network::update() {
 #
             local latency
 
-            latency=$(ping -c 1 -W 1 "${host}" 2>/dev/null | grep "time=" | sed 's/.*time=\([0-9.]*\).*/\1/' || echo "0")
+            latency=$(utils::quiet_err ping -c 1 -W 1 "${host}" | grep "time=" | sed 's/.*time=\([0-9.]*\).*/\1/' || echo "0")
 
-            total_latency=$(echo "${total_latency} + ${latency}" | bc -l 2>/dev/null || echo "${total_latency}")
+            total_latency=$(echo "${total_latency} + ${latency}" | utils::quiet_err bc -l || echo "${total_latency}")
 
         fi
 
@@ -763,7 +763,7 @@ ps1status::network::update() {
 
     if [[ "${successful_pings}" -gt 0 ]]; then
 
-        avg_latency=$(echo "scale=1; ${total_latency} / ${successful_pings}" | bc -l 2>/dev/null || echo "0")
+        avg_latency=$(echo "scale=1; ${total_latency} / ${successful_pings}" | utils::quiet_err bc -l || echo "0")
 
     fi
 
@@ -835,11 +835,11 @@ ps1status::network::get_status() {
 
         up)
 
-            if (( $(echo "${latency} < 50" | bc -l 2>/dev/null || echo "1") )); then
+            if (( $(echo "${latency} < 50" | utils::quiet_err bc -l || echo "1") )); then
 
                 echo -e "${PS1_STATUS_COLOR_NETWORK_UP}NET✓${PS1_STATUS_COLOR_RESET}"
 
-            elif (( $(echo "${latency} < 100" | bc -l 2>/dev/null || echo "1") )); then
+            elif (( $(echo "${latency} < 100" | utils::quiet_err bc -l || echo "1") )); then
 
                 echo -e "${PS1_STATUS_COLOR_SPEED_MEDIUM}NET~${PS1_STATUS_COLOR_RESET}"
 
@@ -944,7 +944,7 @@ ps1status::speed::update() {
 # duration - локальная переменная для этой функции
 # duration - local variable for this function
 #
-        local duration=$(echo "${end_time} - ${start_time}" | bc -l 2>/dev/null || echo "1")
+        local duration=$(echo "${end_time} - ${start_time}" | utils::quiet_err bc -l || echo "1")
 
         
 
@@ -955,7 +955,7 @@ ps1status::speed::update() {
 # speed - локальная переменная для этой функции
 # speed - local variable for this function
 #
-        local speed=$(echo "scale=1; 8 / ${duration}" | bc -l 2>/dev/null || echo "0")
+        local speed=$(echo "scale=1; 8 / ${duration}" | utils::quiet_err bc -l || echo "0")
 
         
 
@@ -1001,15 +1001,15 @@ ps1status::speed::get_status() {
 
     
 
-    if (( $(echo "${speed} > 50" | bc -l 2>/dev/null || echo "0") )); then
+    if (( $(echo "${speed} > 50" | utils::quiet_err bc -l || echo "0") )); then
 
         echo -e "${PS1_STATUS_COLOR_SPEED_GOOD}↓${speed}M${PS1_STATUS_COLOR_RESET}"
 
-    elif (( $(echo "${speed} > 10" | bc -l 2>/dev/null || echo "0") )); then
+    elif (( $(echo "${speed} > 10" | utils::quiet_err bc -l || echo "0") )); then
 
         echo -e "${PS1_STATUS_COLOR_SPEED_MEDIUM}↓${speed}M${PS1_STATUS_COLOR_RESET}"
 
-    elif (( $(echo "${speed} > 0" | bc -l 2>/dev/null || echo "0") )); then
+    elif (( $(echo "${speed} > 0" | utils::quiet_err bc -l || echo "0") )); then
 
         echo -e "${PS1_STATUS_COLOR_SPEED_SLOW}↓${speed}M${PS1_STATUS_COLOR_RESET}"
 
@@ -1077,7 +1077,7 @@ ps1status::audio::update() {
 #
         local sink_info
 
-        sink_info=$(pactl info 2>/dev/null | grep "Default Sink" | cut -d: -f2 | xargs)
+        sink_info=$(utils::quiet_err pactl info | grep "Default Sink" | cut -d: -f2 | xargs)
 
         
 
@@ -1090,7 +1090,7 @@ ps1status::audio::update() {
 #
             local sink_volume
 
-            sink_volume=$(pactl list sinks 2>/dev/null | grep -A 10 "${sink_info}" | grep "Volume:" | head -1)
+            sink_volume=$(utils::quiet_err pactl list sinks | grep -A 10 "${sink_info}" | grep "Volume:" | head -1)
 
             
 
@@ -1106,7 +1106,7 @@ ps1status::audio::update() {
 
             # Check if muted
 
-            if pactl list sinks 2>/dev/null | grep -A 10 "${sink_info}" | grep -q "Mute: yes"; then
+            if utils::quiet_err pactl list sinks | grep -A 10 "${sink_info}" | grep -q "Mute: yes"; then
 
                 muted="true"
 
@@ -1340,7 +1340,7 @@ ps1status::system::update() {
 #
     local cpu_usage
 
-    cpu_usage=$(ps -o %cpu= -A 2>/dev/null | awk '{s+=$1} END {print s}' | xargs || echo "0")
+    cpu_usage=$(utils::quiet_err ps -o %cpu= -A | awk '{s+=$1} END {print s}' | xargs || echo "0")
 
     
 
@@ -1355,7 +1355,7 @@ ps1status::system::update() {
 
     if utils::has free; then
 
-        mem_usage=$(free | grep Mem | awk '{printf("%.1f", $3/$2 * 100.0)}' 2>/dev/null || echo "0")
+        mem_usage=$(free | grep Mem | utils::quiet_err awk '{printf("%.1f", $3/$2 * 100.0)}' || echo "0")
 
     else
 
@@ -1486,11 +1486,11 @@ ps1status::system::get_status() {
 
     
 
-    if (( $(echo "${cpu} > 80" | bc -l 2>/dev/null || echo "0") )); then
+    if (( $(echo "${cpu} > 80" | utils::quiet_err bc -l || echo "0") )); then
 
         cpu_indicator="${PS1_STATUS_COLOR_SPEED_SLOW}▪${PS1_STATUS_COLOR_RESET}"
 
-    elif (( $(echo "${cpu} > 50" | bc -l 2>/dev/null || echo "0") )); then
+    elif (( $(echo "${cpu} > 50" | utils::quiet_err bc -l || echo "0") )); then
 
         cpu_indicator="${PS1_STATUS_COLOR_SPEED_MEDIUM}▪${PS1_STATUS_COLOR_RESET}"
 
@@ -1502,11 +1502,11 @@ ps1status::system::get_status() {
 
     
 
-    if (( $(echo "${mem} > 80" | bc -l 2>/dev/null || echo "0") )); then
+    if (( $(echo "${mem} > 80" | utils::quiet_err bc -l || echo "0") )); then
 
         mem_indicator="${PS1_STATUS_COLOR_SPEED_SLOW}▪${PS1_STATUS_COLOR_RESET}"
 
-    elif (( $(echo "${mem} > 50" | bc -l 2>/dev/null || echo "0") )); then
+    elif (( $(echo "${mem} > 50" | utils::quiet_err bc -l || echo "0") )); then
 
         mem_indicator="${PS1_STATUS_COLOR_SPEED_MEDIUM}▪${PS1_STATUS_COLOR_RESET}"
 

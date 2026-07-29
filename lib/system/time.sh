@@ -17,8 +17,8 @@ system::time::timezone() {
     fi
     
     # For systemd-based systems / Для систем на базе systemd
-    if command -v timedatectl >/dev/null 2>&1; then
-        timedatectl set-timezone "${timezone}" 2>/dev/null || true
+    if utils::has timedatectl; then
+        utils::ignore timedatectl set-timezone "${timezone}"
     else
         # Fallback for non-systemd systems / Резервный вариант для систем без systemd
         if [[ -f "/etc/localtime" ]]; then
@@ -44,33 +44,33 @@ system::time::timezone() {
 system::time::ntp() {
     local enable="${1:-true}"
     
-    if command -v timedatectl >/dev/null 2>&1; then
+    if utils::has timedatectl; then
         if [[ "${enable}" == "true" ]]; then
-            timedatectl set-ntp true 2>/dev/null || true
+            utils::ignore timedatectl set-ntp true
             log::info "NTP synchronization enabled"
         else
-            timedatectl set-ntp false 2>/dev/null || true
+            utils::ignore timedatectl set-ntp false
             log::info "NTP synchronization disabled"
         fi
     else
         # Fallback for systems with ntpdate or chrony / Резервный вариант для систем с
         # ntpdate или chrony
         if [[ "${enable}" == "true" ]]; then
-            if command -v ntpd >/dev/null 2>&1; then
-                systemctl enable ntpd 2>/dev/null || true
-                systemctl start ntpd 2>/dev/null || true
-            elif command -v chronyd >/dev/null 2>&1; then
-                systemctl enable chronyd 2>/dev/null || true
-                systemctl start chronyd 2>/dev/null || true
+            if utils::has ntpd; then
+                utils::ignore systemctl enable ntpd
+                utils::ignore systemctl start ntpd
+            elif utils::has chronyd; then
+                utils::ignore systemctl enable chronyd
+                utils::ignore systemctl start chronyd
             fi
             log::info "NTP service enabled"
         else
-            if command -v ntpd >/dev/null 2>&1; then
-                systemctl stop ntpd 2>/dev/null || true
-                systemctl disable ntpd 2>/dev/null || true
-            elif command -v chronyd >/dev/null 2>&1; then
-                systemctl stop chronyd 2>/dev/null || true
-                systemctl disable chronyd 2>/dev/null || true
+            if utils::has ntpd; then
+                utils::ignore systemctl stop ntpd
+                utils::ignore systemctl disable ntpd
+            elif utils::has chronyd; then
+                utils::ignore systemctl stop chronyd
+                utils::ignore systemctl disable chronyd
             fi
             log::info "NTP service disabled"
         fi
@@ -92,14 +92,14 @@ system::time::set() {
     fi
     
     # For systemd-based systems / Для систем на базе systemd
-    if command -v timedatectl >/dev/null 2>&1; then
-        timedatectl set-time "${datetime}" 2>/dev/null || true
+    if utils::has timedatectl; then
+        utils::ignore timedatectl set-time "${datetime}"
     else
         # Fallback for non-systemd systems / Резервный вариант для систем без systemd
-        if command -v date >/dev/null 2>&1; then
+        if utils::has date; then
             # Format depends on system, trying common formats / Формат зависит от системы,
             # пробуем распространенные форматы
-            date -s "${datetime}" 2>/dev/null || true
+            utils::ignore date -s "${datetime}"
         fi
     fi
     
@@ -110,8 +110,8 @@ system::time::set() {
 # @example
 #   system::time::list_timezones
 system::time::list_timezones() {
-    if command -v timedatectl >/dev/null 2>&1; then
-        timedatectl list-timezones 2>/dev/null || true
+    if utils::has timedatectl; then
+        utils::ignore timedatectl list-timezones
     else
         # Fallback for non-systemd systems / Резервный вариант для систем без systemd
         if [[ -d "/usr/share/zoneinfo" ]]; then

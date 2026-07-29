@@ -110,7 +110,7 @@ presentation::header() {
     local text="$1"
     local separator="${2:-=}"
     local width
-    width=$(tput cols 2>/dev/null || echo 80)
+    width=$(utils::quiet_err tput cols || echo 80)
     local padding=$(( (width - ${#text}) / 2 - 1 ))
     local left_pad=$(printf '%*s' "$padding" | tr ' ' "$separator")
     local right_pad

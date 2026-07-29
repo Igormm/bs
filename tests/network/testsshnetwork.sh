@@ -510,7 +510,7 @@ cleanup() {
     log::info "Cleaning up test artifacts..."
     
     # Clean up test files (изолированный HOME / isolated HOME)
-    rm -rf "${TEST_HOME:-}" 2>/dev/null || true
+    utils::quiet_err rm -rf "${TEST_HOME:-}" || true
     
     log::debug "Cleanup completed"
 }

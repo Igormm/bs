@@ -12,19 +12,19 @@ system::keyboard::layout() {
     local layout="${1:-us}"
     
     # For systemd-based systems with localectl / Для систем на базе systemd с localectl
-    if command -v localectl >/dev/null 2>&1; then
-        localectl set-keymap "${layout}" 2>/dev/null || true
+    if utils::has localectl; then
+        utils::quiet_err localectl set-keymap "${layout}" || true
         # For X11 sessions / Для сессий X11
-        localectl set-x11-keymap "${layout}" 2>/dev/null || true
+        utils::quiet_err localectl set-x11-keymap "${layout}" || true
     else
         # Fallback for non-systemd systems / Резервный вариант для систем без systemd
-        if command -v loadkeys >/dev/null 2>&1; then
-            loadkeys "${layout}" 2>/dev/null || true
+        if utils::has loadkeys; then
+            utils::quiet_err loadkeys "${layout}" || true
         fi
         
         # For X11 systems / Для систем X11
-        if command -v setxkbmap >/dev/null 2>&1; then
-            setxkbmap "${layout}" 2>/dev/null || true
+        if utils::has setxkbmap; then
+            utils::quiet_err setxkbmap "${layout}" || true
         fi
     fi
     
@@ -39,8 +39,8 @@ system::keyboard::layout() {
 system::keyboard::model() {
     local model="${1:-pc105}"
     
-    if command -v localectl >/dev/null 2>&1; then
-        localectl set-keymap --keymap-model "${model}" 2>/dev/null || true
+    if utils::has localectl; then
+        utils::quiet_err localectl set-keymap --keymap-model "${model}" || true
     fi
     
     log::info "Keyboard model set to ${model}"
@@ -54,8 +54,8 @@ system::keyboard::model() {
 system::keyboard::variant() {
     local variant="${1}"
     
-    if command -v localectl >/dev/null 2>&1; then
-        localectl set-keymap --keymap-variant "${variant}" 2>/dev/null || true
+    if utils::has localectl; then
+        utils::quiet_err localectl set-keymap --keymap-variant "${variant}" || true
     fi
     
     log::info "Keyboard variant set to ${variant}"
@@ -69,8 +69,8 @@ system::keyboard::variant() {
 system::keyboard::options() {
     local options="${1}"
     
-    if command -v localectl >/dev/null 2>&1; then
-        localectl set-keymap --keymap-options "${options}" 2>/dev/null || true
+    if utils::has localectl; then
+        utils::quiet_err localectl set-keymap --keymap-options "${options}" || true
     fi
     
     log::info "Keyboard options set to ${options}"

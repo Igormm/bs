@@ -20,14 +20,14 @@ system::users::create() {
     fi
     
     # Check if user already exists / Проверить, существует ли пользователь
-    if id "${username}" &>/dev/null; then
+    if utils::quiet id "${username}"; then
         log::warn "User ${username} already exists"
         return 1
     fi
     
     # Try useradd (most common) / Попробовать useradd (наиболее распространенный)
-    if command -v useradd >/dev/null 2>&1; then
-        if useradd -m -d "${home_dir}" -s "${shell}" "${username}" 2>/dev/null; then
+    if utils::has useradd; then
+        if utils::quiet_err useradd -m -d "${home_dir}" -s "${shell}" "${username}"; then
             log::info "User ${username} created successfully"
             return 0
         else
@@ -36,8 +36,8 @@ system::users::create() {
         fi
     # Fallback to adduser (some Debian-based systems) / Резервный вариант adduser
     # (некоторые Debian-системы)
-    elif command -v adduser >/dev/null 2>&1; then
-        if adduser --home "${home_dir}" --shell "${shell}" --disabled-password --gecos "" "${username}" 2>/dev/null; then
+    elif utils::has adduser; then
+        if utils::quiet_err adduser --home "${home_dir}" --shell "${shell}" --disabled-password --gecos "" "${username}"; then
             log::info "User ${username} created successfully"
             return 0
         else
@@ -67,7 +67,7 @@ system::users::delete() {
     fi
     
     # Check if user exists / Проверить, существует ли пользователь
-    if ! id "${username}" &>/dev/null; then
+    if ! utils::quiet id "${username}"; then
         log::warn "User ${username} does not exist"
         return 1
     fi
@@ -77,8 +77,8 @@ system::users::delete() {
         remove_flag="-r"
     fi
     
-    if command -v userdel >/dev/null 2>&1; then
-        if userdel ${remove_flag} "${username}" 2>/dev/null; then
+    if utils::has userdel; then
+        if utils::quiet_err userdel ${remove_flag} "${username}"; then
             log::info "User ${username} deleted successfully"
             return 0
         else
@@ -110,14 +110,14 @@ system::users::set_password() {
         return 1
     fi
     
-    if ! id "${username}" &>/dev/null; then
+    if ! utils::quiet id "${username}"; then
         log::warn "User ${username} does not exist"
         return 1
     fi
     
-    if command -v chpasswd >/dev/null 2>&1; then
+    if utils::has chpasswd; then
         if [[ -n "${password}" ]]; then
-            echo "${username}:${password}" | chpasswd 2>/dev/null
+            echo "${username}:${password}" | utils::quiet_err chpasswd
             if [[ $? -eq 0 ]]; then
                 log::info "Password for ${username} changed successfully"
                 return 0
@@ -127,7 +127,7 @@ system::users::set_password() {
             fi
         else
             # Interactive password change / Интерактивное изменение пароля
-            if passwd "${username}" 2>/dev/null; then
+            if utils::quiet_err passwd "${username}"; then
                 log::info "Password for ${username} changed successfully"
                 return 0
             else
@@ -135,15 +135,15 @@ system::users::set_password() {
                 return 1
             fi
         fi
-    elif command -v passwd >/dev/null 2>&1; then
+    elif utils::has passwd; then
         if [[ -n "${password}" ]]; then
-            echo "${username}:${password}" | passwd --stdin "${username}" 2>/dev/null || {
+            echo "${username}:${password}" | utils::quiet_err passwd --stdin "${username}" || {
                 log::warn "passwd --stdin not supported, using interactive mode"
                 log::warn "passwd --stdin не поддерживается, используется интерактивный режим"
-                passwd "${username}" 2>/dev/null
+                utils::quiet_err passwd "${username}"
             }
         else
-            passwd "${username}" 2>/dev/null
+            utils::quiet_err passwd "${username}"
         fi
         if [[ $? -eq 0 ]]; then
             log::info "Password for ${username} changed successfully"
@@ -172,26 +172,26 @@ system::users::add_to_group() {
         return 1
     fi
     
-    if ! id "${username}" &>/dev/null; then
+    if ! utils::quiet id "${username}"; then
         log::warn "User ${username} does not exist"
         return 1
     fi
     
-    if ! getent group "${group}" &>/dev/null; then
+    if ! utils::quiet getent group "${group}"; then
         log::warn "Group ${group} does not exist"
         return 1
     fi
     
-    if command -v usermod >/dev/null 2>&1; then
-        if usermod -a -G "${group}" "${username}" 2>/dev/null; then
+    if utils::has usermod; then
+        if utils::quiet_err usermod -a -G "${group}" "${username}"; then
             log::info "User ${username} added to group ${group}"
             return 0
         else
             log::error "Failed to add ${username} to group ${group}"
             return 1
         fi
-    elif command -v gpasswd >/dev/null 2>&1; then
-        if gpasswd -a "${username}" "${group}" 2>/dev/null; then
+    elif utils::has gpasswd; then
+        if utils::quiet_err gpasswd -a "${username}" "${group}"; then
             log::info "User ${username} added to group ${group}"
             return 0
         else
@@ -208,7 +208,7 @@ system::users::add_to_group() {
 # @example
 #   system::users::list
 system::users::list() {
-    if command -v getent >/dev/null 2>&1; then
+    if utils::has getent; then
         getent passwd | cut -d: -f1 | sort
     elif [[ -f /etc/passwd ]]; then
         cut -d: -f1 /etc/passwd | sort
@@ -230,19 +230,19 @@ system::users::info() {
         return 1
     fi
     
-    if ! id "${username}" &>/dev/null; then
+    if ! utils::quiet id "${username}"; then
         log::warn "User ${username} does not exist"
         return 1
     fi
     
     local info
-    info=$(id "${username}" 2>/dev/null)
+    info=$(utils::quiet_err id "${username}")
     log::info "User info for ${username}: ${info}"
     
     # Additional info / Дополнительная информация
-    if command -v getent >/dev/null 2>&1; then
+    if utils::has getent; then
         local passwd_info
-        passwd_info=$(getent passwd "${username}" 2>/dev/null)
+        passwd_info=$(utils::quiet_err getent passwd "${username}")
         if [[ -n "${passwd_info}" ]]; then
             echo "  Full name: $(echo "${passwd_info}" | cut -d: -f5)"
             echo "  Home: $(echo "${passwd_info}" | cut -d: -f6)"
@@ -250,7 +250,7 @@ system::users::info() {
         fi
         
         local groups
-        groups=$(groups "${username}" 2>/dev/null | cut -d: -f2)
+        groups=$(utils::quiet_err groups "${username}" | cut -d: -f2)
         if [[ -n "${groups}" ]]; then
             echo "  Groups:${groups}"
         fi
@@ -269,21 +269,21 @@ system::users::lock() {
         return 1
     fi
     
-    if ! id "${username}" &>/dev/null; then
+    if ! utils::quiet id "${username}"; then
         log::warn "User ${username} does not exist"
         return 1
     fi
     
-    if command -v usermod >/dev/null 2>&1; then
-        if usermod -L "${username}" 2>/dev/null; then
+    if utils::has usermod; then
+        if utils::quiet_err usermod -L "${username}"; then
             log::info "User ${username} locked"
             return 0
         else
             log::error "Failed to lock user ${username}"
             return 1
         fi
-    elif command -v passwd >/dev/null 2>&1; then
-        if passwd -l "${username}" 2>/dev/null; then
+    elif utils::has passwd; then
+        if utils::quiet_err passwd -l "${username}"; then
             log::info "User ${username} locked"
             return 0
         else
@@ -308,21 +308,21 @@ system::users::unlock() {
         return 1
     fi
     
-    if ! id "${username}" &>/dev/null; then
+    if ! utils::quiet id "${username}"; then
         log::warn "User ${username} does not exist"
         return 1
     fi
     
-    if command -v usermod >/dev/null 2>&1; then
-        if usermod -U "${username}" 2>/dev/null; then
+    if utils::has usermod; then
+        if utils::quiet_err usermod -U "${username}"; then
             log::info "User ${username} unlocked"
             return 0
         else
             log::error "Failed to unlock user ${username}"
             return 1
         fi
-    elif command -v passwd >/dev/null 2>&1; then
-        if passwd -u "${username}" 2>/dev/null; then
+    elif utils::has passwd; then
+        if utils::quiet_err passwd -u "${username}"; then
             log::info "User ${username} unlocked"
             return 0
         else
@@ -347,13 +347,13 @@ system::users::group_create() {
         return 1
     fi
     
-    if getent group "${groupname}" &>/dev/null; then
+    if utils::quiet getent group "${groupname}"; then
         log::warn "Group ${groupname} already exists"
         return 1
     fi
     
-    if command -v groupadd >/dev/null 2>&1; then
-        if groupadd "${groupname}" 2>/dev/null; then
+    if utils::has groupadd; then
+        if utils::quiet_err groupadd "${groupname}"; then
             log::info "Group ${groupname} created successfully"
             return 0
         else
@@ -378,13 +378,13 @@ system::users::group_delete() {
         return 1
     fi
     
-    if ! getent group "${groupname}" &>/dev/null; then
+    if ! utils::quiet getent group "${groupname}"; then
         log::warn "Group ${groupname} does not exist"
         return 1
     fi
     
-    if command -v groupdel >/dev/null 2>&1; then
-        if groupdel "${groupname}" 2>/dev/null; then
+    if utils::has groupdel; then
+        if utils::quiet_err groupdel "${groupname}"; then
             log::info "Group ${groupname} deleted successfully"
             return 0
         else
@@ -401,7 +401,7 @@ system::users::group_delete() {
 # @example
 #   system::users::group_list
 system::users::group_list() {
-    if command -v getent >/dev/null 2>&1; then
+    if utils::has getent; then
         getent group | cut -d: -f1 | sort
     elif [[ -f /etc/group ]]; then
         cut -d: -f1 /etc/group | sort

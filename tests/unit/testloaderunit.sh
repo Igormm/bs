@@ -49,7 +49,7 @@ main() {
     testframework::section "Load Missing Module / Загрузка несуществующего модуля"
     
     local rc=0
-    load "lib/nonexistent/module" 2>/dev/null || rc=$?
+    utils::quiet_err load "lib/nonexistent/module" || rc=$?
     testframework::assert_true "$rc -ne 0" "Missing module load fails"
     
     if [[ -z "${BS_LOADED_MODULES[lib/nonexistent/module]:-}" ]]; then
@@ -71,7 +71,7 @@ main() {
     fi
     
     rc=0
-    load "lib/nonexistent/module" 2>/dev/null || rc=$?
+    utils::quiet_err load "lib/nonexistent/module" || rc=$?
     testframework::assert_true "$rc -ne 0" "Retry still fails with error"
     
     # Вывод сводки

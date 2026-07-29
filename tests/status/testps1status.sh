@@ -289,15 +289,15 @@ cleanup() {
        [[ -f "${PS1_STATUS_CONFIG_DIR}/monitor.pid" ]]; then
         monitor_pid=$(cat "${PS1_STATUS_CONFIG_DIR}/monitor.pid")
     fi
-    ps1status::stop_monitoring >/dev/null 2>&1 || true
-    if [[ -n "${monitor_pid}" ]] && kill -0 "${monitor_pid}" 2>/dev/null; then
+    utils::ignore ps1status::stop_monitoring
+    if [[ -n "${monitor_pid}" ]] && utils::quiet_err kill -0 "${monitor_pid}"; then
         sleep 1
-        kill -9 "${monitor_pid}" 2>/dev/null || true
+        utils::quiet_err kill -9 "${monitor_pid}" || true
     fi
-    
+
     # Clean up test files (изолированный HOME + кэш в /tmp / isolated HOME + /tmp cache)
-    rm -rf "${TEST_HOME:-}" 2>/dev/null || true
-    rm -rf "${PS1_STATUS_CACHE_DIR:-}" 2>/dev/null || true
+    utils::quiet_err rm -rf "${TEST_HOME:-}" || true
+    utils::quiet_err rm -rf "${PS1_STATUS_CACHE_DIR:-}" || true
     
     log::debug "Cleanup completed"
 }

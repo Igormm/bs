@@ -123,11 +123,11 @@ main() {
     pipe_out="$(io::streams::pipe printf 'a\nb\n' -- grep b)"
     testframework::assert_equal "b" "${pipe_out}" "pipe connects two commands"
 
-    if command -v stdbuf >/dev/null 2>&1; then
+    if utils::has stdbuf; then
         testframework::assert_equal "line" "$(io::streams::run_line_buffered printf 'line\n')" "run_line_buffered works"
         testframework::assert_equal "raw" "$(io::streams::run_unbuffered printf 'raw\n')" "run_unbuffered works"
     else
-        log::warn "stdbuf not available, skipping buffering tests" 2>/dev/null || true
+        utils::quiet_err log::warn "stdbuf not available, skipping buffering tests" || true
     fi
 
     # Тест 8: Состояние потоков

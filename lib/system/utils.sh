@@ -60,7 +60,7 @@ system::utils::get_load_average() {
 # @example
 #   memory_info=$(system::utils::get_memory_info)
 system::utils::get_memory_info() {
-    if command -v free >/dev/null 2>&1; then
+    if utils::has free; then
         free -h
     else
         cat /proc/meminfo
@@ -83,7 +83,7 @@ system::utils::get_disk_usage() {
 system::utils::get_cpu_info() {
     if [[ -f /proc/cpuinfo ]]; then
         grep -m 1 "model name" /proc/cpuinfo | cut -d ":" -f 2 | xargs
-    elif command -v lscpu >/dev/null 2>&1; then
+    elif utils::has lscpu; then
         lscpu | grep "Model name" | cut -d ":" -f 2 | xargs
     else
         echo "CPU info not available"
@@ -133,7 +133,7 @@ system::utils::check_root() {
 #   fi
 system::utils::check_command_exists() {
     local cmd="${1}"
-    command -v "${cmd}" >/dev/null 2>&1
+    utils::has "${cmd}"
 }
 
 # @description Check if file exists / Проверить файл
@@ -378,7 +378,7 @@ system::utils::log_debug() {
 #   fi
 system::utils::network_check_connectivity() {
     local host="${1:-8.8.8.8}"
-    ping -c 1 -W 5 "${host}" >/dev/null 2>&1
+    utils::quiet ping -c 1 -W 5 "${host}"
 }
 
 # @description Download file from URL / Загрузка файла
@@ -390,13 +390,13 @@ system::utils::network_download() {
     local url="${1}"
     local output_path="${2:-}"
     
-    if command -v wget >/dev/null 2>&1; then
+    if utils::has wget; then
         if [[ -n "${output_path}" ]]; then
             wget "${url}" -O "${output_path}"
         else
             wget "${url}"
         fi
-    elif command -v curl >/dev/null 2>&1; then
+    elif utils::has curl; then
         if [[ -n "${output_path}" ]]; then
             curl -L "${url}" -o "${output_path}"
         else
@@ -426,7 +426,7 @@ system::utils::security_generate_password() {
 system::utils::security_hash_password() {
     local password="${1}"
     
-    if command -v htpasswd >/dev/null 2>&1; then
+    if utils::has htpasswd; then
         echo "${password}" | htpasswd -i -B -n testuser | cut -d: -f2
     else
         # Never return the plain password / Никогда не возвращаем пароль открытым текстом
@@ -446,7 +446,7 @@ system::utils::notify_email() {
     local subject="${2}"
     local body="${3}"
     
-    if command -v mail >/dev/null 2>&1; then
+    if utils::has mail; then
         echo "${body}" | mail -s "${subject}" "${recipient}"
     else
         log::warn "mail command not available"
@@ -658,7 +658,7 @@ system::utils::array_add() {
 system::utils::json_parse() {
     local json_str="${1}"
     
-    if command -v jq >/dev/null 2>&1; then
+    if utils::has jq; then
         echo "${json_str}" | jq .
     else
         log::warn "jq command not available"
@@ -676,8 +676,8 @@ system::utils::json_parse() {
 system::utils::json_validate() {
     local json_str="${1}"
     
-    if command -v jq >/dev/null 2>&1; then
-        echo "${json_str}" | jq empty 2>/dev/null
+    if utils::has jq; then
+        echo "${json_str}" | utils::quiet_err jq empty
     else
         log::warn "jq command not available, cannot validate JSON"
         return 1
@@ -746,7 +746,7 @@ system::utils::dependency_check() {
     local missing_deps=()
     
     for cmd in "$@"; do
-        if ! command -v "${cmd}" >/dev/null 2>&1; then
+        if ! utils::has "${cmd}"; then
             missing_deps+=("${cmd}")
         fi
     done
@@ -771,13 +771,13 @@ system::utils::api_call() {
     local url="${2}"
     local data="${3:-}"
     
-    if command -v curl >/dev/null 2>&1; then
+    if utils::has curl; then
         if [[ -n "${data}" ]]; then
             curl -X "${method}" -H "Content-Type: application/json" -d "${data}" "${url}"
         else
             curl -X "${method}" "${url}"
         fi
-    elif command -v wget >/dev/null 2>&1; then
+    elif utils::has wget; then
         if [[ "${method}" == "GET" ]]; then
             wget -qO- "${url}"
         else

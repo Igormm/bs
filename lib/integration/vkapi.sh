@@ -222,11 +222,11 @@ vkapi::rate_limit_delay() {
     current_time=$(date +%s.%N)
     
     local time_diff
-    time_diff=$(echo "${current_time} - ${VK_API_LAST_REQUEST_TIME}" | bc -l 2>/dev/null || echo "1")
+    time_diff=$(echo "${current_time} - ${VK_API_LAST_REQUEST_TIME}" | utils::quiet_err bc -l || echo "1")
     
-    if (( $(echo "${time_diff} < ${VK_API_RATE_LIMIT_DELAY}" | bc -l 2>/dev/null || echo "0") )); then
+    if (( $(echo "${time_diff} < ${VK_API_RATE_LIMIT_DELAY}" | utils::quiet_err bc -l || echo "0") )); then
         local sleep_time
-        sleep_time=$(echo "${VK_API_RATE_LIMIT_DELAY} - ${time_diff}" | bc -l 2>/dev/null || echo "0.34")
+        sleep_time=$(echo "${VK_API_RATE_LIMIT_DELAY} - ${time_diff}" | utils::quiet_err bc -l || echo "0.34")
         sleep "${sleep_time}"
     fi
     
@@ -372,17 +372,17 @@ vkapi::parse_response() {
     
     # Check for error in response
     local error_msg
-    error_msg=$(echo "${response}" | jq -r '.error.error_msg' 2>/dev/null || echo "")
+    error_msg=$(echo "${response}" | utils::quiet_err jq -r '.error.error_msg' || echo "")
     
     if [[ -n "${error_msg}" ]] && [[ "${error_msg}" != "null" ]]; then
         local error_code
-        error_code=$(echo "${response}" | jq -r '.error.error_code' 2>/dev/null || echo "0")
+        error_code=$(echo "${response}" | utils::quiet_err jq -r '.error.error_code' || echo "0")
         errorhandler::throw "${func_name}" "VK API Error ${error_code}: ${error_msg}" \
             "${LIB_ERROR_API_RESPONSE}"
     fi
     
     # Extract response data
-    echo "${response}" | jq -r '.response' 2>/dev/null || echo "${response}"
+    echo "${response}" | utils::quiet_err jq -r '.response' || echo "${response}"
 }
 
 # Generic API method caller
@@ -788,7 +788,7 @@ vkapi::get_stats() {
     local func_name="vkapi::get_stats"
     
     local cache_count
-    cache_count=$(find "${VK_API_CACHE_DIR}" -name "*.json" 2>/dev/null | wc -l)
+    cache_count=$(utils::quiet_err find "${VK_API_CACHE_DIR}" -name "*.json" | wc -l)
     
     cat << EOF
 VK API Statistics:

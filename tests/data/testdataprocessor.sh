@@ -470,8 +470,8 @@ cleanup() {
     log::info "Cleaning up test artifacts..."
     
     # Clean up test files (изолированный HOME + кэш в /tmp / isolated HOME + /tmp cache)
-    rm -rf "${TEST_HOME:-}" 2>/dev/null || true
-    rm -rf "${DATA_PROCESSOR_CACHE_DIR:-}" 2>/dev/null || true
+    utils::quiet_err rm -rf "${TEST_HOME:-}" || true
+    utils::quiet_err rm -rf "${DATA_PROCESSOR_CACHE_DIR:-}" || true
     
     log::debug "Cleanup completed"
 }

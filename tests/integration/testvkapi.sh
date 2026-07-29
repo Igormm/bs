@@ -205,10 +205,10 @@ test_rate_limiting() {
     end_time=$(date +%s.%N)
     
     local duration
-    duration=$(echo "${end_time} - ${start_time}" | bc -l 2>/dev/null || echo "1")
+    duration=$(echo "${end_time} - ${start_time}" | utils::quiet_err bc -l || echo "1")
     
     # Should be very fast on first call (no delay)
-    if (( $(echo "${duration} < 0.1" | bc -l 2>/dev/null || echo "1") )); then
+    if (( $(echo "${duration} < 0.1" | utils::quiet_err bc -l || echo "1") )); then
         test_pass
     else
         test_fail
@@ -436,7 +436,7 @@ cleanup() {
     log::info "Cleaning up test artifacts..."
     
     # Clean up test files (изолированный кэш / isolated cache)
-    rm -rf "${TEST_VKAPI_TMP:-}" 2>/dev/null || true
+    utils::quiet_err rm -rf "${TEST_VKAPI_TMP:-}" || true
     
     log::debug "Cleanup completed"
 }

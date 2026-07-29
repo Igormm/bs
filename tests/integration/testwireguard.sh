@@ -272,12 +272,12 @@ test_error_handling() {
     local error_caught=0
     
     # Test invalid interface name
-    if ! wireguard::create_interface "" "10.0.0.1/24" 2>/dev/null; then
+    if ! utils::quiet_err wireguard::create_interface "" "10.0.0.1/24"; then
         ((++error_caught))
     fi
     
     # Test invalid peer addition
-    if ! wireguard::add_peer "nonexistent" "key" "" 2>/dev/null; then
+    if ! utils::quiet_err wireguard::add_peer "nonexistent" "key" ""; then
         ((++error_caught))
     fi
     
@@ -298,10 +298,10 @@ test_key_permissions() {
     
     if [[ -f "${private_key_file}" ]] && [[ -f "${public_key_file}" ]]; then
         local private_perms
-        private_perms=$(stat -c %a "${private_key_file}" 2>/dev/null || stat -f %A "${private_key_file}" 2>/dev/null)
+        private_perms=$(utils::quiet_err stat -c %a "${private_key_file}" || utils::quiet_err stat -f %A "${private_key_file}")
         
         local public_perms
-        public_perms=$(stat -c %a "${public_key_file}" 2>/dev/null || stat -f %A "${public_key_file}" 2>/dev/null)
+        public_perms=$(utils::quiet_err stat -c %a "${public_key_file}" || utils::quiet_err stat -f %A "${public_key_file}")
         
         # Private key should be 600, public key should be 644
         if [[ "${private_perms}" == "600" ]] && [[ "${public_perms}" == "644" ]]; then
@@ -324,7 +324,7 @@ test_configuration_permissions() {
     
     if [[ -f "${config_file}" ]]; then
         local perms
-        perms=$(stat -c %a "${config_file}" 2>/dev/null || stat -f %A "${config_file}" 2>/dev/null)
+        perms=$(utils::quiet_err stat -c %a "${config_file}" || utils::quiet_err stat -f %A "${config_file}")
         
         # Configuration should be 600
         if [[ "${perms}" == "600" ]]; then
@@ -344,8 +344,8 @@ cleanup() {
     log::info "Cleaning up test artifacts..."
     
     # Stop test interface if running
-    if wg show "${TEST_INTERFACE}" >/dev/null 2>&1; then
-        wg-quick down "${TEST_INTERFACE}" 2>/dev/null || true
+    if utils::quiet wg show "${TEST_INTERFACE}"; then
+        utils::ignore wg-quick down "${TEST_INTERFACE}"
     fi
     
     # Remove test configuration files

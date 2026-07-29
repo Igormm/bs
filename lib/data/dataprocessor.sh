@@ -160,7 +160,7 @@ dataprocessor::json::validate() {
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
-    if echo "${json_data}" | jq empty 2>/dev/null; then
+    if echo "${json_data}" | utils::quiet_err jq empty; then
         return 0
     else
         return 1
@@ -177,7 +177,7 @@ dataprocessor::json::pretty() {
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
-    echo "${json_data}" | jq '.' 2>/dev/null || {
+    echo "${json_data}" | utils::quiet_err jq '.' || {
         errorhandler::throw "${func_name}" "Invalid JSON data" \
             "${LIB_ERROR_INVALID_DATA}"
     }
@@ -193,7 +193,7 @@ dataprocessor::json::minify() {
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
-    echo "${json_data}" | jq -c '.' 2>/dev/null || {
+    echo "${json_data}" | utils::quiet_err jq -c '.' || {
         errorhandler::throw "${func_name}" "Invalid JSON data" \
             "${LIB_ERROR_INVALID_DATA}"
     }
@@ -210,7 +210,7 @@ dataprocessor::json::query() {
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
-    echo "${json_data}" | jq -r "${query}" 2>/dev/null || {
+    echo "${json_data}" | utils::quiet_err jq -r "${query}" || {
         errorhandler::throw "${func_name}" "Invalid query or JSON data" \
             "${LIB_ERROR_INVALID_DATA}"
     }
@@ -228,7 +228,7 @@ dataprocessor::json::update() {
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
-    echo "${json_data}" | jq "${path} = ${new_value}" 2>/dev/null || {
+    echo "${json_data}" | utils::quiet_err jq "${path} = ${new_value}" || {
         errorhandler::throw "${func_name}" "Invalid JSON data or path" \
             "${LIB_ERROR_INVALID_DATA}"
     }
@@ -245,7 +245,7 @@ dataprocessor::json::delete() {
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
-    echo "${json_data}" | jq "del(${path})" 2>/dev/null || {
+    echo "${json_data}" | utils::quiet_err jq "del(${path})" || {
         errorhandler::throw "${func_name}" "Invalid JSON data or path" \
             "${LIB_ERROR_INVALID_DATA}"
     }
@@ -262,7 +262,7 @@ dataprocessor::json::merge() {
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
-    echo "${json1}" "${json2}" | jq -s '.[0] * .[1]' 2>/dev/null || {
+    echo "${json1}" "${json2}" | utils::quiet_err jq -s '.[0] * .[1]' || {
         errorhandler::throw "${func_name}" "Invalid JSON data" \
             "${LIB_ERROR_INVALID_DATA}"
     }
@@ -283,7 +283,7 @@ dataprocessor::json::to_csv() {
         echo "${json_data}" | in2csv --format json
     else
         # Fallback to jq
-        echo "${json_data}" | jq -r '.[] | @csv' 2>/dev/null || {
+        echo "${json_data}" | utils::quiet_err jq -r '.[] | @csv' || {
             errorhandler::throw "${func_name}" "Failed to convert JSON to CSV" \
                 "${LIB_ERROR_CONVERSION_FAILED}"
         }
@@ -305,7 +305,7 @@ dataprocessor::xml::validate() {
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
-    echo "${xml_data}" | xmllint --noout - 2>/dev/null && return 0 || return 1
+    echo "${xml_data}" | utils::quiet_err xmllint --noout - && return 0 || return 1
 }
 
 # Pretty print XML
@@ -318,7 +318,7 @@ dataprocessor::xml::pretty() {
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
-    echo "${xml_data}" | xmllint --format - 2>/dev/null || {
+    echo "${xml_data}" | utils::quiet_err xmllint --format - || {
         errorhandler::throw "${func_name}" "Invalid XML data" \
             "${LIB_ERROR_INVALID_DATA}"
     }
@@ -337,12 +337,12 @@ dataprocessor::xml::xpath() {
     
     # Try xmlstarlet first, then xmllint
     if utils::has xmlstarlet; then
-        echo "${xml_data}" | xmlstarlet sel -t -v "${xpath_query}" - 2>/dev/null || {
+        echo "${xml_data}" | utils::quiet_err xmlstarlet sel -t -v "${xpath_query}" - || {
             errorhandler::throw "${func_name}" "Invalid XPath query or XML data" \
                 "${LIB_ERROR_INVALID_DATA}"
         }
     else
-        echo "${xml_data}" | xmllint --xpath "${xpath_query}" - 2>/dev/null || {
+        echo "${xml_data}" | utils::quiet_err xmllint --xpath "${xpath_query}" - || {
             errorhandler::throw "${func_name}" "Invalid XPath query or XML data" \
                 "${LIB_ERROR_INVALID_DATA}"
         }
@@ -712,13 +712,13 @@ dataprocessor::detect_format() {
     local data="${1:-}"
     
     # JSON detection
-    if echo "${data}" | jq empty 2>/dev/null; then
+    if echo "${data}" | utils::quiet_err jq empty; then
         echo "json"
         return 0
     fi
     
     # XML detection
-    if echo "${data}" | xmllint --noout - 2>/dev/null; then
+    if echo "${data}" | utils::quiet_err xmllint --noout -; then
         echo "xml"
         return 0
     fi
@@ -852,7 +852,7 @@ dataprocessor::file::info() {
     file_type=$(utils::quiet_err file -b "${file_path}" || echo "unknown")
     
     local first_bytes
-    first_bytes=$(head -c 100 "${file_path}" | od -c 2>/dev/null | head -1 || echo "")
+    first_bytes=$(head -c 100 "${file_path}" | utils::quiet_err od -c | head -1 || echo "")
     
     cat << EOF
 {

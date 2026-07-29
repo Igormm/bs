@@ -204,7 +204,7 @@ vkmusic::search() {
     
     # Parse and store results
     local audio_count
-    audio_count=$(echo "${response}" | jq -r '.count' 2>/dev/null || echo "0")
+    audio_count=$(echo "${response}" | utils::quiet_err jq -r '.count' || echo "0")
     
     if [[ "${audio_count}" == "0" ]] || [[ "${audio_count}" == "null" ]]; then
         log::warn "No audio found for query: ${query}"
@@ -215,7 +215,7 @@ vkmusic::search() {
     VK_MUSIC_LAST_SEARCH_RESULTS=()
     while IFS= read -r audio_info; do
         VK_MUSIC_LAST_SEARCH_RESULTS+=("${audio_info}")
-    done < <(echo "${response}" | jq -c '.items[]' 2>/dev/null)
+    done < <(echo "${response}" | utils::quiet_err jq -c '.items[]')
     
     log::success "Found ${audio_count} audio tracks"
     
@@ -239,19 +239,19 @@ vkmusic::display_search_results() {
     local index=1
     for audio_info in "${VK_MUSIC_LAST_SEARCH_RESULTS[@]}"; do
         local artist
-        artist=$(echo "${audio_info}" | jq -r '.artist' 2>/dev/null || echo "Unknown")
+        artist=$(echo "${audio_info}" | utils::quiet_err jq -r '.artist' || echo "Unknown")
         
         local title
-        title=$(echo "${audio_info}" | jq -r '.title' 2>/dev/null || echo "Unknown")
+        title=$(echo "${audio_info}" | utils::quiet_err jq -r '.title' || echo "Unknown")
         
         local duration
-        duration=$(echo "${audio_info}" | jq -r '.duration' 2>/dev/null || echo "0")
+        duration=$(echo "${audio_info}" | utils::quiet_err jq -r '.duration' || echo "0")
         
         local id
-        id=$(echo "${audio_info}" | jq -r '.id' 2>/dev/null || echo "")
+        id=$(echo "${audio_info}" | utils::quiet_err jq -r '.id' || echo "")
         
         local owner_id
-        owner_id=$(echo "${audio_info}" | jq -r '.owner_id' 2>/dev/null || echo "")
+        owner_id=$(echo "${audio_info}" | utils::quiet_err jq -r '.owner_id' || echo "")
         
         # Format duration
         local duration_formatted
@@ -471,22 +471,22 @@ vkmusic::download() {
     
     # Extract audio information
     local artist
-    artist=$(echo "${audio_info}" | jq -r '.artist' 2>/dev/null || echo "Unknown")
+    artist=$(echo "${audio_info}" | utils::quiet_err jq -r '.artist' || echo "Unknown")
     
     local title
-    title=$(echo "${audio_info}" | jq -r '.title' 2>/dev/null || echo "Unknown")
+    title=$(echo "${audio_info}" | utils::quiet_err jq -r '.title' || echo "Unknown")
     
     local url
-    url=$(echo "${audio_info}" | jq -r '.url' 2>/dev/null || echo "")
+    url=$(echo "${audio_info}" | utils::quiet_err jq -r '.url' || echo "")
     
     local duration
-    duration=$(echo "${audio_info}" | jq -r '.duration' 2>/dev/null || echo "0")
+    duration=$(echo "${audio_info}" | utils::quiet_err jq -r '.duration' || echo "0")
     
     local owner_id
-    owner_id=$(echo "${audio_info}" | jq -r '.owner_id' 2>/dev/null || echo "")
+    owner_id=$(echo "${audio_info}" | utils::quiet_err jq -r '.owner_id' || echo "")
     
     local id
-    id=$(echo "${audio_info}" | jq -r '.id' 2>/dev/null || echo "")
+    id=$(echo "${audio_info}" | utils::quiet_err jq -r '.id' || echo "")
     
     if [[ -z "${url}" ]]; then
         errorhandler::throw "${func_name}" "Audio URL not found" \
@@ -602,7 +602,7 @@ vkmusic::search_and_download() {
     
     # Download found audio
     local audio_items
-    audio_items=$(echo "${search_results}" | jq -c '.items[]' 2>/dev/null)
+    audio_items=$(echo "${search_results}" | utils::quiet_err jq -c '.items[]')
     
     if [[ -n "${audio_items}" ]]; then
         vkmusic::batch_download "${audio_items}" "${output_dir}"
@@ -691,7 +691,7 @@ vkmusic::get_audio_count() {
     response=$(vkapi::api_call "audio.get" "${params}")
     
     local count
-    count=$(echo "${response}" | jq -r '.count' 2>/dev/null || echo "0")
+    count=$(echo "${response}" | utils::quiet_err jq -r '.count' || echo "0")
     
     echo "${count}"
 }
@@ -727,7 +727,7 @@ vkmusic::upload_audio() {
     upload_server_response=$(vkmusic::get_upload_server)
     
     local upload_url
-    upload_url=$(echo "${upload_server_response}" | jq -r '.upload_url' 2>/dev/null)
+    upload_url=$(echo "${upload_server_response}" | utils::quiet_err jq -r '.upload_url')
     
     if [[ -z "${upload_url}" ]] || [[ "${upload_url}" == "null" ]]; then
         errorhandler::throw "${func_name}" "Failed to get upload server" \
@@ -740,11 +740,11 @@ vkmusic::upload_audio() {
     
     # Save audio
     local server
-    server=$(echo "${upload_response}" | jq -r '.server' 2>/dev/null)
+    server=$(echo "${upload_response}" | utils::quiet_err jq -r '.server')
     local audio_hash
-    audio_hash=$(echo "${upload_response}" | jq -r '.audio' 2>/dev/null)
+    audio_hash=$(echo "${upload_response}" | utils::quiet_err jq -r '.audio')
     local hash
-    hash=$(echo "${upload_response}" | jq -r '.hash' 2>/dev/null)
+    hash=$(echo "${upload_response}" | utils::quiet_err jq -r '.hash')
     
     local params="server=${server}&audio=${audio_hash}&hash=${hash}"
     if [[ -n "${title}" ]]; then
@@ -777,13 +777,13 @@ vkmusic::get_stats() {
     local func_name="vkmusic::get_stats"
     
     local download_count
-    download_count=$(find "${VK_MUSIC_DOWNLOAD_DIR}" -name "*.mp3" 2>/dev/null | wc -l)
+    download_count=$(utils::quiet_err find "${VK_MUSIC_DOWNLOAD_DIR}" -name "*.mp3" | wc -l)
     
     local playlist_count
-    playlist_count=$(find "${VK_MUSIC_PLAYLIST_DIR}" -name "*.m3u" -o -name "*.pls" 2>/dev/null | wc -l)
+    playlist_count=$(utils::quiet_err find "${VK_MUSIC_PLAYLIST_DIR}" -name "*.m3u" -o -name "*.pls" | wc -l)
     
     local cache_size
-    cache_size=$(du -sh "${VK_MUSIC_CACHE_DIR}" 2>/dev/null | cut -f1 || echo "0")
+    cache_size=$(utils::quiet_err du -sh "${VK_MUSIC_CACHE_DIR}" | cut -f1 || echo "0")
     
     cat << EOF
 VK Music Statistics:

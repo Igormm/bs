@@ -14,8 +14,8 @@ _bosa_prompt() {
     
     # Get git branch if in a git repository
     local git_branch=""
-    if command -v git &> /dev/null && git rev-parse --git-dir > /dev/null 2>&1; then
-        git_branch=" $(git branch 2>/dev/null | grep '^*' | cut -c3-)"
+    if utils::has git && utils::quiet git rev-parse --git-dir; then
+        git_branch=" $(utils::quiet_err git branch | grep '^*' | cut -c3-)"
         if [[ -n "$git_branch" ]]; then
             git_branch="${purple}[${git_branch}]${reset_color}"
         fi

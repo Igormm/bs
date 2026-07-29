@@ -108,25 +108,25 @@ platformcheck::get_info() {
     # Определяем ОС / Detect OS
     if platformcheck::is_macos; then
         os_name="macOS"
-        os_version=$(sw_vers -productVersion 2>/dev/null || echo "Unknown")
+        os_version=$(utils::quiet_err sw_vers -productVersion || echo "Unknown")
     elif platformcheck::is_alma; then
         os_name="AlmaLinux"
-        os_version=$(cat /etc/almalinux-release 2>/dev/null | awk '{print $2}' || echo "Unknown")
+        os_version=$(utils::quiet_err cat /etc/almalinux-release | awk '{print $2}' || echo "Unknown")
     elif platformcheck::is_ubuntu; then
         os_name="Ubuntu"
-        os_version=$(lsb_release -rs 2>/dev/null || echo "Unknown")
+        os_version=$(utils::quiet_err lsb_release -rs || echo "Unknown")
     elif platformcheck::is_debian; then
         os_name="Debian"
-        os_version=$(cat /etc/debian_version 2>/dev/null || echo "Unknown")
+        os_version=$(utils::quiet_err cat /etc/debian_version || echo "Unknown")
     elif platformcheck::is_fedora; then
         os_name="Fedora"
-        os_version=$(cat /etc/fedora-release 2>/dev/null | awk '{print $3}' || echo "Unknown")
+        os_version=$(utils::quiet_err cat /etc/fedora-release | awk '{print $3}' || echo "Unknown")
     elif platformcheck::is_altlinux; then
         os_name="ALT Linux"
-        os_version=$(cat /etc/altlinux-release 2>/dev/null | head -1 | awk '{print $3}' || echo "Unknown")
+        os_version=$(utils::quiet_err cat /etc/altlinux-release | head -1 | awk '{print $3}' || echo "Unknown")
     else
-        os_name=$(cat /etc/os-release 2>/dev/null | grep "^NAME=" | cut -d'"' -f2 || echo "Unknown")
-        os_version=$(cat /etc/os-release 2>/dev/null | grep "^VERSION_ID=" | cut -d'"' -f2 || echo "Unknown")
+        os_name=$(utils::quiet_err cat /etc/os-release | grep "^NAME=" | cut -d'"' -f2 || echo "Unknown")
+        os_version=$(utils::quiet_err cat /etc/os-release | grep "^VERSION_ID=" | cut -d'"' -f2 || echo "Unknown")
     fi
     
     # Получаем версию ядра / Get kernel version
@@ -199,16 +199,16 @@ platformcheck::check_dependencies() {
     local missing_tools=()
     
     for tool in "${required_tools[@]}"; do
-        if ! command -v "$tool" >/dev/null 2>&1; then
+        if ! utils::has "$tool"; then
             missing_tools+=("$tool")
         fi
     done
-    
+
     if [[ ${#missing_tools[@]} -eq 0 ]]; then
-        log::info "All required tools are available" 2>/dev/null || true
+        utils::quiet_err log::info "All required tools are available" || true
         return 0
     else
-        log::error "Missing required tools: ${missing_tools[*]}" 2>/dev/null || {
+        utils::quiet_err log::error "Missing required tools: ${missing_tools[*]}" || {
             echo "Missing required tools: ${missing_tools[*]}" >&2
         }
         return 1
@@ -230,16 +230,16 @@ platformcheck::check_macos_deps() {
     local missing_tools=()
     
     for tool in "${macos_tools[@]}"; do
-        if ! command -v "$tool" >/dev/null 2>&1; then
+        if ! utils::has "$tool"; then
             missing_tools+=("$tool")
         fi
     done
     
     if [[ ${#missing_tools[@]} -eq 0 ]]; then
-        log::info "All macOS tools are available" 2>/dev/null || true
+        utils::quiet_err log::info "All macOS tools are available" || true
         return 0
     else
-        log::warn "Missing macOS tools: ${missing_tools[*]}" 2>/dev/null || true
+        utils::quiet_err log::warn "Missing macOS tools: ${missing_tools[*]}" || true
         return 1
     fi
 }
@@ -259,16 +259,16 @@ platformcheck::check_linux_deps() {
     local missing_tools=()
     
     for tool in "${linux_tools[@]}"; do
-        if ! command -v "$tool" >/dev/null 2>&1; then
+        if ! utils::has "$tool"; then
             missing_tools+=("$tool")
         fi
     done
     
     if [[ ${#missing_tools[@]} -eq 0 ]]; then
-        log::info "All Linux tools are available" 2>/dev/null || true
+        utils::quiet_err log::info "All Linux tools are available" || true
         return 0
     else
-        log::warn "Missing Linux tools: ${missing_tools[*]}" 2>/dev/null || true
+        utils::quiet_err log::warn "Missing Linux tools: ${missing_tools[*]}" || true
         return 1
     fi
 }
@@ -283,7 +283,7 @@ platformcheck::check_linux_deps() {
 # @example
 #   platformcheck::install_dependencies
 platformcheck::install_dependencies() {
-    log::info "Checking and installing dependencies..." 2>/dev/null || true
+    utils::quiet_err log::info "Checking and installing dependencies..." || true
     
     if platformcheck::is_macos; then
         platformcheck::install_macos_deps
@@ -297,18 +297,18 @@ platformcheck::install_dependencies() {
 # @example
 #   platformcheck::install_macos_deps
 platformcheck::install_macos_deps() {
-    log::info "Installing macOS dependencies..." 2>/dev/null || true
+    utils::quiet_err log::info "Installing macOS dependencies..." || true
     
     # Проверяем Homebrew / Check Homebrew
-    if ! command -v brew >/dev/null 2>&1; then
-        log::info "Homebrew not found. Installing..." 2>/dev/null || true
+    if ! utils::has brew; then
+        utils::quiet_err log::info "Homebrew not found. Installing..." || true
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     fi
     
     # Устанавливаем необходимые пакеты / Install necessary packages
     brew install coreutils gnu-sed grep
     
-    log::success "macOS dependencies installed" 2>/dev/null || true
+    utils::quiet_err log::success "macOS dependencies installed" || true
 }
 
 # @description Install Linux dependencies
@@ -316,14 +316,14 @@ platformcheck::install_macos_deps() {
 # @example
 #   platformcheck::install_linux_deps
 platformcheck::install_linux_deps() {
-    log::info "Installing Linux dependencies..." 2>/dev/null || true
+    utils::quiet_err log::info "Installing Linux dependencies..." || true
     
     load "lib/system/distrologic"
     
     # Устанавливаем необходимые пакеты / Install necessary packages
     system::distrologic::pkg_install_cross "curl" "wget" "git" "tree" "jq"
     
-    log::success "Linux dependencies installed" 2>/dev/null || true
+    utils::quiet_err log::success "Linux dependencies installed" || true
 }
 
 # ==========================================
@@ -335,8 +335,8 @@ platformcheck::install_linux_deps() {
 # @example
 #   platformcheck::show_report
 platformcheck::show_report() {
-    log::header "Platform Compatibility Report" 2>/dev/null || true
-    log::header "Отчет о совместимости платформы" 2>/dev/null || true
+    utils::quiet_err log::header "Platform Compatibility Report" || true
+    utils::quiet_err log::header "Отчет о совместимости платформы" || true
     
     platformcheck::get_report
     
@@ -367,5 +367,5 @@ platformcheck::show_report() {
 # Initialize module on load
 if [[ -z "${PLATFORM_CHECK_INITIALIZED:-}" ]]; then
     PLATFORM_CHECK_INITIALIZED="1"
-    log::debug "Platform check module initialized" 2>/dev/null || true
+    utils::quiet_err log::debug "Platform check module initialized" || true
 fi

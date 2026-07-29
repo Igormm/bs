@@ -1,31 +1,15 @@
 #!/usr/bin/env bs
-# examples/ps1_configuration_example.sh — PS1 configuration example
-# examples/ps1_configuration_example.sh — Пример конфигурации PS1
+# examples/ps1configurationexample.sh — PS1 configuration example
+# examples/ps1configurationexample.sh — Пример конфигурации PS1
 #
 # Этот скрипт демонстрирует различные способы настройки PS1
 # с использованием модуля ps1config.
 # This script demonstrates various ways to configure PS1
 # using the ps1config module.
 
-# Можно использовать как standalone скрипт или source для .bashrc
-# Can be used as standalone script or sourced for .bashrc
-
-set -euo pipefail
-
-# Проверяем, запущен ли скрипт напрямую
-# Check if script is run directly
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    # Запущен напрямую, подключаем BS
-    # Run directly, load BS
-    if [[ -f "boot.sh" ]]; then
-        source "boot.sh"
-        bs::init
-    else
-        echo "Error: boot.sh not found. Please run from BS directory."
-        echo "Ошибка: boot.sh не найден. Пожалуйста, запустите из директории BS."
-        exit 1
-    fi
-fi
+# Запуск / Run:
+#   ./bs run examples/ps1configurationexample.sh
+#   ./examples/ps1configurationexample.sh   (с bs в PATH / with bs in PATH)
 
 # Подключаем модуль PS1
 # Load PS1 module
@@ -39,11 +23,11 @@ load "lib/ui/ps1config"
 # -----------------------------------
 setup_ps1_basic() {
     log::header "Basic PS1 Setup / Базовая настройка PS1"
-    
+
     # Просто включаем расширенные функции
     # Just enable advanced features
     ps1config::enable_advanced
-    
+
     log::success "PS1 configured with advanced features"
     log::success "PS1 настроен с расширенными функциями"
     echo
@@ -53,26 +37,27 @@ setup_ps1_basic() {
 # --------------------------------
 setup_ps1_theme() {
     log::header "Theme Selection / Выбор темы"
-    
+
     # Показываем доступные темы
     # Show available themes
     ps1config::list_themes
-    
+
     echo
-    echo -e "${YELLOW}Applying different themes...${NC}"
-    echo -e "${YELLOW}Применение различных тем...${NC}"
-    
+    echo -e "${COLOR_YELLOW}Applying different themes...${COLOR_RESET}"
+    echo -e "${COLOR_YELLOW}Применение различных тем...${COLOR_RESET}"
+
     local themes=("default" "powerline" "minimal" "time" "rainbow")
+    local theme
     for theme in "${themes[@]}"; do
-        echo -e "\n${BLUE}Applying theme: $theme${NC}"
-        echo -e "${BLUE}Применение темы: $theme${NC}"
-        ps1config::set_theme "$theme"
+        echo -e "\n${COLOR_BLUE}Applying theme: ${theme}${COLOR_RESET}"
+        echo -e "${COLOR_BLUE}Применение темы: ${theme}${COLOR_RESET}"
+        ps1config::set_theme "${theme}"
         echo -e "Your PS1 now looks like:"
         echo -e "Ваш PS1 теперь выглядит так:"
-        echo "PS1: $PS1"
+        echo "PS1: ${PS1}"
         sleep 2
     done
-    
+
     # Возвращаем powerline тему как рекомендуемую
     # Return powerline theme as recommended
     ps1config::set_theme "powerline"
@@ -85,25 +70,25 @@ setup_ps1_theme() {
 # ---------------------------------------------------
 setup_ps1_custom() {
     log::header "Custom Configuration / Настройка под свои нужды"
-    
+
     # Настраиваем время
     # Configure time
     log::info "Setting custom time format..."
     log::info "Настройка пользовательского формата времени..."
     ps1config::set_time_format "%Y-%m-%d %H:%M"
-    
+
     # Включаем/выключаем git info
     # Enable/disable git info
     log::info "Enabling git information..."
     log::info "Включение информации о git..."
     ps1config::set_git_info true
-    
+
     # Настраиваем динамическое обновление
     # Configure dynamic updates
     log::info "Setting up dynamic updates..."
     log::info "Настройка динамического обновления..."
     ps1config::setup_prompt_command
-    
+
     log::success "Custom configuration applied"
     log::success "Пользовательская конфигурация применена"
     echo
@@ -113,27 +98,35 @@ setup_ps1_custom() {
 # -----------------------------------------------
 setup_ps1_interactive() {
     log::header "Interactive Setup / Интерактивная настройка"
-    
-    load "lib/ui/interactiveui"
-    
+
     # Выбор темы
     # Theme selection
     echo
-    echo -e "${BLUE}Choose your preferred theme:${NC}"
-    echo -e "${BLUE}Выберите предпочитаемую тему:${NC}"
-    
-    local theme
-    theme=$(interactiveui::menu "Select PS1 theme" \
-        "default" "powerline" "minimal" "time" "rainbow")
-    
-    ps1config::set_theme "$theme"
-    log::success "Theme set to: $theme"
-    log::success "Тема установлена: $theme"
-    
+    echo -e "${COLOR_BLUE}Choose your preferred theme:${COLOR_RESET}"
+    echo -e "${COLOR_BLUE}Выберите предпочитаемую тему:${COLOR_RESET}"
+
+    local themes=("default" "powerline" "minimal" "time" "rainbow")
+    local i theme theme_num
+    for i in "${!themes[@]}"; do
+        echo "  $((i + 1)). ${themes[$i]}"
+    done
+    read -rp "Select theme (1-${#themes[@]}): " theme_num
+    if [[ "${theme_num}" =~ ^[0-9]+$ ]] && (( theme_num >= 1 && theme_num <= ${#themes[@]} )); then
+        theme="${themes[$((theme_num - 1))]}"
+    else
+        theme="default"
+    fi
+
+    ps1config::set_theme "${theme}"
+    log::success "Theme set to: ${theme}"
+    log::success "Тема установлена: ${theme}"
+
     # Вопросы о дополнительных функциях
     # Questions about additional features
+    local answer
     echo
-    if interactiveui::confirm "Enable git information? / Включить информацию о git?"; then
+    read -rp "Enable git information? / Включить информацию о git? [y/N] " answer
+    if [[ "${answer}" =~ ^[yYдД]$ ]]; then
         ps1config::set_git_info true
         log::info "Git information enabled"
         log::info "Информация о git включена"
@@ -142,9 +135,10 @@ setup_ps1_interactive() {
         log::info "Git information disabled"
         log::info "Информация о git отключена"
     fi
-    
+
     echo
-    if interactiveui::confirm "Enable dynamic updates? / Включить динамическое обновление?"; then
+    read -rp "Enable dynamic updates? / Включить динамическое обновление? [y/N] " answer
+    if [[ "${answer}" =~ ^[yYдД]$ ]]; then
         ps1config::setup_prompt_command
         log::info "Dynamic updates enabled"
         log::info "Динамическое обновление включено"
@@ -152,7 +146,7 @@ setup_ps1_interactive() {
         log::info "Dynamic updates disabled"
         log::info "Динамическое обновление отключено"
     fi
-    
+
     log::success "Interactive setup completed"
     log::success "Интерактивная настройка завершена"
     echo
@@ -162,24 +156,24 @@ setup_ps1_interactive() {
 # ---------------------------------------------------
 setup_ps1_professional() {
     log::header "Professional Setup / Профессиональная настройка"
-    
+
     # Настраиваем для системного администратора
     # Configure for system administrator
     log::info "Configuring for system administrator..."
     log::info "Настройка для системного администратора..."
-    
+
     # Включаем все функции
     # Enable all features
     ps1config::enable_advanced
-    
+
     # Добавляем SSH индикатор
     # Add SSH indicator
     ps1config::detect_ssh
-    
+
     # Настраиваем время с секундами
     # Configure time with seconds
     ps1config::set_time_format "%H:%M:%S"
-    
+
     log::success "Professional PS1 configuration applied"
     log::success "Профессиональная конфигурация PS1 применена"
     echo
@@ -189,12 +183,12 @@ setup_ps1_professional() {
 # ---------------------------------------------
 setup_ps1_minimal() {
     log::header "Minimal Setup / Минималистичная настройка"
-    
+
     # Только самое необходимое
     # Only the essentials
     ps1config::set_theme "minimal"
     ps1config::set_git_info true
-    
+
     log::success "Minimal PS1 configuration applied"
     log::success "Минималистичная конфигурация PS1 применена"
     echo
@@ -205,17 +199,17 @@ setup_ps1_minimal() {
 # ==========================================
 
 main() {
-    print_header "PS1 Configuration Example"
-    print_header "Пример конфигурации PS1"
-    
-    echo -e "${BLUE}This script demonstrates PS1 configuration options${NC}"
-    echo -e "${BLUE}Этот скрипт демонстрирует варианты настройки PS1${NC}"
+    log::header "PS1 Configuration Example"
+    log::header "Пример конфигурации PS1"
+
+    echo -e "${COLOR_BLUE}This script demonstrates PS1 configuration options${COLOR_RESET}"
+    echo -e "${COLOR_BLUE}Этот скрипт демонстрирует варианты настройки PS1${COLOR_RESET}"
     echo
-    
+
     # Меню выбора настройки
     # Setup selection menu
-    echo -e "${GREEN}Choose configuration option:${NC}"
-    echo -e "${GREEN}Выберите вариант настройки:${NC}"
+    echo -e "${COLOR_GREEN}Choose configuration option:${COLOR_RESET}"
+    echo -e "${COLOR_GREEN}Выберите вариант настройки:${COLOR_RESET}"
     echo -e "  1. Basic setup / Базовая настройка"
     echo -e "  2. Theme selection / Выбор темы"
     echo -e "  3. Custom configuration / Пользовательская настройка"
@@ -225,10 +219,11 @@ main() {
     echo -e "  7. Demo / Демо"
     echo -e "  0. Exit / Выход"
     echo
-    
-    read -p "Select option (1-7, 0 to exit): " choice
-    
-    case "$choice" in
+
+    local choice
+    read -rp "Select option (1-7, 0 to exit): " choice
+
+    case "${choice}" in
         1)
             setup_ps1_basic
             ;;
@@ -256,29 +251,27 @@ main() {
             exit 0
             ;;
         *)
-            log::error "Invalid option: $choice"
-            log::error "Недопустимый вариант: $choice"
+            log::error "Invalid option: ${choice}"
+            log::error "Недопустимый вариант: ${choice}"
             ;;
     esac
-    
+
     echo
-    echo -e "${GREEN}✓ PS1 configuration completed!${NC}"
-    echo -e "${GREEN}✓ Конфигурация PS1 завершена!${NC}"
+    echo -e "${COLOR_GREEN}✓ PS1 configuration completed!${COLOR_RESET}"
+    echo -e "${COLOR_GREEN}✓ Конфигурация PS1 завершена!${COLOR_RESET}"
     echo
-    echo -e "${YELLOW}Your PS1 now looks like:${NC}"
-    echo -e "${YELLOW}Ваш PS1 теперь выглядит так:${NC}"
-    echo "$PS1"
-    
+    echo -e "${COLOR_YELLOW}Your PS1 now looks like:${COLOR_RESET}"
+    echo -e "${COLOR_YELLOW}Ваш PS1 теперь выглядит так:${COLOR_RESET}"
+    echo "${PS1}"
+
     echo
-    echo -e "${BLUE}To make changes permanent, add to your .bashrc:${NC}"
-    echo -e "${BLUE}Чтобы сделать изменения постоянными, добавьте в .bashrc:${NC}"
-    echo -e "  source /path/to/BS/boot.sh"
-    echo -e "  load lib/ui/ps1config"
+    echo -e "${COLOR_BLUE}To make changes permanent, add to your .bashrc:${COLOR_RESET}"
+    echo -e "${COLOR_BLUE}Чтобы сделать изменения постоянными, добавьте в .bashrc:${COLOR_RESET}"
+    echo -e "  source /path/to/bs/bootstrap/init.sh"
+    echo -e "  load \"lib/ui/ps1config\""
     echo -e "  ps1config::set_theme \"powerline\""
 }
 
-# Если скрипт запущен напрямую, запускаем main
-# If script is run directly, call main
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    main "$@"
-fi
+# Запускаем main (bs исполняет скрипты через source — как и остальные примеры)
+# Call main (bs runs scripts via source — same as the other examples)
+main "$@"

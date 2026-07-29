@@ -77,7 +77,7 @@ main() {
     # Проверяем базовые инструменты / Check basic tools
     local basic_tools=("bash" "grep" "sed" "awk")
     for tool in "${basic_tools[@]}"; do
-        if command -v "$tool" >/dev/null 2>&1; then
+        if utils::has "$tool"; then
             testframework::assert_true "true" "$tool available"
         else
             testframework::assert_true "false" "$tool not available"

@@ -80,7 +80,7 @@ system::devices::keyboard() {
             # Set keyboard repeat rate
             if utils::has xset; then
                 # Get current delay
-                local delay=$(xset q 2>/dev/null | grep rate | awk '{print $4}')
+                local delay=$(utils::quiet_err xset q | grep rate | awk '{print $4}')
                 utils::quiet_err xset r rate "${delay}" "${value}" || :
                 log::info "Keyboard repeat rate set to ${value}"
             else
@@ -92,8 +92,8 @@ system::devices::keyboard() {
             # Set keyboard repeat delay
             if utils::has xset; then
                 # Get current rate
-                local rate=$(xset q 2>/dev/null | grep rate | awk '{print $5}')
-                xset r rate "${value}" "${rate}" 2>/dev/null || true
+                local rate=$(utils::quiet_err xset q | grep rate | awk '{print $5}')
+                utils::quiet_err xset r rate "${value}" "${rate}" || true
                 log::info "Keyboard repeat delay set to ${value}"
             else
                 log::warn "xset not available, cannot set keyboard repeat delay"
@@ -103,7 +103,7 @@ system::devices::keyboard() {
         layout)
             # Set keyboard layout
             if utils::has setxkbmap; then
-                setxkbmap "${value}" 2>/dev/null || true
+                utils::quiet_err setxkbmap "${value}" || true
                 log::info "Keyboard layout set to ${value}"
             else
                 log::warn "setxkbmap not available, cannot set keyboard layout"
@@ -145,21 +145,21 @@ system::devices::touchpad() {
             tap-to-click)
                 # Enable/disable tap to click
                 for touchpad in ${touchpads}; do
-                    xinput set-prop "${touchpad}" "libinput Tapping Enabled" "${bool_value}" 2>/dev/null || true
+                    utils::quiet_err xinput set-prop "${touchpad}" "libinput Tapping Enabled" "${bool_value}" || true
                 done
                 log::info "Touchpad tap-to-click set to ${value}"
                 ;;
             natural-scroll)
                 # Enable/disable natural scrolling
                 for touchpad in ${touchpads}; do
-                    xinput set-prop "${touchpad}" "libinput Natural Scrolling Enabled" "${bool_value}" 2>/dev/null || true
+                    utils::quiet_err xinput set-prop "${touchpad}" "libinput Natural Scrolling Enabled" "${bool_value}" || true
                 done
                 log::info "Touchpad natural scrolling set to ${value}"
                 ;;
             disable-while-typing)
                 # Enable/disable disable-while-typing
                 for touchpad in ${touchpads}; do
-                    xinput set-prop "${touchpad}" "libinput Disable While Typing Enabled" "${bool_value}" 2>/dev/null || true
+                    utils::quiet_err xinput set-prop "${touchpad}" "libinput Disable While Typing Enabled" "${bool_value}" || true
                 done
                 log::info "Touchpad disable-while-typing set to ${value}"
                 ;;
@@ -180,15 +180,15 @@ system::devices::touchpad() {
 system::devices::list() {
     # For X11 systems
     if utils::has xinput; then
-        xinput list 2>/dev/null || true
+        utils::quiet_err xinput list || true
     else
         # Fallback to lsinput if available
         if utils::has lsinput; then
-            lsinput 2>/dev/null || true
+            utils::quiet_err lsinput || true
         else
             # Fallback to /proc/bus/input/devices
             if [[ -f "/proc/bus/input/devices" ]]; then
-                cat /proc/bus/input/devices 2>/dev/null || true
+                utils::quiet_err cat /proc/bus/input/devices || true
             else
                 log::warn "No method available to list input devices"
                 return 1
@@ -216,22 +216,22 @@ system::devices::audio() {
         case "${setting}" in
             volume)
                 # Set volume
-                pactl set-sink-volume @DEFAULT_SINK@ "${value}%" 2>/dev/null || true
+                utils::quiet_err pactl set-sink-volume @DEFAULT_SINK@ "${value}%" || true
                 log::info "Audio volume set to ${value}%"
                 ;;
             mute)
                 # Mute/unmute
                 if [[ "${value}" == "true" ]] || [[ "${value}" == "1" ]]; then
-                    pactl set-sink-mute @DEFAULT_SINK@ 1 2>/dev/null || true
+                    utils::quiet_err pactl set-sink-mute @DEFAULT_SINK@ 1 || true
                     log::info "Audio muted"
                 else
-                    pactl set-sink-mute @DEFAULT_SINK@ 0 2>/dev/null || true
+                    utils::quiet_err pactl set-sink-mute @DEFAULT_SINK@ 0 || true
                     log::info "Audio unmuted"
                 fi
                 ;;
             output-device)
                 # Set output device
-                pactl set-default-sink "${value}" 2>/dev/null || true
+                utils::quiet_err pactl set-default-sink "${value}" || true
                 log::info "Audio output device set to ${value}"
                 ;;
             *)
@@ -244,16 +244,16 @@ system::devices::audio() {
         case "${setting}" in
             volume)
                 # Set volume
-                amixer set Master "${value}%" 2>/dev/null || true
+                utils::quiet_err amixer set Master "${value}%" || true
                 log::info "Audio volume set to ${value}%"
                 ;;
             mute)
                 # Mute/unmute
                 if [[ "${value}" == "true" ]] || [[ "${value}" == "1" ]]; then
-                    amixer set Master mute 2>/dev/null || true
+                    utils::quiet_err amixer set Master mute || true
                     log::info "Audio muted"
                 else
-                    amixer set Master unmute 2>/dev/null || true
+                    utils::quiet_err amixer set Master unmute || true
                     log::info "Audio unmuted"
                 fi
                 ;;
@@ -291,16 +291,16 @@ system::devices::display() {
                 local primary=$(xrandr --query | grep " connected" | head -n 1 | awk '{print $1}')
                 if [[ -n "${primary}" ]]; then
                     # xrandr uses values from 0.0 to 1.0
-                    local brightness=$(echo "scale=2; ${value}/100" | bc 2>/dev/null || echo "0.${value}")
-                    xrandr --output "${primary}" --brightness "${brightness}" 2>/dev/null || true
+                    local brightness=$(echo "scale=2; ${value}/100" | utils::quiet_err bc || echo "0.${value}")
+                    utils::quiet_err xrandr --output "${primary}" --brightness "${brightness}" || true
                     log::info "Display brightness set to ${value}%"
                 fi
             # Try sysfs
             elif [[ -w "/sys/class/backlight/intel_backlight/brightness" ]]; then
                 # Calculate value based on max_brightness
                 local max_brightness=$(cat /sys/class/backlight/intel_backlight/max_brightness)
-                local brightness=$(echo "${value} * ${max_brightness} / 100" | bc 2>/dev/null || echo $((value * max_brightness / 100)))
-                echo "${brightness}" > /sys/class/backlight/intel_backlight/brightness 2>/dev/null || true
+                local brightness=$(echo "${value} * ${max_brightness} / 100" | utils::quiet_err bc || echo $((value * max_brightness / 100)))
+                utils::quiet_err echo "${brightness}" > /sys/class/backlight/intel_backlight/brightness || true
                 log::info "Display brightness set to ${value}%"
             else
                 log::warn "No method available to set display brightness"
@@ -310,7 +310,7 @@ system::devices::display() {
         primary)
             # Set primary display
             if utils::has xrandr; then
-                xrandr --output "${value}" --primary 2>/dev/null || true
+                utils::quiet_err xrandr --output "${value}" --primary || true
                 log::info "Primary display set to ${value}"
             else
                 log::warn "xrandr not available, cannot set primary display"
@@ -320,7 +320,7 @@ system::devices::display() {
         off)
             # Turn off display
             if utils::has xrandr; then
-                xrandr --output "${value}" --off 2>/dev/null || true
+                utils::quiet_err xrandr --output "${value}" --off || true
                 log::info "Display ${value} turned off"
             else
                 log::warn "xrandr not available, cannot turn off display"

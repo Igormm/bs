@@ -52,11 +52,11 @@ main() {
     # Создаем временный git репозиторий
     local temp_dir
     temp_dir=$(mktemp -d)
-    pushd "$temp_dir" >/dev/null 2>&1
+    utils::quiet pushd "$temp_dir"
     
-    git init >/dev/null 2>&1 || {
+    utils::quiet git init || {
         # popd и rm выполняются ниже в любом случае / popd and rm happen below anyway
-        log::warn "Git not available, skipping git tests" 2>/dev/null || true
+        utils::quiet_err log::warn "Git not available, skipping git tests" || true
     }
     
     if [[ -d .git ]]; then
@@ -70,14 +70,14 @@ main() {
         # Create a file and commit (identity scoped to this commit only:
         # clean environments/containers have no user.name configured)
         echo "test" > test.txt
-        git add test.txt >/dev/null 2>&1
-        git -c user.name="BS Test" -c user.email="bs-test@localhost" commit -m "Test commit" >/dev/null 2>&1
+        utils::quiet git add test.txt
+        utils::quiet git -c user.name="BS Test" -c user.email="bs-test@localhost" commit -m "Test commit"
         
         git_info=$(ps1config::git_info)
         testframework::assert_true "${#git_info} -gt 0" "Git info with commit"
     fi
     
-    popd >/dev/null 2>&1
+    utils::quiet popd
     rm -rf "$temp_dir"
     
     # Тест 4: SSH обнаружение
@@ -87,7 +87,7 @@ main() {
     local original_ssh_client="${SSH_CLIENT:-}"
     
     # Тестируем без SSH
-    unset SSH_CLIENT 2>/dev/null || true
+    utils::quiet_err unset SSH_CLIENT || true
     ps1config::detect_ssh
     testframework::assert_equal "" "$PS1_CONFIG_SSH_INFO" "No SSH detected"
     
@@ -111,8 +111,8 @@ main() {
     local original_conda="${CONDA_DEFAULT_ENV:-}"
     
     # Без виртуального окружения
-    unset VIRTUAL_ENV 2>/dev/null || true
-    unset CONDA_DEFAULT_ENV 2>/dev/null || true
+    utils::quiet_err unset VIRTUAL_ENV || true
+    utils::quiet_err unset CONDA_DEFAULT_ENV || true
     ps1config::detect_virtualenv
     testframework::assert_equal "" "$PS1_CONFIG_VIRTUALENV_INFO" "No venv detected"
     

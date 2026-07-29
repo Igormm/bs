@@ -23,7 +23,7 @@ system::permissions::chmod() {
         return 1
     fi
     
-    if chmod "${permissions}" "${target}" 2>/dev/null; then
+    if utils::quiet_err chmod "${permissions}" "${target}"; then
         log::info "Permissions changed to ${permissions} for ${target}"
         return 0
     else
@@ -53,7 +53,7 @@ system::permissions::chown() {
         return 1
     fi
     
-    if chown "${owner}" "${target}" 2>/dev/null; then
+    if utils::quiet_err chown "${owner}" "${target}"; then
         log::info "Owner changed to ${owner} for ${target}"
         return 0
     else
@@ -132,12 +132,12 @@ system::permissions::view() {
     echo "=== Permissions for ${target} ==="
     
     # Use ls -l for detailed view / Использовать ls -l для детального просмотра
-    if command -v ls >/dev/null 2>&1; then
-        ls -ld "${target}" 2>/dev/null
+    if utils::has ls; then
+        utils::quiet_err ls -ld "${target}"
         
         # Parse and explain permissions / Разобрать и объяснить права доступа
         local perms
-        perms=$(ls -ld "${target}" 2>/dev/null | awk '{print $1}')
+        perms=$(utils::quiet_err ls -ld "${target}" | awk '{print $1}')
         
         if [[ -n "${perms}" ]]; then
             echo ""
@@ -150,14 +150,14 @@ system::permissions::view() {
         
         # Show numeric permissions / Показать числовые права доступа
         local numeric
-        numeric=$(stat -c "%a" "${target}" 2>/dev/null || stat -f "%OLp" "${target}" 2>/dev/null)
+        numeric=$(utils::quiet_err stat -c "%a" "${target}" || utils::quiet_err stat -f "%OLp" "${target}")
         if [[ -n "${numeric}" ]]; then
             echo "  Numeric: ${numeric}"
         fi
         
         # Show owner and group / Показать владельца и группу
         local owner_info
-        owner_info=$(ls -ld "${target}" 2>/dev/null | awk '{print $3":"$4}')
+        owner_info=$(utils::quiet_err ls -ld "${target}" | awk '{print $3":"$4}')
         if [[ -n "${owner_info}" ]]; then
             echo "  Owner:Group: ${owner_info}"
         fi
@@ -186,7 +186,7 @@ system::permissions::recursive() {
         return 1
     fi
     
-    if chmod -R "${permissions}" "${target}" 2>/dev/null; then
+    if utils::quiet_err chmod -R "${permissions}" "${target}"; then
         log::info "Permissions changed recursively to ${permissions} for ${target}"
         return 0
     else
@@ -217,7 +217,7 @@ system::permissions::default() {
             ;;
     esac
     
-    if umask "${umask_octal}" 2>/dev/null; then
+    if utils::quiet_err umask "${umask_octal}"; then
         log::info "Default umask set to ${umask_octal}"
         return 0
     else
@@ -243,7 +243,7 @@ system::permissions::sticky() {
         return 1
     fi
     
-    if chmod +t "${target}" 2>/dev/null; then
+    if utils::quiet_err chmod +t "${target}"; then
         log::info "Sticky bit set on ${target}"
         return 0
     else
@@ -269,7 +269,7 @@ system::permissions::setuid() {
         return 1
     fi
     
-    if chmod u+s "${target}" 2>/dev/null; then
+    if utils::quiet_err chmod u+s "${target}"; then
         log::info "Setuid bit set on ${target}"
         log::warn "Setuid files can be security risks. Use with caution!"
         return 0
@@ -296,7 +296,7 @@ system::permissions::setgid() {
         return 1
     fi
     
-    if chmod g+s "${target}" 2>/dev/null; then
+    if utils::quiet_err chmod g+s "${target}"; then
         log::info "Setgid bit set on ${target}"
         return 0
     else

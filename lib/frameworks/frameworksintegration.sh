@@ -322,7 +322,7 @@ frameworks::bashit::plugins::git::load() {
     }
     
     git_current_sha() {
-        git rev-parse HEAD 2>/dev/null | cut -c1-7 || echo "unknown"
+        utils::quiet_err git rev-parse HEAD | cut -c1-7 || echo "unknown"
     }
     
     # Git prompt

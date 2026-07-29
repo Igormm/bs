@@ -46,7 +46,7 @@ PS1_CONFIG_THEME_RAINBOW="\[\033[38;5;196m\]\u\[\033[38;5;214m\]@\[\033[38;5;226
 # @example
 #   ps1config::init
 ps1config::init() {
-    log::debug "Initializing PS1 config module" 2>/dev/null || true
+    utils::quiet_err log::debug "Initializing PS1 config module" || true
     
     # Устанавливаем тему по умолчанию
     # Set default theme
@@ -64,7 +64,7 @@ ps1config::init() {
     # Set up update on each command
     ps1config::setup_prompt_command
     
-    log::info "PS1 config module initialized" 2>/dev/null || true
+    utils::quiet_err log::info "PS1 config module initialized" || true
 }
 
 # ==========================================
@@ -96,13 +96,13 @@ ps1config::set_theme() {
             PS1="$PS1_CONFIG_THEME_RAINBOW"
             ;;
         *)
-            log::warn "Unknown theme: $theme, using default" 2>/dev/null || true
+            utils::quiet_err log::warn "Unknown theme: $theme, using default" || true
             PS1="$PS1_CONFIG_THEME_DEFAULT"
             ;;
     esac
     
     PS1_CONFIG_CURRENT_THEME="$theme"
-    log::info "PS1 theme set to: $theme" 2>/dev/null || true
+    utils::quiet_err log::info "PS1 theme set to: $theme" || true
 }
 
 # @description List available themes
@@ -112,7 +112,7 @@ ps1config::set_theme() {
 ps1config::list_themes() {
     local themes=("default" "powerline" "minimal" "time" "rainbow")
     
-    log::info "Available PS1 themes:" 2>/dev/null || true
+    utils::quiet_err log::info "Available PS1 themes:" || true
     for theme in "${themes[@]}"; do
         if [[ "$theme" == "$PS1_CONFIG_CURRENT_THEME" ]]; then
             echo -e "  ${COLOR_GREEN}● $theme (current)${COLOR_RESET}"
@@ -132,16 +132,16 @@ ps1config::list_themes() {
 # @example
 #   ps1config::git_info
 ps1config::git_info() {
-    if [[ -d .git ]] || git rev-parse --git-dir >/dev/null 2>&1; then
+    if [[ -d .git ]] || utils::quiet git rev-parse --git-dir; then
         local branch
-        branch=$(git symbolic-ref --short HEAD 2>/dev/null || git describe --tags --exact-match 2>/dev/null)
+        branch=$(utils::quiet_err git symbolic-ref --short HEAD || utils::quiet_err git describe --tags --exact-match)
         
         if [[ -n "$branch" ]]; then
             local git_status=""
             
             # Проверяем состояние репозитория
             # Check repository status
-            if [[ -n $(git status --porcelain 2>/dev/null) ]]; then
+            if [[ -n $(utils::quiet_err git status --porcelain) ]]; then
                 git_status="*"  # Есть изменения / Has changes
             fi
             
@@ -160,10 +160,10 @@ ps1config::set_git_info() {
     
     if [[ "$enabled" == "true" ]]; then
         PS1_CONFIG_GIT_INFO="\$(ps1config::git_info)"
-        log::info "Git info enabled in PS1" 2>/dev/null || true
+        utils::quiet_err log::info "Git info enabled in PS1" || true
     else
         PS1_CONFIG_GIT_INFO=""
-        log::info "Git info disabled in PS1" 2>/dev/null || true
+        utils::quiet_err log::info "Git info disabled in PS1" || true
     fi
 }
 
@@ -215,7 +215,7 @@ ps1config::detect_virtualenv() {
 ps1config::set_time_format() {
     local format="${1:-%H:%M:%S}"
     PS1_CONFIG_TIME_FORMAT="$format"
-    log::info "Time format set to: $format" 2>/dev/null || true
+    utils::quiet_err log::info "Time format set to: $format" || true
 }
 
 # ==========================================
@@ -284,7 +284,7 @@ ps1config::get_current_theme() {
 ps1config::reset() {
     PS1="\[\033[01;32m\]\u\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ "
     PS1_CONFIG_CURRENT_THEME="default"
-    log::info "PS1 reset to default" 2>/dev/null || true
+    utils::quiet_err log::info "PS1 reset to default" || true
 }
 
 # @description Show PS1 configuration demo
@@ -292,8 +292,8 @@ ps1config::reset() {
 # @example
 #   ps1config::demo
 ps1config::demo() {
-    log::header "PS1 Configuration Demo" 2>/dev/null || true
-    log::header "Демо конфигурации PS1" 2>/dev/null || true
+    utils::quiet_err log::header "PS1 Configuration Demo" || true
+    utils::quiet_err log::header "Демо конфигурации PS1" || true
     
     echo
     echo -e "${COLOR_BLUE}Available themes / Доступные темы:${COLOR_RESET}"
@@ -339,8 +339,8 @@ ps1config::enable_advanced() {
     # Set powerline theme
     ps1config::set_theme "powerline"
     
-    log::info "Advanced PS1 features enabled" 2>/dev/null || true
-    log::info "Расширенные функции PS1 включены" 2>/dev/null || true
+    utils::quiet_err log::info "Advanced PS1 features enabled" || true
+    utils::quiet_err log::info "Расширенные функции PS1 включены" || true
 }
 
 # @description Disable all PS1 enhancements
@@ -355,8 +355,8 @@ ps1config::disable_enhancements() {
     # Clear PROMPT_COMMAND
     PROMPT_COMMAND=""
     
-    log::info "PS1 enhancements disabled" 2>/dev/null || true
-    log::info "Улучшения PS1 отключены" 2>/dev/null || true
+    utils::quiet_err log::info "PS1 enhancements disabled" || true
+    utils::quiet_err log::info "Улучшения PS1 отключены" || true
 }
 
 # ==========================================

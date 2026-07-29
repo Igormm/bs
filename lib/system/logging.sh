@@ -11,15 +11,15 @@ system::logging::configure() {
     local log_level="${1:-info}"
     
     # For systemd-based systems / Для систем на базе systemd
-    if command -v journalctl >/dev/null 2>&1; then
+    if utils::has journalctl; then
         # Set log level for journald / Установить уровень логирования для journald
         if [[ -f "/etc/systemd/journald.conf" ]]; then
-            sed -i "s/^#MaxLevelStore=.*/MaxLevelStore=${log_level}/" /etc/systemd/journald.conf 2>/dev/null || true
-            sed -i "s/^#MaxLevelSyslog=.*/MaxLevelSyslog=${log_level}/" /etc/systemd/journald.conf 2>/dev/null || true
+            utils::quiet_err sed -i "s/^#MaxLevelStore=.*/MaxLevelStore=${log_level}/" /etc/systemd/journald.conf || true
+            utils::quiet_err sed -i "s/^#MaxLevelSyslog=.*/MaxLevelSyslog=${log_level}/" /etc/systemd/journald.conf || true
             # Restart journald to apply changes / Перезапустить journald для применения
             # изменений
-            if command -v systemctl >/dev/null 2>&1; then
-                systemctl restart systemd-journald 2>/dev/null || true
+            if utils::has systemctl; then
+                utils::quiet_err systemctl restart systemd-journald || true
             fi
         fi
         log::info "System logging configured with level: ${log_level}"
@@ -27,13 +27,13 @@ system::logging::configure() {
         # For sysvinit systems with rsyslog / Для систем sysvinit с rsyslog
         if [[ -f "/etc/rsyslog.conf" ]]; then
             # Set log level in rsyslog / Установить уровень логирования в rsyslog
-            sed -i "s/^\$SystemLogRateLimitInterval.*/\$SystemLogRateLimitInterval 0/" /etc/rsyslog.conf 2>/dev/null || true
+            utils::quiet_err sed -i "s/^\$SystemLogRateLimitInterval.*/\$SystemLogRateLimitInterval 0/" /etc/rsyslog.conf || true
             # Restart rsyslog to apply changes / Перезапустить rsyslog для применения
             # изменений
-            if command -v systemctl >/dev/null 2>&1; then
-                systemctl restart rsyslog 2>/dev/null || true
-            elif command -v service >/dev/null 2>&1; then
-                service rsyslog restart 2>/dev/null || true
+            if utils::has systemctl; then
+                utils::quiet_err systemctl restart rsyslog || true
+            elif utils::has service; then
+                utils::quiet_err service rsyslog restart || true
             fi
         fi
         log::info "RSyslog configured"
@@ -85,11 +85,11 @@ system::logging::view() {
     local service="${2}"
     
     # For systemd-based systems
-    if command -v journalctl >/dev/null 2>&1; then
+    if utils::has journalctl; then
         if [[ -n "${service}" ]]; then
-            journalctl -u "${service}" -n "${lines}" -f 2>/dev/null || true
+            utils::quiet_err journalctl -u "${service}" -n "${lines}" -f || true
         else
-            journalctl -n "${lines}" -f 2>/dev/null || true
+            utils::quiet_err journalctl -n "${lines}" -f || true
         fi
     else
         # For sysvinit systems
@@ -102,7 +102,7 @@ system::logging::view() {
         fi
         
         if [[ -f "${log_file}" ]]; then
-            tail -n "${lines}" "${log_file}" 2>/dev/null || true
+            utils::quiet_err tail -n "${lines}" "${log_file}" || true
         else
             log::warn "Log file ${log_file} not found"
             return 1
@@ -130,10 +130,10 @@ system::logging::remote() {
         echo "*.* @${server_ip}:${server_port}" >> /etc/rsyslog.conf
         
         # Restart rsyslog to apply changes
-        if command -v systemctl >/dev/null 2>&1; then
-            systemctl restart rsyslog 2>/dev/null || true
-        elif command -v service >/dev/null 2>&1; then
-            service rsyslog restart 2>/dev/null || true
+        if utils::has systemctl; then
+            utils::quiet_err systemctl restart rsyslog || true
+        elif utils::has service; then
+            utils::quiet_err service rsyslog restart || true
         fi
         
         log::info "Remote logging configured to ${server_ip}:${server_port}"
@@ -152,18 +152,18 @@ system::logging::audit() {
     
     if [[ "${enable}" == "true" ]]; then
         # Install auditd if not present
-        if command -v apt >/dev/null 2>&1; then
-            apt install -y auditd 2>/dev/null || true
-        elif command -v yum >/dev/null 2>&1; then
-            yum install -y audit 2>/dev/null || true
-        elif command -v dnf >/dev/null 2>&1; then
-            dnf install -y audit 2>/dev/null || true
+        if utils::has apt; then
+            utils::quiet_err apt install -y auditd || true
+        elif utils::has yum; then
+            utils::quiet_err yum install -y audit || true
+        elif utils::has dnf; then
+            utils::quiet_err dnf install -y audit || true
         fi
         
         # Enable and start auditd service
-        if command -v systemctl >/dev/null 2>&1; then
-            systemctl enable auditd 2>/dev/null || true
-            systemctl start auditd 2>/dev/null || true
+        if utils::has systemctl; then
+            utils::quiet_err systemctl enable auditd || true
+            utils::quiet_err systemctl start auditd || true
         fi
         
         # Basic audit rules
@@ -182,20 +182,20 @@ system::logging::audit() {
 EOF
         
         # Load audit rules
-        if command -v augenrules >/dev/null 2>&1; then
-            augenrules --load 2>/dev/null || true
+        if utils::has augenrules; then
+            utils::quiet_err augenrules --load || true
         fi
         
         log::info "Audit logging enabled"
     else
         # Stop and disable auditd service
-        if command -v systemctl >/dev/null 2>&1; then
-            systemctl stop auditd 2>/dev/null || true
-            systemctl disable auditd 2>/dev/null || true
+        if utils::has systemctl; then
+            utils::quiet_err systemctl stop auditd || true
+            utils::quiet_err systemctl disable auditd || true
         fi
         
         # Remove BS audit rules
-        rm -f /etc/audit/rules.d/BS.rules 2>/dev/null || true
+        utils::quiet_err rm -f /etc/audit/rules.d/BS.rules || true
         
         log::info "Audit logging disabled"
     fi
@@ -221,7 +221,7 @@ system::logging::permissions() {
     
     # Set default group if not specified
     if [[ -z "${group}" ]]; then
-        if getent group adm >/dev/null 2>&1; then
+        if utils::quiet getent group adm; then
             group="adm"
         else
             group="root"
@@ -230,8 +230,8 @@ system::logging::permissions() {
     
     # Set permissions
     if [[ -f "${log_file}" ]]; then
-        chmod "${permissions}" "${log_file}" 2>/dev/null || true
-        chown "${owner}:${group}" "${log_file}" 2>/dev/null || true
+        utils::quiet_err chmod "${permissions}" "${log_file}" || true
+        utils::quiet_err chown "${owner}:${group}" "${log_file}" || true
         log::info "Permissions set for ${log_file}: ${permissions}, owner: ${owner}, group: ${group}"
     else
         log::warn "Log file ${log_file} not found"
@@ -254,7 +254,7 @@ system::logging::clean() {
     fi
     
     # Find and remove old log files
-    find "${directory}" -name "*.log.*" -type f -mtime +${age} -delete 2>/dev/null || true
+    utils::quiet_err find "${directory}" -name "*.log.*" -type f -mtime +${age} -delete || true
     
     log::info "Old log files cleaned from ${directory} (older than ${age} days)"
 }

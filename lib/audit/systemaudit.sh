@@ -363,14 +363,14 @@ systemaudit::security::check_firewall_status() {
     
     # Check firewalld (RHEL/CentOS/Fedora)
     if utils::has firewall-cmd; then
-        if firewall-cmd --state 2>/dev/null | grep -q "running"; then
+        if utils::quiet_err firewall-cmd --state | grep -q "running"; then
             firewall_active=true
         fi
     fi
     
     # Check iptables
     if utils::has iptables; then
-        if iptables -L 2>/dev/null | grep -q "ACCEPT\|DROP\|REJECT"; then
+        if utils::quiet_err iptables -L | grep -q "ACCEPT\|DROP\|REJECT"; then
             firewall_active=true
         fi
     fi
@@ -408,7 +408,7 @@ systemaudit::security::check_selinux_apparmor() {
     
     # Check AppArmor
     if utils::has aa-status; then
-        if ! aa-status 2>/dev/null | grep -q "profiles are loaded"; then
+        if ! utils::quiet_err aa-status | grep -q "profiles are loaded"; then
             finding=$(systemaudit::create_finding \
                 "AppArmor is not active" \
                 "AppArmor provides application confinement" \
@@ -447,7 +447,7 @@ systemaudit::security::check_suid_files() {
     
     # Find SUID files
     local suid_files
-    suid_files=$(find / -type f -perm -4000 2>/dev/null | head -20)
+    suid_files=$(utils::quiet_err find / -type f -perm -4000 | head -20)
     
     local suid_count
     suid_count=$(echo "${suid_files}" | wc -l)
@@ -469,7 +469,7 @@ systemaudit::security::check_world_writable_dirs() {
     
     # Find world-writable directories
     local world_writable
-    world_writable=$(find / -type d -perm -o+w 2>/dev/null | grep -v "/proc\|/sys\|/tmp" | head -10)
+    world_writable=$(utils::quiet_err find / -type d -perm -o+w | grep -v "/proc\|/sys\|/tmp" | head -10)
     
     if [[ -n "${world_writable}" ]]; then
         finding=$(systemaudit::create_finding \
@@ -605,7 +605,7 @@ systemaudit::users::check_home_permissions() {
     
     # Check for world-readable home directories
     local world_readable_homes
-    world_readable_homes=$(find /home -type d -perm -o+r 2>/dev/null | head -10)
+    world_readable_homes=$(utils::quiet_err find /home -type d -perm -o+r | head -10)
     
     if [[ -n "${world_readable_homes}" ]]; then
         finding=$(systemaudit::create_finding \
@@ -774,7 +774,7 @@ systemaudit::filesystem::check_world_writable() {
     
     # Find world-writable files (excluding /proc, /sys, /tmp)
     local world_writable_files
-    world_writable_files=$(find / -type f -perm -o+w 2>/dev/null | \
+    world_writable_files=$(utils::quiet_err find / -type f -perm -o+w | \
         grep -v "/proc\|/sys\|/tmp\|/dev/shm" | head -20)
     
     if [[ -n "${world_writable_files}" ]]; then
@@ -794,7 +794,7 @@ systemaudit::filesystem::check_suid_files() {
     
     # Get detailed SUID file information
     local suid_files
-    suid_files=$(find / -type f -perm -4000 -ls 2>/dev/null | head -10)
+    suid_files=$(utils::quiet_err find / -type f -perm -4000 -ls | head -10)
     
     if [[ -n "${suid_files}" ]]; then
         # This is informational - SUID files are normal but should be monitored
@@ -1316,9 +1316,9 @@ systemaudit::create_baseline() {
     baseline="${baseline} \"hostname\": \"$(hostname)\","
     baseline="${baseline} \"kernel\": \"$(uname -r)\","
     baseline="${baseline} \"users\": $(getent passwd | wc -l),"
-    baseline="${baseline} \"listening_ports\": $(ss -tuln 2>/dev/null | grep LISTEN | wc -l || echo 0),"
-    baseline="${baseline} \"suid_files\": $(find / -type f -perm -4000 2>/dev/null | wc -l || echo 0),"
-    baseline="${baseline} \"world_writable_files\": $(find / -type f -perm -o+w 2>/dev/null | wc -l || echo 0)"
+    baseline="${baseline} \"listening_ports\": $(utils::quiet_err ss -tuln | grep LISTEN | wc -l || echo 0),"
+    baseline="${baseline} \"suid_files\": $(utils::quiet_err find / -type f -perm -4000 | wc -l || echo 0),"
+    baseline="${baseline} \"world_writable_files\": $(utils::quiet_err find / -type f -perm -o+w | wc -l || echo 0)"
     baseline="${baseline} }"
     
     echo "${baseline}" > "${AUDIT_BASELINE_FILE}"

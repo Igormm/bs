@@ -21,6 +21,8 @@ consistent code style and with zero external dependencies.
 - **`lib/io/streams`** — безопасный вывод, перенаправления, save/restore FD,
   pipe, буферизация stdio, `/dev` спецфайлы
 - **`core/logger`** — уровни, цвета, форматы text/json/structured
+- **`core/utils`** — идиомы тишины: `utils::has`, `utils::quiet`,
+  `utils::quiet_err`, `utils::ignore` вместо ручных `>/dev/null 2>&1`
 - **`lib/system/*`** — дистрибутивы, пакеты, пользователи, сервисы, сеть,
   устройства (20+ модулей)
 - **Тесты и CI** — свой тест-фреймворк, ShellCheck, матрица
@@ -70,7 +72,7 @@ lib/                # io, system, ui, network, data, integration, ...
 install/            # модульный установщик / modular installer
 tests/              # тест-фреймворк и наборы тестов / test framework & suites
 examples/           # примеры (bs run examples/...) 
-documentation/      # руководства и справочники / guides and references
+documentation/      # документация: en/ и ru/ (+ archive/) / docs: en/ & ru/ (+ archive/)
 ```
 
 ## Тестирование / Testing
@@ -86,10 +88,18 @@ ubuntu, debian:stable, almalinux:9, almalinux:8 — см. `.github/workflows/ci.
 
 ## Документация / Documentation
 
-- `documentation/01-getting-started` — начало работы
-- `documentation/03-modules` — обзоры модулей
-- `documentation/code-style-guide.md` — стиль кода проекта
-- `examples/` — рабочие примеры с комментариями
+Полная документация на двух языках / Full documentation in two languages:
+
+- **[documentation/ru/](documentation/ru/README.md)** — русская документация
+- **[documentation/en/](documentation/en/README.md)** — English documentation
+
+Точки входа / Entry points:
+
+- Начало работы / Getting started — [ru](documentation/ru/01-getting-started/README.md) · [en](documentation/en/01-getting-started/README.md)
+- Архитектура / Architecture — [ru](documentation/ru/02-core-concepts/architecture.md) · [en](documentation/en/02-core-concepts/architecture.md)
+- Идиомы тишины `utils::quiet*` / Silence idioms — [ru](documentation/ru/03-modules/core-utils.md) · [en](documentation/en/03-modules/core-utils.md)
+- Стиль кода / Code style — [ru](documentation/ru/code-style-guide.md) · [en](documentation/en/code-style-guide.md)
+- `examples/` — рабочие примеры с комментариями / working examples with comments
 
 ## Лицензия / License
 

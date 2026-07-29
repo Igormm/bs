@@ -147,7 +147,7 @@ test_quick_audit() {
     
     export -f ps free uptime
     
-    if systemaudit::run_quick >/dev/null 2>&1; then
+    if utils::quiet systemaudit::run_quick; then
         test_pass
     else
         test_fail
@@ -201,7 +201,7 @@ EOF
     
     export -f grep command
     
-    if systemaudit::run_full >/dev/null 2>&1; then
+    if utils::quiet systemaudit::run_full; then
         test_pass
     else
         test_fail
@@ -288,14 +288,14 @@ EOF
     
     # Mock functions
     [[ -f /etc/ssh/sshd_config ]] && mv /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
-    cp /tmp/test_audit/etc/sshd_config /etc/ssh/sshd_config 2>/dev/null || true
+    utils::quiet_err cp /tmp/test_audit/etc/sshd_config /etc/ssh/sshd_config || true
     
     systemaudit::security::check_root_login
     systemaudit::security::check_password_policy
     systemaudit::security::check_ssh_config
     
     # Restore original
-    [[ -f /etc/ssh/sshd_config.bak ]] && mv /etc/ssh/sshd_config.bak /etc/ssh/sshd_config 2>/dev/null || true
+    [[ -f /etc/ssh/sshd_config.bak ]] && utils::quiet_err mv /etc/ssh/sshd_config.bak /etc/ssh/sshd_config || true
     
     rm -rf /tmp/test_audit
     
@@ -399,15 +399,15 @@ EOF
     
     # Mock pwquality.conf location
     if [[ -f /etc/security/pwquality.conf ]]; then
-        mv /etc/security/pwquality.conf /etc/security/pwquality.conf.bak 2>/dev/null || true
+        utils::quiet_err mv /etc/security/pwquality.conf /etc/security/pwquality.conf.bak || true
     fi
-    cp /tmp/test_audit/etc/security/pwquality.conf /etc/security/pwquality.conf 2>/dev/null || true
+    utils::quiet_err cp /tmp/test_audit/etc/security/pwquality.conf /etc/security/pwquality.conf || true
     
     systemaudit::compliance::check_password_complexity
     
     # Restore
     if [[ -f /etc/security/pwquality.conf.bak ]]; then
-        mv /etc/security/pwquality.conf.bak /etc/security/pwquality.conf 2>/dev/null || true
+        utils::quiet_err mv /etc/security/pwquality.conf.bak /etc/security/pwquality.conf || true
     fi
     
     rm -rf /tmp/test_audit
@@ -483,7 +483,7 @@ cleanup() {
     log::info "Cleaning up test artifacts..."
     
     # Clean up test files (изолированный HOME / isolated HOME)
-    rm -rf "${TEST_HOME:-}" 2>/dev/null || true
+    utils::quiet_err rm -rf "${TEST_HOME:-}" || true
     
     log::debug "Cleanup completed"
 }

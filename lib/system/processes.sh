@@ -6,13 +6,13 @@
 # @example
 #   system::processes::list
 system::processes::list() {
-    if command -v ps >/dev/null 2>&1; then
+    if utils::has ps; then
         # Modern ps with wide output / Современный ps с широким выводом
-        if ps aux 2>/dev/null | head -1; then
-            ps aux 2>/dev/null | tail -n +2
+        if utils::quiet_err ps aux | head -1; then
+            utils::quiet_err ps aux | tail -n +2
         # Fallback to basic ps / Резервный вариант базового ps
         else
-            ps -ef 2>/dev/null
+            utils::quiet_err ps -ef
         fi
     else
         log::error "ps command not found"
@@ -32,17 +32,17 @@ system::processes::find() {
         return 1
     fi
     
-    if command -v pgrep >/dev/null 2>&1; then
+    if utils::has pgrep; then
         local pids
-        pids=$(pgrep -f "${pattern}" 2>/dev/null)
+        pids=$(utils::quiet_err pgrep -f "${pattern}")
         if [[ -n "${pids}" ]]; then
-            ps -p "${pids}" -o pid,user,comm,args 2>/dev/null
+            utils::quiet_err ps -p "${pids}" -o pid,user,comm,args
         else
             log::info "No processes found matching '${pattern}'"
             return 1
         fi
-    elif command -v ps >/dev/null 2>&1; then
-        ps aux 2>/dev/null | grep -i "${pattern}" | grep -v grep
+    elif utils::has ps; then
+        utils::quiet_err ps aux | grep -i "${pattern}" | grep -v grep
     else
         log::error "pgrep or ps command not found"
         return 1
@@ -65,13 +65,13 @@ system::processes::kill() {
     fi
     
     # Check if process exists
-    if ! ps -p "${pid}" >/dev/null 2>&1; then
+    if ! utils::quiet ps -p "${pid}"; then
         log::warn "Process ${pid} does not exist"
         return 1
     fi
     
-    if command -v kill >/dev/null 2>&1; then
-        if kill -${signal} "${pid}" 2>/dev/null; then
+    if utils::has kill; then
+        if utils::quiet_err kill -${signal} "${pid}"; then
             log::info "Sent ${signal} signal to process ${pid}"
             return 0
         else
@@ -100,13 +100,13 @@ system::processes::kill_by_name() {
     fi
     
     local pids
-    if command -v pgrep >/dev/null 2>&1; then
-        pids=$(pgrep -f "${pattern}" 2>/dev/null)
-    elif command -v pidof >/dev/null 2>&1; then
-        pids=$(pidof "${pattern}" 2>/dev/null)
+    if utils::has pgrep; then
+        pids=$(utils::quiet_err pgrep -f "${pattern}")
+    elif utils::has pidof; then
+        pids=$(utils::quiet_err pidof "${pattern}")
     else
         # Fallback using ps and grep / Резервный вариант с использованием ps и grep
-        pids=$(ps aux 2>/dev/null | grep -i "${pattern}" | grep -v grep | awk '{print $2}')
+        pids=$(utils::quiet_err ps aux | grep -i "${pattern}" | grep -v grep | awk '{print $2}')
     fi
     
     if [[ -z "${pids}" ]]; then
@@ -116,7 +116,7 @@ system::processes::kill_by_name() {
     
     local killed=0
     for pid in ${pids}; do
-        if system::processes::kill "${pid}" "${signal}" 2>/dev/null; then
+        if utils::quiet_err system::processes::kill "${pid}" "${signal}"; then
             killed=$((killed + 1))
         fi
     done
@@ -134,11 +134,11 @@ system::processes::kill_by_name() {
 # @example
 #   system::processes::tree
 system::processes::tree() {
-    if command -v pstree >/dev/null 2>&1; then
-        pstree -p 2>/dev/null
-    elif command -v ps >/dev/null 2>&1; then
+    if utils::has pstree; then
+        utils::quiet_err pstree -p
+    elif utils::has ps; then
         # Simple tree using ps / Простое дерево с использованием ps
-        ps auxf 2>/dev/null | head -20
+        utils::quiet_err ps auxf | head -20
         log::info "Full tree view requires pstree command"
     else
         log::error "pstree or ps command not found"
@@ -154,10 +154,10 @@ system::processes::tree() {
 system::processes::cpu_top() {
     local count="${1:-10}"
     
-    if command -v top >/dev/null 2>&1; then
-        top -bn1 | head -n $((count + 7)) | tail -n +8 2>/dev/null
-    elif command -v ps >/dev/null 2>&1; then
-        ps aux --sort=-%cpu 2>/dev/null | head -n $((count + 1)) | tail -n +2
+    if utils::has top; then
+        top -bn1 | head -n $((count + 7)) | utils::quiet_err tail -n +8
+    elif utils::has ps; then
+        utils::quiet_err ps aux --sort=-%cpu | head -n $((count + 1)) | tail -n +2
     else
         log::error "top or ps command not found"
         return 1
@@ -172,10 +172,10 @@ system::processes::cpu_top() {
 system::processes::memory_top() {
     local count="${1:-10}"
     
-    if command -v top >/dev/null 2>&1; then
-        top -bn1 -o %MEM | head -n $((count + 7)) | tail -n +8 2>/dev/null
-    elif command -v ps >/dev/null 2>&1; then
-        ps aux --sort=-%mem 2>/dev/null | head -n $((count + 1)) | tail -n +2
+    if utils::has top; then
+        top -bn1 -o %MEM | head -n $((count + 7)) | utils::quiet_err tail -n +8
+    elif utils::has ps; then
+        utils::quiet_err ps aux --sort=-%mem | head -n $((count + 1)) | tail -n +2
     else
         log::error "top or ps command not found"
         return 1
@@ -195,9 +195,9 @@ system::processes::port() {
     fi
     
     # Try lsof first / Попробовать lsof сначала
-    if command -v lsof >/dev/null 2>&1; then
+    if utils::has lsof; then
         local result
-        result=$(lsof -i :"${port}" 2>/dev/null)
+        result=$(utils::quiet_err lsof -i :"${port}")
         if [[ -n "${result}" ]]; then
             echo "${result}"
             return 0
@@ -206,9 +206,9 @@ system::processes::port() {
             return 1
         fi
     # Try netstat / Попробовать netstat
-    elif command -v netstat >/dev/null 2>&1; then
+    elif utils::has netstat; then
         local result
-        result=$(netstat -tulpn 2>/dev/null | grep ":${port} ")
+        result=$(utils::quiet_err netstat -tulpn | grep ":${port} ")
         if [[ -n "${result}" ]]; then
             echo "${result}"
             return 0
@@ -218,9 +218,9 @@ system::processes::port() {
         fi
     # Try ss (modern replacement for netstat) / Попробовать ss (современная замена
     # netstat)
-    elif command -v ss >/dev/null 2>&1; then
+    elif utils::has ss; then
         local result
-        result=$(ss -tulpn 2>/dev/null | grep ":${port} ")
+        result=$(utils::quiet_err ss -tulpn | grep ":${port} ")
         if [[ -n "${result}" ]]; then
             echo "${result}"
             return 0
@@ -247,14 +247,14 @@ system::processes::info() {
     fi
     
     # Check if process exists / Проверить, существует ли процесс
-    if ! ps -p "${pid}" >/dev/null 2>&1; then
+    if ! utils::quiet ps -p "${pid}"; then
         log::warn "Process ${pid} does not exist"
         return 1
     fi
     
-    if command -v ps >/dev/null 2>&1; then
+    if utils::has ps; then
         echo "=== Process Information (PID: ${pid}) ==="
-        ps -p "${pid}" -o pid,ppid,user,comm,cmd,etime,%cpu,%mem,stat 2>/dev/null
+        utils::quiet_err ps -p "${pid}" -o pid,ppid,user,comm,cmd,etime,%cpu,%mem,stat
     fi
     
     # Additional info from /proc if available / Дополнительная информация из /proc если
@@ -263,13 +263,13 @@ system::processes::info() {
         if [[ -r "/proc/${pid}/cmdline" ]]; then
             echo ""
             echo "Command line:"
-            cat /proc/${pid}/cmdline 2>/dev/null | tr '\0' ' ' && echo
+            utils::quiet_err cat /proc/${pid}/cmdline | tr '\0' ' ' && echo
         fi
         
         if [[ -r "/proc/${pid}/environ" ]]; then
             echo ""
             echo "Environment variables (first 5):"
-            cat /proc/${pid}/environ 2>/dev/null | tr '\0' '\n' | head -5
+            utils::quiet_err cat /proc/${pid}/environ | tr '\0' '\n' | head -5
         fi
     fi
 }

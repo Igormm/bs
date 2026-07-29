@@ -18,20 +18,20 @@ system::network::interface() {
     fi
     
     # Using ip command (modern approach) / Использование команды ip (современный подход)
-    if command -v ip >/dev/null 2>&1; then
+    if utils::has ip; then
         case "${action}" in
             up)
-                ip link set "${interface}" up 2>/dev/null || true
+                utils::quiet_err ip link set "${interface}" up || true
                 log::info "Interface ${interface} brought up"
                 ;;
             down)
-                ip link set "${interface}" down 2>/dev/null || true
+                utils::quiet_err ip link set "${interface}" down || true
                 log::info "Interface ${interface} brought down"
                 ;;
             restart)
-                ip link set "${interface}" down 2>/dev/null || true
+                utils::quiet_err ip link set "${interface}" down || true
                 sleep 1
-                ip link set "${interface}" up 2>/dev/null || true
+                utils::quiet_err ip link set "${interface}" up || true
                 log::info "Interface ${interface} restarted"
                 ;;
             *)
@@ -43,17 +43,17 @@ system::network::interface() {
         # Fallback to ifconfig / Резервный вариант ifconfig
         case "${action}" in
             up)
-                ifconfig "${interface}" up 2>/dev/null || true
+                utils::quiet_err ifconfig "${interface}" up || true
                 log::info "Interface ${interface} brought up"
                 ;;
             down)
-                ifconfig "${interface}" down 2>/dev/null || true
+                utils::quiet_err ifconfig "${interface}" down || true
                 log::info "Interface ${interface} brought down"
                 ;;
             restart)
-                ifconfig "${interface}" down 2>/dev/null || true
+                utils::quiet_err ifconfig "${interface}" down || true
                 sleep 1
-                ifconfig "${interface}" up 2>/dev/null || true
+                utils::quiet_err ifconfig "${interface}" up || true
                 log::info "Interface ${interface} restarted"
                 ;;
             *)
@@ -81,8 +81,8 @@ system::network::static_ip() {
     fi
     
     # Using ip command / Использование команды ip
-    if command -v ip >/dev/null 2>&1; then
-        ip addr add "${ip_address}" dev "${interface}" 2>/dev/null || true
+    if utils::has ip; then
+        utils::quiet_err ip addr add "${ip_address}" dev "${interface}" || true
         log::info "Static IP ${ip_address} assigned to ${interface}"
     else
         # Fallback to ifconfig / Резервный вариант ifconfig
@@ -99,7 +99,7 @@ system::network::static_ip() {
             netmask="255.0.0.0"
         fi
         
-        ifconfig "${interface}" "${ip}" netmask "${netmask}" 2>/dev/null || true
+        utils::quiet_err ifconfig "${interface}" "${ip}" netmask "${netmask}" || true
         log::info "Static IP ${ip} with netmask ${netmask} assigned to ${interface}"
     fi
 }
@@ -117,12 +117,12 @@ system::network::gateway() {
     fi
     
     # Using ip command / Использование команды ip
-    if command -v ip >/dev/null 2>&1; then
-        ip route add default via "${gateway}" 2>/dev/null || true
+    if utils::has ip; then
+        utils::quiet_err ip route add default via "${gateway}" || true
         log::info "Default gateway set to ${gateway}"
     else
         # Fallback to route / Резервный вариант route
-        route add default gw "${gateway}" 2>/dev/null || true
+        utils::quiet_err route add default gw "${gateway}" || true
         log::info "Default gateway set to ${gateway}"
     fi
 }
@@ -141,7 +141,7 @@ system::network::dns() {
     local resolv_conf="/etc/resolv.conf"
     if [[ -w "${resolv_conf}" ]]; then
         # Clear existing nameservers / Очистить существующие nameserver
-        sed -i '/^nameserver/d' "${resolv_conf}" 2>/dev/null || true
+        utils::quiet_err sed -i '/^nameserver/d' "${resolv_conf}" || true
         
         # Add new nameservers / Добавить новые nameserver
         for dns in "$@"; do
@@ -159,11 +159,11 @@ system::network::dns() {
 # @example
 #   system::network::list_interfaces
 system::network::list_interfaces() {
-    if command -v ip >/dev/null 2>&1; then
-        ip link show 2>/dev/null | awk -F': ' '/^[0-9]+: / {print $2}' | grep -v 'lo'
+    if utils::has ip; then
+        utils::quiet_err ip link show | awk -F': ' '/^[0-9]+: / {print $2}' | grep -v 'lo'
     else
         # Fallback to ifconfig / Резервный вариант ifconfig
-        ifconfig -a 2>/dev/null | awk '/^[a-zA-Z]/ {print $1}' | grep -v 'lo' | sed 's/://'
+        utils::quiet_err ifconfig -a | awk '/^[a-zA-Z]/ {print $1}' | grep -v 'lo' | sed 's/://'
     fi
 }
 
@@ -175,16 +175,16 @@ system::network::status() {
     local interface="${1:-}"
     
     if [[ -n "${interface}" ]]; then
-        if command -v ip >/dev/null 2>&1; then
-            ip addr show "${interface}" 2>/dev/null || true
+        if utils::has ip; then
+            utils::quiet_err ip addr show "${interface}" || true
         else
-            ifconfig "${interface}" 2>/dev/null || true
+            utils::quiet_err ifconfig "${interface}" || true
         fi
     else
-        if command -v ip >/dev/null 2>&1; then
-            ip addr show 2>/dev/null || true
+        if utils::has ip; then
+            utils::quiet_err ip addr show || true
         else
-            ifconfig 2>/dev/null || true
+            utils::quiet_err ifconfig || true
         fi
     fi
 }

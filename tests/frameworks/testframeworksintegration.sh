@@ -127,9 +127,9 @@ test_bashit_base_plugin() {
     frameworks::bashit::load_plugin "base"
     
     # Test aliases
-    if command -v .. >/dev/null 2>&1 && \
-       command -v ll >/dev/null 2>&1 && \
-       command -v psg >/dev/null 2>&1; then
+    if utils::has .. && \
+       utils::has ll && \
+       utils::has psg; then
         test_pass
     else
         test_fail
@@ -144,9 +144,9 @@ test_bashit_git_plugin() {
     frameworks::bashit::load_plugin "git"
     
     # Test git aliases
-    if command -v g >/dev/null 2>&1 && \
-       command -v gs >/dev/null 2>&1 && \
-       command -v ga >/dev/null 2>&1; then
+    if utils::has g && \
+       utils::has gs && \
+       utils::has ga; then
         test_pass
     else
         test_fail
@@ -177,7 +177,7 @@ test_bashit_extract_function() {
     frameworks::bashit::load_plugin "alias"
     
     # Test extract function
-    if command -v extract >/dev/null 2>&1; then
+    if utils::has extract; then
         test_pass
     else
         test_fail
@@ -353,7 +353,7 @@ test_mbfl_function_definition() {
     
     frameworks::mbfl::define_function "test_func" "echo 'test output'"
     
-    if command -v mbfl_test_func >/dev/null 2>&1 && \
+    if utils::has mbfl_test_func && \
        [[ "$(mbfl_test_func)" == "test output" ]]; then
         test_pass
     else
@@ -487,8 +487,8 @@ cleanup() {
     log::info "Cleaning up test artifacts..."
     
     # Clean up test files (изолированный HOME / isolated HOME)
-    rm -rf "${TEST_HOME:-}" 2>/dev/null || true
-    rm -rf "${FRAMEWORKS_CACHE_DIR:-}" 2>/dev/null || true
+    utils::quiet_err rm -rf "${TEST_HOME:-}" || true
+    utils::quiet_err rm -rf "${FRAMEWORKS_CACHE_DIR:-}" || true
     
     log::debug "Cleanup completed"
 }

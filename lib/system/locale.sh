@@ -11,17 +11,17 @@ system::locale::set() {
     local locale="${1:-en_US.UTF-8}"
     
     # For systemd-based systems / Для систем на базе systemd
-    if command -v localectl >/dev/null 2>&1; then
-        localectl set-locale "${locale}" 2>/dev/null || true
+    if utils::has localectl; then
+        utils::quiet_err localectl set-locale "${locale}" || true
     else
         # Fallback for non-systemd systems / Резервный вариант для систем без systemd
         if [[ -f "/etc/locale.gen" ]]; then
             # Uncomment the locale in /etc/locale.gen / Раскомментировать локаль в
             # /etc/locale.gen
-            sed -i "s/^#${locale}/${locale}/" /etc/locale.gen 2>/dev/null || true
+            utils::quiet_err sed -i "s/^#${locale}/${locale}/" /etc/locale.gen || true
             # Generate the locale / Сгенерировать локаль
-            if command -v locale-gen >/dev/null 2>&1; then
-                locale-gen 2>/dev/null || true
+            if utils::has locale-gen; then
+                utils::quiet_err locale-gen || true
             fi
         fi
         
@@ -40,10 +40,10 @@ system::locale::set() {
 # @example
 #   system::locale::list
 system::locale::list() {
-    if command -v localectl >/dev/null 2>&1; then
-        localectl list-locales 2>/dev/null || true
+    if utils::has localectl; then
+        utils::quiet_err localectl list-locales || true
     else
-        locale -a 2>/dev/null || true
+        utils::quiet_err locale -a || true
     fi
 }
 

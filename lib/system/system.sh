@@ -18,13 +18,13 @@ system::keyboard_layout() {
     local layout="${1:-us}"
     
     # For systemd-based systems / Для систем на базе systemd
-    if command -v localectl >/dev/null 2>&1; then
-        localectl set-keymap "${layout}" 2>/dev/null || true
+    if utils::has localectl; then
+        utils::quiet_err localectl set-keymap "${layout}" || true
     fi
     
     # For X11 systems / Для систем X11
-    if command -v setxkbmap >/dev/null 2>&1; then
-        setxkbmap "${layout}" 2>/dev/null || true
+    if utils::has setxkbmap; then
+        utils::quiet_err setxkbmap "${layout}" || true
     fi
     
     log::info "Keyboard layout set to ${layout}"
@@ -39,8 +39,8 @@ system::localization() {
     local locale="${1:-en_US.UTF-8}"
     
     # For systemd-based systems / Для систем на базе systemd
-    if command -v localectl >/dev/null 2>&1; then
-        localectl set-locale "${locale}" 2>/dev/null || true
+    if utils::has localectl; then
+        utils::quiet_err localectl set-locale "${locale}" || true
     fi
     
     log::info "System locale set to ${locale}"
@@ -55,8 +55,8 @@ system::date_time() {
     local timezone="${1:-UTC}"
     
     # For systemd-based systems / Для систем на базе systemd
-    if command -v timedatectl >/dev/null 2>&1; then
-        timedatectl set-timezone "${timezone}" 2>/dev/null || true
+    if utils::has timedatectl; then
+        utils::quiet_err timedatectl set-timezone "${timezone}" || true
     fi
     
     log::info "System timezone set to ${timezone}"
