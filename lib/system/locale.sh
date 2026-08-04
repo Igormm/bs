@@ -1,6 +1,16 @@
 #!/usr/bin/env bs
 # locale.sh — Localization configuration for system setup / Конфигурация локализации для
 # настройки системы
+# @depends core/const, core/logger, core/utils
+
+# Source Guard / Защита от повторной загрузки
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
+bs::guard "SYSTEM_LOCALE" || return 0
+
+# Зависимости / Dependencies
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
 
 # @description Set system locale / Установить системную локаль
 # @param $1 Locale (e.g., "en_US.UTF-8", "ru_RU.UTF-8") / Локаль (например, "en_US.UTF-8",

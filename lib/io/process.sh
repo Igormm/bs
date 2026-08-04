@@ -12,11 +12,17 @@
 #   load "lib/io/process"
 #   io::process::guard --timeout 60 --hang-after 30 -- wget https://example.com/file.iso
 #
-# @depends core/const, core/logger, core/errorhandler, core/utils, lib/io/streams, lib/system/processes
+# @depends core/const, core/logger, core/utils, core/errorhandler
 
 # Source Guard / Защита от повторной загрузки
-[[ -n "${__IO_PROCESS_SOURCED:-}" ]] && return 0
-readonly __IO_PROCESS_SOURCED=1
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
+bs::guard "IO_PROCESS" || return 0
+
+# Зависимости / Dependencies
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/errorhandler.sh"
 
 # Module version / Версия модуля
 declare -g IO_PROCESS_VERSION="1.0.0"

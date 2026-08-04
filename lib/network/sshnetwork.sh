@@ -38,18 +38,18 @@
 # @author BS Framework
 # @since 2026-01-06
 # @version 1.0.0
+# @depends core/const, core/logger, core/utils, core/errorhandler, lib/system/platformcheck
 
-# Check if module is already loaded
-if [[ -n "${BOSA_LIB_NETWORK_SSH_LOADED:-}" ]]; then
-    utils::ignore log::debug "SSH Network module already loaded"
-    return 0
-fi
-readonly BOSA_LIB_NETWORK_SSH_LOADED=1
+# Source Guard / Защита от повторной загрузки
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
+bs::guard "NETWORK_SSH" || return 0
 
-# Import required modules
-source "${BS_HOME}/core/const.sh"
-source "${BS_HOME}/core/logger.sh"
-source "${BS_HOME}/core/errorhandler.sh"
+# Зависимости / Dependencies
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/errorhandler.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../system/platformcheck.sh"
 
 # SSH Network configuration constants
 readonly SSH_NETWORK_CONFIG_DIR="${HOME}/.config/sshnetwork"
@@ -152,9 +152,6 @@ sshnetwork::install_dependencies() {
     local deps=("$@")
     
     log::info "Installing missing dependencies: ${deps[*]}..."
-    
-    # Source platform check module
-    source "${BS_HOME}/lib/system/platformcheck.sh"
     
     if platformcheck::is_debian || platformcheck::is_ubuntu; then
         apt-get update

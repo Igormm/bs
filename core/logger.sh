@@ -1,4 +1,4 @@
-#!/usr/bin/env bs
+#!/usr/bin/env bash
 #
 # core/logger.sh — модуль логирования фреймворка BS
 # core/logger.sh — BS framework logging module
@@ -25,6 +25,10 @@
 
 # Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points
+
+# Source Guard / Защита от повторного импорта
+source "$(dirname -- "${BASH_SOURCE[0]}")/guard.sh"
+bs::guard "LOGGER" || return 0
 
 # Настройки по умолчанию / Default settings
 : "${BS_LOG_LEVEL:=INFO}"
@@ -72,18 +76,18 @@ log::__is_color_enabled() {
 # @param $1 Log level string / Строка уровня логирования
 # @return Numeric level / Числовой уровень
 log::__level_to_number() {
-    local level="${1^^}"
-    
-    case "$level" in
-        TRACE)    echo 0 ;;
-        DEBUG)    echo 10 ;;
-        INFO)     echo 20 ;;
-        SUCCESS)  echo 25 ;;
-        WARN)     echo 30 ;;
-        ERROR)    echo 40 ;;
-        FATAL)    echo 50 ;;
-        NONE)     echo 1000 ;;
-        *)        echo 20 ;;  # По умолчанию INFO / Default to INFO
+    local -r level="${1^^}"
+
+    case "${level}" in
+        TRACE)    printf '%d\n' 0 ;;
+        DEBUG)    printf '%d\n' 10 ;;
+        INFO)     printf '%d\n' 20 ;;
+        SUCCESS)  printf '%d\n' 25 ;;
+        WARN)     printf '%d\n' 30 ;;
+        ERROR)    printf '%d\n' 40 ;;
+        FATAL)    printf '%d\n' 50 ;;
+        NONE)     printf '%d\n' 1000 ;;
+        *)        printf '%d\n' 20 ;;  # По умолчанию INFO / Default to INFO
     esac
 }
 
@@ -108,17 +112,17 @@ log::__is_level_allowed() {
 # @param $1 Log level / Уровень логирования
 # @return ANSI color code / ANSI код цвета
 log::__get_level_color() {
-    local level="${1^^}"
-    
-    case "$level" in
-        TRACE)   echo '\033[90m' ;;     # Серый / Gray
-        DEBUG)   echo '\033[36m' ;;     # Циан / Cyan
-        INFO)    echo '\033[34m' ;;     # Синий / Blue
-        SUCCESS) echo '\033[32m' ;;     # Зеленый / Green
-        WARN)    echo '\033[33m' ;;     # Желтый / Yellow
-        ERROR)   echo '\033[31m' ;;     # Красный / Red
-        FATAL)   echo '\033[35m' ;;     # Пурпурный / Purple
-        *)       echo '\033[0m' ;;      # Сброс / Reset
+    local -r level="${1^^}"
+
+    case "${level}" in
+        TRACE)   printf '%s\n' '\033[90m' ;;     # Серый / Gray
+        DEBUG)   printf '%s\n' '\033[36m' ;;     # Циан / Cyan
+        INFO)    printf '%s\n' '\033[34m' ;;     # Синий / Blue
+        SUCCESS) printf '%s\n' '\033[32m' ;;     # Зеленый / Green
+        WARN)    printf '%s\n' '\033[33m' ;;     # Желтый / Yellow
+        ERROR)   printf '%s\n' '\033[31m' ;;     # Красный / Red
+        FATAL)   printf '%s\n' '\033[35m' ;;     # Пурпурный / Purple
+        *)       printf '%s\n' '\033[0m' ;;      # Сброс / Reset
     esac
 }
 
@@ -144,7 +148,7 @@ log::__json_escape() {
 # @param $@ Message text / Текст сообщения
 # @return Formatted message / Отформатированное сообщение
 log::__format_message() {
-    local level="${1^^}"
+    local -r level="${1^^}"
     shift
     local text="$*"
     
@@ -174,9 +178,9 @@ log::__format_message() {
         text|*)
             # Текстовый формат с цветами / Text format with colors
             if log::__is_color_enabled; then
-                local color_reset='\033[0m'
+                local -r color_reset='\033[0m'
                 local color="$(log::__get_level_color "$level")"
-                local bold='\033[1m'
+                local -r bold='\033[1m'
                 
                 # Для ошибок и фатальных используем жирный шрифт
                 # For errors and fatal use bold

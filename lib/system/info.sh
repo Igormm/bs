@@ -1,6 +1,16 @@
 #!/usr/bin/env bs
 # info.sh — System information for system setup / Системная информация для настройки
 # системы
+# @depends core/const, core/logger, core/utils
+
+# Source Guard / Защита от повторной загрузки
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
+bs::guard "SYSTEM_INFO" || return 0
+
+# Зависимости / Dependencies
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
 
 # @description Get operating system information / Получить информацию об операционной
 # системе

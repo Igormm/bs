@@ -1,4 +1,4 @@
-#!/usr/bin/env bs
+#!/usr/bin/env bash
 #
 # core/const.sh 
 # — константы ошибок и кодов возврата фреймворка BS
@@ -13,6 +13,10 @@
 
 # Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points
+
+# Source Guard / Защита от повторного импорта
+source "$(dirname -- "${BASH_SOURCE[0]}")/guard.sh"
+bs::guard "CONST" || return 0
 
 #
 # Базовые коды возврата / Basic return codes
@@ -169,10 +173,10 @@ readonly FILENAME_ALLOWED_CHARS='[a-zA-Z0-9._-]'
 # @param $1 Error code to check / Код ошибки для проверки
 # @return E_SUCCESS if valid, E_ERROR otherwise / E_SUCCESS если валиден, иначе E_ERROR
 const::is_valid_error_code() {
-    local code="${1:?Missing error code}"
-    
-    case "$code" in
-        0|1|2|3|4|5|6|7|8|9|10)
+    local -r code="${1:?Missing error code}"
+
+    case "${code}" in
+        0|1|2|3|4|5|6|7|8|9|10|100|101|102|200|201|202|203|210)
             return "${E_SUCCESS}"
             ;;
         *)
@@ -185,26 +189,34 @@ const::is_valid_error_code() {
 # @param $1 Error code / Код ошибки
 # @return Error description / Описание ошибки
 const::error_description() {
-    local code="${1:?Missing error code}"
-    
-    case "$code" in
-        0) echo "Success / Успешно" ;;
-        1) echo "General error / Общая ошибка" ;;
-        2) echo "Invalid arguments / Неверные аргументы" ;;
-        3) echo "Invalid function arguments / Неверные аргументы функции" ;;
-        4) echo "Invalid input data format / Неверный формат входных данных" ;;
-        5) echo "File not found / Файл не найден" ;;
-        6) echo "Permission denied / Отказано в доступе" ;;
-        7) echo "Dependency error / Ошибка зависимости" ;;
-        8) echo "Unsupported OS / Неподдерживаемая ОС" ;;
-        9) echo "Operation timeout / Таймаут операции" ;;
-        10) echo "Resource conflict / Конфликт ресурсов" ;;
-        *) echo "Unknown error / Неизвестная ошибка" ;;
+    local -r code="${1:?Missing error code}"
+
+    case "${code}" in
+        0) printf '%s\n' "Success / Успешно" ;;
+        1) printf '%s\n' "General error / Общая ошибка" ;;
+        2) printf '%s\n' "Invalid arguments / Неверные аргументы" ;;
+        3) printf '%s\n' "Invalid function arguments / Неверные аргументы функции" ;;
+        4) printf '%s\n' "Invalid input data format / Неверный формат входных данных" ;;
+        5) printf '%s\n' "File not found / Файл не найден" ;;
+        6) printf '%s\n' "Permission denied / Отказано в доступе" ;;
+        7) printf '%s\n' "Dependency error / Ошибка зависимости" ;;
+        8) printf '%s\n' "Unsupported OS / Неподдерживаемая ОС" ;;
+        9) printf '%s\n' "Operation timeout / Таймаут операции" ;;
+        10) printf '%s\n' "Resource conflict / Конфликт ресурсов" ;;
+        100) printf '%s\n' "File operation error / Ошибка файловой операции" ;;
+        101) printf '%s\n' "Dependency missing / Отсутствует зависимость" ;;
+        102) printf '%s\n' "Platform unsupported / Платформа не поддерживается" ;;
+        200) printf '%s\n' "HTTP request error / Ошибка HTTP-запроса" ;;
+        201) printf '%s\n' "LLM provider error / Ошибка LLM-провайдера" ;;
+        202) printf '%s\n' "Kubernetes error / Ошибка Kubernetes" ;;
+        203) printf '%s\n' "Module external dependency missing / Отсутствует внешняя зависимость модуля" ;;
+        210) printf '%s\n' "Configuration error / Ошибка конфигурации" ;;
+        *) printf '%s\n' "Unknown error / Неизвестная ошибка" ;;
     esac
 }
 
 # @description Get framework version / Получить версию фреймворка
 # @return Framework version string / Строка версии фреймворка
 const::version() {
-    echo "${BS_VERSION}"
+    printf '%s\n' "${BS_VERSION}"
 }

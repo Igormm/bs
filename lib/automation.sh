@@ -11,6 +11,17 @@
 #   automation::locale::check_locale
 #   automation::locale::set_locale "ru_RU.UTF-8"
 #   automation::locale::verify_locale "ru_RU.UTF-8"
+# @depends core/const, core/logger, core/utils, lib/system/distro
+
+# Source Guard / Защита от повторной загрузки
+source "$(dirname -- "${BASH_SOURCE[0]}")/../core/guard.sh"
+bs::guard "AUTOMATION" || return 0
+
+# Зависимости / Dependencies
+source "$(dirname -- "${BASH_SOURCE[0]}")/../core/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../core/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../core/utils.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/system/distro.sh"
 
 # @description Check current keyboard layout / Проверить текущую раскладку клавиатуры
 # @example

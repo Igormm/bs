@@ -1,6 +1,16 @@
 #!/usr/bin/env bs
 # distro.sh — Distribution detection and compatibility / Определение дистрибутива и
 # совместимость
+# @depends core/const, core/logger, core/utils
+
+# Source Guard / Защита от повторной загрузки
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
+bs::guard "SYSTEM_DISTRO" || return 0
+
+# Зависимости / Dependencies
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
 
 # Global variables for detected distribution / Глобальные переменные для определенного
 # дистрибутива
@@ -17,13 +27,20 @@ system::distro::detect() {
     # Try /etc/os-release first (modern standard) / Попробовать /etc/os-release сначала
     # (современный стандарт)
     if [[ -f /etc/os-release ]]; then
-        # Parse without sourcing into current shell / Парсим без source в текущий shell
-        DISTRO_ID=$(sed -n 's/^ID=//p' /etc/os-release | head -1 | tr -d '"')
-        DISTRO_NAME=$(sed -n 's/^NAME=//p' /etc/os-release | head -1 | tr -d '"')
-        DISTRO_VERSION=$(sed -n 's/^VERSION_ID=//p' /etc/os-release | head -1 | tr -d '"')
-        DISTRO_ID="${DISTRO_ID:-unknown}"
-        DISTRO_NAME="${DISTRO_NAME:-Unknown}"
-        DISTRO_VERSION="${DISTRO_VERSION:-unknown}"
+        # Parse without sourcing into current shell, single read pass /
+        # Парсим без source в текущий shell, один проход чтения
+        local osr_key osr_value osr_id="" osr_name="" osr_version=""
+        while IFS='=' read -r osr_key osr_value; do
+            osr_value="${osr_value%\"}"; osr_value="${osr_value#\"}"
+            case "${osr_key}" in
+                ID)         [[ -z "${osr_id}" ]]      && osr_id="${osr_value}" ;;
+                NAME)       [[ -z "${osr_name}" ]]    && osr_name="${osr_value}" ;;
+                VERSION_ID) [[ -z "${osr_version}" ]] && osr_version="${osr_value}" ;;
+            esac
+        done < /etc/os-release
+        DISTRO_ID="${osr_id:-unknown}"
+        DISTRO_NAME="${osr_name:-Unknown}"
+        DISTRO_VERSION="${osr_version:-unknown}"
     # Try lsb_release / Попробовать lsb_release
     elif utils::has lsb_release; then
         DISTRO_ID=$(utils::quiet_err lsb_release -si | tr '[:upper:]' '[:lower:]')

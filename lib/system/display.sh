@@ -1,5 +1,15 @@
 #!/usr/bin/env bs
 # display.sh — Display server and desktop environment configuration for system setup
+# @depends core/const, core/logger, core/utils
+
+# Source Guard / Защита от повторной загрузки
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
+bs::guard "SYSTEM_DISPLAY" || return 0
+
+# Зависимости / Dependencies
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
 
 # @description Configure display server
 # @param $1 Display server type ("x11", "wayland")

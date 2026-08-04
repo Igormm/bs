@@ -6,6 +6,16 @@
 # превосходящую функциональность oh-my-zsh.
 # This module provides advanced command line configuration,
 # surpassing oh-my-zsh functionality.
+# @depends core/const, core/logger, core/utils
+
+# Source Guard / Защита от повторной загрузки
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
+bs::guard "UI_PS1CONFIG" || return 0
+
+# Зависимости / Dependencies
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
 
 set -euo pipefail
 

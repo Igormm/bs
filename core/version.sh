@@ -1,10 +1,14 @@
-#!/usr/bin/env bs
+#!/usr/bin/env bash
 #
 # version.sh — Framework version information / Информация о версии фреймворка
 #
 
 # Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points
+
+# Source Guard / Защита от повторного импорта
+source "$(dirname -- "${BASH_SOURCE[0]}")/guard.sh"
+bs::guard "VERSION" || return 0
 
 # @description BS Framework Version / Версия фреймворка BS
 # @export BS_VERSION The current version of BS / Текущая версия BS
@@ -22,7 +26,7 @@ export BS_NAME="BS (Bash Open Source Architecture) BOSA Framework"
 # @example
 #   bs::version::print
 bs::version::print() {
-    echo "${BS_NAME} ${BS_VERSION}"
+    printf '%s %s\n' "${BS_NAME}" "${BS_VERSION}"
 }
 
 # @description Get version as string / Получить версию как строку
@@ -30,7 +34,7 @@ bs::version::print() {
 # @example
 #   version=$(BS::version::get)
 bs::version::get() {
-    echo "${BS_VERSION}"
+    printf '%s\n' "${BS_VERSION}"
 }
 
 # @description Compare versions / Сравнить версии
@@ -42,40 +46,41 @@ bs::version::get() {
 #       echo "First version is older"
 #   fi
 bs::version::compare() {
-    local ver1="${1}"
-    local ver2="${2}"
-    
+    local -r ver1="${1}"
+    local -r ver2="${2}"
+
     # Split versions into arrays (локальный IFS, глобальный не трогаем)
     # Split versions into arrays (local IFS, global IFS untouched)
     local IFS='.'
     local -a v1_parts v2_parts
     read -ra v1_parts <<< "${ver1}"
     read -ra v2_parts <<< "${ver2}"
-    
+
     # Determine max number of parts to compare
-    local max_parts
+    local -i max_parts
     if [[ ${#v1_parts[@]} -gt ${#v2_parts[@]} ]]; then
         max_parts=${#v1_parts[@]}
     else
         max_parts=${#v2_parts[@]}
     fi
-    
+
     # Compare each part numerically
+    local -i i
     for ((i=0; i<max_parts; i++)); do
-        local part1=${v1_parts[i]:-0}
-        local part2=${v2_parts[i]:-0}
-        
+        local part1="${v1_parts[i]:-0}"
+        local part2="${v2_parts[i]:-0}"
+
         # Ensure both parts are numeric for comparison
-        part1=${part1//[^0-9]/0}
-        part2=${part2//[^0-9]/0}
-        
-        if [[ 10#$part1 -gt 10#$part2 ]]; then
+        part1="${part1//[^0-9]/0}"
+        part2="${part2//[^0-9]/0}"
+
+        if [[ 10#${part1} -gt 10#${part2} ]]; then
             return 1
-        elif [[ 10#$part1 -lt 10#$part2 ]]; then
+        elif [[ 10#${part1} -lt 10#${part2} ]]; then
             return 2
         fi
     done
-    
+
     # If we get here, versions are equal
     return 0
 }

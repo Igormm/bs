@@ -34,20 +34,18 @@
 # @author BS Framework
 # @since 2026-01-06
 # @version 1.0.0
+# @depends core/const, core/logger, core/utils, core/errorhandler, lib/system/platformcheck
 
-# Check if module is already loaded
-if [[ -n "${BOSA_LIB_INTEGRATION_VK_API_LOADED:-}" ]]; then
-    utils::ignore log::debug "VK API module already loaded"
-    return 0
-fi
-readonly BOSA_LIB_INTEGRATION_VK_API_LOADED=1
+# Source Guard / Защита от повторной загрузки
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
+bs::guard "INTEGRATION_VK_API" || return 0
 
-# Import required modules (use BS_ROOT if available, otherwise try to detect)
-if [[ -n "${BS_ROOT:-}" ]]; then
-    utils::ignore source "${BS_ROOT}/core/const.sh"
-    utils::ignore source "${BS_ROOT}/core/logger.sh"
-    utils::ignore source "${BS_ROOT}/core/errorhandler.sh"
-fi
+# Зависимости / Dependencies
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/errorhandler.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../system/platformcheck.sh"
 
 # Error codes fallbacks (no readonly): values live in core/const.sh;
 # assign defaults only when const.sh was not loaded (standalone mode).
@@ -159,9 +157,6 @@ vkapi::install_dependencies() {
     
     log::info "Installing missing dependencies: ${deps[*]}..."
     
-    # Source platform check module
-    utils::ignore source "${BS_ROOT}/lib/system/platformcheck.sh"
-
     # Helper predicates with graceful fallbacks if platformcheck is unavailable
     _vk_is_debian_like=false
     _vk_is_rhel_like=false

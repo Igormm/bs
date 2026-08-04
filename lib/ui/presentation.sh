@@ -1,6 +1,16 @@
 #!/usr/bin/env bs
 # presentation.sh — Main presentation module for BS
 # This module provides beautiful terminal output styling capabilities
+# @depends core/const, core/logger, core/utils
+
+# Source Guard / Защита от повторной загрузки
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
+bs::guard "UI_PRESENTATION" || return 0
+
+# Зависимости / Dependencies
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
 
 # Define common color codes
 export PRESENTATION_COLOR_RESET=$'\033[0m'

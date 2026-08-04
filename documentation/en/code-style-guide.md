@@ -57,30 +57,40 @@ file is sourced more than once:
 ```bash
 #!/usr/bin/env bash
 # lib/my_module.sh
+#
+# @depends core/const, core/logger, core/utils
 
-# Source Guard
-if utils::guard "MY_MODULE"; then return 0; fi
-readonly __MY_MODULE_SOURCED=1
+# Source Guard — shared wrapper from core/guard.sh
+source "$(dirname -- "${BASH_SOURCE[0]}")/../core/guard.sh"
+bs::guard "MY_MODULE" || return 0
 
-# Dependencies are loaded via load (path relative to the framework root,
-# without the .sh extension)
-load "core/logger"
+# Dependencies — self-source relative to the module file (the module works
+# even when sourced directly, without the loader); the @depends header
+# duplicates them for load
+source "$(dirname -- "${BASH_SOURCE[0]}")/../core/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../core/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../core/utils.sh"
 
 # Global constants and module structures
 readonly MODULE_NAME="my_module"
 declare -gA MODULE_CONFIG
 ```
 
-`utils::guard "name"` ([core/utils.sh](../../core/utils.sh)) checks the
-`__NAME_SOURCED` variable: it returns 0 if the module has not been loaded yet,
-and 1 if it has (then the file returns immediately).
+`bs::guard "name"` ([core/guard.sh](../../core/guard.sh)) atomically checks
+and sets the `__NAME_SOURCED` variable: it returns 1 if the module **has
+already been loaded** (then `|| return 0` skips the rest of the file), and 0
+on first load — the mark is set and the module body runs.
 
 On the first load `__MY_MODULE_SOURCED` is undefined, so the code runs; on
-subsequent loads the variable is set and `return` skips the body.
+subsequent loads the variable is set and `return` skips the body. Do not
+hand-roll the `[[ -n "${__X_SOURCED:-}" ]] && return 0` idiom in new modules.
+The legacy `utils::guard` from `core/utils.sh` is kept as an alias for
+backward compatibility.
 
 Do not load modules with `source lib/...`. Use the `load` function
 ([bootstrap/loader.sh](../../bootstrap/loader.sh)): it resolves paths relative
 to `BS_ROOT`, tracks already-loaded modules and detects circular dependencies.
+See [section 8](#8-module-metadata-and-source-guard) for more on module metadata.
 
 ## 2. Naming
 
@@ -253,7 +263,142 @@ fi
 utils::ignore systemctl stop some-service
 ```
 
-## 7. Project structure
+## 7. Framework abstractions
+
+In addition to the basic idioms in `core/utils.sh`, the framework provides
+high-level abstractions for streams, files, and processes. Use them in new
+modules instead of low-level commands.
+
+### 7.1 I/O streams
+
+The `lib/io/streams.sh` module centralizes stream, FD, and redirection handling.
+
+| Instead of | Use |
+|------------|-----|
+| `echo "$msg"` | `io::streams::print "$msg"` |
+| `echo -n "$msg"` | `io::streams::printn "$msg"` |
+| `printf "%s" "$data"` | `io::streams::printf "%s" "$data"` (format is a separate argument) |
+| `>&2 echo` | `io::streams::eprint "$msg"` |
+| `exec 1>file` | `io::streams::redirect_stdout "file"` |
+| `exec 3>&1` / `exec 1>&3-` | `io::streams::save 1 saved` / `io::streams::restore "$saved" 1` |
+
+```bash
+load "lib/io/streams"
+
+io::streams::print "safe output"
+io::streams::eprint "error message"
+```
+
+Rules:
+- Never pass user data as the `printf` format string.
+- For dynamic file descriptors use Bash 4 syntax: `exec {fd}<file`.
+- Library functions must not write to stdout unless that is their purpose;
+  diagnostics go through `log::warn` / `log::error`.
+
+### 7.2 File operations
+
+The `lib/io/files.sh` module (FSH API) replaces direct calls to `cp`, `mv`, `rm`.
+
+```bash
+load "lib/io/files"
+
+io::files::copy_file "src.txt" "dst.txt"
+io::files::ensure_dir "my/dir" "0750"
+io::files::move "old" "new"
+io::files::remove "tmp"
+```
+
+Features:
+- Supports `FRAMEWORK_DRY_RUN=true`: the command is only logged, not executed.
+- Atomic operations via a temporary file/directory next to the target.
+- Automatic backups via `BS_FILES_BACKUP_SUFFIX`.
+- Cross-device move with fallback to `cp -a` + `rm -rf`.
+- Error codes: `E_INVALID`, `LIB_ERROR_FILE_NOT_FOUND`, `LIB_ERROR_FILE_OPERATION`.
+
+### 7.3 Process guard and strace debugging
+
+The `lib/io/process.sh` module runs a command, watches for timeout and hang,
+collects diagnostics, and optionally runs `strace`.
+
+```bash
+load "lib/io/process"
+
+# 60 s timeout, consider hung after 30 s of silence
+io::process::guard --timeout 60 --hang-after 30 -- ./long-task
+
+# Also collect network strace
+io::process::guard --timeout 120 --hang-after 60 --strace-net -- ./server
+```
+
+When the guard triggers, the diagnostic directory contains:
+- `report.log` — snapshot of `/proc/<pid>/status`, `stack`, `fd/`, `wchan`, `ps`;
+- `strace_file.log` — `strace -p <pid> -e trace=read,write,%file`;
+- `strace_net.log` — `strace -p <pid> -e trace=%net` (if requested).
+
+Rules:
+- Always separate the wrapped command's arguments from the guard options with `--`.
+- strace runs with `sudo -n`; if privileges are missing, diagnostics are collected
+  without strace.
+- Use the cleanup stack (`cleanup::add`) to clean up child processes.
+
+## 8. Module metadata and Source Guard
+
+### 8.1 Source Guard
+
+Every module must guard against repeated imports. Use the shared `bs::guard`
+wrapper from [core/guard.sh](../../core/guard.sh) — it checks the
+`__NAME_SOURCED` mark and sets it in a single call:
+
+```bash
+#!/usr/bin/env bash
+# lib/my_module.sh
+
+source "$(dirname -- "${BASH_SOURCE[0]}")/../core/guard.sh"
+bs::guard "MY_MODULE" || return 0
+```
+
+The path to `guard.sh` is relative to the module file (from `core/` — just
+`guard.sh` next to it, from `lib/<group>/` — `../../core/guard.sh`).
+
+Legacy variants found in older code:
+
+```bash
+# check-only helper from core/utils.sh (deprecated, alias to bs::guard_loaded)
+if utils::guard "MY_MODULE"; then return 0; fi
+readonly __MY_MODULE_SOURCED=1
+
+# manual idiom in early core/ modules
+[[ -n "${__CONST_SOURCED:-}" ]] && return 0
+readonly __CONST_SOURCED=1
+```
+
+### 8.2 Metadata
+
+After the Source Guard, declare the module version and load marker:
+
+```bash
+readonly MODULE_NAME="my_module"
+declare -g MODULE_VERSION="1.0.0"
+```
+
+At the end of the module:
+
+```bash
+declare -g MODULE_LOADED="1"
+```
+
+### 8.3 Dependencies
+
+Load dependencies with `load` and declare them with a `# @depends` comment:
+
+```bash
+# @depends core/logger, core/errorhandler, lib/io/streams
+load "core/logger"
+load "core/errorhandler"
+load "lib/io/streams"
+```
+
+## 9. Project structure
 
 The actual layout of the BS framework:
 
@@ -274,7 +419,7 @@ bs/
 └── README.md
 ```
 
-## 8. Testing and linting
+## 10. Testing and linting
 
 Testing: use the framework's own test library
 [tests/testframework.sh](../../tests/testframework.sh) — not BATS. It provides

@@ -139,7 +139,13 @@ Its steps:
    - `core/utils` — environment helpers, including the silence idioms
      `utils::has`, `utils::quiet`, `utils::quiet_err`, `utils::ignore`
      (replacements for `command -v … >/dev/null 2>&1`, `>/dev/null 2>&1`,
-     `2>/dev/null` and `>/dev/null 2>&1 || true` respectively).
+     `2>/dev/null` and `>/dev/null 2>&1 || true` respectively);
+   - `core/config` — the unified configuration loader (`config::load`,
+     `config::get`, `config::set`).
+
+[core/guard.sh](../../../core/guard.sh) stands apart: it is not loaded via
+`load` — modules source it directly by relative path — and provides
+`bs::guard`, the single Source Guard implementation for all modules.
 7. **Marker.** Exports `BS_INITIALIZED=1`. Unless `BS_SILENT=1`, prints the
    bootstrap path.
 

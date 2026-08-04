@@ -1,6 +1,16 @@
 #!/usr/bin/env bs
 # permissions.sh — File permissions management for system setup / Управление правами
 # доступа к файлам для настройки системы
+# @depends core/const, core/logger, core/utils
+
+# Source Guard / Защита от повторной загрузки
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
+bs::guard "SYSTEM_PERMISSIONS" || return 0
+
+# Зависимости / Dependencies
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
 
 # @description Change file permissions / Изменить права доступа к файлу
 # @param $1 File or directory path / Путь к файлу или директории

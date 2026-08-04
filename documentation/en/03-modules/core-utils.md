@@ -28,18 +28,24 @@ on their own, so this is left to the caller.
 
 ### utils::guard
 
+> **Deprecated.** Use `bs::guard` from [core/guard.sh](../../core/guard.sh):
+> `bs::guard "foo" || return 0` — it checks the mark and sets it in one call.
+> `utils::guard` is kept as a check-only alias (`bs::guard_loaded`) for
+> backward compatibility.
+
 ```bash
 if utils::guard "foo"; then return 0; fi
 readonly __FOO_SOURCED=1
 ```
 
-Source guard for hand-written modules. Returns `0` if the module has **not** been loaded yet
-(caller should continue) and `1` if it already has (caller should `return 0` immediately).
+Source guard for hand-written modules. Returns `0` if the module has already been loaded
+(caller should `return 0` immediately) and `1` if it has **not** been loaded yet
+(caller should continue).
 The argument is the module name without the `__` / `_SOURCED` parts; it is uppercased
 internally (`foo` → `__FOO_SOURCED`).
 
 Note: modules loaded via `load` are already protected against double loading by the loader's
-`BS_LOADED_MODULES` registry; `utils::guard` is for files sourced outside the loader.
+`BS_LOADED_MODULES` registry; the guard is for files sourced outside the loader.
 
 ### utils::has
 

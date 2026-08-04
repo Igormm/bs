@@ -1,6 +1,16 @@
 #!/usr/bin/env bs
 # keyboard.sh — Keyboard layout configuration for system setup / Конфигурация раскладки
 # клавиатуры для настройки системы
+# @depends core/const, core/logger, core/utils
+
+# Source Guard / Защита от повторной загрузки
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
+bs::guard "SYSTEM_KEYBOARD" || return 0
+
+# Зависимости / Dependencies
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
 
 # @description Set keyboard layout for console and X11 / Установить раскладку клавиатуры
 # для консоли и X11

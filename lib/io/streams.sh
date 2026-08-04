@@ -21,22 +21,16 @@
 #
 # Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points
+# @depends core/const, core/logger, core/utils
 
 # Source Guard / Защита от повторной загрузки
-[[ -n "${__IO_STREAMS_SOURCED:-}" ]] && return 0
-readonly __IO_STREAMS_SOURCED=1
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
+bs::guard "IO_STREAMS" || return 0
 
-# Подключаем core, если логгер ещё не загружен
-# Source core if the logger is not loaded yet
-if ! utils::quiet declare -F log::info; then
-    if [[ -n "${BS_HOME:-}" ]]; then
-        source "${BS_HOME}/core/const.sh"
-        source "${BS_HOME}/core/logger.sh"
-    elif [[ -n "${BS_ROOT:-}" ]]; then
-        source "${BS_ROOT}/core/const.sh"
-        source "${BS_ROOT}/core/logger.sh"
-    fi
-fi
+# Зависимости / Dependencies
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
 
 # Версия модуля / Module version
 declare -g IO_STREAMS_VERSION="1.0.0"

@@ -12,12 +12,17 @@
 #   http::download "https://example.com/file.iso" "/tmp/file.iso"
 #   http::retry 3 1 http::get "https://api.example.com/status"
 #
-# @depends core/const, core/logger, core/utils, core/deps
+# @depends core/const, core/logger, core/utils
 # @optdeps curl, wget
 
 # Source Guard / Защита от повторной загрузки
-[[ -n "${__IO_INTEGRATION_HTTP_SOURCED:-}" ]] && return 0
-readonly __IO_INTEGRATION_HTTP_SOURCED=1
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
+bs::guard "IO_INTEGRATION_HTTP" || return 0
+
+# Зависимости / Dependencies
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
 
 # Module version / Версия модуля
 declare -g IO_INTEGRATION_HTTP_VERSION="1.0.0"

@@ -16,12 +16,18 @@
 #   export OLLAMA_HOST="http://localhost:11434"
 #   llm::chat ollama llama3 "Explain bash arrays"
 #
-# @depends core/const, core/logger, core/utils, lib/integration/http
+# @depends core/const, core/logger, core/utils, lib/integration/result
 # @optdeps jq
 
 # Source Guard / Защита от повторной загрузки
-[[ -n "${__IO_INTEGRATION_LLM_SOURCED:-}" ]] && return 0
-readonly __IO_INTEGRATION_LLM_SOURCED=1
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
+bs::guard "IO_INTEGRATION_LLM" || return 0
+
+# Зависимости / Dependencies
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/result.sh"
 
 # Module version / Версия модуля
 declare -g IO_INTEGRATION_LLM_VERSION="1.0.0"

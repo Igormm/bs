@@ -1,6 +1,17 @@
 #!/usr/bin/env bs
 # services.sh — Service management for system setup / Управление сервисами для настройки
 # системы
+# @depends core/const, core/logger, core/utils, lib/system/distro
+
+# Source Guard / Защита от повторной загрузки
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
+bs::guard "SYSTEM_SERVICES" || return 0
+
+# Зависимости / Dependencies
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/distro.sh"
 
 # @description Start a system service / Запустить системный сервис
 # @param $1 Service name / Имя сервиса

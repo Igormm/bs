@@ -9,6 +9,17 @@
 #   load "lib/system/distrologic"
 #   system::distrologic::pkg_install_debian "curl"
 #   system::distrologic::service_manage_systemd "nginx" "start"
+# @depends core/const, core/logger, core/utils, lib/system/distro
+
+# Source Guard / Защита от повторной загрузки
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
+bs::guard "SYSTEM_DISTROLOGIC" || return 0
+
+# Зависимости / Dependencies
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/distro.sh"
 
 # @description Install package on Debian-based systems / Установить пакет в системах на
 # базе Debian

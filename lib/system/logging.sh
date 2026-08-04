@@ -1,6 +1,16 @@
 #!/usr/bin/env bs
 # logging.sh — Logging configuration for system setup / Конфигурация логирования для
 # настройки системы
+# @depends core/const, core/logger, core/utils
+
+# Source Guard / Защита от повторной загрузки
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
+bs::guard "SYSTEM_LOGGING" || return 0
+
+# Зависимости / Dependencies
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
 
 # @description Configure system logging / Настроить системное логирование
 # @param $1 Log level (e.g., "info", "warn", "error") / Уровень логирования (например,

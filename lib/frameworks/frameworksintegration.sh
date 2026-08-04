@@ -31,18 +31,17 @@
 # @author BS Framework
 # @since 2026-01-06
 # @version 1.0.0
+# @depends core/const, core/logger, core/utils, core/errorhandler
 
-# Check if module is already loaded
-if [[ -n "${BS_LIB_FRAMEWORKS_INTEGRATION_LOADED:-}" ]]; then
-    utils::ignore log::debug "Frameworks Integration module already loaded"
-    return 0
-fi
-readonly BS_LIB_FRAMEWORKS_INTEGRATION_LOADED=1
+# Source Guard / Защита от повторной загрузки
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
+bs::guard "FRAMEWORKS_INTEGRATION" || return 0
 
-# Import required modules
-source "${BS_HOME}/core/const.sh"
-source "${BS_HOME}/core/logger.sh"
-source "${BS_HOME}/core/errorhandler.sh"
+# Зависимости / Dependencies
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/errorhandler.sh"
 
 # Frameworks Integration configuration
 readonly FRAMEWORKS_CONFIG_DIR="${HOME}/.config/bs_frameworks"

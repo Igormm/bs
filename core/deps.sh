@@ -15,8 +15,13 @@
 # @depends core/const, core/logger, core/utils
 
 # Source Guard / Защита от повторной загрузки
-[[ -n "${__CORE_DEPS_SOURCED:-}" ]] && return 0
-readonly __CORE_DEPS_SOURCED=1
+source "$(dirname -- "${BASH_SOURCE[0]}")/guard.sh"
+bs::guard "CORE_DEPS" || return 0
+
+# Зависимости / Dependencies
+source "$(dirname -- "${BASH_SOURCE[0]}")/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/utils.sh"
 
 # Module version / Версия модуля
 declare -g CORE_DEPS_VERSION="1.0.0"

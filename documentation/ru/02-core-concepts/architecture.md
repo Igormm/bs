@@ -141,7 +141,13 @@ source**, а не запускаться (при прямом запуске о�
    - `core/utils` — помощники среды, включая идиомы тишины `utils::has`,
      `utils::quiet`, `utils::quiet_err`, `utils::ignore` (замены для
      `command -v … >/dev/null 2>&1`, `>/dev/null 2>&1`, `2>/dev/null` и
-     `>/dev/null 2>&1 || true` соответственно).
+     `>/dev/null 2>&1 || true` соответственно);
+   - `core/config` — единый загрузчик конфигурации (`config::load`,
+     `config::get`, `config::set`).
+
+Отдельно стоит [core/guard.sh](../../../core/guard.sh): он не загружается
+через `load`, а подключается модулями напрямую относительным путём и даёт
+`bs::guard` — единую реализацию Source Guard для всех модулей.
 7. **Маркер.** Экспортируется `BS_INITIALIZED=1`. Если `BS_SILENT` не равен
    `1`, выводится путь, откуда выполнен bootstrap.
 

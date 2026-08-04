@@ -1,4 +1,4 @@
-#!/usr/bin/env bs
+#!/usr/bin/env bash
 #
 # core/args.sh — модуль объявления и валидации параметров скриптов BS
 # core/args.sh — script parameter declaration and validation module for BS
@@ -39,20 +39,12 @@
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points
 
 # Source Guard / Защита от повторной загрузки
-[[ -n "${__ARGS_SOURCED:-}" ]] && return 0
-readonly __ARGS_SOURCED=1
+source "$(dirname -- "${BASH_SOURCE[0]}")/guard.sh"
+bs::guard "ARGS" || return 0
 
-# Подключаем core, если логгер ещё не загружен
-# Source core if the logger is not loaded yet
-if ! declare -F log::info >/dev/null 2>&1; then
-    if [[ -n "${BS_HOME:-}" ]]; then
-        source "${BS_HOME}/core/const.sh"
-        source "${BS_HOME}/core/logger.sh"
-    elif [[ -n "${BS_ROOT:-}" ]]; then
-        source "${BS_ROOT}/core/const.sh"
-        source "${BS_ROOT}/core/logger.sh"
-    fi
-fi
+# Зависимости / Dependencies
+source "$(dirname -- "${BASH_SOURCE[0]}")/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/logger.sh"
 
 # Версия модуля / Module version
 declare -g ARGS_VERSION="1.0.0"
@@ -529,7 +521,7 @@ args::parse() {
 # @example
 #   stage="$(args::get 1)"
 args::get() {
-    local position="${1:-}"
+    local -r position="${1:-}"
 
     if [[ -z "${position}" ]] || ! [[ "${position}" =~ ^[0-9]+$ ]] || [[ "${position}" -eq 0 ]]; then
         log::warn "args::get: position must be a positive integer, got: ${position}"

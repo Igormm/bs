@@ -2,7 +2,7 @@
 
 # Справочник Core API
 
-Справочник по core-модулям: `core/logger.sh`, `core/errorhandler.sh`, `core/const.sh`, `core/version.sh`.
+Справочник по core-модулям: `core/logger.sh`, `core/errorhandler.sh`, `core/const.sh`, `core/version.sh`, `core/guard.sh`.
 Про `core/args.sh` и `core/utils.sh` см. [Модуль Core utils](../03-modules/core-utils.md).
 
 ## Загрузка
@@ -18,6 +18,29 @@ load "core/version"      # информация о версии
 ```
 
 `load` разрешает пути относительно `BS_ROOT` без расширения `.sh` и предотвращает повторную загрузку.
+
+---
+
+## Source Guard — `core/guard.sh`
+
+Единая реализация защиты от повторной загрузки для всех модулей. Не грузится через `load` — модули подключают его напрямую относительным путём.
+
+#### `bs::guard <name>`
+- Параметры: `$1` — имя модуля (без `__` / `_SOURCED`, регистр не важен)
+- Возвращает: 0 при первой загрузке (метка `__NAME_SOURCED` установлена), 1 если модуль уже загружался
+- Пример: `bs::guard "my_module" || return 0`
+
+#### `bs::guard_loaded <name>`
+- Параметры: `$1` — имя модуля
+- Возвращает: 0, если модуль загружен, иначе 1
+- Пример: `bs::guard_loaded "logger" && echo "logger is here"`
+
+Шаблон для модуля:
+
+```bash
+source "$(dirname -- "${BASH_SOURCE[0]}")/../core/guard.sh"  # путь относительно файла модуля
+bs::guard "MY_MODULE" || return 0
+```
 
 ---
 

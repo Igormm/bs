@@ -29,8 +29,8 @@ double underscore before the function name: `io::streams::__is_fd()`.
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points
 
 # Source Guard / Защита от повторной загрузки
-[[ -n "${__SYSTEM_FOO_SOURCED:-}" ]] && return 0
-readonly __SYSTEM_FOO_SOURCED=1
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
+bs::guard "SYSTEM_FOO" || return 0
 ```
 
 Key points:
@@ -40,15 +40,11 @@ Key points:
 - A module must not call `set -euo pipefail` or change `IFS` — that is the
   entry point's job (see [Strict mode](#strict-mode)).
 - The source guard prevents double execution when the file is sourced twice.
-  The same pattern is used in [core/utils.sh:11-12](../../../core/utils.sh)
-  and [lib/io/streams.sh:26-27](../../../lib/io/streams.sh). A helper for it
-  exists: `utils::guard "foo"` returns 1 if the module was already loaded
-  ([core/utils.sh:32](../../../core/utils.sh)):
-
-  ```bash
-  if utils::guard "system_foo"; then return 0; fi
-  readonly __SYSTEM_FOO_SOURCED=1
-  ```
+  Use the `bs::guard` wrapper from [core/guard.sh](../../../core/guard.sh):
+  it atomically checks the `__SYSTEM_FOO_SOURCED` mark and sets it; it returns
+  1 if the module was already loaded (then `|| return 0` fires). The manual
+  `[[ -n "${__X_SOURCED:-}" ]] && return 0` idiom and the check-only
+  `utils::guard` helper are deprecated and kept for backward compatibility.
 
 ### Dependencies
 
@@ -61,7 +57,20 @@ with cycle detection:
 ```
 
 Dependencies are module paths relative to `BS_ROOT`, without the `.sh`
-extension, comma-separated. An entry script then loads the module with:
+extension, comma-separated. Additionally, every module self-sources its
+dependencies right after the Source Guard — with paths relative to its own
+file — so the module also works when sourced directly, bypassing the loader:
+
+```bash
+bs::guard "SYSTEM_FOO" || return 0
+
+# Зависимости / Dependencies
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
+```
+
+An entry script then loads the module with:
 
 ```bash
 #!/usr/bin/env bs

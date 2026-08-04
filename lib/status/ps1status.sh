@@ -43,40 +43,25 @@
 
 # @version 1.0.0
 
-# Check if module is already loaded
+# @depends core/const, core/logger, core/utils, core/errorhandler, lib/system/platformcheck
 
-if [[ -n "${BOSA_LIB_STATUS_PS1_LOADED:-}" ]]; then
+# Source Guard / Защита от повторной загрузки
 
-    utils::ignore log::debug "PS1 Status module already loaded"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
 
-    return 0
+bs::guard "STATUS_PS1" || return 0
 
-fi
+# Зависимости / Dependencies
 
-readonly BOSA_LIB_STATUS_PS1_LOADED=1
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
 
-# Import required modules
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
 
-#
-# ПОДКЛЮЧЕНИЕ МОДУЛЯ / MODULE IMPORT:
-# Импортируется: "${BS_HOME}/core/const.sh"
-# Imports: "${BS_HOME}/core/const.sh"
-#
-source "${BS_HOME}/core/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
 
-#
-# ПОДКЛЮЧЕНИЕ МОДУЛЯ / MODULE IMPORT:
-# Импортируется: "${BS_HOME}/core/logger.sh"
-# Imports: "${BS_HOME}/core/logger.sh"
-#
-source "${BS_HOME}/core/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/errorhandler.sh"
 
-#
-# ПОДКЛЮЧЕНИЕ МОДУЛЯ / MODULE IMPORT:
-# Импортируется: "${BS_HOME}/core/errorhandler.sh"
-# Imports: "${BS_HOME}/core/errorhandler.sh"
-#
-source "${BS_HOME}/core/errorhandler.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../system/platformcheck.sh"
 
 # PS1 Status configuration
 
@@ -290,17 +275,6 @@ ps1status::install_dependencies() {
     
 
     log::info "Installing missing dependencies: ${deps[*]}..."
-
-    
-
-    # Source platform check module
-
-#
-# ПОДКЛЮЧЕНИЕ МОДУЛЯ / MODULE IMPORT:
-# Импортируется: "${BS_HOME}/lib/system/platformcheck.sh"
-# Imports: "${BS_HOME}/lib/system/platformcheck.sh"
-#
-    source "${BS_HOME}/lib/system/platformcheck.sh"
 
     
 

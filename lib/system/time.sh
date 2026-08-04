@@ -1,6 +1,16 @@
 #!/usr/bin/env bs
 # time.sh — Date and time configuration for system setup / Конфигурация даты и времени для
 # настройки системы
+# @depends core/const, core/logger, core/utils
+
+# Source Guard / Защита от повторной загрузки
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
+bs::guard "SYSTEM_TIME" || return 0
+
+# Зависимости / Dependencies
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
 
 # @description Set system timezone / Установить системный часовой пояс
 # @param $1 Timezone (e.g., "Europe/Moscow", "America/New_York") / Часовой пояс (например,

@@ -1,7 +1,9 @@
-#!/usr/bin/env bs
+#!/usr/bin/env bash
 #
 # errorhandler.sh — единый EXIT-хендлер и cleanup-хуки / unified EXIT handler and cleanup
 # hooks
+#
+# @depends core/const, core/logger
 #
 # Идея / Idea:
 # - любой модуль/скрипт может добавить очистку / any module/script can add cleanup:
@@ -13,6 +15,14 @@
 # Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points
 
+# Source Guard / Защита от повторного импорта
+source "$(dirname -- "${BASH_SOURCE[0]}")/guard.sh"
+bs::guard "ERRORHANDLER" || return 0
+
+# Зависимости / Dependencies
+source "$(dirname -- "${BASH_SOURCE[0]}")/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/logger.sh"
+
 declare -ga BS_CLEANUP_STACK=()
 
 # @description Add cleanup function to stack / Добавить функцию очистки в стек
@@ -23,7 +33,7 @@ cleanup::add() {
 	local fn="${1-}"
 	if [[ -z "${fn}" ]]; then
 		log::warn "cleanup::add: не указана функция"
-		return 2
+		return "${E_INVALID:-2}"
 	fi
 	BS_CLEANUP_STACK+=("${fn}")
 }
@@ -62,9 +72,9 @@ errorhandler::setup_trap() {
 # @example
 #   errorhandler::throw "my::func" "Something failed" "${LIB_ERROR_FILE_NOT_FOUND}"
 errorhandler::throw() {
-	local func_name="${1:-unknown}"
-	local message="${2:-}"
-	local code="${3:-${E_ERROR:-1}}"
+	local -r func_name="${1:-unknown}"
+	local -r message="${2:-}"
+	local -r code="${3:-${E_ERROR:-1}}"
 
 	# Логируем через log::error, если logger загружен, иначе — в stderr
 	# Log via log::error if logger is loaded, otherwise to stderr
@@ -83,7 +93,7 @@ errorhandler::throw() {
 #   BS::exit
 #   BS::exit 1
 bs::exit() {
-    local exit_code="${1:-0}"
+    local -r exit_code="${1:-0}"
     # Run all cleanup functions / Запустить все функции очистки
     cleanup::__run_all
     exit "${exit_code}"
@@ -96,8 +106,8 @@ bs::exit() {
 # @example
 #   error::exit "Something went wrong" 2
 error::exit() {
-    local message="${1}"
-    local exit_code="${2:-1}"
+    local -r message="${1}"
+    local -r exit_code="${2:-${E_ERROR:-1}}"
     
     log::error "${message}"
     bs::exit "${exit_code}"
@@ -110,8 +120,8 @@ error::exit() {
 # @example
 #   error::exit_with_backtrace "Critical error occurred" 3
 error::exit_with_backtrace() {
-    local message="${1}"
-    local exit_code="${2:-1}"
+    local -r message="${1}"
+    local -r exit_code="${2:-${E_ERROR:-1}}"
     
     log::error "${message}"
     log::error "Backtrace:"
@@ -133,8 +143,8 @@ error::exit_with_backtrace() {
 # @example
 #   error::handle 127 "Command not found"
 error::handle() {
-    local error_code="${1}"
-    local message="${2}"
+    local -r error_code="${1}"
+    local -r message="${2}"
     
     log::error "Error ${error_code}: ${message}"
     
@@ -152,7 +162,7 @@ error::handle() {
 # @return 0 if function exists, 1 otherwise / 0 если функция существует, 1 в противном
 # случае
 function_exists() {
-    local fn="${1}"
+    local -r fn="${1}"
     declare -F "${fn}" >/dev/null 2>&1
 }
 
@@ -163,8 +173,8 @@ function_exists() {
 # @example
 #   error::set_handler 127 my_not_found_handler
 error::set_handler() {
-    local error_code="${1}"
-    local handler="${2}"
+    local -r error_code="${1}"
+    local -r handler="${2}"
     
     if function_exists "${handler}"; then
         # Create a named handler function
@@ -182,7 +192,7 @@ error::set_handler() {
 # @example
 #   error::reset_handler 127
 error::reset_handler() {
-    local error_code="${1}"
+    local -r error_code="${1}"
     
     unset -f "error::handler::${error_code}" 2>/dev/null
     log::debug "Reset handler for error ${error_code}"
@@ -193,14 +203,14 @@ error::reset_handler() {
 # @example
 #   error::try command_that_might_fail
 error::try() {
-    local result=0
+    local -i result=0
     "$@" || result=$?
-    
+
     if [[ ${result} -ne 0 ]]; then
         log::error "Command failed: $*"
-        return ${result}
+        return "${result}"
     fi
-    
+
     return 0
 }
 
@@ -226,11 +236,11 @@ error::try_with_fallback() {
 # @example
 #   error::retry 3 command_that_might_fail
 error::retry() {
-    local max_retries="${1}"
+    local -r max_retries="${1}"
     shift
     local cmd=("$@")
-    local attempt=1
-    local result=0
+    local -i attempt=1
+    local -i result=0
     
     while [[ ${attempt} -le ${max_retries} ]]; do
         log::debug "Attempt ${attempt}/${max_retries}: ${cmd[*]}"
@@ -282,16 +292,16 @@ error::with_timeout() {
 # @example
 #   error::panic "Critical system failure"
 error::panic() {
-    local message="${1}"
-    
+    local -r message="${1}"
+
     log::error "PANIC: ${message}"
     log::error "System is in an inconsistent state. Terminating immediately."
-    
+
     # Run cleanup functions
     cleanup::__run_all
-    
+
     # Exit immediately with error code
-    exit 1
+    exit "${E_ERROR:-1}"
 }
 
 # @description Log error without exiting / Записать ошибку без выхода
@@ -299,7 +309,7 @@ error::panic() {
 # @example
 #   error::log "Non-fatal error occurred"
 error::log() {
-    local message="${1}"
+    local -r message="${1}"
     log::error "${message}"
 }
 
@@ -310,9 +320,9 @@ error::log() {
 # @example
 #   error::conditional "command -v nonexistent >/dev/null 2>&1" "Command not found" 127
 error::conditional() {
-    local condition="${1}"
-    local message="${2}"
-    local exit_code="${3:-1}"
+    local -r condition="${1}"
+    local -r message="${2}"
+    local -r exit_code="${3:-${E_ERROR:-1}}"
     
     if eval "${condition}"; then
         error::exit "${message}" "${exit_code}"
@@ -325,8 +335,8 @@ error::conditional() {
 # @example
 #   error::conditional_warning "check_deprecated_feature" "Feature is deprecated"
 error::conditional_warning() {
-    local condition="${1}"
-    local message="${2}"
+    local -r condition="${1}"
+    local -r message="${2}"
     
     if eval "${condition}"; then
         log::warn "${message}"
@@ -339,21 +349,23 @@ error::conditional_warning() {
 # @example
 #   error::handler::command_not_found "mycommand"
 error::handler::command_not_found() {
-    local cmd="${1}"
+    local -r cmd="${1}"
     log::error "Command not found: ${cmd}"
-    
+
     # Check if the command exists in any package
     if command -v apt >/dev/null 2>&1; then
-        local package=$(apt-cache search "${cmd}" | head -n 1 | awk '{print $1}')
+        local package
+        package=$(apt-cache search "${cmd}" | head -n 1 | awk '{print $1}')
         if [[ -n "${package}" ]]; then
             log::info "You might need to install package: ${package}"
         fi
     elif command -v dnf >/dev/null 2>&1; then
-        local package=$(dnf search "${cmd}" 2>/dev/null | grep -E '^\w' | head -n 1 | awk '{print $1}')
+        local package
+        package=$(dnf search "${cmd}" 2>/dev/null | grep -E '^\w' | head -n 1 | awk '{print $1}')
         if [[ -n "${package}" ]]; then
             log::info "You might need to install package: ${package}"
         fi
     fi
-    
+
     error::exit "Command '${cmd}' not found" 127
 }

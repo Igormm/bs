@@ -1,5 +1,15 @@
 #!/usr/bin/env bs
 # safety.sh — Safety features for newbies / Функции безопасности для новичков
+# @depends core/const, core/logger, core/utils
+
+# Source Guard / Защита от повторной загрузки
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
+bs::guard "SYSTEM_SAFETY" || return 0
+
+# Зависимости / Dependencies
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
 
 # Safety levels / Уровни безопасности
 declare -g SAFETY_LEVEL="normal"  # paranoid, strict, normal, relaxed

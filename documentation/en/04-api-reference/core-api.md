@@ -2,7 +2,7 @@
 
 # Core API Reference
 
-Reference for the core modules: `core/logger.sh`, `core/errorhandler.sh`, `core/const.sh`, `core/version.sh`.
+Reference for the core modules: `core/logger.sh`, `core/errorhandler.sh`, `core/const.sh`, `core/version.sh`, `core/guard.sh`.
 For `core/args.sh` and `core/utils.sh` see the [Core utils module](../03-modules/core-utils.md).
 
 ## Loading
@@ -18,6 +18,29 @@ load "core/version"      # version information
 ```
 
 `load` resolves paths relative to `BS_ROOT` without the `.sh` extension and prevents duplicate loading.
+
+---
+
+## Source Guard — `core/guard.sh`
+
+The single double-source protection implementation for all modules. Not loaded via `load` — modules source it directly by relative path.
+
+#### `bs::guard <name>`
+- Parameters: `$1` — module name (without `__` / `_SOURCED`, case-insensitive)
+- Returns: 0 on first load (the `__NAME_SOURCED` mark is set), 1 if the module was already loaded
+- Example: `bs::guard "my_module" || return 0`
+
+#### `bs::guard_loaded <name>`
+- Parameters: `$1` — module name
+- Returns: 0 if the module is loaded, 1 otherwise
+- Example: `bs::guard_loaded "logger" && echo "logger is here"`
+
+Module template:
+
+```bash
+source "$(dirname -- "${BASH_SOURCE[0]}")/../core/guard.sh"  # path relative to the module file
+bs::guard "MY_MODULE" || return 0
+```
 
 ---
 

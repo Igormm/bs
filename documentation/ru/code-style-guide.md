@@ -59,32 +59,41 @@ utils::strict
 ```bash
 #!/usr/bin/env bash
 # lib/my_module.sh
+#
+# @depends core/const, core/logger, core/utils
 
-# Source Guard
-if utils::guard "MY_MODULE"; then return 0; fi
-readonly __MY_MODULE_SOURCED=1
+# Source Guard — единая обёртка из core/guard.sh
+source "$(dirname -- "${BASH_SOURCE[0]}")/../core/guard.sh"
+bs::guard "MY_MODULE" || return 0
 
-# Зависимости загружаются через load (путь от корня фреймворка,
-# без расширения .sh)
-load "core/logger"
+# Зависимости — self-source относительно файла модуля (модуль работает
+# и при прямом source, без загрузчика); @depends в заголовке дублирует
+# их для load
+source "$(dirname -- "${BASH_SOURCE[0]}")/../core/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../core/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../core/utils.sh"
 
 # Глобальные константы и структуры модуля
 readonly MODULE_NAME="my_module"
 declare -gA MODULE_CONFIG
 ```
 
-`utils::guard "name"` ([core/utils.sh](../../core/utils.sh)) проверяет
-переменную `__NAME_SOURCED`: возвращает 0, если модуль ещё не загружался, и 1,
-если уже загружался (тогда файл сразу завершает подключение).
+`bs::guard "name"` ([core/guard.sh](../../core/guard.sh)) атомарно проверяет
+и выставляет переменную `__NAME_SOURCED`: возвращает 1, если модуль
+**уже загружался** (тогда `|| return 0` завершает подключение), и 0 при
+первой загрузке — метка ставится, код модуля выполняется дальше.
 
 При первой загрузке переменная `__MY_MODULE_SOURCED` не определена — код
 выполняется; при повторной переменная уже существует, и `return` пропускает
-тело файла.
+тело файла. Ручную идиому `[[ -n "${__X_SOURCED:-}" ]] && return 0` в новых
+модулях не используйте. Устаревший `utils::guard` из `core/utils.sh`
+сохранён как алиас для обратной совместимости.
 
 Не загружайте модули через `source lib/...`. Используйте функцию `load`
 ([bootstrap/loader.sh](../../bootstrap/loader.sh)): она разрешает пути
 относительно `BS_ROOT`, отслеживает уже загруженные модули и обнаруживает
-циклические зависимости.
+циклические зависимости. Подробнее о метаданных модуля см.
+[раздел 8](#8-метаданные-модуля-и-source-guard).
 
 ## 2. Именование
 
@@ -257,7 +266,141 @@ fi
 utils::ignore systemctl stop some-service
 ```
 
-## 7. Структура проекта
+## 7. Абстракции фреймворка
+
+Помимо базовых идиом в `core/utils.sh`, фреймворк предоставляет высокоуровневые
+абстракции для потоков, файлов и процессов. Используйте их в новых модулях
+вместо низкоуровневых команд.
+
+### 7.1 Потоки ввода-вывода
+
+Модуль `lib/io/streams.sh` централизует работу с потоками, FD и перенаправлениями.
+
+| Вместо | Используйте |
+|--------|-------------|
+| `echo "$msg"` | `io::streams::print "$msg"` |
+| `echo -n "$msg"` | `io::streams::printn "$msg"` |
+| `printf "%s" "$data"` | `io::streams::printf "%s" "$data"` (формат — отдельный аргумент) |
+| `>&2 echo` | `io::streams::eprint "$msg"` |
+| `exec 1>file` | `io::streams::redirect_stdout "file"` |
+| `exec 3>&1` / `exec 1>&3-` | `io::streams::save 1 saved` / `io::streams::restore "$saved" 1` |
+
+```bash
+load "lib/io/streams"
+
+io::streams::print "safe output"
+io::streams::eprint "error message"
+```
+
+Правила:
+- Никогда не передавайте пользовательские данные в строку формата `printf`.
+- Для динамических дескрипторов используйте синтаксис Bash 4: `exec {fd}<file`.
+- Библиотечные функции не должны писать в stdout, если это не их прямая задача;
+  диагностику направляйте через `log::warn` / `log::error`.
+
+### 7.2 Файловые операции
+
+Модуль `lib/io/files.sh` (FSH API) заменяет прямые вызовы `cp`, `mv`, `rm`.
+
+```bash
+load "lib/io/files"
+
+io::files::copy_file "src.txt" "dst.txt"
+io::files::ensure_dir "my/dir" "0750"
+io::files::move "old" "new"
+io::files::remove "tmp"
+```
+
+Особенности:
+- Поддержка `FRAMEWORK_DRY_RUN=true`: команда только логируется, но не выполняется.
+- Атомарные операции через временный файл/каталог рядом с целью.
+- Автоматические бэкапы через `BS_FILES_BACKUP_SUFFIX`.
+- Cross-device move с fallback на `cp -a` + `rm -rf`.
+- Коды ошибок: `E_INVALID`, `LIB_ERROR_FILE_NOT_FOUND`, `LIB_ERROR_FILE_OPERATION`.
+
+### 7.3 Сторож процессов и отладка strace
+
+Модуль `lib/io/process.sh` запускает команду, следит за таймаутом и зависанием,
+собирает диагностику и при необходимости запускает `strace`.
+
+```bash
+load "lib/io/process"
+
+# Таймаут 60 с, считать зависшим после 30 с молчания
+io::process::guard --timeout 60 --hang-after 30 -- ./long-task
+
+# Дополнительно собирать сетевой strace
+io::process::guard --timeout 120 --hang-after 60 --strace-net -- ./server
+```
+
+При срабатывании сторожа в диагностическом каталоге создаётся:
+- `report.log` — снимок `/proc/<pid>/status`, `stack`, `fd/`, `wchan`, `ps`;
+- `strace_file.log` — `strace -p <pid> -e trace=read,write,%file`;
+- `strace_net.log` — `strace -p <pid> -e trace=%net` (если запрошен).
+
+Правила:
+- Всегда отделяйте аргументы самой команды от опций сторожа через `--`.
+- strace запускается с `sudo -n`; если прав нет — диагностика собирается без strace.
+- Используйте cleanup-stack (`cleanup::add`) для очистки дочерних процессов.
+
+## 8. Метаданные модуля и Source Guard
+
+### 8.1 Source Guard
+
+Каждый модуль должен защищаться от повторного импорта. Используйте единую
+обёртку `bs::guard` из [core/guard.sh](../../core/guard.sh) — она и проверяет
+метку `__NAME_SOURCED`, и выставляет её за один вызов:
+
+```bash
+#!/usr/bin/env bash
+# lib/my_module.sh
+
+source "$(dirname -- "${BASH_SOURCE[0]}")/../core/guard.sh"
+bs::guard "MY_MODULE" || return 0
+```
+
+Путь до `guard.sh` указывается относительно файла модуля (из `core/` —
+просто `guard.sh` рядом, из `lib/<group>/` — `../../core/guard.sh`).
+
+Устаревшие варианты, встречающиеся в старом коде:
+
+```bash
+# check-only хелпер из core/utils.sh (deprecated, алиас к bs::guard_loaded)
+if utils::guard "MY_MODULE"; then return 0; fi
+readonly __MY_MODULE_SOURCED=1
+
+# ручная идиому в ранних модулях core/
+[[ -n "${__CONST_SOURCED:-}" ]] && return 0
+readonly __CONST_SOURCED=1
+```
+
+### 8.2 Метаданные
+
+После Source Guard объявляйте версию и отметку о загрузке:
+
+```bash
+readonly MODULE_NAME="my_module"
+declare -g MODULE_VERSION="1.0.0"
+```
+
+В конце модуля:
+
+```bash
+declare -g MODULE_LOADED="1"
+```
+
+### 8.3 Зависимости
+
+Загружайте зависимости через `load` и декларируйте их комментарием `# @depends`:
+
+```bash
+# @depends core/logger, core/errorhandler, lib/io/streams
+load "core/logger"
+load "core/errorhandler"
+load "lib/io/streams"
+```
+
+## 9. Структура проекта
 
 Реальная структура фреймворка BS:
 
@@ -278,7 +421,7 @@ bs/
 └── README.md
 ```
 
-## 8. Тестирование и линтинг
+## 10. Тестирование и линтинг
 
 Тестирование: используйте собственную тестовую библиотеку фреймворка
 [tests/testframework.sh](../../tests/testframework.sh) — не BATS. Она

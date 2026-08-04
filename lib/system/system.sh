@@ -8,6 +8,16 @@
 #   load "lib/system"
 #   system::keyboard_layout "us"
 #   system::set_timezone "Europe/Moscow"
+# @depends core/const, core/logger, core/utils
+
+# Source Guard / Защита от повторной загрузки
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
+bs::guard "SYSTEM_SYSTEM" || return 0
+
+# Зависимости / Dependencies
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
 
 # @description Set keyboard layout / Установить раскладку клавиатуры
 # @param $1 Keyboard layout code (e.g., "us", "ru") / Код раскладки клавиатуры (например,

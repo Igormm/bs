@@ -6,6 +6,17 @@
 # extensive list.
 # / Этот модуль предоставляет широкий спектр функций системных утилит на основе обширного
 # списка пользователя.
+# @depends core/const, core/logger, core/utils, lib/system/distro
+
+# Source Guard / Защита от повторной загрузки
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
+bs::guard "SYSTEM_UTILS" || return 0
+
+# Зависимости / Dependencies
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/distro.sh"
 
 # @description Get OS type / Получить тип ОС
 # @return OS type string / Строка типа ОС

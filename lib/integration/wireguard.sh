@@ -33,19 +33,18 @@
 # @author BS Framework
 # @since 2026-01-06
 # @version 1.0.0
+# @depends core/const, core/logger, core/utils, core/errorhandler, lib/system/platformcheck
 
-# Check if module is already loaded
-if [[ -n "${BOSA_LIB_INTEGRATION_WIREGUARD_LOADED:-}" ]]; then
-    utils::ignore log::debug "WireGuard module already loaded"
-    return 0
-fi
-readonly BOSA_LIB_INTEGRATION_WIREGUARD_LOADED=1
+# Source Guard / Защита от повторной загрузки
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
+bs::guard "INTEGRATION_WIREGUARD" || return 0
 
-# Import required modules
-source "${BS_HOME}/core/const.sh"
-source "${BS_HOME}/core/logger.sh"
-source "${BS_HOME}/core/errorhandler.sh"
-source "${BS_HOME}/lib/system/platformcheck.sh"
+# Зависимости / Dependencies
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/errorhandler.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../system/platformcheck.sh"
 
 # WireGuard configuration constants
 readonly WIREGUARD_CONFIG_DIR="/etc/wireguard"

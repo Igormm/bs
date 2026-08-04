@@ -276,6 +276,7 @@ Key entrypoints and setup:
 - Adding new modules:
   - Place under core/ or appropriate lib/ subdirectory with clear namespace.
   - Declare dependencies via `# @depends`.
+  - Protect against double sourcing via the shared wrapper: `source "$(dirname -- "${BASH_SOURCE[0]}")/guard.sh"` (adjust the relative path to core/), then `bs::guard "NAME" || return 0`. Do not hand-roll `[[ -n "${__X_SOURCED:-}" ]] && return 0` idioms — `bs::guard` checks and sets the mark atomically.
   - Provide unit tests (tests/unit) and integration tests (tests/integration) as needed.
 - Version check refactor plan for current codebase:
   - Implement core/shell.sh with ensure_bash4 and optional zsh-to-bash shimming.

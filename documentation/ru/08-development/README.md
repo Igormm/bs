@@ -29,8 +29,8 @@
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points
 
 # Source Guard / Защита от повторной загрузки
-[[ -n "${__SYSTEM_FOO_SOURCED:-}" ]] && return 0
-readonly __SYSTEM_FOO_SOURCED=1
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
+bs::guard "SYSTEM_FOO" || return 0
 ```
 
 Ключевые моменты:
@@ -40,15 +40,12 @@ readonly __SYSTEM_FOO_SOURCED=1
 - Модуль не вызывает `set -euo pipefail` и не меняет `IFS` — это задача точки
   входа (см. [Строгий режим](#строгий-режим)).
 - Source guard предотвращает повторное выполнение при двойном подключении
-  файла. Тот же паттерн используется в [core/utils.sh:11-12](../../../core/utils.sh)
-  и [lib/io/streams.sh:26-27](../../../lib/io/streams.sh). Для него есть
-  хелпер: `utils::guard "foo"` возвращает 1, если модуль уже загружался
-  ([core/utils.sh:32](../../../core/utils.sh)):
-
-  ```bash
-  if utils::guard "system_foo"; then return 0; fi
-  readonly __SYSTEM_FOO_SOURCED=1
-  ```
+  файла. Используйте обёртку `bs::guard` из
+  [core/guard.sh](../../../core/guard.sh): она атомарно проверяет метку
+  `__SYSTEM_FOO_SOURCED` и выставляет её; возвращает 1, если модуль уже
+  загружался (тогда срабатывает `|| return 0`). Ручная идиома
+  `[[ -n "${__X_SOURCED:-}" ]] && return 0` и check-only хелпер `utils::guard`
+  считаются устаревшими и оставлены для обратной совместимости.
 
 ### Зависимости
 
@@ -61,7 +58,20 @@ readonly __SYSTEM_FOO_SOURCED=1
 ```
 
 Зависимости — пути модулей относительно `BS_ROOT`, без расширения `.sh`,
-через запятую. В скрипте-точке входа модуль подключается так:
+через запятую. Дополнительно каждый модуль подключает свои зависимости
+self-source'ом сразу после Source Guard — путями относительно собственного
+файла, поэтому модуль работает и при прямом `source` в обход загрузчика:
+
+```bash
+bs::guard "SYSTEM_FOO" || return 0
+
+# Зависимости / Dependencies
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
+```
+
+В скрипте-точке входа модуль подключается так:
 
 ```bash
 #!/usr/bin/env bs

@@ -8,32 +8,31 @@
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points
 
 # Source Guard
-[[ -n "${__UTILS_SOURCED:-}" ]] && return 0
-readonly __UTILS_SOURCED=1
+source "$(dirname -- "${BASH_SOURCE[0]}")/guard.sh"
+bs::guard "UTILS" || return 0
 
 
 # Устанавливает строгий режим.
-# @function utils::init
+# @function utils::strict
 utils::strict() {
   set -euo pipefail
   IFS=$'\n\t'
 }
 
 # Проверяет, был ли уже загружен модуль.
-# Возвращает 0 – если НЕ загружен (можно продолжать),
-#            1 – если уже загружён (нужно прервать весь скрипт).
+# Возвращает 0 – если уже загружён (нужно прервать выполнение модуля),
+#            1 – если ещё не загружен (можно продолжать).
 # Использование:
 #   if utils::guard "foo"; then return 0; fi
 #   readonly __FOO_SOURCED=1
 # @function utils::guard
+# @deprecated Используйте bs::guard из core/guard.sh — она и проверяет, и ставит метку
 # @param $1 {string} Уникальное имя модуля (без __ и _SOURCED)
-# @returns 0  модуль ещё не загружался
-# @returns 1  модуль уже загружался
+# @returns 0  модуль уже загружался
+# @returns 1  модуль ещё не загружался
 utils::guard() {
   local -r module="${1:?Module name required}"
-  local -r var="__${module^^}_SOURCED"  # FOO -> __FOO_SOURCED
-  # индирект-расширение имени переменной
-  [[ -n "${!var:-}" ]] && return 1 || return 0
+  bs::guard_loaded "${module}"
 }
 
 # Проверяет наличие команды в PATH.
@@ -45,7 +44,8 @@ utils::guard() {
 # @example
 #   if utils::has dnf; then ...; fi
 utils::has() {
-  command -v "$1" >/dev/null 2>&1
+  local -r cmd="${1}"
+  command -v "${cmd}" >/dev/null 2>&1
 }
 
 # Выполняет команду, полностью подавляя вывод. Код возврата сохраняется.
@@ -150,35 +150,36 @@ utils::ensure_source() {
 
 # Function to check if current shell is at least the required version
 utils::ensure_shell_version() {
-    
-    local required_version=${1:-4}  # Default to version 4 if not specified
-    
+    local -r required_version="${1:-4}"  # Default to version 4 if not specified
+
     if [[ -z "${SHELL:-}" ]]; then
-        echo "Error: SHELL variable is not set, cannot verify shell version" >&2
+        printf 'Error: SHELL variable is not set, cannot verify shell version\n' >&2
         return 1
     fi
-    local shell_name=$(basename "$SHELL")
+    local -r shell_name="$(basename "$SHELL")"
 
-    case "$shell_name" in
+    case "${shell_name}" in
         "bash")
-            if [[ -z "$BASH_VERSION" ]] || [[ "${BASH_VERSION%%.*}" -lt "$required_version" ]]; then
-                echo "Error: Bash version $required_version or higher is required but you have version $BASH_VERSION" >&2
+            if [[ -z "${BASH_VERSION:-}" ]] || [[ "${BASH_VERSION%%.*}" -lt "${required_version}" ]]; then
+                printf 'Error: Bash version %s or higher is required but you have version %s\n' \
+                    "${required_version}" "${BASH_VERSION:-unknown}" >&2
                 return 1
             fi
             ;;
         "zsh")
-            if [[ -z "$ZSH_VERSION" ]] || [[ "${ZSH_VERSION%%.*}" -lt "$required_version" ]]; then
-                echo "Error: Zsh version $required_version or higher is required but you have version $ZSH_VERSION" >&2
+            if [[ -z "${ZSH_VERSION:-}" ]] || [[ "${ZSH_VERSION%%.*}" -lt "${required_version}" ]]; then
+                printf 'Error: Zsh version %s or higher is required but you have version %s\n' \
+                    "${required_version}" "${ZSH_VERSION:-unknown}" >&2
                 return 1
             fi
             ;;
         *)
-            echo "Warning: Unknown shell $shell_name, cannot verify version requirements" >&2
+            printf 'Warning: Unknown shell %s, cannot verify version requirements\n' "${shell_name}" >&2
             return 1
             ;;
     esac
-    
-    echo "Shell $shell_name meets version requirement (>= $required_version)"
+
+    printf 'Shell %s meets version requirement (>= %s)\n' "${shell_name}" "${required_version}"
     return 0
 }
 
@@ -190,8 +191,11 @@ utils::detect_root() {
     
     # 1. Пробуем получить из переменной окружения
     if [[ -n "${FRAMEWORK_ROOT:-}" ]] && [[ -d "${FRAMEWORK_ROOT}" ]]; then
-        log::debug "FRAMEWORK_ROOT задан явно: ${FRAMEWORK_ROOT}"
-        return
+        # log:: опционален для utils (нижний уровень) / log:: is optional for utils
+        if declare -F log::debug >/dev/null 2>&1; then
+            log::debug "FRAMEWORK_ROOT задан явно: ${FRAMEWORK_ROOT}"
+        fi
+        return 0
     fi
     
     # 2. Определяем путь к скрипту
@@ -219,7 +223,11 @@ utils::detect_root() {
     FRAMEWORK_ROOT="$(cd -- "${script_dir}" && pwd -P)"
     export FRAMEWORK_ROOT
     
-    log::info "Корень фреймворка: ${FRAMEWORK_ROOT}"
+    # log:: опционален для utils (нижний уровень) / log:: is optional for utils
+    if declare -F log::info >/dev/null 2>&1; then
+        log::info "Корень фреймворка: ${FRAMEWORK_ROOT}"
+    fi
+    return 0
 }
 
 #bootdir

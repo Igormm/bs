@@ -27,8 +27,14 @@
 # @depends core/const, core/logger, core/utils, lib/system/permissions
 
 # Source Guard / Защита от повторной загрузки
-[[ -n "${__IO_FILES_SOURCED:-}" ]] && return 0
-readonly __IO_FILES_SOURCED=1
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
+bs::guard "IO_FILES" || return 0
+
+# Зависимости / Dependencies
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../system/permissions.sh"
 
 # Module version / Версия модуля
 declare -g IO_FILES_VERSION="1.0.0"

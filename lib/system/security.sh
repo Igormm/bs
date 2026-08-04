@@ -1,6 +1,16 @@
 #!/usr/bin/env bs
 # security.sh — Security configuration for system setup / Конфигурация безопасности для
 # настройки системы
+# @depends core/const, core/logger, core/utils
+
+# Source Guard / Защита от повторной загрузки
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
+bs::guard "SYSTEM_SECURITY" || return 0
+
+# Зависимости / Dependencies
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
 
 # @description Set up firewall with basic rules / Настроить файрвол с базовыми правилами
 # @param $1 Action ("enable", "disable", "status") / Действие ("enable", "disable",
