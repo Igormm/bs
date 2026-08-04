@@ -88,6 +88,11 @@ load "core/logger"
 load "core/errorhandler"
 load "core/version"
 load "core/utils"
+load "core/config"
+load "core/deps"
+
+# Load configuration from files and env
+config::load
 
 # Mark as initialized
 export BS_INITIALIZED=1

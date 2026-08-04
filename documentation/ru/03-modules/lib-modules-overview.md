@@ -26,10 +26,12 @@ load "lib/data/dataprocessor"
 ## io — `lib/io/`
 
 - [streams.sh](../../../lib/io/streams.sh) — низкоуровневое управление потоками ввода-вывода: вывод, чтение, перенаправление файловых дескрипторов, каналы и определение TTY.
+- [files.sh](../../../lib/io/files.sh) — высокоуровневые файловые операции: копирование, перемещение, синхронизация и удаление файлов/каталогов с dry-run и единой обработкой ошибок.
+- [process.sh](../../../lib/io/process.sh) — обёртка-сторож процесса: таймаут, hang-детекция по stdout/stderr, диагностический снимок `/proc/<pid>` и `strace`.
 
-Ключевые функции: `io::streams::print`, `io::streams::read_line`, `io::streams::redirect_stdout`, `io::streams::pipe`.
+Ключевые функции: `io::streams::print`, `io::streams::read_line`, `io::streams::redirect_stdout`, `io::streams::pipe`, `io::files::copy_dir`, `io::files::sync_dir`, `io::files::copy_matching`, `io::files::move`, `io::files::remove`, `io::process::guard`.
 
-Подробнее: [io-streams.md](io-streams.md)
+Подробнее: [io-streams.md](io-streams.md), [io-files.md](io-files.md), [io-process.md](io-process.md)
 
 ## system — `lib/system/`
 
@@ -57,9 +59,18 @@ load "lib/data/dataprocessor"
 
 ## integration — `lib/integration/`
 
-Клиенты для внешних сервисов и VPN-инструменты: [vkapi.sh](../../../lib/integration/vkapi.sh) (обёртка VK API с кэшированием и ограничением частоты запросов), [vkmusic.sh](../../../lib/integration/vkmusic.sh) (поиск и загрузка музыки VK), [wireguard.sh](../../../lib/integration/wireguard.sh) (управление интерфейсами и пирами WireGuard).
+Клиенты для внешних сервисов, VPN-инструменты, LLM, Kubernetes и коннекторы к другим системам:
+- [http.sh](../../../lib/integration/http.sh) — HTTP-клиент на базе `curl`/`wget` с dry-run, таймаутами и retries.
+- [llm.sh](../../../lib/integration/llm.sh) — единый клиент для OpenAI и Ollama.
+- [k8s.sh](../../../lib/integration/k8s.sh) — обёртка над `kubectl` с namespace по умолчанию и dry-run.
+- [vkapi.sh](../../../lib/integration/vkapi.sh) — обёртка VK API с кэшированием и ограничением частоты запросов.
+- [vkmusic.sh](../../../lib/integration/vkmusic.sh) — поиск и загрузка музыки VK.
+- [wireguard.sh](../../../lib/integration/wireguard.sh) — управление интерфейсами и пирами WireGuard.
+- [result.sh](../../../lib/integration/result.sh) — JSON-контракт результата операций для интеграции с Go-backend, HTTP API и CI.
 
-Ключевые функции: `vkapi::api_call`, `vkmusic::search_and_download`, `wireguard::create_interface`, `wireguard::add_peer`.
+Ключевые функции: `http::get`, `http::post`, `http::retry`, `llm::chat`, `llm::chat_file`, `k8s::pod::list`, `k8s::deployment::restart`, `k8s::apply`, `vkapi::api_call`, `vkmusic::search_and_download`, `wireguard::create_interface`, `wireguard::add_peer`, `result::run`, `result::wrap`, `result::ok`, `result::error`.
+
+Подробнее: [integration-http.md](integration-http.md), [integration-llm.md](integration-llm.md), [integration-k8s.md](integration-k8s.md), [integration-result.md](integration-result.md)
 
 ## frameworks — `lib/frameworks/`
 

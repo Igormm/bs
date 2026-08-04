@@ -23,6 +23,8 @@ consistent code style and with zero external dependencies.
 - **`core/logger`** — уровни, цвета, форматы text/json/structured
 - **`core/utils`** — идиомы тишины: `utils::has`, `utils::quiet`,
   `utils::quiet_err`, `utils::ignore` вместо ручных `>/dev/null 2>&1`
+- **`lib/integration/*`** — HTTP-клиент, LLM (OpenAI/Ollama), Kubernetes,
+  JSON-контракт результата для интеграции с Go-backend / CI
 - **`lib/system/*`** — дистрибутивы, пакеты, пользователи, сервисы, сеть,
   устройства (20+ модулей)
 - **Тесты и CI** — свой тест-фреймворк, ShellCheck, матрица
@@ -45,6 +47,9 @@ consistent code style and with zero external dependencies.
 # Запуск примеров / Run examples
 ./bs run examples/argsparseexample.sh deploy now --env production --dry-run
 ./bs run examples/passwordgenexample.sh --length 24 --count 5
+./bs run examples/http_example.sh
+./bs run examples/llm_example.sh
+./bs run examples/k8s_example.sh
 ```
 
 ## Свой скрипт за 5 строк / A script in 5 lines
@@ -98,6 +103,8 @@ ubuntu, debian:stable, almalinux:9, almalinux:8 — см. `.github/workflows/ci.
 - Начало работы / Getting started — [ru](documentation/ru/01-getting-started/README.md) · [en](documentation/en/01-getting-started/README.md)
 - Архитектура / Architecture — [ru](documentation/ru/02-core-concepts/architecture.md) · [en](documentation/en/02-core-concepts/architecture.md)
 - Идиомы тишины `utils::quiet*` / Silence idioms — [ru](documentation/ru/03-modules/core-utils.md) · [en](documentation/en/03-modules/core-utils.md)
+- JSON-контракт результата / Result contract — [ru](documentation/ru/03-modules/integration-result.md) · [en](documentation/en/03-modules/integration-result.md)
+- HTTP, LLM, Kubernetes / HTTP, LLM, Kubernetes — [ru](documentation/ru/03-modules/integration-http.md) · [en](documentation/en/03-modules/integration-http.md)
 - Стиль кода / Code style — [ru](documentation/ru/code-style-guide.md) · [en](documentation/en/code-style-guide.md)
 - `examples/` — рабочие примеры с комментариями / working examples with comments
 

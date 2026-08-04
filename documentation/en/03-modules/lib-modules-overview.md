@@ -26,10 +26,12 @@ Most lib modules follow the same conventions: a `<module>::init` function, a `<m
 ## io — `lib/io/`
 
 - [streams.sh](../../../lib/io/streams.sh) — low-level I/O stream management: printing, reading, fd redirection, pipes and TTY detection.
+- [files.sh](../../../lib/io/files.sh) — high-level file operations: copying, moving, syncing, and removing files/directories with dry-run and unified error handling.
+- [process.sh](../../../lib/io/process.sh) — process guard wrapper: timeout, hang detection via stdout/stderr, diagnostic snapshot of `/proc/<pid>` and `strace`.
 
-Key functions: `io::streams::print`, `io::streams::read_line`, `io::streams::redirect_stdout`, `io::streams::pipe`.
+Key functions: `io::streams::print`, `io::streams::read_line`, `io::streams::redirect_stdout`, `io::streams::pipe`, `io::files::copy_dir`, `io::files::sync_dir`, `io::files::copy_matching`, `io::files::move`, `io::files::remove`, `io::process::guard`.
 
-Details: [io-streams.md](io-streams.md)
+Details: [io-streams.md](io-streams.md), [io-files.md](io-files.md), [io-process.md](io-process.md)
 
 ## system — `lib/system/`
 
@@ -57,9 +59,18 @@ Key functions: `dataprocessor::json::query`, `dataprocessor::xml::to_json`, `dat
 
 ## integration — `lib/integration/`
 
-Clients for external services and VPN tooling: [vkapi.sh](../../../lib/integration/vkapi.sh) (VK API wrapper with caching and rate limiting), [vkmusic.sh](../../../lib/integration/vkmusic.sh) (VK music search/download), [wireguard.sh](../../../lib/integration/wireguard.sh) (WireGuard interface and peer management).
+Clients for external services, VPN tooling, LLMs, Kubernetes and connectors to other systems:
+- [http.sh](../../../lib/integration/http.sh) — HTTP client based on `curl`/`wget` with dry-run, timeouts and retries.
+- [llm.sh](../../../lib/integration/llm.sh) — unified client for OpenAI and Ollama.
+- [k8s.sh](../../../lib/integration/k8s.sh) — `kubectl` wrapper with default namespace and dry-run.
+- [vkapi.sh](../../../lib/integration/vkapi.sh) — VK API wrapper with caching and rate limiting.
+- [vkmusic.sh](../../../lib/integration/vkmusic.sh) — VK music search/download.
+- [wireguard.sh](../../../lib/integration/wireguard.sh) — WireGuard interface and peer management.
+- [result.sh](../../../lib/integration/result.sh) — JSON result contract for integrations with Go backends, HTTP APIs and CI systems.
 
-Key functions: `vkapi::api_call`, `vkmusic::search_and_download`, `wireguard::create_interface`, `wireguard::add_peer`.
+Key functions: `http::get`, `http::post`, `http::retry`, `llm::chat`, `llm::chat_file`, `k8s::pod::list`, `k8s::deployment::restart`, `k8s::apply`, `vkapi::api_call`, `vkmusic::search_and_download`, `wireguard::create_interface`, `wireguard::add_peer`, `result::run`, `result::wrap`, `result::ok`, `result::error`.
+
+Details: [integration-http.md](integration-http.md), [integration-llm.md](integration-llm.md), [integration-k8s.md](integration-k8s.md), [integration-result.md](integration-result.md)
 
 ## frameworks — `lib/frameworks/`
 

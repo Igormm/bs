@@ -78,6 +78,30 @@ utils::ignore() {
   "$@" >/dev/null 2>&1 || :
 }
 
+# Разбивает строку на массив по заданному разделителю.
+# Безопасна при любом IFS вызывающего: устанавливает локальный IFS внутри функции.
+# @function utils::split
+# @param $1 {string} Имя выходного массива
+# @param $2 {string} Исходная строка
+# @param $3 {string} Разделитель (по умолчанию пробел)
+# @example
+#   utils::split my_array "a b c"
+#   utils::split my_array "one,two,three" ","
+utils::split() {
+  local -n __utils_split_ref="${1:?Array variable name required}"
+  local str="${2:-}"
+  local delim="${3:- }"
+
+  local IFS="${delim}"
+  # Пустая строка даёт пустой массив, а не массив из одной пустой строки
+  if [[ -z "${str}" ]]; then
+    __utils_split_ref=()
+    return 0
+  fi
+
+  read -ra __utils_split_ref <<< "${str}"
+}
+
 # Проверяет существование файла-источника, загружает его и убеждается,
 # что требуемая функция появилась в окружении.
 # Возвращает 0 при успехе, 1 при любой ошибке.

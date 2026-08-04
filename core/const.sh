@@ -64,6 +64,31 @@ readonly LIB_ERROR_DEPENDENCY_MISSING=101
 # Платформа не поддерживается / Platform unsupported
 readonly LIB_ERROR_PLATFORM_UNSUPPORTED=102
 
+#
+# Коды ошибок интеграций / Integration error codes
+# Диапазон 200–249 зарезервирован для integration-модулей.
+# Range 200–249 is reserved for integration modules.
+
+# Ошибка HTTP-запроса / HTTP request error
+readonly INTEGRATION_ERROR_HTTP=200
+
+# Ошибка LLM-провайдера / LLM provider error
+readonly INTEGRATION_ERROR_LLM=201
+
+# Ошибка Kubernetes / Kubernetes error
+readonly INTEGRATION_ERROR_K8S=202
+
+# Отсутствует внешняя зависимость модуля / Module external dependency missing
+readonly INTEGRATION_ERROR_MISSING_DEPS=203
+
+#
+# Коды ошибок модулей / Module error codes
+# Диапазон 210–239 зарезервирован для generic module errors.
+# Range 210–239 is reserved for generic module errors.
+
+# Ошибка конфигурации / Configuration error
+readonly MODULE_ERROR_CONFIG=210
+
 # 
 # Глобальные переменные фреймворка / Framework global variables
 # 

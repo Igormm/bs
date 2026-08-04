@@ -110,7 +110,16 @@ doctor_cmd() {
   echo "BS doctor report"
   echo "BS_ROOT: $BS_ROOT"
 
-  local req=(bootstrap/init.sh core/logger.sh core/errorhandler.sh core/utils.sh)
+  # Bash version / Версия bash
+  echo "Bash version: ${BASH_VERSION}"
+  if [[ ${BASH_VERSINFO[0]} -ge 4 ]]; then
+    echo "  [OK] Bash version"
+  else
+    echo "  [FAIL] Bash 4.0+ required"; fail=1
+  fi
+
+  # Required core files / Обязательные файлы ядра
+  local req=(bootstrap/init.sh bootstrap/loader.sh core/const.sh core/logger.sh core/errorhandler.sh core/version.sh core/utils.sh core/config.sh core/deps.sh)
   for f in "${req[@]}"; do
     if [[ -f "${BS_ROOT}/${f}" ]]; then
       echo "  [OK] ${f}"
@@ -118,6 +127,8 @@ doctor_cmd() {
       echo "  [FAIL] ${f}"; fail=1
     fi
   done
+
+  # Required directories / Обязательные директории
   for d in core lib; do
     if [[ -d "${BS_ROOT}/${d}" ]]; then
       echo "  [OK] dir ${d}"
@@ -125,6 +136,34 @@ doctor_cmd() {
       echo "  [FAIL] dir ${d}"; fail=1
     fi
   done
+
+  # Optional external tools / Опциональные внешние инструменты
+  local opt
+  for opt in shellcheck jq curl wget kubectl; do
+    if command -v "${opt}" >/dev/null 2>&1; then
+      echo "  [OK] optional tool: ${opt}"
+    else
+      echo "  [OPTIONAL] missing tool: ${opt}"
+    fi
+  done
+
+  # Optional dependency check for lib modules / Проверка опциональных зависимостей lib-модулей
+  if command -v deps::check_module >/dev/null 2>&1; then
+    echo "Module dependency check:"
+    local module
+    for module in lib/integration/result lib/integration/http lib/integration/llm lib/integration/k8s; do
+      if [[ -f "${BS_ROOT}/${module}.sh" ]]; then
+        if deps::check_module "${module}" >/dev/null 2>&1; then
+          echo "  [OK] ${module}: dependencies satisfied"
+        else
+          local missing
+          missing="$(deps::list_missing "${module}" 2>/dev/null || true)"
+          echo "  [OPTIONAL] ${module}: missing dependencies: ${missing}"
+        fi
+      fi
+    done
+  fi
+
   return "$fail"
 }
 

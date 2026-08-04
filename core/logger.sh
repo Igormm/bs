@@ -252,7 +252,7 @@ log::success() {
 #   log::warn "Configuration file not found, using defaults"
 log::warn() {
     log::__is_level_allowed "WARN" || return 0
-    log::__format_message "WARN" "$@"
+    log::__format_message "WARN" "$@" >&2
 }
 
 # @description Вывести сообщение об ошибке / Output ERROR level message
