@@ -18,6 +18,13 @@
 #   ./install.sh --local --path         # print snippet / вывести сниппет
 #   ./install.sh --local --update-path  # auto add to ~/.bashrc and/or ~/.zshrc / авто-добавление
 #
+# Important / Важно:
+#   The installer COPIES files to the target location. After installation
+#   the source repository can be removed. Target paths depend on mode:
+#     system (default): /usr/local/lib/bs  + /usr/local/bin/bs
+#     local  (--local): ~/.local/lib/bs    + ~/.local/bin/bs
+#     custom:           $LIB_DIR/bs        + $BIN_DIR/bs
+#
 # Overrides (optional) / Переопределения (опционально):
 #   PREFIX=... BIN_DIR=... LIB_DIR=...
 #

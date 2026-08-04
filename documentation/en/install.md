@@ -82,6 +82,14 @@ Rules: `~/.bashrc` is updated if it exists, or if there is no `~/.zshrc`; `~/.zs
 
 ## Notes
 
+- **The source repository can be removed.**  
+  The installer copies framework files to `TARGET_LIB` and creates a
+  wrapper at `TARGET_BIN`. After installation BS runs from the target
+  directory, not from the repository where `install.sh` was launched.
+  The target directory depends on the mode:
+  - `system` (default): `/usr/local/lib/bs`;
+  - `local` (`--local`): `~/.local/lib/bs`;
+  - custom: values of `PREFIX`, `BIN_DIR`, `LIB_DIR`.
 - bash 4.0+ is required; the installer aborts on older shells via `utils::ensure_shell_version`.
 - If BS is already installed at the target (`is_already_installed`), the installer stops and suggests uninstalling first or overriding `PREFIX`/`BIN_DIR`/`LIB_DIR`.
 - The installer runs under strict mode (`utils::strict`: `set -euo pipefail`) and validates every file it sources via `utils::ensure_source`.

@@ -63,6 +63,14 @@ sudo ./install.sh uninstall      # system
 ./install.sh --local uninstall   # local
 ```
 
+> **Note on the source directory.**  
+> The installer **copies** BS files to the target directory
+> (`~/.local/lib/bs` for `--local`, `/usr/local/lib/bs` for system
+> install; paths can be overridden via `PREFIX`/`LIB_DIR`/`BIN_DIR`)
+> and creates a `bs` wrapper in the matching `bin/`. After a successful
+> install, the source repository can be removed — the framework will
+> run from the target directory.
+
 ## Verify the installation
 
 ```bash

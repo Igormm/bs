@@ -66,6 +66,33 @@ io::streams::print "works: $(args::get 1)"
 
 Запуск / Run: `./script.sh hello` (с `bs` в PATH) или `bs run script.sh hello`.
 
+## Установка / Installation
+
+BS можно запускать прямо из клонированного репозитория, но для регулярного
+использования удобно установить команду `bs` в `PATH`.
+
+```bash
+# Локальная установка в ~/.local (без sudo)
+./install.sh --local
+
+# Системная установка в /usr/local (нужен root)
+sudo ./install.sh
+```
+
+Установщик **копирует** файлы фреймворка в целевой каталог и создаёт
+обёртку `bs` в соответствующем `bin/`. После успешной установки исходный
+репозиторий можно удалить — BS будет работать из целевого каталога.
+
+| Режим | Куда копируется | Обёртка |
+|-------|-----------------|---------|
+| `--local` | `~/.local/lib/bs` | `~/.local/bin/bs` |
+| system (по умолчанию) | `/usr/local/lib/bs` | `/usr/local/bin/bs` |
+| custom | `$LIB_DIR/bs` | `$BIN_DIR/bs` |
+
+Пути переопределяются переменными окружения `PREFIX`, `BIN_DIR` и
+`LIB_DIR`. Подробнее — в [documentation/ru/install.md](documentation/ru/install.md)
+/ [documentation/en/install.md](documentation/en/install.md).
+
 ## Структура / Layout
 
 ```
