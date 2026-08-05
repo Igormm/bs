@@ -5,8 +5,6 @@
 #
 # Этот файл не имеет зависимостей и подключается напрямую (raw source).
 # It has no dependencies and is sourced directly (raw source).
-#
-# @depends (none)
 
 # Self-guard via raw idiom: bs::guard is defined here, so cannot use it yet.
 [[ -n "${__PREREQ_SOURCED:-}" ]] && return 0

@@ -83,6 +83,8 @@ else
 fi
 
 # Load core modules via loader
+# core/prereq must come first: it provides bs::guard and bs::source_relative
+load "core/prereq"
 load "core/const"
 load "core/logger"
 load "core/errorhandler"
