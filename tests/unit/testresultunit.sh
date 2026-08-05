@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # tests/unit/testresultunit.sh — Unit tests for lib/integration/result
 # tests/unit/testresultunit.sh — Модульные тесты для модуля result
 

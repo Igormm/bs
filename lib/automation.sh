@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # automation.sh — Automation tasks module for BS / Модуль задач автоматизации для BS
 #
 # This module provides functions to handle automation tasks based on the provided

@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # shellcheck disable=SC2155
 
 # dataprocessor.sh — Data Processing Module for BS Framework

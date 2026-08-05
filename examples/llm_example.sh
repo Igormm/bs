@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # examples/llm_example.sh — LLM client demo
 # Пример использования LLM-клиента BS.
 

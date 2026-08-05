@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # examples/passwordgenexample.sh — Password generator: /dev/urandom + args
 # examples/passwordgenexample.sh — Генератор паролей: /dev/urandom + args
 #

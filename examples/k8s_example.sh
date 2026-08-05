@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # examples/k8s_example.sh — Kubernetes client demo
 # Пример использования Kubernetes-клиента BS.
 

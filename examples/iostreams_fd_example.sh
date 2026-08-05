@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # examples/iostreams_fd_example.sh — FD management demo for io::streams
 # examples/iostreams_fd_example.sh — Демонстрация управления FD io::streams
 #

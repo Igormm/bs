@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # examples/deploytoolexample.sh — Mini deploy tool: args + io::streams combo
 # examples/deploytoolexample.sh — Мини-утилита деплоя: связка args + io::streams
 #

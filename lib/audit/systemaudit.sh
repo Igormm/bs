@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # shellcheck disable=SC2155
 
 # systemaudit.sh — Linux System Audit Module for BS Framework

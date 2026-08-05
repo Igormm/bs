@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # shellcheck disable=SC2155
 
 # test_ssh_network.sh — Unit tests for SSH Network module

@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # tests/unit/testargsunit.sh — Unit tests for args module
 # tests/unit/testargsunit.sh — Модульные тесты для модуля параметров
 #

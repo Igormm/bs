@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # shellcheck disable=SC2155
 
 # test_vk_music.sh — Unit tests for VK Music integration module

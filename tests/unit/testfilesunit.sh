@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # tests/unit/testfilesunit.sh — Unit tests for lib/io/files
 # tests/unit/testfilesunit.sh — Модульные тесты для модуля io::files
 

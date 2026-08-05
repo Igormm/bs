@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # bosatheme.sh — BS theme for BS bash-it integration
 # @depends core/const, core/logger, core/utils
 

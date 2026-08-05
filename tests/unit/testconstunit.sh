@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # tests/unit/testconstunit.sh — Unit tests for core/const module
 # tests/unit/testconstunit.sh — Модульные тесты для модуля core/const
 #

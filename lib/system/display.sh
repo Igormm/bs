@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # display.sh — Display server and desktop environment configuration for system setup
 # @depends core/const, core/logger, core/utils
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # examples/iostreams_state_example.sh — Stream state demo for io::streams
 # examples/iostreams_state_example.sh — Демонстрация состояния потоков io::streams
 #

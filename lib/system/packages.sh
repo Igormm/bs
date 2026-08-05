@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # packages.sh — Package management for system setup / Управление пакетами для настройки
 # системы
 # @depends core/const, core/logger, core/utils

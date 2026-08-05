@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # examples/ps1configurationexample.sh — PS1 configuration example
 # examples/ps1configurationexample.sh — Пример конфигурации PS1
 #

@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # info.sh — System information for system setup / Системная информация для настройки
 # системы
 # @depends core/const, core/logger, core/utils

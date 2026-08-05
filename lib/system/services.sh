@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # services.sh — Service management for system setup / Управление сервисами для настройки
 # системы
 # @depends core/const, core/logger, core/utils, lib/system/distro

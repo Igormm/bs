@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # permissions.sh — File permissions management for system setup / Управление правами
 # доступа к файлам для настройки системы
 # @depends core/const, core/logger, core/utils

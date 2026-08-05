@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # routing.sh — Routing table configuration for system setup
 # @depends core/const, core/logger, core/utils
 

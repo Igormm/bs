@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # examples/demo.sh — BS framework asciinema demo
 # Короткая демонстрация возможностей BS для записи в asciinema.
 

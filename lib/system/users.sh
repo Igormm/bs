@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # users.sh — User and group management for system setup / Управление пользователями и
 # группами для настройки системы
 # @depends core/const, core/logger, core/utils

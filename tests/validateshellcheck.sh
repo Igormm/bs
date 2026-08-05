@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # tests/validateshellcheck.sh — ShellCheck validation for BS framework
 # tests/validateshellcheck.sh — Проверка ShellCheck для фреймворка BS
 #

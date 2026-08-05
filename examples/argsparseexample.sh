@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # examples/argsparseexample.sh — Parameter tree demo for args module
 # examples/argsparseexample.sh — Демонстрация дерева параметров модуля args
 #

@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # tests/unit/testk8sunit.sh — Unit tests for lib/integration/k8s
 # tests/unit/testk8sunit.sh — Модульные тесты Kubernetes-клиента BS
 

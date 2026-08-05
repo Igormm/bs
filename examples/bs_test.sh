@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # examples/bs_test.sh — Smoke test of BS framework core components
 # examples/bs_test.sh — Дымовой тест основных компонентов фреймворка BS
 #

@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # presentation.sh — Main presentation module for BS
 # This module provides beautiful terminal output styling capabilities
 # @depends core/const, core/logger, core/utils

@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # locale.sh — Localization configuration for system setup / Конфигурация локализации для
 # настройки системы
 # @depends core/const, core/logger, core/utils

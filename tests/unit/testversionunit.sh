@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # tests/unit/testversionunit.sh — Unit tests for core/version module
 # tests/unit/testversionunit.sh — Модульные тесты для модуля core/version
 #

@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # examples/processguard_example.sh — Process Guard usage demo
 # Пример использования обёртки-сторожа io::process::guard.
 

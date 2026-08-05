@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # lib/ui/ps1config.sh — Advanced PS1 configuration module for BS
 # lib/ui/ps1config.sh — Модуль расширенной конфигурации PS1 для BS
 #

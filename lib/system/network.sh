@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # network.sh — Network configuration for system setup / Конфигурация сети для настройки
 # системы
 # @depends core/const, core/logger, core/utils

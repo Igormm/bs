@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # tests/demos/test_ps1_config_demo.sh — Demo of PS1 configuration module
 # tests/demos/test_ps1_config_demo.sh — Демонстрация модуля конфигурации PS1
 #

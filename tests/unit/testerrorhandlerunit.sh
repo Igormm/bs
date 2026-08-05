@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # tests/unit/testerrorhandlerunit.sh — Unit tests for core/errorhandler module
 # tests/unit/testerrorhandlerunit.sh — Модульные тесты для модуля core/errorhandler
 #

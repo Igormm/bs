@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # shellcheck disable=SC2155
 
 # ps1status.sh — PS1 Status Monitoring Module for BS Framework

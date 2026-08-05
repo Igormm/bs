@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # distro.sh — Distribution detection and compatibility / Определение дистрибутива и
 # совместимость
 # @depends core/const, core/logger, core/utils

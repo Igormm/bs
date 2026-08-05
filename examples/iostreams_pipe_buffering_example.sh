@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # examples/iostreams_pipe_buffering_example.sh — Pipe and buffering demo
 # examples/iostreams_pipe_buffering_example.sh — Демонстрация pipe и буферизации
 #

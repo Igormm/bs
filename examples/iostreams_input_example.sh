@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # examples/iostreams_input_example.sh — Input demo for io::streams
 # examples/iostreams_input_example.sh — Демонстрация ввода io::streams
 #

@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # tests/unit/testllmunit.sh — Unit tests for lib/integration/llm
 # tests/unit/testllmunit.sh — Модульные тесты LLM-клиента BS
 

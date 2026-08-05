@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # safety.sh — Safety features for newbies / Функции безопасности для новичков
 # @depends core/const, core/logger, core/utils
 

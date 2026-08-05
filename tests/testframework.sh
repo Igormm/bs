@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # tests/testframework.sh — Basic test framework for BS
 # tests/testframework.sh — Базовый тестовый фреймворк для BS
 #

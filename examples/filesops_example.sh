@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # examples/filesops_example.sh — FSH (io::files) usage demo
 # Пример использования модуля файловых операций BS.
 

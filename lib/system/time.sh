@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # time.sh — Date and time configuration for system setup / Конфигурация даты и времени для
 # настройки системы
 # @depends core/const, core/logger, core/utils

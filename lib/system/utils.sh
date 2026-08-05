@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # utils.sh — Comprehensive system utilities library for BS / Комплексная библиотека
 # системных утилит для BS
 #

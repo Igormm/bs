@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # lib/system/platformcheck.sh — Platform compatibility checker for BS
 # lib/system/platformcheck.sh — Модуль проверки совместимости платформ для BS
 #

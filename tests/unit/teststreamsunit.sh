@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # tests/unit/teststreamsunit.sh — Unit tests for IO streams module
 # tests/unit/teststreamsunit.sh — Модульные тесты для модуля потоков ввода/вывода
 #

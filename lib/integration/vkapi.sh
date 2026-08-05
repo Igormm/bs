@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # vkapi.sh — VK API Integration Module for BS Framework
 # Модуль интеграции VK API для фреймворка BS
 #

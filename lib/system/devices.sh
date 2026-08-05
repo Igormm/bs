@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # devices.sh — Input/output devices configuration for system setup / Конфигурация
 # устройств ввода/вывода для настройки системы
 # @depends core/const, core/logger, core/utils

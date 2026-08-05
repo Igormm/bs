@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # keyboard.sh — Keyboard layout configuration for system setup / Конфигурация раскладки
 # клавиатуры для настройки системы
 # @depends core/const, core/logger, core/utils

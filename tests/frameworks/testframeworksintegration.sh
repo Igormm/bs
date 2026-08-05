@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # shellcheck disable=SC2155
 
 # test_frameworks_integration.sh — Unit tests for Frameworks Integration module

@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # tests/unit/testloaderunit.sh — Unit tests for bootstrap/loader module
 # tests/unit/testloaderunit.sh — Модульные тесты для загрузчика bootstrap/loader
 #

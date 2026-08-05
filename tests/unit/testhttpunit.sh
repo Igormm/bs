@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # tests/unit/testhttpunit.sh — Unit tests for lib/integration/http
 # tests/unit/testhttpunit.sh — Модульные тесты HTTP-клиента BS
 

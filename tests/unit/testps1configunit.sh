@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # tests/unit/test_ps1_config_unit.sh — Unit tests for PS1 configuration module
 # tests/unit/test_ps1_config_unit.sh — Модульные тесты для модуля конфигурации PS1
 #

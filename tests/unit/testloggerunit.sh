@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # tests/unit/test_logger_unit.sh — Unit tests for logger module
 # tests/unit/test_logger_unit.sh — Модульные тесты для модуля logger
 #

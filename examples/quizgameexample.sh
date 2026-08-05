@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # examples/quizgameexample.sh — Timed quiz: wait_readable on stdin
 # examples/quizgameexample.sh — Викторина с таймаутом: wait_readable на stdin
 #

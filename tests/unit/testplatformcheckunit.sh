@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # tests/unit/test_platform_check_unit.sh — Unit tests for platform check module
 # tests/unit/test_platform_check_unit.sh — Модульные тесты для модуля проверки платформы
 #

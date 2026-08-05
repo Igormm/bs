@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # tests/unit/testprocessunit.sh — Unit tests for lib/io/process
 # tests/unit/testprocessunit.sh — Модульные тесты для Process Guard
 

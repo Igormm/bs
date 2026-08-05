@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # tests/validatesyntax.sh — Bash syntax validation for BS framework
 # tests/validatesyntax.sh — Проверка синтаксиса bash для фреймворка BS
 #

@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # examples/http_example.sh — HTTP client demo
 # Пример использования HTTP-клиента BS.
 

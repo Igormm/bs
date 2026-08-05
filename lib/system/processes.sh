@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # processes.sh — Process management for system setup / Управление процессами для настройки
 # системы
 # @depends core/const, core/logger, core/utils

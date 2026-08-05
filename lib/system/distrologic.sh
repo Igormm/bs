@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # distrologic.sh — Distribution-specific logic for BS / Логика для конкретного
 # дистрибутива для BS
 #

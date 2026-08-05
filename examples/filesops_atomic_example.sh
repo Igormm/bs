@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # examples/filesops_atomic_example.sh — FSH atomic/backup/fallback demo
 # Пример атомарного копирования, резервных копий и move-fallback в BS.
 

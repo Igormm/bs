@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # logging.sh — Logging configuration for system setup / Конфигурация логирования для
 # настройки системы
 # @depends core/const, core/logger, core/utils

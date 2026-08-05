@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # examples/iostreams_dev_example.sh — /dev special files demo for io::streams
 # examples/iostreams_dev_example.sh — Демонстрация специальных файлов /dev
 #

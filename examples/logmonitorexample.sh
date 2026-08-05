@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # examples/logmonitorexample.sh — Live log monitor: pipes + non-blocking reads
 # examples/logmonitorexample.sh — Живой монитор лога: pipe + неблокирующее чтение
 #

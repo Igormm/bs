@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # examples/iostreams_redirection_example.sh — Redirection demo for io::streams
 # examples/iostreams_redirection_example.sh — Демонстрация перенаправлений io::streams
 #

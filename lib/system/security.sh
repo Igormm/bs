@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # security.sh — Security configuration for system setup / Конфигурация безопасности для
 # настройки системы
 # @depends core/const, core/logger, core/utils

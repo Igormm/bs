@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # examples/result_example.sh — JSON result contract demo for BS integrations
 # Пример JSON-контракта результата для интеграций BS (Go backend и др.).
 

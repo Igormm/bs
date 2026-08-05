@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # tests/runalltests.sh — Comprehensive test runner for BS framework
 # tests/runalltests.sh — Комплексный запуск всех тестов фреймворка BS
 #

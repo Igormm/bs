@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # examples/iostreams_output_example.sh — Safe output demo for io::streams
 # examples/iostreams_output_example.sh — Демонстрация безопасного вывода io::streams
 #
