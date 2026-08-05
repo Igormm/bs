@@ -20,10 +20,6 @@
 # @optdeps jq
 
 # Source Guard / Защита от повторной загрузки
-# Load core prerequisites if not already available
-if ! declare -f bs::guard >/dev/null 2>&1; then
-    source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/prereq.sh"
-fi
 bs::guard "IO_INTEGRATION_LLM" || return 0
 
 # Зависимости / Dependencies

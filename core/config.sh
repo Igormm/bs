@@ -14,11 +14,6 @@
 #
 # @depends core/const, core/logger, core/utils
 
-# Core prerequisites
-# Load core prerequisites if not already available
-if ! declare -f bs::guard >/dev/null 2>&1; then
-    source "$(dirname -- "${BASH_SOURCE[0]}")/prereq.sh"
-fi
 bs::guard "CORE_CONFIG" || return 0
 
 # Зависимости / Dependencies
