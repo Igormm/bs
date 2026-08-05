@@ -1,8 +1,7 @@
 # Migrating from BOSA to BS
 
 The project was renamed from **BOSA** to **BS** (Bash Open Source Architecture).
-This note lists the renames for anyone who knew the old version. Source:
-[archive completion report](../archive/09-refactoring/02-completion-report.md).
+This note lists the renames for anyone who knew the old version.
 
 ## Project and variable names
 
@@ -88,5 +87,5 @@ Modules removed after the rename (no longer in the repository):
 ## See also
 
 - [README](../../README.md)
-- [Best practices](../../best-practices.md) — naming conventions
+- [Best practices](./best-practices.md) — naming conventions
   (`log::`, `bs::`, `BS_*`)

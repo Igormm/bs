@@ -436,7 +436,7 @@ bs/
 ├── tests/             # Tests: testframework.sh, runalltests.sh,
 │                      #   unit/, integration/, ...
 ├── examples/          # Usage examples
-├── documentation/     # Documentation (en/, ru/, archive/)
+├── documentation/     # Documentation (en/, ru/)
 ├── bs                 # The bs launcher (shebang target)
 ├── boot.sh            # Entry point for bootstrapping the environment
 ├── install.sh         # Installer

@@ -104,7 +104,7 @@ lib/                # io, system, ui, network, data, integration, ...
 install/            # модульный установщик / modular installer
 tests/              # тест-фреймворк и наборы тестов / test framework & suites
 examples/           # примеры (bs run examples/...) 
-documentation/      # документация: en/ и ru/ (+ archive/) / docs: en/ & ru/ (+ archive/)
+documentation/      # документация: en/ и ru/ / docs: en/ & ru/
 ```
 
 ## Тестирование / Testing

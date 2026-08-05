@@ -86,7 +86,7 @@ load "lib/system/foo"
 
 Публичные функции документируются `@`-аннотациями непосредственно над
 функцией (гибридный стиль из
-[руководства по стилю](../../archive/code-style-guide.md)):
+[руководства по стилю](../../code-style-guide.md)):
 
 ```bash
 # @description Check if a package is installed / Проверить, установлен ли пакет

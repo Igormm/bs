@@ -84,7 +84,7 @@ modules in `BS_LOADED_MODULES` and skips duplicates.
 
 Public functions are documented with `@`-annotations directly above the
 function (the hybrid style from the
-[code style guide](../../archive/code-style-guide.md)):
+[code style guide](../../code-style-guide.md)):
 
 ```bash
 # @description Check if a package is installed / Проверить, установлен ли пакет

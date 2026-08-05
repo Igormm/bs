@@ -438,7 +438,7 @@ bs/
 ├── tests/             # Тесты: testframework.sh, runalltests.sh,
 │                      #   unit/, integration/, ...
 ├── examples/          # Примеры использования
-├── documentation/     # Документация (en/, ru/, archive/)
+├── documentation/     # Документация (en/, ru/)
 ├── bs                 # Лаунчер bs (цель shebang)
 ├── boot.sh            # Точка входа для инициализации окружения
 ├── install.sh         # Установщик

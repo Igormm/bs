@@ -30,6 +30,5 @@ an I/O streams abstraction and a set of system modules.
 
 - [Developer guide](08-development/README.md) — writing modules, `# @depends`, pre-commit checks.
 - [Code style guide](code-style-guide.md) — project conventions.
+- [Best practices](best-practices.md) — high-level guidelines for contributors.
 - [Migration BOSA → BS](09-migration-bosa-to-bs.md) — renaming tables for those who knew the old version.
-
-Historical reports from previous stages live in [archive/](../archive/) and are not part of the main navigation.

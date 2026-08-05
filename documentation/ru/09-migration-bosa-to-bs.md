@@ -2,7 +2,7 @@
 
 Проект переименован из **BOSA** в **BS** (Bash Open Source Architecture).
 Эта заметка перечисляет переименования для тех, кто знал старую версию.
-Источник: [архивный отчёт о завершении](../archive/09-refactoring/02-completion-report.md).
+
 
 ## Имена проекта и переменных
 
@@ -88,5 +88,5 @@ load "core/args"
 ## См. также
 
 - [README](../../README.md)
-- [Best practices](../../best-practices.md) — соглашения об именовании
+- [Best practices](./best-practices.md) — соглашения об именовании
   (`log::`, `bs::`, `BS_*`)
