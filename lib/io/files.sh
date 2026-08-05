@@ -35,7 +35,9 @@ bs::guard "IO_FILES" || return 0
 bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../system/permissions.sh"
 
 # Module version / Версия модуля
+# shellcheck disable=SC2034
 declare -g IO_FILES_VERSION="1.0.0"
+# shellcheck disable=SC2034
 declare -g IO_FILES_LOADED="1"
 
 # ==========================================

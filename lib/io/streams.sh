@@ -460,6 +460,8 @@ io::streams::wait_readable() {
         return "${E_ERROR:-1}"
     fi
 
+    # byte is populated by read; value intentionally unused
+    # shellcheck disable=SC2034
     local byte
     local IFS=""
     utils::quiet_err read -r -t "${timeout}" -u "${fd}" -n 1 byte
@@ -540,6 +542,7 @@ io::streams::list_fds() {
 # ==========================================
 
 # Отмечаем модуль как загруженный / Mark module as loaded
+# shellcheck disable=SC2034
 declare -g IO_STREAMS_LOADED="1"
 
 utils::quiet_err log::debug "IO streams module initialized, version: ${IO_STREAMS_VERSION}" || true

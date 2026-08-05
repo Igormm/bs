@@ -23,7 +23,9 @@ bs::guard "IO_PROCESS" || return 0
 bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/errorhandler.sh"
 
 # Module version / Версия модуля
+# shellcheck disable=SC2034
 declare -g IO_PROCESS_VERSION="1.0.0"
+# shellcheck disable=SC2034
 declare -g IO_PROCESS_LOADED="1"
 
 # Exit codes specific to this module / Специфичные коды возврата модуля
