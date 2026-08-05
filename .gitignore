@@ -10,3 +10,8 @@
 # IDE
 .kdev4/
 .qodo/
+
+# Local drafts / Локальные черновики (не публикуются)
+# Local promo/article drafts that should never be committed
+*_DRAFT.md
+PROMO_DRAFT.md
