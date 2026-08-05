@@ -39,7 +39,10 @@
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points
 
 # Core prerequisites
-source "$(dirname -- "${BASH_SOURCE[0]}")/prereq.sh"
+# Load core prerequisites if not already available
+if ! declare -f bs::guard >/dev/null 2>&1; then
+    source "$(dirname -- "${BASH_SOURCE[0]}")/prereq.sh"
+fi
 bs::guard "ARGS" || return 0
 
 # Зависимости / Dependencies

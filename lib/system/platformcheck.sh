@@ -10,7 +10,10 @@
 # @depends core/const, core/logger, core/utils, lib/system/distrologic
 
 # Source Guard / Защита от повторной загрузки
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/prereq.sh"
+# Load core prerequisites if not already available
+if ! declare -f bs::guard >/dev/null 2>&1; then
+    source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/prereq.sh"
+fi
 bs::guard "SYSTEM_PLATFORMCHECK" || return 0
 
 # Зависимости / Dependencies
