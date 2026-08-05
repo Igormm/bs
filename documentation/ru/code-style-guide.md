@@ -62,23 +62,21 @@ utils::strict
 #
 # @depends core/const, core/logger, core/utils
 
-# Source Guard — единая обёртка из core/guard.sh
-source "$(dirname -- "${BASH_SOURCE[0]}")/../core/guard.sh"
+# Core prerequisites — базовые примитивы ядра из core/prereq.sh
+source "$(dirname -- "${BASH_SOURCE[0]}")/../core/prereq.sh"
 bs::guard "MY_MODULE" || return 0
 
 # Зависимости — self-source относительно файла модуля (модуль работает
 # и при прямом source, без загрузчика); @depends в заголовке дублирует
 # их для load
-source "$(dirname -- "${BASH_SOURCE[0]}")/../core/const.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/../core/logger.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/../core/utils.sh"
+bs::source_relative "../core/const.sh" "../core/logger.sh" "../core/utils.sh"
 
 # Глобальные константы и структуры модуля
 readonly MODULE_NAME="my_module"
 declare -gA MODULE_CONFIG
 ```
 
-`bs::guard "name"` ([core/guard.sh](../../core/guard.sh)) атомарно проверяет
+`bs::guard "name"` ([core/prereq.sh](../../core/prereq.sh)) атомарно проверяет
 и выставляет переменную `__NAME_SOURCED`: возвращает 1, если модуль
 **уже загружался** (тогда `|| return 0` завершает подключение), и 0 при
 первой загрузке — метка ставится, код модуля выполняется дальше.
@@ -348,19 +346,22 @@ io::process::guard --timeout 120 --hang-after 60 --strace-net -- ./server
 ### 8.1 Source Guard
 
 Каждый модуль должен защищаться от повторного импорта. Используйте единую
-обёртку `bs::guard` из [core/guard.sh](../../core/guard.sh) — она и проверяет
+обёртку `bs::guard` из [core/prereq.sh](../../core/prereq.sh) — она и проверяет
 метку `__NAME_SOURCED`, и выставляет её за один вызов:
 
 ```bash
 #!/usr/bin/env bash
 # lib/my_module.sh
 
-source "$(dirname -- "${BASH_SOURCE[0]}")/../core/guard.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../core/prereq.sh"
 bs::guard "MY_MODULE" || return 0
 ```
 
-Путь до `guard.sh` указывается относительно файла модуля (из `core/` —
-просто `guard.sh` рядом, из `lib/<group>/` — `../../core/guard.sh`).
+Путь до `prereq.sh` указывается относительно файла модуля (из `core/` —
+просто `prereq.sh` рядом, из `lib/<group>/` — `../../core/prereq.sh`).
+
+Файл [core/guard.sh](../../core/guard.sh) сохранён как обратносовместимая
+обёртка над `core/prereq.sh`.
 
 Устаревшие варианты, встречающиеся в старом коде:
 
@@ -393,11 +394,11 @@ declare -g MODULE_LOADED="1"
 
 Если модуль может быть подключён в обход загрузчика (например, через `source` из
 другого модуля или напрямую пользователем), используйте `bs::source_relative`
-из [core/guard.sh](../../core/guard.sh) для подключения зависимостей относительно
+из [core/prereq.sh](../../core/prereq.sh) для подключения зависимостей относительно
 своего файла:
 
 ```bash
-source "$(dirname -- "${BASH_SOURCE[0]}")/../core/guard.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../core/prereq.sh"
 bs::guard "MY_MODULE" || return 0
 
 # @depends core/logger, core/errorhandler, lib/io/streams
@@ -405,8 +406,8 @@ bs::source_relative "../core/logger.sh" "../core/errorhandler.sh" "../io/streams
 ```
 
 Правила:
-- Первый `source "$(dirname -- "${BASH_SOURCE[0]}")/.../guard.sh"` оставляйте
-  как есть — он загружает саму обёртку.
+- Первый `source "$(dirname -- "${BASH_SOURCE[0]}")/.../prereq.sh"` оставляйте
+  как есть — он загружает базовые примитивы ядра.
 - Все последующие зависимости заменяйте на `bs::source_relative`.
 - Несколько зависимостей можно передать одним вызовом.
 - Если модуль гарантированно загружается через `load`, используйте `load` и

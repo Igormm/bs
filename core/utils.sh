@@ -7,8 +7,8 @@
 # Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points
 
-# Source Guard
-source "$(dirname -- "${BASH_SOURCE[0]}")/guard.sh"
+# Core prerequisites
+source "$(dirname -- "${BASH_SOURCE[0]}")/prereq.sh"
 bs::guard "UTILS" || return 0
 
 
@@ -26,7 +26,7 @@ utils::strict() {
 #   if utils::guard "foo"; then return 0; fi
 #   readonly __FOO_SOURCED=1
 # @function utils::guard
-# @deprecated Используйте bs::guard из core/guard.sh — она и проверяет, и ставит метку
+# @deprecated Используйте bs::guard из core/prereq.sh — она и проверяет, и ставит метку
 # @param $1 {string} Уникальное имя модуля (без __ и _SOURCED)
 # @returns 0  модуль уже загружался
 # @returns 1  модуль ещё не загружался

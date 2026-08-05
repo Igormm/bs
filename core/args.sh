@@ -38,8 +38,8 @@
 # Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points
 
-# Source Guard / Защита от повторной загрузки
-source "$(dirname -- "${BASH_SOURCE[0]}")/guard.sh"
+# Core prerequisites
+source "$(dirname -- "${BASH_SOURCE[0]}")/prereq.sh"
 bs::guard "ARGS" || return 0
 
 # Зависимости / Dependencies

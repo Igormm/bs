@@ -20,7 +20,7 @@
 # @optdeps jq
 
 # Source Guard / Защита от повторной загрузки
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/prereq.sh"
 bs::guard "IO_INTEGRATION_LLM" || return 0
 
 # Зависимости / Dependencies

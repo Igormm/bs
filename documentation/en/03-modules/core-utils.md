@@ -28,7 +28,7 @@ on their own, so this is left to the caller.
 
 ### utils::guard
 
-> **Deprecated.** Use `bs::guard` from [core/guard.sh](../../core/guard.sh):
+> **Deprecated.** Use `bs::guard` from [core/prereq.sh](../../core/prereq.sh):
 > `bs::guard "foo" || return 0` — it checks the mark and sets it in one call.
 > `utils::guard` is kept as a check-only alias (`bs::guard_loaded`) for
 > backward compatibility.

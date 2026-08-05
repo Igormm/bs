@@ -60,23 +60,21 @@ file is sourced more than once:
 #
 # @depends core/const, core/logger, core/utils
 
-# Source Guard — shared wrapper from core/guard.sh
-source "$(dirname -- "${BASH_SOURCE[0]}")/../core/guard.sh"
+# Core prerequisites — shared primitives from core/prereq.sh
+source "$(dirname -- "${BASH_SOURCE[0]}")/../core/prereq.sh"
 bs::guard "MY_MODULE" || return 0
 
 # Dependencies — self-source relative to the module file (the module works
 # even when sourced directly, without the loader); the @depends header
 # duplicates them for load
-source "$(dirname -- "${BASH_SOURCE[0]}")/../core/const.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/../core/logger.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/../core/utils.sh"
+bs::source_relative "../core/const.sh" "../core/logger.sh" "../core/utils.sh"
 
 # Global constants and module structures
 readonly MODULE_NAME="my_module"
 declare -gA MODULE_CONFIG
 ```
 
-`bs::guard "name"` ([core/guard.sh](../../core/guard.sh)) atomically checks
+`bs::guard "name"` ([core/prereq.sh](../../core/prereq.sh)) atomically checks
 and sets the `__NAME_SOURCED` variable: it returns 1 if the module **has
 already been loaded** (then `|| return 0` skips the rest of the file), and 0
 on first load — the mark is set and the module body runs.
@@ -346,19 +344,22 @@ Rules:
 ### 8.1 Source Guard
 
 Every module must guard against repeated imports. Use the shared `bs::guard`
-wrapper from [core/guard.sh](../../core/guard.sh) — it checks the
+wrapper from [core/prereq.sh](../../core/prereq.sh) — it checks the
 `__NAME_SOURCED` mark and sets it in a single call:
 
 ```bash
 #!/usr/bin/env bash
 # lib/my_module.sh
 
-source "$(dirname -- "${BASH_SOURCE[0]}")/../core/guard.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../core/prereq.sh"
 bs::guard "MY_MODULE" || return 0
 ```
 
-The path to `guard.sh` is relative to the module file (from `core/` — just
-`guard.sh` next to it, from `lib/<group>/` — `../../core/guard.sh`).
+The path to `prereq.sh` is relative to the module file (from `core/` — just
+`prereq.sh` next to it, from `lib/<group>/` — `../../core/prereq.sh`).
+
+[core/guard.sh](../../core/guard.sh) is kept as a backward-compatible wrapper
+around `core/prereq.sh`.
 
 Legacy variants found in older code:
 
@@ -391,11 +392,11 @@ declare -g MODULE_LOADED="1"
 
 If a module may be sourced outside the loader (for example, from another module
 or directly by the user), use `bs::source_relative` from
-[core/guard.sh](../../core/guard.sh) to load dependencies relative to the
+[core/prereq.sh](../../core/prereq.sh) to load dependencies relative to the
 module's own file:
 
 ```bash
-source "$(dirname -- "${BASH_SOURCE[0]}")/../core/guard.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../core/prereq.sh"
 bs::guard "MY_MODULE" || return 0
 
 # @depends core/logger, core/errorhandler, lib/io/streams
@@ -403,8 +404,8 @@ bs::source_relative "../core/logger.sh" "../core/errorhandler.sh" "../io/streams
 ```
 
 Rules:
-- Keep the first `source "$(dirname -- "${BASH_SOURCE[0]}")/.../guard.sh"` as
-  is — it loads the wrapper itself.
+- Keep the first `source "$(dirname -- "${BASH_SOURCE[0]}")/.../prereq.sh"` as
+  is — it loads the core primitives.
 - Replace all subsequent dependency sources with `bs::source_relative`.
 - Multiple dependencies can be passed in a single call.
 - If the module is guaranteed to be loaded through `load`, use `load` and

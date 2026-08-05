@@ -14,8 +14,8 @@
 #
 # @depends core/const, core/logger, core/utils
 
-# Source Guard / Защита от повторной загрузки
-source "$(dirname -- "${BASH_SOURCE[0]}")/guard.sh"
+# Core prerequisites
+source "$(dirname -- "${BASH_SOURCE[0]}")/prereq.sh"
 bs::guard "CORE_CONFIG" || return 0
 
 # Зависимости / Dependencies

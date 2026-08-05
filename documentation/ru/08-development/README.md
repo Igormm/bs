@@ -28,8 +28,8 @@
 # Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points
 
-# Source Guard / Защита от повторной загрузки
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
+# Core prerequisites / Базовые примитивы ядра
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/prereq.sh"
 bs::guard "SYSTEM_FOO" || return 0
 ```
 
@@ -41,7 +41,7 @@ bs::guard "SYSTEM_FOO" || return 0
   входа (см. [Строгий режим](#строгий-режим)).
 - Source guard предотвращает повторное выполнение при двойном подключении
   файла. Используйте обёртку `bs::guard` из
-  [core/guard.sh](../../../core/guard.sh): она атомарно проверяет метку
+  [core/prereq.sh](../../../core/prereq.sh): она атомарно проверяет метку
   `__SYSTEM_FOO_SOURCED` и выставляет её; возвращает 1, если модуль уже
   загружался (тогда срабатывает `|| return 0`). Ручная идиома
   `[[ -n "${__X_SOURCED:-}" ]] && return 0` и check-only хелпер `utils::guard`

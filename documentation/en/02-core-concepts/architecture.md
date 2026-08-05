@@ -143,9 +143,11 @@ Its steps:
    - `core/config` — the unified configuration loader (`config::load`,
      `config::get`, `config::set`).
 
-[core/guard.sh](../../../core/guard.sh) stands apart: it is not loaded via
+[core/prereq.sh](../../../core/prereq.sh) stands apart: it is not loaded via
 `load` — modules source it directly by relative path — and provides
-`bs::guard`, the single Source Guard implementation for all modules.
+`bs::guard`, `bs::guard_loaded` and `bs::source_relative`, the core primitives
+available a priori to all modules. [core/guard.sh](../../../core/guard.sh) is
+kept as a backward-compatible wrapper.
 7. **Marker.** Exports `BS_INITIALIZED=1`. Unless `BS_SILENT=1`, prints the
    bootstrap path.
 

@@ -28,7 +28,7 @@ utils::strict
 
 ### utils::guard
 
-> **Deprecated.** Используйте `bs::guard` из [core/guard.sh](../../core/guard.sh):
+> **Deprecated.** Используйте `bs::guard` из [core/prereq.sh](../../core/prereq.sh):
 > `bs::guard "foo" || return 0` — проверяет метку и выставляет её за один вызов.
 > `utils::guard` оставлен как check-only алиас (`bs::guard_loaded`) для обратной
 > совместимости.

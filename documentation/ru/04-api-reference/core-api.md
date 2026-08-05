@@ -2,8 +2,9 @@
 
 # Справочник Core API
 
-Справочник по core-модулям: `core/logger.sh`, `core/errorhandler.sh`, `core/const.sh`, `core/version.sh`, `core/guard.sh`.
+Справочник по core-модулям: `core/logger.sh`, `core/errorhandler.sh`, `core/const.sh`, `core/version.sh`, `core/prereq.sh`.
 Про `core/args.sh` и `core/utils.sh` см. [Модуль Core utils](../03-modules/core-utils.md).
+Файл `core/guard.sh` сохранён как обратносовместимая обёртка над `core/prereq.sh`.
 
 ## Загрузка
 
@@ -21,9 +22,11 @@ load "core/version"      # информация о версии
 
 ---
 
-## Source Guard — `core/guard.sh`
+## Source Guard — `core/prereq.sh`
 
-Единая реализация защиты от повторной загрузки для всех модулей. Не грузится через `load` — модули подключают его напрямую относительным путём.
+Базовые примитивы ядра: защита от повторной загрузки (`bs::guard`,
+`bs::guard_loaded`) и относительный sourcing (`bs::source_relative`). Не грузится
+через `load` — модули подключают его напрямую относительным путём.
 
 #### `bs::guard <name>`
 - Параметры: `$1` — имя модуля (без `__` / `_SOURCED`, регистр не важен)
@@ -38,7 +41,7 @@ load "core/version"      # информация о версии
 Шаблон для модуля:
 
 ```bash
-source "$(dirname -- "${BASH_SOURCE[0]}")/../core/guard.sh"  # путь относительно файла модуля
+source "$(dirname -- "${BASH_SOURCE[0]}")/../core/prereq.sh"  # путь относительно файла модуля
 bs::guard "MY_MODULE" || return 0
 bs::source_relative "../core/logger.sh" "../core/utils.sh"  # зависимости относительно файла модуля
 ```

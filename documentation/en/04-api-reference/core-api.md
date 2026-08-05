@@ -2,8 +2,9 @@
 
 # Core API Reference
 
-Reference for the core modules: `core/logger.sh`, `core/errorhandler.sh`, `core/const.sh`, `core/version.sh`, `core/guard.sh`.
+Reference for the core modules: `core/logger.sh`, `core/errorhandler.sh`, `core/const.sh`, `core/version.sh`, `core/prereq.sh`.
 For `core/args.sh` and `core/utils.sh` see the [Core utils module](../03-modules/core-utils.md).
+`core/guard.sh` is kept as a backward-compatible wrapper around `core/prereq.sh`.
 
 ## Loading
 
@@ -21,9 +22,11 @@ load "core/version"      # version information
 
 ---
 
-## Source Guard — `core/guard.sh`
+## Source Guard — `core/prereq.sh`
 
-The single double-source protection implementation for all modules. Not loaded via `load` — modules source it directly by relative path.
+Core primitives available a priori: double-source protection (`bs::guard`,
+`bs::guard_loaded`) and relative sourcing (`bs::source_relative`). Not loaded via
+`load` — modules source it directly by relative path.
 
 #### `bs::guard <name>`
 - Parameters: `$1` — module name (without `__` / `_SOURCED`, case-insensitive)
@@ -38,7 +41,7 @@ The single double-source protection implementation for all modules. Not loaded v
 Module template:
 
 ```bash
-source "$(dirname -- "${BASH_SOURCE[0]}")/../core/guard.sh"  # path relative to the module file
+source "$(dirname -- "${BASH_SOURCE[0]}")/../core/prereq.sh"  # path relative to the module file
 bs::guard "MY_MODULE" || return 0
 bs::source_relative "../core/logger.sh" "../core/utils.sh"  # dependencies relative to the module file
 ```

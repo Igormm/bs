@@ -28,8 +28,8 @@ double underscore before the function name: `io::streams::__is_fd()`.
 # Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points
 
-# Source Guard / Защита от повторной загрузки
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
+# Core prerequisites / Базовые примитивы ядра
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/prereq.sh"
 bs::guard "SYSTEM_FOO" || return 0
 ```
 
@@ -40,7 +40,7 @@ Key points:
 - A module must not call `set -euo pipefail` or change `IFS` — that is the
   entry point's job (see [Strict mode](#strict-mode)).
 - The source guard prevents double execution when the file is sourced twice.
-  Use the `bs::guard` wrapper from [core/guard.sh](../../../core/guard.sh):
+  Use the `bs::guard` wrapper from [core/prereq.sh](../../../core/prereq.sh):
   it atomically checks the `__SYSTEM_FOO_SOURCED` mark and sets it; it returns
   1 if the module was already loaded (then `|| return 0` fires). The manual
   `[[ -n "${__X_SOURCED:-}" ]] && return 0` idiom and the check-only

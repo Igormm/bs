@@ -10,7 +10,7 @@
 # @depends core/const, core/logger, core/utils
 
 # Source Guard / Защита от повторной загрузки
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
+source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/prereq.sh"
 bs::guard "UI_PS1CONFIG" || return 0
 
 # Зависимости / Dependencies
