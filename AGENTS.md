@@ -82,8 +82,8 @@ When asked to implement a feature:
 
 For focused development tasks, use the dedicated prompt files:
 
-- `.qodo/agents/lib-developer.md` — implement or modify `lib/` modules.
-- `.qodo/agents/core-developer.md` — implement or modify `core/` modules.
+- `ai/lib-prompt.md` — implement or modify `lib/` modules.
+- `ai/core-prompt.md` — implement or modify `core/` modules.
 
 ## MCP / API provider suggestions
 
