@@ -88,5 +88,5 @@ For focused development tasks, use the dedicated prompt files:
 ## MCP / API provider suggestions
 
 - **MCP**: expose `bs` CLI commands (`bs doctor`, `bs list`, `bs run`) plus the validator/test scripts as tools.
-- **API providers**: any LLM with function-calling support can invoke the validation tools to verify generated code.
+- **API providers**: any LLM with function-calling / tool-use support can invoke the validation tools to verify generated code. Examples: OpenAI GPT, Anthropic Claude, Kimi, DeepSeek, Google Gemini, and local models via Ollama/vLLM.
 - **Context compression**: when the full repo is too large, provide only `AGENTS.md`, the target module, its tests, and `code-style-guide.md`.

@@ -75,13 +75,22 @@ Recommended tools to expose:
 
 ### API providers
 
-Any LLM with function calling can invoke the validators to verify generated code:
+Any LLM with function calling (or tool use) can invoke the validators to verify generated code. The major providers all fit the same loop:
 
 1. Model generates code from a request.
 2. Agent calls `validatesyntax.sh`.
 3. Agent calls `validateshellcheck.sh`.
 4. Agent calls `runalltests.sh`.
 5. If errors exist, the model receives the output and fixes the code.
+
+Examples of supported provider families:
+
+- **OpenAI GPT** — function calling (GPT-4o, GPT-4.1, o3, etc.)
+- **Anthropic Claude** — tool use (Claude 3.5/4 Sonnet, Opus)
+- **Kimi** — function calling (Moonshot AI, e.g. Kimi k1.5)
+- **DeepSeek** — function calling / reasoning (V3, R1)
+- **Google Gemini** — function calling (1.5/2.0 Pro/Flash)
+- **Local models** — tool use via Ollama, vLLM, llama.cpp
 
 ### Context tips
 

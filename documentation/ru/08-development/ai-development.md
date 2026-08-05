@@ -75,13 +75,22 @@ BS — это Bash-фреймворк с чёткими соглашениями
 
 ### API-провайдеры
 
-Любой LLM с function calling может вызывать валидаторы для проверки сгенерированного кода. Последовательность:
+Любой LLM с function calling (или tool use) может вызывать валидаторы для проверки сгенерированного кода. Последовательность одна и та же для всех основных провайдеров:
 
 1. Модель генерирует код по запросу.
 2. Агент вызывает `validatesyntax.sh`.
 3. Агент вызывает `validateshellcheck.sh`.
 4. Агент вызывает `runalltests.sh`.
 5. Если есть ошибки — модель получает вывод и исправляет код.
+
+Примеры поддерживаемых семейств провайдеров:
+
+- **OpenAI GPT** — function calling (GPT-4o, GPT-4.1, o3 и др.)
+- **Anthropic Claude** — tool use (Claude 3.5/4 Sonnet, Opus)
+- **Kimi** — function calling (Moonshot AI, например Kimi k1.5)
+- **DeepSeek** — function calling / reasoning (V3, R1)
+- **Google Gemini** — function calling (1.5/2.0 Pro/Flash)
+- **Локальные модели** — tool use через Ollama, vLLM, llama.cpp
 
 ### Подсказки по контексту
 

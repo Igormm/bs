@@ -25,7 +25,7 @@ An MCP server for BS could expose the following tools to an AI agent:
 
 ## API provider integration
 
-Any LLM with function calling can drive BS development:
+Any LLM with function calling (or tool use) can drive BS development. The pattern is the same for all major providers:
 
 1. The user describes a feature or bug.
 2. The model generates a draft module or patch.
@@ -33,6 +33,19 @@ Any LLM with function calling can drive BS development:
 4. The agent calls `validate_syntax`, `validate_shellcheck`, and `run_tests`.
 5. If errors are reported, the model receives the output and produces a fix.
 6. The loop continues until all validators pass.
+
+### Popular providers
+
+| Provider / family | Tool mechanism | Notes |
+|-------------------|----------------|-------|
+| **OpenAI GPT** (GPT-4o, GPT-4.1, o3, etc.) | Function calling | Well-tested; good for structured tool outputs. |
+| **Anthropic Claude** (Claude 3.5/4 Sonnet, Opus) | Tool use | Strong at long-context reasoning; ideal for big modules. |
+| **Kimi** (Moonshot AI, e.g. Kimi k1.5) | Function calling | Long context window; good for full repo analysis. |
+| **DeepSeek** (V3, R1) | Function calling / reasoning | Cost-efficient; R1 exposes chain-of-thought before tool calls. |
+| **Google Gemini** (1.5/2.0 Pro/Flash) | Function calling | Very large context; useful for style-guide + many modules. |
+| **Local / self-hosted** | Tool use via Ollama, vLLM, llama.cpp | Keeps code on-premise; works with `lib/integration/llm.sh`. |
+
+Provider choice usually depends on context-window size, cost, and whether the code must stay inside a private network. The BS validator loop does not depend on any specific API.
 
 ### Suggested system prompt fragment
 
