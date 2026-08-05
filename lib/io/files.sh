@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 #
 # lib/io/files.sh — File System Helper (FSH) for BS
 # lib/io/files.sh — FSH: высокоуровневые файловые операции с dry-run,

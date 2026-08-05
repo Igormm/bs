@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 #
 # lib/io/process.sh — Process Guard for BS
 # lib/io/process.sh — обёртка-сторож процесса с таймаутом, hang-детекцией

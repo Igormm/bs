@@ -1,4 +1,5 @@
 #!/usr/bin/env bs
+# shellcheck shell=bash
 # lib/io/streams.sh — Абстракция потоков ввода/вывода, FD и перенаправлений для BS
 # lib/io/streams.sh — I/O streams, file descriptors and redirections abstraction for BS
 #
