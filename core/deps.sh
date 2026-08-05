@@ -19,9 +19,7 @@ source "$(dirname -- "${BASH_SOURCE[0]}")/guard.sh"
 bs::guard "CORE_DEPS" || return 0
 
 # Зависимости / Dependencies
-source "$(dirname -- "${BASH_SOURCE[0]}")/const.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/logger.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/utils.sh"
+bs::source_relative "const.sh" "logger.sh" "utils.sh"
 
 # Module version / Версия модуля
 declare -g CORE_DEPS_VERSION="1.0.0"

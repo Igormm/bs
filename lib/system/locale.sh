@@ -8,9 +8,7 @@ source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
 bs::guard "SYSTEM_LOCALE" || return 0
 
 # Зависимости / Dependencies
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh"
 
 # @description Set system locale / Установить системную локаль
 # @param $1 Locale (e.g., "en_US.UTF-8", "ru_RU.UTF-8") / Локаль (например, "en_US.UTF-8",

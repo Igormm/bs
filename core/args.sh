@@ -43,8 +43,7 @@ source "$(dirname -- "${BASH_SOURCE[0]}")/guard.sh"
 bs::guard "ARGS" || return 0
 
 # Зависимости / Dependencies
-source "$(dirname -- "${BASH_SOURCE[0]}")/const.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/logger.sh"
+bs::source_relative "const.sh" "logger.sh"
 
 # Версия модуля / Module version
 declare -g ARGS_VERSION="1.0.0"

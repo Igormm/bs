@@ -40,7 +40,13 @@ Module template:
 ```bash
 source "$(dirname -- "${BASH_SOURCE[0]}")/../core/guard.sh"  # path relative to the module file
 bs::guard "MY_MODULE" || return 0
+bs::source_relative "../core/logger.sh" "../core/utils.sh"  # dependencies relative to the module file
 ```
+
+#### `bs::source_relative <path>...`
+- Parameters: `$@` — relative file paths from the caller module's directory
+- Purpose: replaces the verbose idiom `source "$(dirname -- "${BASH_SOURCE[0]}")/..."`
+- Example: `bs::source_relative "const.sh" "logger.sh"`
 
 ---
 

@@ -53,3 +53,18 @@ bs::guard_loaded() {
   local -r var="__${name^^}_SOURCED"
   [[ -n "${!var:-}" ]]
 }
+
+# @description Source files relative to the caller's location.
+# Replaces the verbose idiom:
+#   source "$(dirname -- "${BASH_SOURCE[0]}")/some.sh"
+# @param $@ Relative file paths from the caller's directory
+# @example
+#   bs::source_relative "const.sh" "logger.sh"
+bs::source_relative() {
+  local -r caller_dir="$(dirname -- "${BASH_SOURCE[1]}")"
+  local file
+  for file in "$@"; do
+    # shellcheck disable=SC1090
+    source "${caller_dir}/${file}"
+  done
+}

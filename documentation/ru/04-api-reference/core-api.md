@@ -40,7 +40,13 @@ load "core/version"      # информация о версии
 ```bash
 source "$(dirname -- "${BASH_SOURCE[0]}")/../core/guard.sh"  # путь относительно файла модуля
 bs::guard "MY_MODULE" || return 0
+bs::source_relative "../core/logger.sh" "../core/utils.sh"  # зависимости относительно файла модуля
 ```
+
+#### `bs::source_relative <path>...`
+- Параметры: `$@` — относительные пути к файлам от каталога вызывающего модуля
+- Назначение: заменяет многословную идиому `source "$(dirname -- "${BASH_SOURCE[0]}")/..."`
+- Пример: `bs::source_relative "const.sh" "logger.sh"`
 
 ---
 

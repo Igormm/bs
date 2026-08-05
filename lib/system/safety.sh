@@ -7,9 +7,7 @@ source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
 bs::guard "SYSTEM_SAFETY" || return 0
 
 # Зависимости / Dependencies
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh"
 
 # Safety levels / Уровни безопасности
 declare -g SAFETY_LEVEL="normal"  # paranoid, strict, normal, relaxed

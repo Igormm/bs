@@ -37,11 +37,7 @@ source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
 bs::guard "DATA_PROCESSOR" || return 0
 
 # Зависимости / Dependencies
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/errorhandler.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/../system/platformcheck.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/errorhandler.sh" "../system/platformcheck.sh"
 
 # Data processor configuration
 readonly DATA_PROCESSOR_CONFIG_DIR="${HOME}/.config/dataprocessor"

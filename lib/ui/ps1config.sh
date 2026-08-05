@@ -13,9 +13,7 @@ source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
 bs::guard "UI_PS1CONFIG" || return 0
 
 # Зависимости / Dependencies
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh"
 
 set -euo pipefail
 

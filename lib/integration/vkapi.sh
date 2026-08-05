@@ -41,11 +41,7 @@ source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
 bs::guard "INTEGRATION_VK_API" || return 0
 
 # Зависимости / Dependencies
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/errorhandler.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/../system/platformcheck.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/errorhandler.sh" "../system/platformcheck.sh"
 
 # Error codes fallbacks (no readonly): values live in core/const.sh;
 # assign defaults only when const.sh was not loaded (standalone mode).

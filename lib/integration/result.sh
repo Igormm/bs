@@ -21,10 +21,7 @@ source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
 bs::guard "IO_INTEGRATION_RESULT" || return 0
 
 # Зависимости / Dependencies
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/../io/streams.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../io/streams.sh"
 
 # Module version / Версия модуля
 declare -g IO_INTEGRATION_RESULT_VERSION="1.0.0"

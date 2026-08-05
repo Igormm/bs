@@ -53,15 +53,15 @@ bs::guard "STATUS_PS1" || return 0
 
 # Зависимости / Dependencies
 
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
+bs::source_relative "../../core/const.sh"
 
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
+bs::source_relative "../../core/logger.sh"
 
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
+bs::source_relative "../../core/utils.sh"
 
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/errorhandler.sh"
+bs::source_relative "../../core/errorhandler.sh"
 
-source "$(dirname -- "${BASH_SOURCE[0]}")/../system/platformcheck.sh"
+bs::source_relative "../system/platformcheck.sh"
 
 # PS1 Status configuration
 

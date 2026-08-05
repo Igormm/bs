@@ -23,10 +23,7 @@ source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
 bs::guard "IO_INTEGRATION_K8S" || return 0
 
 # Зависимости / Dependencies
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/result.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "result.sh"
 
 # Module version / Версия модуля
 declare -g IO_INTEGRATION_K8S_VERSION="1.0.0"

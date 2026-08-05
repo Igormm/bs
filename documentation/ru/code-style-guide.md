@@ -391,7 +391,30 @@ declare -g MODULE_LOADED="1"
 
 ### 8.3 Зависимости
 
-Загружайте зависимости через `load` и декларируйте их комментарием `# @depends`:
+Если модуль может быть подключён в обход загрузчика (например, через `source` из
+другого модуля или напрямую пользователем), используйте `bs::source_relative`
+из [core/guard.sh](../../core/guard.sh) для подключения зависимостей относительно
+своего файла:
+
+```bash
+source "$(dirname -- "${BASH_SOURCE[0]}")/../core/guard.sh"
+bs::guard "MY_MODULE" || return 0
+
+# @depends core/logger, core/errorhandler, lib/io/streams
+bs::source_relative "../core/logger.sh" "../core/errorhandler.sh" "../io/streams.sh"
+```
+
+Правила:
+- Первый `source "$(dirname -- "${BASH_SOURCE[0]}")/.../guard.sh"` оставляйте
+  как есть — он загружает саму обёртку.
+- Все последующие зависимости заменяйте на `bs::source_relative`.
+- Несколько зависимостей можно передать одним вызовом.
+- Если модуль гарантированно загружается через `load`, используйте `load` и
+  декларируйте зависимости комментарием `# @depends`.
+
+### 8.4 Подключение через `load` (внутри фреймворка)
+
+Когда модуль уже находится в загруженном окружении BS, используйте `load`:
 
 ```bash
 # @depends core/logger, core/errorhandler, lib/io/streams

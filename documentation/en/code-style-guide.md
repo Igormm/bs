@@ -389,7 +389,30 @@ declare -g MODULE_LOADED="1"
 
 ### 8.3 Dependencies
 
-Load dependencies with `load` and declare them with a `# @depends` comment:
+If a module may be sourced outside the loader (for example, from another module
+or directly by the user), use `bs::source_relative` from
+[core/guard.sh](../../core/guard.sh) to load dependencies relative to the
+module's own file:
+
+```bash
+source "$(dirname -- "${BASH_SOURCE[0]}")/../core/guard.sh"
+bs::guard "MY_MODULE" || return 0
+
+# @depends core/logger, core/errorhandler, lib/io/streams
+bs::source_relative "../core/logger.sh" "../core/errorhandler.sh" "../io/streams.sh"
+```
+
+Rules:
+- Keep the first `source "$(dirname -- "${BASH_SOURCE[0]}")/.../guard.sh"` as
+  is — it loads the wrapper itself.
+- Replace all subsequent dependency sources with `bs::source_relative`.
+- Multiple dependencies can be passed in a single call.
+- If the module is guaranteed to be loaded through `load`, use `load` and
+  declare dependencies with a `# @depends` comment.
+
+### 8.4 Loading via `load` (inside the framework)
+
+When the module is already inside a loaded BS environment, use `load`:
 
 ```bash
 # @depends core/logger, core/errorhandler, lib/io/streams

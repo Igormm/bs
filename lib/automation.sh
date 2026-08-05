@@ -18,10 +18,7 @@ source "$(dirname -- "${BASH_SOURCE[0]}")/../core/guard.sh"
 bs::guard "AUTOMATION" || return 0
 
 # Зависимости / Dependencies
-source "$(dirname -- "${BASH_SOURCE[0]}")/../core/const.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/../core/logger.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/../core/utils.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/system/distro.sh"
+bs::source_relative "../core/const.sh" "../core/logger.sh" "../core/utils.sh" "system/distro.sh"
 
 # @description Check current keyboard layout / Проверить текущую раскладку клавиатуры
 # @example

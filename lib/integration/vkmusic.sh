@@ -44,12 +44,7 @@ source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/guard.sh"
 bs::guard "INTEGRATION_VK_MUSIC" || return 0
 
 # Зависимости / Dependencies
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/const.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/logger.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/errorhandler.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/../system/platformcheck.sh"
-source "$(dirname -- "${BASH_SOURCE[0]}")/vkapi.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/errorhandler.sh" "../system/platformcheck.sh" "vkapi.sh"
 
 # VK Music configuration constants
 readonly VK_MUSIC_CACHE_DIR="/tmp/vk_music_cache"
