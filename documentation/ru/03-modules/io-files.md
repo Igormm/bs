@@ -37,6 +37,15 @@ io::files::ensure_dir "/tmp/myapp"      # mkdir -p
 io::files::ensure_dir "/tmp/myapp" "755" # + chmod 755
 ```
 
+## Запись содержимого
+
+```bash
+# Дописать строку в файл — «лингвистическая» замена: echo "..." >> file
+# Аргументы после пути объединяются пробелами (как echo); учитывает dry-run.
+io::files::append "${log_file}" "[${timestamp}] started"
+io::files::append "${log_file}" ""      # пустая строка
+```
+
 ## Копирование
 
 ```bash

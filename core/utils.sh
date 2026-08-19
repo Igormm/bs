@@ -76,6 +76,56 @@ utils::ignore() {
   "$@" >/dev/null 2>&1 || :
 }
 
+# Выполняет команду, игнорируя результат; stderr подавляется, stdout сохраняется.
+# Явная замена идиомы: cmd 2>/dev/null || true (и utils::quiet_err cmd || true)
+# Использовать для best-effort операций, где неудача допустима.
+# @function utils::attempt
+# @param $@ {string} Команда и её аргументы
+# @returns всегда 0
+utils::attempt() {
+  "$@" 2>/dev/null || :
+}
+
+# Текущее время в секундах (epoch).
+# Заменяет идиому: date +%s
+# @function utils::now_s
+# @stdout секунды с начала эпохи
+utils::now_s() {
+  date +%s
+}
+
+# Текущее время в миллисекундах (epoch).
+# Заменяет идиому: date +%s%3N
+# @function utils::now_ms
+# @stdout миллисекунды с начала эпохи
+utils::now_ms() {
+  date +%s%3N
+}
+
+# Текущее время в секундах с дробной частью (для интервалов через bc/awk).
+# Заменяет идиому: date +%s.%N
+# @function utils::now_float
+# @stdout секунды с наносекундной дробной частью
+utils::now_float() {
+  date +%s.%N
+}
+
+# Метка времени для имён файлов: YYYYMMDD_HHMMSS.
+# Заменяет идиому: date +%Y%m%d_%H%M%S
+# @function utils::stamp
+# @stdout timestamp, безопасный для имён файлов
+utils::stamp() {
+  date +%Y%m%d_%H%M%S
+}
+
+# Человекочитаемая метка времени для логов: "YYYY-MM-DD HH:MM:SS".
+# Заменяет идиому: date '+%Y-%m-%d %H:%M:%S'
+# @function utils::log_stamp
+# @stdout timestamp для логов
+utils::log_stamp() {
+  date '+%Y-%m-%d %H:%M:%S'
+}
+
 # Разбивает строку на массив по заданному разделителю.
 # Безопасна при любом IFS вызывающего: устанавливает локальный IFS внутри функции.
 # @function utils::split
@@ -125,22 +175,22 @@ utils::ensure_source() {
   local -r func="${2:?Function name is required}"
 
   #  валидация аргументов 
-  [[ -n ${file} ]] || { printf 'ERROR: file argument is empty\n' >&2; return 1; }
-  [[ -n ${func} ]] || { printf 'ERROR: function argument is empty\n' >&2; return 1; }
+  [[ -n ${file} ]] || { log::error "file argument is empty"; return "${E_INVALID:-2}"; }
+  [[ -n ${func} ]] || { log::error "function argument is empty"; return "${E_INVALID:-2}"; }
 
   if [[ ! -f "${file}" ]]; then
-    printf 'ERROR: file not found: %s\n' "${file}" >&2
-    return 1
+    log::error "file not found: ${file}"
+    return "${E_ERROR:-1}"
   fi
 
   if ! source -- "${file}"; then
-    printf 'ERROR: failed to source file: %s\n' "${file}" >&2
-    return 1
+    log::error "failed to source file: ${file}"
+    return "${E_ERROR:-1}"
   fi
 
   if ! declare -F -- "${func}" >/dev/null 2>&1; then
-    printf 'ERROR: required function %q not defined\n' "${func}" >&2
-    return 1
+    log::error "required function ${func} not defined"
+    return "${E_ERROR:-1}"
   fi
 
   return 0
@@ -151,29 +201,27 @@ utils::ensure_shell_version() {
     local -r required_version="${1:-4}"  # Default to version 4 if not specified
 
     if [[ -z "${SHELL:-}" ]]; then
-        printf 'Error: SHELL variable is not set, cannot verify shell version\n' >&2
-        return 1
+        log::error "SHELL variable is not set, cannot verify shell version"
+        return "${E_ERROR:-1}"
     fi
     local -r shell_name="$(basename "$SHELL")"
 
     case "${shell_name}" in
         "bash")
             if [[ -z "${BASH_VERSION:-}" ]] || [[ "${BASH_VERSION%%.*}" -lt "${required_version}" ]]; then
-                printf 'Error: Bash version %s or higher is required but you have version %s\n' \
-                    "${required_version}" "${BASH_VERSION:-unknown}" >&2
-                return 1
+                log::error "Bash version ${required_version} or higher is required but you have version ${BASH_VERSION:-unknown}"
+                return "${E_ERROR:-1}"
             fi
             ;;
         "zsh")
             if [[ -z "${ZSH_VERSION:-}" ]] || [[ "${ZSH_VERSION%%.*}" -lt "${required_version}" ]]; then
-                printf 'Error: Zsh version %s or higher is required but you have version %s\n' \
-                    "${required_version}" "${ZSH_VERSION:-unknown}" >&2
-                return 1
+                log::error "Zsh version ${required_version} or higher is required but you have version ${ZSH_VERSION:-unknown}"
+                return "${E_ERROR:-1}"
             fi
             ;;
         *)
-            printf 'Warning: Unknown shell %s, cannot verify version requirements\n' "${shell_name}" >&2
-            return 1
+            log::warn "Unknown shell ${shell_name}, cannot verify version requirements"
+            return "${E_ERROR:-1}"
             ;;
     esac
 

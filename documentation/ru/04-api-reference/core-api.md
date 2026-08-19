@@ -38,10 +38,10 @@ load "core/version"      # информация о версии
 - Возвращает: 0, если модуль загружен, иначе 1
 - Пример: `bs::guard_loaded "logger" && echo "logger is here"`
 
-Шаблон для модуля:
+Шаблон для модуля (`core/prereq.sh` автозагружается первым из `bootstrap/init.sh`,
+подключать его вручную не нужно):
 
 ```bash
-source "$(dirname -- "${BASH_SOURCE[0]}")/../core/prereq.sh"  # путь относительно файла модуля
 bs::guard "MY_MODULE" || return 0
 bs::source_relative "../core/logger.sh" "../core/utils.sh"  # зависимости относительно файла модуля
 ```
@@ -50,6 +50,15 @@ bs::source_relative "../core/logger.sh" "../core/utils.sh"  # зависимос
 - Параметры: `$@` — относительные пути к файлам от каталога вызывающего модуля
 - Назначение: заменяет многословную идиому `source "$(dirname -- "${BASH_SOURCE[0]}")/..."`
 - Пример: `bs::source_relative "const.sh" "logger.sh"`
+
+#### `bs::script_dir [index]`
+- Параметры: `$1` — необязательный индекс `BASH_SOURCE` (по умолчанию 1 = вызывающий файл)
+- Возвращает: 0 при успехе, 1 если каталог не удалось определить
+- Stdout: абсолютный физический путь (`pwd -P`) каталога вызывающего файла
+- Назначение: заменяет бойлерплейт `"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"`.
+  Доступна только после загрузки `core/prereq` — заголовки точек входа,
+  выполняющиеся до `bootstrap/init.sh`, должны оставаться на сырой идиоме.
+- Пример: `readonly SCRIPT_DIR="$(bs::script_dir)"`
 
 ---
 

@@ -126,6 +126,9 @@ Its steps:
 5. **Loader.** Sources `bootstrap/loader.sh` (falling back to
    `${BS_ROOT}/loader.sh`).
 6. **Core modules**, loaded via `load` in a fixed order:
+   - `core/prereq` — first: the core primitives `bs::guard`,
+     `bs::guard_loaded` and `bs::source_relative`, available a priori to all
+     other modules (modules never source `prereq.sh` manually);
    - `core/const` — error codes (`E_SUCCESS`, `E_ERROR`, `LIB_ERROR_*`),
      color constants, framework flags (`FRAMEWORK_DEBUG`,
      `FRAMEWORK_DRY_RUN`);
@@ -137,17 +140,17 @@ Its steps:
    - `core/version` — `BS_VERSION` / `BS_NAME` exports and
      `bs::version::*` helpers;
    - `core/utils` — environment helpers, including the silence idioms
-     `utils::has`, `utils::quiet`, `utils::quiet_err`, `utils::ignore`
+     `utils::has`, `utils::quiet`, `utils::quiet_err`, `utils::ignore`,
+     `utils::attempt`
      (replacements for `command -v … >/dev/null 2>&1`, `>/dev/null 2>&1`,
-     `2>/dev/null` and `>/dev/null 2>&1 || true` respectively);
+     `2>/dev/null`, `>/dev/null 2>&1 || true` and `2>/dev/null || true`
+     respectively);
    - `core/config` — the unified configuration loader (`config::load`,
-     `config::get`, `config::set`).
+     `config::get`, `config::set`);
+   - `core/deps` — module dependency parsing (`# @depends`).
 
-[core/prereq.sh](../../../core/prereq.sh) stands apart: it is not loaded via
-`load` — modules source it directly by relative path — and provides
-`bs::guard`, `bs::guard_loaded` and `bs::source_relative`, the core primitives
-available a priori to all modules. [core/guard.sh](../../../core/guard.sh) is
-kept as a backward-compatible wrapper.
+[core/guard.sh](../../../core/guard.sh) is kept as a backward-compatible
+wrapper around [core/prereq.sh](../../../core/prereq.sh).
 7. **Marker.** Exports `BS_INITIALIZED=1`. Unless `BS_SILENT=1`, prints the
    bootstrap path.
 

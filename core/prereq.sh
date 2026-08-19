@@ -41,3 +41,15 @@ bs::source_relative() {
     source "${caller_dir}/${file}"
   done
 }
+
+# @description Print the absolute (physical) directory of the caller's file.
+#   Replaces the boilerplate: "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)".
+#   Note: available only after core/prereq is loaded, so entry-point headers
+#   that run before bootstrap/init.sh must keep the raw idiom.
+# @param $1 Optional BASH_SOURCE index (default 1 = immediate caller).
+# @stdout Absolute directory path (pwd -P).
+# @returns 0 on success; 1 if the directory cannot be resolved.
+bs::script_dir() {
+  local -r idx="${1:-1}"
+  (cd -- "$(dirname -- "${BASH_SOURCE[${idx}]}")" >/dev/null 2>&1 && pwd -P)
+}

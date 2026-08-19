@@ -128,6 +128,9 @@ source**, а не запускаться (при прямом запуске о�
 5. **Загрузчик.** Подключается `bootstrap/loader.sh` (с запасным вариантом
    `${BS_ROOT}/loader.sh`).
 6. **Модули ядра**, загружаемые через `load` в фиксированном порядке:
+   - `core/prereq` — первым: базовые примитивы `bs::guard`,
+     `bs::guard_loaded` и `bs::source_relative`, доступные априори всем
+     остальным модулям (модули не подключают `prereq.sh` вручную);
    - `core/const` — коды ошибок (`E_SUCCESS`, `E_ERROR`, `LIB_ERROR_*`),
      цветовые константы, флаги фреймворка (`FRAMEWORK_DEBUG`,
      `FRAMEWORK_DRY_RUN`);
@@ -139,17 +142,16 @@ source**, а не запускаться (при прямом запуске о�
    - `core/version` — экспорт `BS_VERSION` / `BS_NAME` и помощники
      `bs::version::*`;
    - `core/utils` — помощники среды, включая идиомы тишины `utils::has`,
-     `utils::quiet`, `utils::quiet_err`, `utils::ignore` (замены для
-     `command -v … >/dev/null 2>&1`, `>/dev/null 2>&1`, `2>/dev/null` и
-     `>/dev/null 2>&1 || true` соответственно);
+     `utils::quiet`, `utils::quiet_err`, `utils::ignore`, `utils::attempt`
+     (замены для `command -v … >/dev/null 2>&1`, `>/dev/null 2>&1`,
+     `2>/dev/null`, `>/dev/null 2>&1 || true` и `2>/dev/null || true`
+     соответственно);
    - `core/config` — единый загрузчик конфигурации (`config::load`,
-     `config::get`, `config::set`).
+     `config::get`, `config::set`);
+   - `core/deps` — разбор зависимостей модулей (`# @depends`).
 
-Отдельно стоит [core/prereq.sh](../../../core/prereq.sh): он не загружается
-через `load`, а подключается модулями напрямую относительным путём и даёт
-`bs::guard`, `bs::guard_loaded` и `bs::source_relative` — базовые примитивы,
-доступные априори для всех модулей. Файл [core/guard.sh](../../../core/guard.sh)
-сохранён как обратносовместимая обёртка.
+Файл [core/guard.sh](../../../core/guard.sh) сохранён как
+обратносовместимая обёртка над [core/prereq.sh](../../../core/prereq.sh).
 7. **Маркер.** Экспортируется `BS_INITIALIZED=1`. Если `BS_SILENT` не равен
    `1`, выводится путь, откуда выполнен bootstrap.
 

@@ -123,7 +123,7 @@ io::files::__atomic_temp() {
   parent_dir="$(dirname -- "${dst}")"
   if [[ ! -d "${parent_dir}" ]]; then
     log::error "Parent directory does not exist for atomic temp: ${parent_dir}"
-    return 1
+    return "${E_ERROR}"
   fi
 
   local base
@@ -169,7 +169,7 @@ io::files::__backup_if_needed() {
 
   if ! mv -- "${dst}" "${backup}"; then
     log::error "Failed to create backup: ${dst} -> ${backup}"
-    return 1
+    return "${E_ERROR}"
   fi
   return 0
 }
@@ -188,7 +188,7 @@ io::files::__atomic_replace() {
 
   if [[ -z "${temp_path}" || -z "${dst}" ]]; then
     log::warn "atomic_replace: temp and dst required"
-    return 1
+    return "${E_ERROR}"
   fi
 
   if [[ "${FRAMEWORK_DRY_RUN:-false}" == "true" ]]; then
@@ -202,19 +202,19 @@ io::files::__atomic_replace() {
     if ! mv -- "${dst}" "${old_dir}/old"; then
       log::error "Failed to move existing destination aside: ${dst}"
       io::files::__cleanup_temp "${old_dir}"
-      return 1
+      return "${E_ERROR}"
     fi
     if ! mv -- "${temp_path}" "${dst}"; then
       log::error "Failed to move temp directory into place: ${temp_path} -> ${dst}"
       mv -- "${old_dir}/old" "${dst}" >/dev/null 2>&1 || true
       io::files::__cleanup_temp "${old_dir}"
-      return 1
+      return "${E_ERROR}"
     fi
     io::files::__cleanup_temp "${old_dir}"
   else
     if ! mv -- "${temp_path}" "${dst}"; then
       log::error "Failed to move temp into place: ${temp_path} -> ${dst}"
-      return 1
+      return "${E_ERROR}"
     fi
   fi
 
@@ -233,7 +233,7 @@ io::files::__atomic_copy_file() {
   local temp_path
 
   temp_path="$(io::files::__atomic_temp "${dst}" false)"
-  [[ -n "${temp_path}" ]] || return 1
+  [[ -n "${temp_path}" ]] || return "${E_ERROR}"
 
   if [[ "${FRAMEWORK_DRY_RUN:-false}" == "true" ]]; then
     log::warn "[DRY-RUN] atomic copy: cp -p -- ${src} ${temp_path}; mv -- ${temp_path} ${dst}"
@@ -243,12 +243,12 @@ io::files::__atomic_copy_file() {
   if ! cp -p -- "${src}" "${temp_path}"; then
     log::error "Failed to copy source to temp: ${src} -> ${temp_path}"
     io::files::__cleanup_temp "${temp_path}"
-    return 1
+    return "${E_ERROR}"
   fi
 
   if ! io::files::__atomic_replace "${temp_path}" "${dst}" false; then
     io::files::__cleanup_temp "${temp_path}"
-    return 1
+    return "${E_ERROR}"
   fi
 
   return 0
@@ -266,7 +266,7 @@ io::files::__atomic_copy_dir() {
   local temp_path
 
   temp_path="$(io::files::__atomic_temp "${dst}" true)"
-  [[ -n "${temp_path}" ]] || return 1
+  [[ -n "${temp_path}" ]] || return "${E_ERROR}"
 
   if [[ "${FRAMEWORK_DRY_RUN:-false}" == "true" ]]; then
     log::warn "[DRY-RUN] atomic copy dir: cp -a ${src}/. ${temp_path}/; mv -- ${temp_path} ${dst}"
@@ -276,12 +276,12 @@ io::files::__atomic_copy_dir() {
   if ! cp -a -- "${src}/." "${temp_path}/"; then
     log::error "Failed to copy directory contents to temp: ${src} -> ${temp_path}"
     io::files::__cleanup_temp "${temp_path}"
-    return 1
+    return "${E_ERROR}"
   fi
 
   if ! io::files::__atomic_replace "${temp_path}" "${dst}" true; then
     io::files::__cleanup_temp "${temp_path}"
-    return 1
+    return "${E_ERROR}"
   fi
 
   return 0
@@ -349,6 +349,44 @@ io::files::ensure_dir() {
     elif ! system::permissions::chmod "${dir_path}" "${mode}"; then
       return "${LIB_ERROR_FILE_OPERATION}"
     fi
+  fi
+
+  return "${E_SUCCESS}"
+}
+
+# ==========================================
+# Content writing / Запись содержимого
+# ==========================================
+
+# @description Append a line of text to a file.
+# @description Дописать строку текста в файл.
+#   Linguistic replacement for `echo "..." >> file`: arguments after the file
+#   path are joined with spaces (like echo).
+#   «Лингвистическая» замена `echo "..." >> file`: аргументы после пути
+#   объединяются пробелами (как echo).
+# @param $1 File path / Путь к файлу
+# @param $@ Text to append / Дописываемый текст
+# @return 0 on success, error code otherwise / 0 при успехе
+# @example
+#   io::files::append "${log_file}" "[${timestamp}] ${message}"
+io::files::append() {
+  local file_path="${1:-}"
+
+  if [[ -z "${file_path}" ]]; then
+    log::warn "File path is required"
+    return "${E_INVALID}"
+  fi
+
+  shift
+
+  if [[ "${FRAMEWORK_DRY_RUN:-false}" == "true" ]]; then
+    log::warn "[DRY-RUN] append to ${file_path}: $*"
+    return "${E_SUCCESS}"
+  fi
+
+  if ! printf '%s\n' "$*" >> "${file_path}"; then
+    log::error "Failed to append to file: ${file_path}"
+    return "${LIB_ERROR_FILE_OPERATION}"
   fi
 
   return "${E_SUCCESS}"

@@ -87,6 +87,30 @@ utils::ignore systemctl stop myservice
 Явная замена идиомы `cmd >/dev/null 2>&1 || true`. Использовать только там, где неудача
 команды действительно не важна.
 
+### utils::attempt
+
+```bash
+utils::attempt xinput set-prop "${device}" "libinput Tapping Enabled" 1
+```
+
+Выполняет команду в режиме best-effort: stderr подавляется, stdout остаётся видимым,
+код возврата игнорируется — всегда возвращает `0`. Явная замена идиомы
+`cmd 2>/dev/null || true` (и `utils::quiet_err cmd || true`). Использовать для
+операций, где неудача допустима, а stdout может ещё использоваться.
+
+### Примитивы времени
+
+```bash
+utils::now_s        # секунды (epoch)             — заменяет: date +%s
+utils::now_ms       # миллисекунды (epoch)        — заменяет: date +%s%3N
+utils::now_float    # секунды с дробной частью    — заменяет: date +%s.%N
+utils::stamp        # YYYYMMDD_HHMMSS             — заменяет: date +%Y%m%d_%H%M%S
+utils::log_stamp    # "YYYY-MM-DD HH:MM:SS"       — заменяет: date '+%Y-%m-%d %H:%M:%S'
+```
+
+Именованные замены для различных идиом `date +...`, чтобы место вызова выражало
+намерение, а не строку формата.
+
 ### utils::ensure_source
 
 ```bash
@@ -138,6 +162,7 @@ utils::boot_dir
 | `cmd >/dev/null 2>&1`           | `utils::quiet cmd`   | Подавить stdout+stderr, код возврата сохраняется  |
 | `cmd 2>/dev/null`               | `utils::quiet_err cmd` | Подавить только stderr, код возврата сохраняется |
 | `cmd >/dev/null 2>&1 \|\| true` | `utils::ignore cmd`  | Подавить вывод и игнорировать неудачу (всегда `0`) |
+| `cmd 2>/dev/null \|\| true`     | `utils::attempt cmd` | Подавить stderr, stdout виден, неудача игнорируется (всегда `0`) |
 
 Пример — было / стало:
 

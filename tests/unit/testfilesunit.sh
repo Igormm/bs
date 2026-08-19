@@ -42,6 +42,27 @@ main() {
     testframework::assert_equal "700" "${mode}" "ensure_dir sets mode"
 
     # ==========================================
+    # append
+    # ==========================================
+    testframework::section "append"
+
+    io::files::append "${tmp_dir}/log.txt" "first line"
+    io::files::append "${tmp_dir}/log.txt" "second line"
+    testframework::assert_equal $'first line\nsecond line' "$(cat "${tmp_dir}/log.txt")" "append writes lines in order"
+
+    io::files::append "${tmp_dir}/log.txt" ""
+    testframework::assert_equal "3" "$(wc -l < "${tmp_dir}/log.txt")" "append writes empty line"
+
+    local rc=0
+    io::files::append "" "nothing" || rc=$?
+    testframework::assert_equal "${E_INVALID}" "${rc}" "append rejects empty file path"
+
+    export FRAMEWORK_DRY_RUN=true
+    io::files::append "${tmp_dir}/dry_log.txt" "should not appear"
+    testframework::assert_false "io::files::exists '${tmp_dir}/dry_log.txt'" "append honors dry-run"
+    unset FRAMEWORK_DRY_RUN
+
+    # ==========================================
     # copy_file
     # ==========================================
     testframework::section "copy_file"

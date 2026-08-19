@@ -86,6 +86,30 @@ Runs a command with output suppressed and the result ignored — always returns 
 Explicit replacement for `cmd >/dev/null 2>&1 || true`. Use only where failure of the
 command genuinely does not matter.
 
+### utils::attempt
+
+```bash
+utils::attempt xinput set-prop "${device}" "libinput Tapping Enabled" 1
+```
+
+Runs a best-effort command: stderr is muted, stdout stays visible, and the exit status
+is ignored — always returns `0`. Explicit replacement for `cmd 2>/dev/null || true`
+(and `utils::quiet_err cmd || true`). Use for operations where failure is acceptable
+and stdout may still be consumed.
+
+### Time primitives
+
+```bash
+utils::now_s        # epoch seconds            — replaces: date +%s
+utils::now_ms       # epoch milliseconds       — replaces: date +%s%3N
+utils::now_float    # seconds with fraction    — replaces: date +%s.%N
+utils::stamp        # YYYYMMDD_HHMMSS          — replaces: date +%Y%m%d_%H%M%S
+utils::log_stamp    # "YYYY-MM-DD HH:MM:SS"    — replaces: date '+%Y-%m-%d %H:%M:%S'
+```
+
+Named replacements for the various `date +...` idioms, so call sites state the intent
+instead of a format string.
+
 ### utils::ensure_source
 
 ```bash
@@ -137,6 +161,7 @@ with named functions, so intent is visible at the call site:
 | `cmd >/dev/null 2>&1`           | `utils::quiet cmd`   | Suppress stdout+stderr, keep exit code            |
 | `cmd 2>/dev/null`               | `utils::quiet_err cmd` | Suppress stderr only, keep exit code            |
 | `cmd >/dev/null 2>&1 \|\| true` | `utils::ignore cmd`  | Suppress output and ignore failure (always `0`)   |
+| `cmd 2>/dev/null \|\| true`     | `utils::attempt cmd` | Mute stderr, keep stdout, ignore failure (always `0`) |
 
 Example — before / after:
 

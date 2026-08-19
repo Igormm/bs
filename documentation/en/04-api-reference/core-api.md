@@ -38,10 +38,10 @@ Core primitives available a priori: double-source protection (`bs::guard`,
 - Returns: 0 if the module is loaded, 1 otherwise
 - Example: `bs::guard_loaded "logger" && echo "logger is here"`
 
-Module template:
+Module template (`core/prereq.sh` is autoloaded first by `bootstrap/init.sh`,
+no manual sourcing needed):
 
 ```bash
-source "$(dirname -- "${BASH_SOURCE[0]}")/../core/prereq.sh"  # path relative to the module file
 bs::guard "MY_MODULE" || return 0
 bs::source_relative "../core/logger.sh" "../core/utils.sh"  # dependencies relative to the module file
 ```
@@ -50,6 +50,15 @@ bs::source_relative "../core/logger.sh" "../core/utils.sh"  # dependencies relat
 - Parameters: `$@` — relative file paths from the caller module's directory
 - Purpose: replaces the verbose idiom `source "$(dirname -- "${BASH_SOURCE[0]}")/..."`
 - Example: `bs::source_relative "const.sh" "logger.sh"`
+
+#### `bs::script_dir [index]`
+- Parameters: `$1` — optional `BASH_SOURCE` index (default 1 = immediate caller)
+- Returns: 0 on success, 1 if the directory cannot be resolved
+- Stdout: absolute physical path (`pwd -P`) of the caller's directory
+- Purpose: replaces the boilerplate `"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"`.
+  Available only after `core/prereq` is loaded — entry-point headers that run
+  before `bootstrap/init.sh` must keep the raw idiom.
+- Example: `readonly SCRIPT_DIR="$(bs::script_dir)"`
 
 ---
 

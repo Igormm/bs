@@ -84,6 +84,22 @@ test_source_relative() {
     rm -rf "${temp_dir}"
 }
 
+# Test bs::script_dir resolves the caller's directory
+test_script_dir() {
+    local dir
+    dir="$(bs::script_dir)"
+    local expected
+    expected="$(cd -- "${TEST_SCRIPT_DIR}" >/dev/null 2>&1 && pwd -P)"
+    testframework::assert_equal "${expected}" "${dir}" "bs::script_dir returns caller directory"
+
+    # Invalid index should fail
+    if bs::script_dir 99 >/dev/null 2>&1; then
+        testframework::assert_true "1 -eq 2" "bs::script_dir fails on invalid index"
+    else
+        testframework::assert_true "0 -eq 0" "bs::script_dir fails on invalid index"
+    fi
+}
+
 main() {
     print_header "Core Prerequisites Unit Tests / Модульные тесты примитивов ядра"
 
@@ -100,6 +116,9 @@ main() {
 
     testframework::section "Source Relative / Относительный source"
     test_source_relative
+
+    testframework::section "Script Dir / Каталог скрипта"
+    test_script_dir
 
     testframework::summary
 }

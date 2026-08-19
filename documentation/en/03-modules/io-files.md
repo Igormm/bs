@@ -37,6 +37,15 @@ io::files::ensure_dir "/tmp/myapp"      # mkdir -p
 io::files::ensure_dir "/tmp/myapp" "755" # + chmod 755
 ```
 
+## Content writing
+
+```bash
+# Append a line to a file — linguistic replacement for: echo "..." >> file
+# Arguments after the path are joined with spaces (like echo); honors dry-run.
+io::files::append "${log_file}" "[${timestamp}] started"
+io::files::append "${log_file}" ""      # empty line
+```
+
 ## Copy
 
 ```bash

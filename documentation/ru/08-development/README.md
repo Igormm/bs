@@ -28,8 +28,8 @@
 # Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points
 
-# Core prerequisites / Базовые примитивы ядра
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/prereq.sh"
+# Source Guard / Защита от повторного подключения
+# (bs::guard автозагружается из core/prereq.sh первым, bootstrap/init.sh)
 bs::guard "SYSTEM_FOO" || return 0
 ```
 
@@ -43,7 +43,9 @@ bs::guard "SYSTEM_FOO" || return 0
   файла. Используйте обёртку `bs::guard` из
   [core/prereq.sh](../../../core/prereq.sh): она атомарно проверяет метку
   `__SYSTEM_FOO_SOURCED` и выставляет её; возвращает 1, если модуль уже
-  загружался (тогда срабатывает `|| return 0`). Ручная идиома
+  загружался (тогда срабатывает `|| return 0`). `core/prereq.sh`
+  автозагружается первым из `bootstrap/init.sh`, поэтому подключать его
+  вручную не нужно. Ручная идиома
   `[[ -n "${__X_SOURCED:-}" ]] && return 0` и check-only хелпер `utils::guard`
   считаются устаревшими и оставлены для обратной совместимости.
 

@@ -28,8 +28,8 @@ double underscore before the function name: `io::streams::__is_fd()`.
 # Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points
 
-# Core prerequisites / Базовые примитивы ядра
-source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/prereq.sh"
+# Source Guard / Защита от повторного подключения
+# (bs::guard автозагружается из core/prereq.sh первым, bootstrap/init.sh)
 bs::guard "SYSTEM_FOO" || return 0
 ```
 
@@ -42,7 +42,9 @@ Key points:
 - The source guard prevents double execution when the file is sourced twice.
   Use the `bs::guard` wrapper from [core/prereq.sh](../../../core/prereq.sh):
   it atomically checks the `__SYSTEM_FOO_SOURCED` mark and sets it; it returns
-  1 if the module was already loaded (then `|| return 0` fires). The manual
+  1 if the module was already loaded (then `|| return 0` fires).
+  `core/prereq.sh` is autoloaded first by `bootstrap/init.sh`, so modules
+  never source it manually. The manual
   `[[ -n "${__X_SOURCED:-}" ]] && return 0` idiom and the check-only
   `utils::guard` helper are deprecated and kept for backward compatibility.
 

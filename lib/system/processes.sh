@@ -24,7 +24,7 @@ system::processes::list() {
         fi
     else
         log::error "ps command not found"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -37,7 +37,7 @@ system::processes::find() {
     
     if [[ -z "${pattern}" ]]; then
         log::warn "Process name/pattern not specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if utils::has pgrep; then
@@ -47,13 +47,37 @@ system::processes::find() {
             utils::quiet_err ps -p "${pids}" -o pid,user,comm,args
         else
             log::info "No processes found matching '${pattern}'"
-            return 1
+            return "${E_ERROR}"
         fi
     elif utils::has ps; then
         utils::quiet_err ps aux | grep -i "${pattern}" | grep -v grep
     else
         log::error "pgrep or ps command not found"
+        return "${E_ERROR}"
+    fi
+}
+
+# @description Check if a process with the exact name is running /
+#   Проверить, запущен ли процесс с точным именем
+#   Boolean predicate / Булев предикат: 0 — запущен, 1 — нет.
+#   Linguistic replacement for `pgrep -x name >/dev/null`.
+# @param $1 Exact process name / Точное имя процесса
+# @return 0 if running, 1 otherwise / 0 если запущен, иначе 1
+# @example
+#   if system::processes::is_running "sshd"; then ...
+system::processes::is_running() {
+    local name="${1:-}"
+
+    if [[ -z "${name}" ]]; then
+        log::warn "Process name not specified"
         return 1
+    fi
+
+    if utils::has pgrep; then
+        utils::quiet pgrep -x "${name}"
+    else
+        # Fallback without pgrep / Резервный вариант без pgrep
+        utils::quiet ps -eo comm | utils::quiet grep -qx "${name}"
     fi
 }
 
@@ -69,13 +93,13 @@ system::processes::kill() {
     
     if [[ -z "${pid}" ]]; then
         log::warn "Process ID not specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # Check if process exists
     if ! utils::quiet ps -p "${pid}"; then
         log::warn "Process ${pid} does not exist"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if utils::has kill; then
@@ -84,11 +108,11 @@ system::processes::kill() {
             return 0
         else
             log::error "Failed to kill process ${pid}"
-            return 1
+            return "${E_ERROR}"
         fi
     else
         log::error "kill command not found"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -104,7 +128,7 @@ system::processes::kill_by_name() {
     
     if [[ -z "${pattern}" ]]; then
         log::warn "Process name/pattern not specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     local pids
@@ -119,7 +143,7 @@ system::processes::kill_by_name() {
     
     if [[ -z "${pids}" ]]; then
         log::warn "No processes found matching '${pattern}'"
-        return 1
+        return "${E_ERROR}"
     fi
     
     local killed=0
@@ -134,7 +158,7 @@ system::processes::kill_by_name() {
         return 0
     else
         log::error "Failed to kill any processes matching '${pattern}'"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -150,7 +174,7 @@ system::processes::tree() {
         log::info "Full tree view requires pstree command"
     else
         log::error "pstree or ps command not found"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -168,7 +192,7 @@ system::processes::cpu_top() {
         utils::quiet_err ps aux --sort=-%cpu | head -n $((count + 1)) | tail -n +2
     else
         log::error "top or ps command not found"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -186,7 +210,7 @@ system::processes::memory_top() {
         utils::quiet_err ps aux --sort=-%mem | head -n $((count + 1)) | tail -n +2
     else
         log::error "top or ps command not found"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -199,7 +223,7 @@ system::processes::port() {
     
     if [[ -z "${port}" ]]; then
         log::warn "Port number not specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # Try lsof first / Попробовать lsof сначала
@@ -211,7 +235,7 @@ system::processes::port() {
             return 0
         else
             log::info "No process found using port ${port}"
-            return 1
+            return "${E_ERROR}"
         fi
     # Try netstat / Попробовать netstat
     elif utils::has netstat; then
@@ -222,7 +246,7 @@ system::processes::port() {
             return 0
         else
             log::info "No process found using port ${port}"
-            return 1
+            return "${E_ERROR}"
         fi
     # Try ss (modern replacement for netstat) / Попробовать ss (современная замена
     # netstat)
@@ -234,11 +258,11 @@ system::processes::port() {
             return 0
         else
             log::info "No process found using port ${port}"
-            return 1
+            return "${E_ERROR}"
         fi
     else
         log::error "lsof, netstat, or ss command not found"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -251,13 +275,13 @@ system::processes::info() {
     
     if [[ -z "${pid}" ]]; then
         log::warn "Process ID not specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # Check if process exists / Проверить, существует ли процесс
     if ! utils::quiet ps -p "${pid}"; then
         log::warn "Process ${pid} does not exist"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if utils::has ps; then

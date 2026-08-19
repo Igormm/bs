@@ -60,8 +60,8 @@ file is sourced more than once:
 #
 # @depends core/const, core/logger, core/utils
 
-# Core prerequisites — shared primitives from core/prereq.sh
-source "$(dirname -- "${BASH_SOURCE[0]}")/../core/prereq.sh"
+# Source Guard — bs::guard is provided by core/prereq.sh, which is
+# autoloaded first by bootstrap/init.sh; modules must NOT source it manually
 bs::guard "MY_MODULE" || return 0
 
 # Dependencies — self-source relative to the module file (the module works
@@ -82,8 +82,10 @@ on first load — the mark is set and the module body runs.
 On the first load `__MY_MODULE_SOURCED` is undefined, so the code runs; on
 subsequent loads the variable is set and `return` skips the body. Do not
 hand-roll the `[[ -n "${__X_SOURCED:-}" ]] && return 0` idiom in new modules.
-The legacy `utils::guard` from `core/utils.sh` is kept as an alias for
-backward compatibility.
+Do not `source core/prereq.sh` manually either — `bootstrap/init.sh` loads it
+before every other module, so `bs::guard` and `bs::source_relative` are always
+available a priori. The legacy `utils::guard` from `core/utils.sh` is kept as
+an alias for backward compatibility.
 
 Do not load modules with `source lib/...`. Use the `load` function
 ([bootstrap/loader.sh](../../bootstrap/loader.sh)): it resolves paths relative
@@ -351,12 +353,11 @@ wrapper from [core/prereq.sh](../../core/prereq.sh) — it checks the
 #!/usr/bin/env bash
 # lib/my_module.sh
 
-source "$(dirname -- "${BASH_SOURCE[0]}")/../core/prereq.sh"
 bs::guard "MY_MODULE" || return 0
 ```
 
-The path to `prereq.sh` is relative to the module file (from `core/` — just
-`prereq.sh` next to it, from `lib/<group>/` — `../../core/prereq.sh`).
+`core/prereq.sh` is autoloaded first by `bootstrap/init.sh`, so `bs::guard` is
+always available — modules never source `prereq.sh` themselves.
 
 [core/guard.sh](../../core/guard.sh) is kept as a backward-compatible wrapper
 around `core/prereq.sh`.
@@ -396,7 +397,6 @@ or directly by the user), use `bs::source_relative` from
 module's own file:
 
 ```bash
-source "$(dirname -- "${BASH_SOURCE[0]}")/../core/prereq.sh"
 bs::guard "MY_MODULE" || return 0
 
 # @depends core/logger, core/errorhandler, lib/io/streams
@@ -404,9 +404,10 @@ bs::source_relative "../core/logger.sh" "../core/errorhandler.sh" "../io/streams
 ```
 
 Rules:
-- Keep the first `source "$(dirname -- "${BASH_SOURCE[0]}")/.../prereq.sh"` as
-  is — it loads the core primitives.
-- Replace all subsequent dependency sources with `bs::source_relative`.
+- Do not `source core/prereq.sh` manually — it is autoloaded first by
+  `bootstrap/init.sh`, so `bs::guard` and `bs::source_relative` are available
+  a priori.
+- Replace all dependency sources with `bs::source_relative`.
 - Multiple dependencies can be passed in a single call.
 - If the module is guaranteed to be loaded through `load`, use `load` and
   declare dependencies with a `# @depends` comment.

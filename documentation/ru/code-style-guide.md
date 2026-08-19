@@ -62,8 +62,9 @@ utils::strict
 #
 # @depends core/const, core/logger, core/utils
 
-# Core prerequisites — базовые примитивы ядра из core/prereq.sh
-source "$(dirname -- "${BASH_SOURCE[0]}")/../core/prereq.sh"
+# Source Guard — bs::guard предоставляется core/prereq.sh, который
+# автозагружается первым из bootstrap/init.sh; модули НЕ подключают
+# его вручную
 bs::guard "MY_MODULE" || return 0
 
 # Зависимости — self-source относительно файла модуля (модуль работает
@@ -84,8 +85,11 @@ declare -gA MODULE_CONFIG
 При первой загрузке переменная `__MY_MODULE_SOURCED` не определена — код
 выполняется; при повторной переменная уже существует, и `return` пропускает
 тело файла. Ручную идиому `[[ -n "${__X_SOURCED:-}" ]] && return 0` в новых
-модулях не используйте. Устаревший `utils::guard` из `core/utils.sh`
-сохранён как алиас для обратной совместимости.
+модулях не используйте. Не подключайте и `core/prereq.sh` вручную —
+`bootstrap/init.sh` загружает его раньше всех остальных модулей, поэтому
+`bs::guard` и `bs::source_relative` доступны априори. Устаревший
+`utils::guard` из `core/utils.sh` сохранён как алиас для обратной
+совместимости.
 
 Не загружайте модули через `source lib/...`. Используйте функцию `load`
 ([bootstrap/loader.sh](../../bootstrap/loader.sh)): она разрешает пути
@@ -353,12 +357,11 @@ io::process::guard --timeout 120 --hang-after 60 --strace-net -- ./server
 #!/usr/bin/env bash
 # lib/my_module.sh
 
-source "$(dirname -- "${BASH_SOURCE[0]}")/../core/prereq.sh"
 bs::guard "MY_MODULE" || return 0
 ```
 
-Путь до `prereq.sh` указывается относительно файла модуля (из `core/` —
-просто `prereq.sh` рядом, из `lib/<group>/` — `../../core/prereq.sh`).
+`core/prereq.sh` автозагружается первым из `bootstrap/init.sh`, поэтому
+`bs::guard` всегда доступен — модули никогда не подключают `prereq.sh` сами.
 
 Файл [core/guard.sh](../../core/guard.sh) сохранён как обратносовместимая
 обёртка над `core/prereq.sh`.
@@ -398,7 +401,6 @@ declare -g MODULE_LOADED="1"
 своего файла:
 
 ```bash
-source "$(dirname -- "${BASH_SOURCE[0]}")/../core/prereq.sh"
 bs::guard "MY_MODULE" || return 0
 
 # @depends core/logger, core/errorhandler, lib/io/streams
@@ -406,9 +408,10 @@ bs::source_relative "../core/logger.sh" "../core/errorhandler.sh" "../io/streams
 ```
 
 Правила:
-- Первый `source "$(dirname -- "${BASH_SOURCE[0]}")/.../prereq.sh"` оставляйте
-  как есть — он загружает базовые примитивы ядра.
-- Все последующие зависимости заменяйте на `bs::source_relative`.
+- Не подключайте `core/prereq.sh` вручную — он автозагружается первым из
+  `bootstrap/init.sh`, поэтому `bs::guard` и `bs::source_relative` доступны
+  априори.
+- Все зависимости подключайте через `bs::source_relative`.
 - Несколько зависимостей можно передать одним вызовом.
 - Если модуль гарантированно загружается через `load`, используйте `load` и
   декларируйте зависимости комментарием `# @depends`.

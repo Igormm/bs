@@ -171,3 +171,47 @@ deps::check_module() {
   log::debug "Module ${module_path} dependencies satisfied"
   return 0
 }
+
+# @description Collect missing tools into an array (package names).
+# @description Собрать отсутствующие инструменты в массив (имена пакетов).
+#   Linguistic replacement for the repeated `if ! utils::has X; then
+#   missing+=("pkg"); fi` blocks in module check_dependencies functions.
+#   Each spec is "cmd", "cmd:package" or "cmdA|cmdB:package" (alternatives:
+#   any one is enough). Package defaults to the command name; several
+#   packages can be space-separated.
+# @param $1 Name of the output array (filled with missing package names)
+# @param $@ Tool specs / Спецификации инструментов
+# @return Always 0 — the result is in the array / Всегда 0
+# @example
+#   local -a missing=()
+#   deps::missing_tools missing wg:wireguard-tools "netstat|ss:net-tools iproute2"
+deps::missing_tools() {
+  local -n __deps_out="${1:?output array name required}"
+  shift
+
+  local spec cmd pkg alt
+  local -a alts=()
+  for spec in "$@"; do
+    cmd="${spec%%:*}"
+    pkg="${spec#*:}"
+
+    local found=1
+    IFS='|' read -r -a alts <<< "${cmd}"
+    for alt in "${alts[@]}"; do
+      if utils::has "${alt}"; then
+        found=0
+        break
+      fi
+    done
+
+    if [[ "${found}" -ne 0 ]]; then
+      local p
+      # Deliberate word splitting: pkg may hold several package names
+      for p in ${pkg}; do
+        __deps_out+=("${p}")
+      done
+    fi
+  done
+
+  return 0
+}
