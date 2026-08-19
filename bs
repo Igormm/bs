@@ -119,7 +119,7 @@ doctor_cmd() {
   fi
 
   # Required core files / Обязательные файлы ядра
-  local req=(bootstrap/init.sh bootstrap/loader.sh core/const.sh core/logger.sh core/errorhandler.sh core/version.sh core/utils.sh core/config.sh core/deps.sh)
+  local req=(bootstrap/init.sh bootstrap/loader.sh core/prereq.sh core/lang.sh core/const.sh core/logger.sh core/errorhandler.sh core/version.sh core/utils.sh core/config.sh core/deps.sh)
   for f in "${req[@]}"; do
     if [[ -f "${BS_ROOT}/${f}" ]]; then
       echo "  [OK] ${f}"

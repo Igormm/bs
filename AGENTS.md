@@ -8,7 +8,7 @@ BS is a modular Bash 4+ framework and standard library. It provides:
 
 - `bs` — shebang interpreter and CLI (`#!/usr/bin/env bs`)
 - `bootstrap/loader.sh` — module loader with dependency resolution (`load "lib/io/streams"`)
-- `core/` — framework kernel: `args`, `logger`, `errorhandler`, `const`, `utils`, `version`, `config`, `deps`, `prereq`
+- `core/` — framework kernel: `args`, `logger`, `errorhandler`, `const`, `utils`, `version`, `config`, `deps`, `prereq`, `lang`
 - `lib/` — standard library: `io/streams`, `io/files`, `io/process`, `system/*`, `integration/*`, `ui/*`, etc.
 - `tests/` — custom test framework, ShellCheck validation, syntax validation
 

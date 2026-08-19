@@ -129,6 +129,9 @@ Its steps:
    - `core/prereq` — first: the core primitives `bs::guard`,
      `bs::guard_loaded` and `bs::source_relative`, available a priori to all
      other modules (modules never source `prereq.sh` manually);
+   - `core/lang` — language primitives over Bash built-ins: introspection
+     (`bs::func_name`, `bs::call_stack`, `bs::type_of`), strings (`str::*`),
+     collections (`arr::*`, `map::*`);
    - `core/const` — error codes (`E_SUCCESS`, `E_ERROR`, `LIB_ERROR_*`),
      color constants, framework flags (`FRAMEWORK_DEBUG`,
      `FRAMEWORK_DRY_RUN`);

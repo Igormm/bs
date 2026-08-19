@@ -25,8 +25,8 @@ load "core/version"      # информация о версии
 ## Source Guard — `core/prereq.sh`
 
 Базовые примитивы ядра: защита от повторной загрузки (`bs::guard`,
-`bs::guard_loaded`) и относительный sourcing (`bs::source_relative`). Не грузится
-через `load` — модули подключают его напрямую относительным путём.
+`bs::guard_loaded`) и относительный sourcing (`bs::source_relative`).
+Автозагружается первым из `bootstrap/init.sh` — модули не подключают его вручную.
 
 #### `bs::guard <name>`
 - Параметры: `$1` — имя модуля (без `__` / `_SOURCED`, регистр не важен)
@@ -59,6 +59,44 @@ bs::source_relative "../core/logger.sh" "../core/utils.sh"  # зависимос
   Доступна только после загрузки `core/prereq` — заголовки точек входа,
   выполняющиеся до `bootstrap/init.sh`, должны оставаться на сырой идиоме.
 - Пример: `readonly SCRIPT_DIR="$(bs::script_dir)"`
+
+---
+
+## Языковые примитивы — `core/lang.sh`
+
+«Языковое ядро»: интроспекция, типы, строки и коллекции поверх чистого
+Bash 4+ (без внешних команд). Автозагружается сразу после `core/prereq`.
+
+### Интроспекция
+
+#### `bs::func_name [depth]`
+- Stdout: имя вызывающей функции (`FUNCNAME`), "main" на верхнем уровне скрипта; `$1` — глубина стека (по умолчанию 1)
+- Заменяет бойлерплейт `local func_name="my::func"`
+
+#### `bs::call_stack`
+- Stdout: по фрейму на строку: `function (file:line)`, начиная с вызывающего
+
+#### `bs::is_function <name>` / `bs::is_defined <name>`
+- Предикаты: функция определена (`declare -F`) / переменная задана (`[[ -v ]]`)
+
+#### `bs::type_of <name>`
+- Stdout: `function | map | array | integer | string | undefined`; возвращает 1, если не определено
+
+### Строки
+
+`str::upper`, `str::lower`, `str::trim`, `str::replace <s> <old> <new>` печатают
+результат; `str::contains`, `str::starts_with`, `str::ends_with` — предикаты
+(0/1). Чистое раскрытие параметров — без форков `sed`/`awk`.
+
+### Коллекции
+
+- `arr::contains <массив> <элемент>` — предикат, точное совпадение
+- `arr::push <массив> <элемент>` — добавление на месте (nameref)
+- `arr::length <массив>` — число элементов
+- `arr::join <массив> <sep>` — склейка многосимвольным разделителем (в отличие от `"${a[*]}"` с IFS)
+- `map::has <map> <ключ>` — предикат
+
+Все принимают ИМЯ переменной (не значение), напр. `arr::join my_tools ", "`.
 
 ---
 
@@ -184,6 +222,10 @@ bs::source_relative "../core/logger.sh" "../core/utils.sh"  # зависимос
 - Параметры: `$1` — имя функции, где произошла ошибка; `$2` — сообщение; `$3` — код ошибки (опционально, по умолчанию `E_ERROR`)
 - Возвращает: код ошибки; логирует через `log::error`, если логгер загружен, иначе печатает в stderr
 - Пример: `errorhandler::throw "my::func" "Something failed" "${LIB_ERROR_FILE_NOT_FOUND}"`
+
+#### `error::throw <message> [code]`
+- То же, что `errorhandler::throw`, но имя вызывающей функции определяется автоматически через `FUNCNAME` — без бойлерплейта `local func_name="..."`, и имя не расходится с кодом после переименований
+- Пример: `error::throw "Something failed" "${LIB_ERROR_FILE_NOT_FOUND}"`
 
 #### `error::log <message>`
 - Параметры: `$1` — сообщение

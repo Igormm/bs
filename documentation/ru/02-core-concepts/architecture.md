@@ -131,6 +131,9 @@ source**, а не запускаться (при прямом запуске о�
    - `core/prereq` — первым: базовые примитивы `bs::guard`,
      `bs::guard_loaded` и `bs::source_relative`, доступные априори всем
      остальным модулям (модули не подключают `prereq.sh` вручную);
+   - `core/lang` — языковые примитивы поверх встроенных возможностей Bash:
+     интроспекция (`bs::func_name`, `bs::call_stack`, `bs::type_of`),
+     строки (`str::*`), коллекции (`arr::*`, `map::*`);
    - `core/const` — коды ошибок (`E_SUCCESS`, `E_ERROR`, `LIB_ERROR_*`),
      цветовые константы, флаги фреймворка (`FRAMEWORK_DEBUG`,
      `FRAMEWORK_DRY_RUN`);

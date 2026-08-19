@@ -25,8 +25,8 @@ load "core/version"      # version information
 ## Source Guard — `core/prereq.sh`
 
 Core primitives available a priori: double-source protection (`bs::guard`,
-`bs::guard_loaded`) and relative sourcing (`bs::source_relative`). Not loaded via
-`load` — modules source it directly by relative path.
+`bs::guard_loaded`) and relative sourcing (`bs::source_relative`). Autoloaded
+first by `bootstrap/init.sh` — modules never source it manually.
 
 #### `bs::guard <name>`
 - Parameters: `$1` — module name (without `__` / `_SOURCED`, case-insensitive)
@@ -59,6 +59,45 @@ bs::source_relative "../core/logger.sh" "../core/utils.sh"  # dependencies relat
   Available only after `core/prereq` is loaded — entry-point headers that run
   before `bootstrap/init.sh` must keep the raw idiom.
 - Example: `readonly SCRIPT_DIR="$(bs::script_dir)"`
+
+---
+
+## Language primitives — `core/lang.sh`
+
+The "language kernel": introspection, types, strings and collections over
+pure Bash 4+ built-ins (no external commands). Autoloaded right after
+`core/prereq`.
+
+### Introspection
+
+#### `bs::func_name [depth]`
+- Stdout: name of the calling function (`FUNCNAME`), "main" at script top level; `$1` — stack depth (default 1)
+- Replaces the `local func_name="my::func"` boilerplate
+
+#### `bs::call_stack`
+- Stdout: one frame per line: `function (file:line)`, caller first
+
+#### `bs::is_function <name>` / `bs::is_defined <name>`
+- Predicates: function exists (`declare -F`) / variable is set (`[[ -v ]]`)
+
+#### `bs::type_of <name>`
+- Stdout: `function | map | array | integer | string | undefined`; returns 1 when undefined
+
+### Strings
+
+`str::upper`, `str::lower`, `str::trim`, `str::replace <s> <old> <new>` print the
+result; `str::contains`, `str::starts_with`, `str::ends_with` are predicates
+(0/1). Pure parameter expansion — no `sed`/`awk` forks.
+
+### Collections
+
+- `arr::contains <array> <element>` — predicate, exact match
+- `arr::push <array> <element>` — append in place (nameref)
+- `arr::length <array>` — element count
+- `arr::join <array> <sep>` — joins with a multi-char separator (unlike `"${a[*]}"` with IFS)
+- `map::has <map> <key>` — predicate
+
+All take the variable NAME (not the value), e.g. `arr::join my_tools ", "`.
 
 ---
 
@@ -184,6 +223,10 @@ Any module can register a cleanup function; the stack runs in LIFO order when th
 - Parameters: `$1` — function name where the error occurred; `$2` — message; `$3` — error code (optional, default `E_ERROR`)
 - Returns: the error code; logs via `log::error` if the logger is loaded, otherwise prints to stderr
 - Example: `errorhandler::throw "my::func" "Something failed" "${LIB_ERROR_FILE_NOT_FOUND}"`
+
+#### `error::throw <message> [code]`
+- Like `errorhandler::throw`, but the caller's function name is auto-detected via `FUNCNAME` — no `local func_name="..."` boilerplate, and the name stays correct after renames
+- Example: `error::throw "Something failed" "${LIB_ERROR_FILE_NOT_FOUND}"`
 
 #### `error::log <message>`
 - Parameters: `$1` — message
