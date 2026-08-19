@@ -63,7 +63,6 @@ SSH_NETWORK_SSH_PUBLIC_KEY_PATH="${SSH_NETWORK_SSH_KEY_PATH}.pub"
 
 # Module initialization
 sshnetwork::init() {
-    local func_name="sshnetwork::init"
     
     log::info "Initializing SSH Network module..."
     
@@ -72,19 +71,19 @@ sshnetwork::init() {
     
     # Create necessary directories
     mkdir -p "${SSH_NETWORK_CONFIG_DIR}" || {
-        errorhandler::throw "${func_name}" "Failed to create config directory" \
+        error::throw "Failed to create config directory" \
             "${LIB_ERROR_FILE_OPERATION}"
     }
     
     mkdir -p "${HOME}/.ssh" || {
-        errorhandler::throw "${func_name}" "Failed to create SSH directory" \
+        error::throw "Failed to create SSH directory" \
             "${LIB_ERROR_FILE_OPERATION}"
     }
     
     # Create known devices file if it doesn't exist
     if [[ ! -f "${SSH_NETWORK_KNOWN_HOSTS_FILE}" ]]; then
         touch "${SSH_NETWORK_KNOWN_HOSTS_FILE}" || {
-            errorhandler::throw "${func_name}" "Failed to create known devices file" \
+            error::throw "Failed to create known devices file" \
                 "${LIB_ERROR_FILE_OPERATION}"
         }
         chmod 600 "${SSH_NETWORK_KNOWN_HOSTS_FILE}"
@@ -98,7 +97,6 @@ sshnetwork::init() {
 
 # Check SSH Network dependencies
 sshnetwork::check_dependencies() {
-    local func_name="sshnetwork::check_dependencies"
     local missing_deps=()
     
     log::debug "Checking SSH Network dependencies..."
@@ -117,7 +115,6 @@ sshnetwork::check_dependencies() {
 
 # Install missing dependencies
 sshnetwork::install_dependencies() {
-    local func_name="sshnetwork::install_dependencies"
     local deps=("$@")
     
     log::info "Installing missing dependencies: ${deps[*]}..."
@@ -129,12 +126,12 @@ sshnetwork::install_dependencies() {
         dnf install -y openssh rsync nmap iputils
     elif platformcheck::is_macos; then
         if ! utils::has brew; then
-            errorhandler::throw "${func_name}" "Homebrew is required for macOS" \
+            error::throw "Homebrew is required for macOS" \
                 "${LIB_ERROR_DEPENDENCY_MISSING}"
         fi
         brew install openssh rsync nmap
     else
-        errorhandler::throw "${func_name}" "Unsupported platform for dependency installation" \
+        error::throw "Unsupported platform for dependency installation" \
             "${LIB_ERROR_PLATFORM_UNSUPPORTED}"
     fi
     
@@ -143,13 +140,12 @@ sshnetwork::install_dependencies() {
 
 # Generate SSH keys for BS
 sshnetwork::generate_ssh_keys() {
-    local func_name="sshnetwork::generate_ssh_keys"
     
     if [[ ! -f "${SSH_NETWORK_SSH_KEY_PATH}" ]]; then
         log::info "Generating SSH keys for BS..."
         
         ssh-keygen -t rsa -b 4096 -f "${SSH_NETWORK_SSH_KEY_PATH}" -N "" -C "BS@sshnetwork" || {
-            errorhandler::throw "${func_name}" "Failed to generate SSH keys" \
+            error::throw "Failed to generate SSH keys" \
                 "${LIB_ERROR_COMMAND_FAILED}"
         }
         
@@ -164,7 +160,6 @@ sshnetwork::generate_ssh_keys() {
 
 # Discover SSH-enabled devices in network
 sshnetwork::discover_devices() {
-    local func_name="sshnetwork::discover_devices"
     local network_range="${1:-}"
     local port="${2:-${SSH_NETWORK_DEFAULT_PORT}}"
     
@@ -172,7 +167,7 @@ sshnetwork::discover_devices() {
         # Auto-detect local network
         network_range=$(sshnetwork::get_local_network)
         if [[ -z "${network_range}" ]]; then
-            errorhandler::throw "${func_name}" "Could not detect local network range" \
+            error::throw "Could not detect local network range" \
                 "${LIB_ERROR_NETWORK}"
         fi
     fi
@@ -217,7 +212,6 @@ sshnetwork::discover_devices() {
 
 # Get local network range
 sshnetwork::get_local_network() {
-    local func_name="sshnetwork::get_local_network"
     
     # Try to get network information using ip command
     if utils::has ip; then
@@ -256,12 +250,11 @@ sshnetwork::get_local_network() {
 
 # Test SSH connection
 sshnetwork::test_connection() {
-    local func_name="sshnetwork::test_connection"
     local host="${1:-}"
     local port="${2:-${SSH_NETWORK_DEFAULT_PORT}}"
     
     if [[ -z "${host}" ]]; then
-        errorhandler::throw "${func_name}" "Host is required" \
+        error::throw "Host is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -281,7 +274,6 @@ sshnetwork::test_connection() {
 
 # Save discovered devices to file
 sshnetwork::save_discovered_devices() {
-    local func_name="sshnetwork::save_discovered_devices"
     
     if [[ ${#SSH_NETWORK_DISCOVERED_DEVICES[@]} -eq 0 ]]; then
         return 0
@@ -301,7 +293,6 @@ sshnetwork::save_discovered_devices() {
 
 # Load known devices from file
 sshnetwork::load_known_devices() {
-    local func_name="sshnetwork::load_known_devices"
     
     if [[ ! -f "${SSH_NETWORK_KNOWN_HOSTS_FILE}" ]]; then
         return "${E_ERROR}"
@@ -321,14 +312,13 @@ sshnetwork::load_known_devices() {
 
 # Execute remote command
 sshnetwork::execute_remote() {
-    local func_name="sshnetwork::execute_remote"
     local host="${1:-}"
     local command="${2:-}"
     local user="${3:-$(whoami)}"
     local port="${4:-${SSH_NETWORK_DEFAULT_PORT}}"
     
     if [[ -z "${host}" ]] || [[ -z "${command}" ]]; then
-        errorhandler::throw "${func_name}" "Host and command are required" \
+        error::throw "Host and command are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -359,13 +349,12 @@ sshnetwork::execute_remote() {
 
 # Transfer file using scp
 sshnetwork::transfer_file() {
-    local func_name="sshnetwork::transfer_file"
     local source="${1:-}"
     local destination="${2:-}"
     local port="${3:-${SSH_NETWORK_DEFAULT_PORT}}"
     
     if [[ -z "${source}" ]] || [[ -z "${destination}" ]]; then
-        errorhandler::throw "${func_name}" "Source and destination are required" \
+        error::throw "Source and destination are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -382,7 +371,7 @@ sshnetwork::transfer_file() {
     )
     
     scp "${scp_options[@]}" "${source}" "${destination}" || {
-        errorhandler::throw "${func_name}" "File transfer failed" \
+        error::throw "File transfer failed" \
             "${LIB_ERROR_FILE_TRANSFER}"
     }
     
@@ -391,14 +380,13 @@ sshnetwork::transfer_file() {
 
 # Transfer file using rsync (more efficient)
 sshnetwork::transfer_file_rsync() {
-    local func_name="sshnetwork::transfer_file_rsync"
     local source="${1:-}"
     local destination="${2:-}"
     local port="${3:-${SSH_NETWORK_DEFAULT_PORT}}"
     local options="${4:-}"
     
     if [[ -z "${source}" ]] || [[ -z "${destination}" ]]; then
-        errorhandler::throw "${func_name}" "Source and destination are required" \
+        error::throw "Source and destination are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -415,7 +403,7 @@ sshnetwork::transfer_file_rsync() {
     fi
     
     rsync "${rsync_options[@]}" "${source}" "${destination}" || {
-        errorhandler::throw "${func_name}" "Rsync transfer failed" \
+        error::throw "Rsync transfer failed" \
             "${LIB_ERROR_FILE_TRANSFER}"
     }
     
@@ -424,7 +412,6 @@ sshnetwork::transfer_file_rsync() {
 
 # Synchronize directories
 sshnetwork::sync_directories() {
-    local func_name="sshnetwork::sync_directories"
     local source_dir="${1:-}"
     local destination_dir="${2:-}"
     local host="${3:-}"
@@ -432,7 +419,7 @@ sshnetwork::sync_directories() {
     local port="${5:-${SSH_NETWORK_DEFAULT_PORT}}"
     
     if [[ -z "${source_dir}" ]] || [[ -z "${destination_dir}" ]] || [[ -z "${host}" ]]; then
-        errorhandler::throw "${func_name}" "Source, destination, and host are required" \
+        error::throw "Source, destination, and host are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -446,7 +433,7 @@ sshnetwork::sync_directories() {
     )
     
     rsync "${rsync_options[@]}" "${source_dir}/" "${user}@${host}:${destination_dir}/" || {
-        errorhandler::throw "${func_name}" "Directory synchronization failed" \
+        error::throw "Directory synchronization failed" \
             "${LIB_ERROR_FILE_TRANSFER}"
     }
     
@@ -455,13 +442,12 @@ sshnetwork::sync_directories() {
 
 # Copy SSH public key to remote host
 sshnetwork::setup_passwordless_auth() {
-    local func_name="sshnetwork::setup_passwordless_auth"
     local host="${1:-}"
     local user="${2:-$(whoami)}"
     local port="${3:-${SSH_NETWORK_DEFAULT_PORT}}"
     
     if [[ -z "${host}" ]]; then
-        errorhandler::throw "${func_name}" "Host is required" \
+        error::throw "Host is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -476,13 +462,13 @@ sshnetwork::setup_passwordless_auth() {
     # Use ssh-copy-id or manual method
     if utils::has ssh-copy-id; then
         ssh-copy-id -p "${port}" -i "${SSH_NETWORK_SSH_PUBLIC_KEY_PATH}" "${user}@${host}" || {
-            errorhandler::throw "${func_name}" "Failed to copy SSH key" \
+            error::throw "Failed to copy SSH key" \
                 "${LIB_ERROR_COMMAND_FAILED}"
         }
     else
         # Manual method
         cat "${SSH_NETWORK_SSH_PUBLIC_KEY_PATH}" | ssh -p "${port}" "${user}@${host}" "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && chmod 700 ~/.ssh" || {
-            errorhandler::throw "${func_name}" "Failed to copy SSH key manually" \
+            error::throw "Failed to copy SSH key manually" \
                 "${LIB_ERROR_COMMAND_FAILED}"
         }
     fi
@@ -492,7 +478,6 @@ sshnetwork::setup_passwordless_auth() {
 
 # Execute command on multiple hosts
 sshnetwork::execute_batch() {
-    local func_name="sshnetwork::execute_batch"
     local hosts=("$@")
     local command=""
     
@@ -503,7 +488,7 @@ sshnetwork::execute_batch() {
     fi
     
     if [[ ${#hosts[@]} -eq 0 ]] || [[ -z "${command}" ]]; then
-        errorhandler::throw "${func_name}" "At least one host and command are required" \
+        error::throw "At least one host and command are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -546,13 +531,12 @@ sshnetwork::execute_batch() {
 
 # Get system information from remote host
 sshnetwork::get_remote_info() {
-    local func_name="sshnetwork::get_remote_info"
     local host="${1:-}"
     local user="${2:-$(whoami)}"
     local port="${3:-${SSH_NETWORK_DEFAULT_PORT}}"
     
     if [[ -z "${host}" ]]; then
-        errorhandler::throw "${func_name}" "Host is required" \
+        error::throw "Host is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -589,7 +573,6 @@ sshnetwork::get_remote_info() {
 
 # Monitor network connectivity
 sshnetwork::monitor_network() {
-    local func_name="sshnetwork::monitor_network"
     local hosts=("$@")
     local interval="${1:-60}"
     
@@ -600,7 +583,7 @@ sshnetwork::monitor_network() {
     fi
     
     if [[ ${#hosts[@]} -eq 0 ]]; then
-        errorhandler::throw "${func_name}" "No hosts to monitor" \
+        error::throw "No hosts to monitor" \
             "${LIB_ERROR_INVALID_STATE}"
     fi
     
@@ -637,7 +620,6 @@ sshnetwork::monitor_network() {
 
 # Get network topology
 sshnetwork::get_topology() {
-    local func_name="sshnetwork::get_topology"
     
     log::info "Analyzing network topology..."
     
@@ -669,7 +651,6 @@ sshnetwork::get_topology() {
 
 # Create SSH tunnel
 sshnetwork::create_tunnel() {
-    local func_name="sshnetwork::create_tunnel"
     local local_port="${1:-}"
     local remote_host="${2:-}"
     local remote_port="${3:-}"
@@ -679,7 +660,7 @@ sshnetwork::create_tunnel() {
     
     if [[ -z "${local_port}" ]] || [[ -z "${remote_host}" ]] || \
        [[ -z "${remote_port}" ]] || [[ -z "${ssh_host}" ]]; then
-        errorhandler::throw "${func_name}" "Local port, remote host, remote port, and SSH host are required" \
+        error::throw "Local port, remote host, remote port, and SSH host are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -698,7 +679,7 @@ sshnetwork::create_tunnel() {
     )
     
     ssh "${ssh_options[@]}" "${ssh_user}@${ssh_host}" || {
-        errorhandler::throw "${func_name}" "Failed to create SSH tunnel" \
+        error::throw "Failed to create SSH tunnel" \
             "${LIB_ERROR_COMMAND_FAILED}"
     }
     
@@ -707,11 +688,10 @@ sshnetwork::create_tunnel() {
 
 # Close SSH tunnel
 sshnetwork::close_tunnel() {
-    local func_name="sshnetwork::close_tunnel"
     local local_port="${1:-}"
     
     if [[ -z "${local_port}" ]]; then
-        errorhandler::throw "${func_name}" "Local port is required" \
+        error::throw "Local port is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -731,7 +711,6 @@ sshnetwork::close_tunnel() {
 
 # Get active tunnels
 sshnetwork::get_active_tunnels() {
-    local func_name="sshnetwork::get_active_tunnels"
     
     log::info "Active SSH tunnels:"
     
@@ -742,7 +721,6 @@ sshnetwork::get_active_tunnels() {
 
 # Log network activity
 sshnetwork::log_activity() {
-    local func_name="sshnetwork::log_activity"
     local message="${1:-}"
     
     if [[ -z "${message}" ]]; then
@@ -757,7 +735,6 @@ sshnetwork::log_activity() {
 
 # Get network statistics
 sshnetwork::get_network_stats() {
-    local func_name="sshnetwork::get_network_stats"
     local host="${1:-}"
     
     if [[ -n "${host}" ]]; then

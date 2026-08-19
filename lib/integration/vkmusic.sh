@@ -61,7 +61,6 @@ VK_MUSIC_LAST_SEARCH_RESULTS=()
 
 # Module initialization
 vkmusic::init() {
-    local func_name="vkmusic::init"
     
     log::info "Initializing VK Music module..."
     
@@ -70,17 +69,17 @@ vkmusic::init() {
     
     # Create necessary directories
     mkdir -p "${VK_MUSIC_CACHE_DIR}" || {
-        errorhandler::throw "${func_name}" "Failed to create cache directory" \
+        error::throw "Failed to create cache directory" \
             "${LIB_ERROR_FILE_OPERATION}"
     }
     
     mkdir -p "${VK_MUSIC_DOWNLOAD_DIR}" || {
-        errorhandler::throw "${func_name}" "Failed to create download directory" \
+        error::throw "Failed to create download directory" \
             "${LIB_ERROR_FILE_OPERATION}"
     }
     
     mkdir -p "${VK_MUSIC_PLAYLIST_DIR}" || {
-        errorhandler::throw "${func_name}" "Failed to create playlist directory" \
+        error::throw "Failed to create playlist directory" \
             "${LIB_ERROR_FILE_OPERATION}"
     }
     
@@ -89,7 +88,6 @@ vkmusic::init() {
 
 # Check VK Music dependencies
 vkmusic::check_dependencies() {
-    local func_name="vkmusic::check_dependencies"
     local missing_deps=()
     
     log::debug "Checking VK Music dependencies..."
@@ -108,7 +106,6 @@ vkmusic::check_dependencies() {
 
 # Install missing dependencies
 vkmusic::install_dependencies() {
-    local func_name="vkmusic::install_dependencies"
     local deps=("$@")
     
     log::info "Installing missing dependencies: ${deps[*]}..."
@@ -120,12 +117,12 @@ vkmusic::install_dependencies() {
         dnf install -y curl jq ffmpeg eyed3
     elif platformcheck::is_macos; then
         if ! utils::has brew; then
-            errorhandler::throw "${func_name}" "Homebrew is required for macOS" \
+            error::throw "Homebrew is required for macOS" \
                 "${LIB_ERROR_DEPENDENCY_MISSING}"
         fi
         brew install curl jq ffmpeg eye-d3
     else
-        errorhandler::throw "${func_name}" "Unsupported platform for dependency installation" \
+        error::throw "Unsupported platform for dependency installation" \
             "${LIB_ERROR_PLATFORM_UNSUPPORTED}"
     fi
     
@@ -134,12 +131,11 @@ vkmusic::install_dependencies() {
 
 # Authenticate with VK API
 vkmusic::auth() {
-    local func_name="vkmusic::auth"
     local access_token="${1:-}"
     local user_id="${2:-}"
     
     if [[ -z "${access_token}" ]]; then
-        errorhandler::throw "${func_name}" "Access token is required" \
+        error::throw "Access token is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -155,13 +151,12 @@ vkmusic::auth() {
 
 # Search for audio tracks
 vkmusic::search() {
-    local func_name="vkmusic::search"
     local query="${1:-}"
     local count="${2:-10}"
     local offset="${3:-0}"
     
     if [[ -z "${query}" ]]; then
-        errorhandler::throw "${func_name}" "Search query is required" \
+        error::throw "Search query is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -173,7 +168,7 @@ vkmusic::search() {
     response=$(vkapi::api_call "audio.search" "${params}")
     
     if [[ -z "${response}" ]]; then
-        errorhandler::throw "${func_name}" "Empty response from API" \
+        error::throw "Empty response from API" \
             "${LIB_ERROR_INVALID_RESPONSE}"
     fi
     
@@ -202,7 +197,6 @@ vkmusic::search() {
 
 # Display search results
 vkmusic::display_search_results() {
-    local func_name="vkmusic::display_search_results"
     
     if [[ ${#VK_MUSIC_LAST_SEARCH_RESULTS[@]} -eq 0 ]]; then
         log::warn "No search results to display"
@@ -239,12 +233,11 @@ vkmusic::display_search_results() {
 
 # Get audio by ID
 vkmusic::get_audio() {
-    local func_name="vkmusic::get_audio"
     local owner_id="${1:-}"
     local audio_id="${2:-}"
     
     if [[ -z "${owner_id}" ]] || [[ -z "${audio_id}" ]]; then
-        errorhandler::throw "${func_name}" "Owner ID and audio ID are required" \
+        error::throw "Owner ID and audio ID are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -259,13 +252,12 @@ vkmusic::get_audio() {
 
 # Get user's audio
 vkmusic::get_user_audio() {
-    local func_name="vkmusic::get_user_audio"
     local user_id="${1:-}"
     local count="${2:-100}"
     local offset="${3:-0}"
     
     if [[ -z "${user_id}" ]]; then
-        errorhandler::throw "${func_name}" "User ID is required" \
+        error::throw "User ID is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -280,7 +272,6 @@ vkmusic::get_user_audio() {
 
 # Get recommendations
 vkmusic::get_recommendations() {
-    local func_name="vkmusic::get_recommendations"
     local user_id="${1:-}"
     local count="${2:-20}"
     
@@ -299,7 +290,6 @@ vkmusic::get_recommendations() {
 
 # Get popular tracks
 vkmusic::get_popular() {
-    local func_name="vkmusic::get_popular"
     local genre_id="${1:-}"
     local count="${2:-20}"
     
@@ -318,7 +308,6 @@ vkmusic::get_popular() {
 
 # Get audio genres
 vkmusic::get_genres() {
-    local func_name="vkmusic::get_genres"
     
     log::info "Getting audio genres..."
     
@@ -330,12 +319,11 @@ vkmusic::get_genres() {
 
 # Add audio to user page
 vkmusic::add_audio() {
-    local func_name="vkmusic::add_audio"
     local owner_id="${1:-}"
     local audio_id="${2:-}"
     
     if [[ -z "${owner_id}" ]] || [[ -z "${audio_id}" ]]; then
-        errorhandler::throw "${func_name}" "Owner ID and audio ID are required" \
+        error::throw "Owner ID and audio ID are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -351,12 +339,11 @@ vkmusic::add_audio() {
 
 # Delete audio
 vkmusic::delete_audio() {
-    local func_name="vkmusic::delete_audio"
     local owner_id="${1:-}"
     local audio_id="${2:-}"
     
     if [[ -z "${owner_id}" ]] || [[ -z "${audio_id}" ]]; then
-        errorhandler::throw "${func_name}" "Owner ID and audio ID are required" \
+        error::throw "Owner ID and audio ID are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -372,12 +359,11 @@ vkmusic::delete_audio() {
 
 # Create playlist
 vkmusic::create_playlist() {
-    local func_name="vkmusic::create_playlist"
     local title="${1:-}"
     local description="${2:-}"
     
     if [[ -z "${title}" ]]; then
-        errorhandler::throw "${func_name}" "Playlist title is required" \
+        error::throw "Playlist title is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -397,7 +383,6 @@ vkmusic::create_playlist() {
 
 # Get user's playlists
 vkmusic::get_playlists() {
-    local func_name="vkmusic::get_playlists"
     local user_id="${1:-}"
     local count="${2:-50}"
     local offset="${3:-0}"
@@ -422,7 +407,7 @@ vkmusic::download() {
     local filename="${3:-}"
     
     if [[ -z "${audio_info}" ]]; then
-        errorhandler::throw "${func_name}" "Audio information is required" \
+        error::throw "Audio information is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -437,7 +422,7 @@ vkmusic::download() {
         audio_data=$(vkmusic::get_audio "${owner_id}" "${audio_id}")
         
         if [[ -z "${audio_data}" ]]; then
-            errorhandler::throw "${func_name}" "Failed to get audio information" \
+            error::throw "Failed to get audio information" \
                 "${LIB_ERROR_API_RESPONSE}"
         fi
         
@@ -464,7 +449,7 @@ vkmusic::download() {
     id=$(echo "${audio_info}" | utils::quiet_err jq -r '.id' || echo "")
     
     if [[ -z "${url}" ]]; then
-        errorhandler::throw "${func_name}" "Audio URL not found" \
+        error::throw "Audio URL not found" \
             "${LIB_ERROR_INVALID_RESPONSE}"
     fi
     
@@ -484,7 +469,7 @@ vkmusic::download() {
     # Download audio file
     curl -L -s -o "${output_file}" --max-filesize "${VK_MUSIC_MAX_DOWNLOAD_SIZE}" \
         --connect-timeout 30 --max-time 300 "${url}" || {
-        errorhandler::throw "${func_name}" "Failed to download audio file" \
+        error::throw "Failed to download audio file" \
             "${LIB_ERROR_DOWNLOAD_FAILED}"
     }
     
@@ -499,14 +484,13 @@ vkmusic::download() {
 
 # Add metadata to audio file
 vkmusic::add_metadata() {
-    local func_name="vkmusic::add_metadata"
     local file="${1:-}"
     local artist="${2:-}"
     local title="${3:-}"
     local duration="${4:-}"
     
     if [[ ! -f "${file}" ]]; then
-        errorhandler::throw "${func_name}" "File not found: ${file}" \
+        error::throw "File not found: ${file}" \
             "${LIB_ERROR_FILE_NOT_FOUND}"
     fi
     
@@ -524,12 +508,11 @@ vkmusic::add_metadata() {
 
 # Batch download
 vkmusic::batch_download() {
-    local func_name="vkmusic::batch_download"
     local audio_list="${1:-}"
     local output_dir="${2:-${VK_MUSIC_DOWNLOAD_DIR}}"
     
     if [[ -z "${audio_list}" ]]; then
-        errorhandler::throw "${func_name}" "Audio list is required" \
+        error::throw "Audio list is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -554,13 +537,12 @@ vkmusic::batch_download() {
 
 # Search and download
 vkmusic::search_and_download() {
-    local func_name="vkmusic::search_and_download"
     local query="${1:-}"
     local count="${2:-5}"
     local output_dir="${3:-${VK_MUSIC_DOWNLOAD_DIR}}"
     
     if [[ -z "${query}" ]]; then
-        errorhandler::throw "${func_name}" "Search query is required" \
+        error::throw "Search query is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -586,12 +568,11 @@ vkmusic::search_and_download() {
 
 # Get lyrics
 vkmusic::get_lyrics() {
-    local func_name="vkmusic::get_lyrics"
     local owner_id="${1:-}"
     local audio_id="${2:-}"
     
     if [[ -z "${owner_id}" ]] || [[ -z "${audio_id}" ]]; then
-        errorhandler::throw "${func_name}" "Owner ID and audio ID are required" \
+        error::throw "Owner ID and audio ID are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -606,13 +587,12 @@ vkmusic::get_lyrics() {
 
 # Create playlist file
 vkmusic::create_playlist_file() {
-    local func_name="vkmusic::create_playlist_file"
     local playlist_name="${1:-}"
     local audio_ids="${2:-}"
     local format="${3:-m3u}"  # m3u, pls, xspf
     
     if [[ -z "${playlist_name}" ]]; then
-        errorhandler::throw "${func_name}" "Playlist name is required" \
+        error::throw "Playlist name is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -656,7 +636,6 @@ vkmusic::create_playlist_file() {
 
 # Get audio count
 vkmusic::get_audio_count() {
-    local func_name="vkmusic::get_audio_count"
     local user_id="${1:-}"
     
     log::info "Getting audio count..."
@@ -673,7 +652,6 @@ vkmusic::get_audio_count() {
 
 # Get audio upload server
 vkmusic::get_upload_server() {
-    local func_name="vkmusic::get_upload_server"
     
     log::info "Getting audio upload server..."
     
@@ -685,13 +663,12 @@ vkmusic::get_upload_server() {
 
 # Upload audio file
 vkmusic::upload_audio() {
-    local func_name="vkmusic::upload_audio"
     local file_path="${1:-}"
     local title="${2:-}"
     local artist="${3:-}"
     
     if [[ ! -f "${file_path}" ]]; then
-        errorhandler::throw "${func_name}" "File not found: ${file_path}" \
+        error::throw "File not found: ${file_path}" \
             "${LIB_ERROR_FILE_NOT_FOUND}"
     fi
     
@@ -705,7 +682,7 @@ vkmusic::upload_audio() {
     upload_url=$(echo "${upload_server_response}" | utils::quiet_err jq -r '.upload_url')
     
     if [[ -z "${upload_url}" ]] || [[ "${upload_url}" == "null" ]]; then
-        errorhandler::throw "${func_name}" "Failed to get upload server" \
+        error::throw "Failed to get upload server" \
             "${LIB_ERROR_API_RESPONSE}"
     fi
     
@@ -738,7 +715,6 @@ vkmusic::upload_audio() {
 
 # Clear cache
 vkmusic::clear_cache() {
-    local func_name="vkmusic::clear_cache"
     
     log::info "Clearing VK Music cache..."
     
@@ -749,7 +725,6 @@ vkmusic::clear_cache() {
 
 # Get statistics
 vkmusic::get_stats() {
-    local func_name="vkmusic::get_stats"
     
     local download_count
     download_count=$(utils::quiet_err find "${VK_MUSIC_DOWNLOAD_DIR}" -name "*.mp3" | wc -l)

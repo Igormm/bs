@@ -88,7 +88,6 @@ _vkapi_error() {
 
 # Module initialization
 vkapi::init() {
-    local func_name="vkapi::init"
     local app_id="${1:-}"
     local app_secret="${2:-}"
     
@@ -103,7 +102,7 @@ vkapi::init() {
     
     # Create cache directory
     mkdir -p "${VK_API_CACHE_DIR}" || {
-        errorhandler::throw "${func_name}" "Failed to create cache directory" \
+        error::throw "Failed to create cache directory" \
             "${LIB_ERROR_FILE_OPERATION}"
     }
     
@@ -112,7 +111,6 @@ vkapi::init() {
 
 # Check VK API dependencies
 vkapi::check_dependencies() {
-    local func_name="vkapi::check_dependencies"
     local missing_deps=()
     
     log::debug "Checking VK API dependencies..."
@@ -131,7 +129,6 @@ vkapi::check_dependencies() {
 
 # Install missing dependencies
 vkapi::install_dependencies() {
-    local func_name="vkapi::install_dependencies"
     local deps=("$@")
     
     log::info "Installing missing dependencies: ${deps[*]}..."
@@ -159,7 +156,7 @@ vkapi::install_dependencies() {
     elif [[ "${_vk_is_macos}" == true ]]; then
         if ! utils::has brew; then
             if utils::has errorhandler::throw; then
-                errorhandler::throw "${func_name}" "Homebrew is required for macOS" "${LIB_ERROR_DEPENDENCY_MISSING}"
+                error::throw "Homebrew is required for macOS" "${LIB_ERROR_DEPENDENCY_MISSING}"
             else
                 _vkapi_error "Homebrew is required for macOS" "${LIB_ERROR_DEPENDENCY_MISSING}"
             fi
@@ -167,7 +164,7 @@ vkapi::install_dependencies() {
         brew install curl jq openssl
     else
         if utils::has errorhandler::throw; then
-            errorhandler::throw "${func_name}" "Unsupported or undetected platform for dependency installation" "${LIB_ERROR_PLATFORM_UNSUPPORTED}"
+            error::throw "Unsupported or undetected platform for dependency installation" "${LIB_ERROR_PLATFORM_UNSUPPORTED}"
         else
             _vkapi_error "Unsupported or undetected platform for dependency installation" "${LIB_ERROR_PLATFORM_UNSUPPORTED}"
         fi
@@ -178,11 +175,10 @@ vkapi::install_dependencies() {
 
 # Set access token
 vkapi::auth() {
-    local func_name="vkapi::auth"
     local access_token="${1:-}"
     
     if [[ -z "${access_token}" ]]; then
-        errorhandler::throw "${func_name}" "Access token is required" \
+        error::throw "Access token is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -217,7 +213,6 @@ vkapi::get_cache_key() {
 
 # Check if cached response exists and is valid
 vkapi::get_cached_response() {
-    local func_name="vkapi::get_cached_response"
     local cache_key="${1:-}"
     
     local cache_file="${VK_API_CACHE_DIR}/${cache_key}.json"
@@ -239,7 +234,6 @@ vkapi::get_cached_response() {
 
 # Cache API response
 vkapi::cache_response() {
-    local func_name="vkapi::cache_response"
     local cache_key="${1:-}"
     local response="${2:-}"
     
@@ -249,18 +243,17 @@ vkapi::cache_response() {
 
 # Make API request
 vkapi::api_request() {
-    local func_name="vkapi::api_request"
     local method="${1:-}"
     local params="${2:-}"
     local use_cache="${3:-true}"
     
     if [[ -z "${method}" ]]; then
-        errorhandler::throw "${func_name}" "API method is required" \
+        error::throw "API method is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
     if [[ -z "${VK_API_ACCESS_TOKEN}" ]]; then
-        errorhandler::throw "${func_name}" "Access token not set. Use vkapi::auth() first." \
+        error::throw "Access token not set. Use vkapi::auth() first." \
             "${LIB_ERROR_INVALID_STATE}"
     fi
     
@@ -322,7 +315,7 @@ vkapi::api_request() {
     
     # Check final response
     if [[ "${http_code}" != "200" ]]; then
-        errorhandler::throw "${func_name}" "API request failed with HTTP ${http_code}: ${response}" \
+        error::throw "API request failed with HTTP ${http_code}: ${response}" \
             "${LIB_ERROR_API_REQUEST}"
     fi
     
@@ -336,11 +329,10 @@ vkapi::api_request() {
 
 # Parse API response
 vkapi::parse_response() {
-    local func_name="vkapi::parse_response"
     local response="${1:-}"
     
     if [[ -z "${response}" ]]; then
-        errorhandler::throw "${func_name}" "Empty response" \
+        error::throw "Empty response" \
             "${LIB_ERROR_INVALID_RESPONSE}"
     fi
     
@@ -351,7 +343,7 @@ vkapi::parse_response() {
     if [[ -n "${error_msg}" ]] && [[ "${error_msg}" != "null" ]]; then
         local error_code
         error_code=$(echo "${response}" | utils::quiet_err jq -r '.error.error_code' || echo "0")
-        errorhandler::throw "${func_name}" "VK API Error ${error_code}: ${error_msg}" \
+        error::throw "VK API Error ${error_code}: ${error_msg}" \
             "${LIB_ERROR_API_RESPONSE}"
     fi
     
@@ -361,7 +353,6 @@ vkapi::parse_response() {
 
 # Generic API method caller
 vkapi::api_call() {
-    local func_name="vkapi::api_call"
     local method="${1:-}"
     local params="${2:-}"
     local use_cache="${3:-true}"
@@ -376,14 +367,12 @@ vkapi::api_call() {
 
 # User management methods
 vkapi::users.get() {
-    local func_name="vkapi::users.get"
     local params="${1:-}"
     
     vkapi::api_call "users.get" "${params}"
 }
 
 vkapi::users.search() {
-    local func_name="vkapi::users.search"
     local params="${1:-}"
     
     vkapi::api_call "users.search" "${params}"
@@ -391,14 +380,12 @@ vkapi::users.search() {
 
 # Friends methods
 vkapi::friends.get() {
-    local func_name="vkapi::friends.get"
     local params="${1:-}"
     
     vkapi::api_call "friends.get" "${params}"
 }
 
 vkapi::friends.getOnline() {
-    local func_name="vkapi::friends.getOnline"
     local params="${1:-}"
     
     vkapi::api_call "friends.getOnline" "${params}"
@@ -406,14 +393,12 @@ vkapi::friends.getOnline() {
 
 # Groups methods
 vkapi::groups.get() {
-    local func_name="vkapi::groups.get"
     local params="${1:-}"
     
     vkapi::api_call "groups.get" "${params}"
 }
 
 vkapi::groups.getById() {
-    local func_name="vkapi::groups.getById"
     local params="${1:-}"
     
     vkapi::api_call "groups.getById" "${params}"
@@ -421,14 +406,12 @@ vkapi::groups.getById() {
 
 # Wall methods
 vkapi::wall.get() {
-    local func_name="vkapi::wall.get"
     local params="${1:-}"
     
     vkapi::api_call "wall.get" "${params}"
 }
 
 vkapi::wall.post() {
-    local func_name="vkapi::wall.post"
     local params="${1:-}"
     
     vkapi::api_call "wall.post" "${params}"
@@ -436,21 +419,18 @@ vkapi::wall.post() {
 
 # Messages methods
 vkapi::messages.getConversations() {
-    local func_name="vkapi::messages.getConversations"
     local params="${1:-}"
     
     vkapi::api_call "messages.getConversations" "${params}"
 }
 
 vkapi::messages.getHistory() {
-    local func_name="vkapi::messages.getHistory"
     local params="${1:-}"
     
     vkapi::api_call "messages.getHistory" "${params}"
 }
 
 vkapi::messages.send() {
-    local func_name="vkapi::messages.send"
     local params="${1:-}"
     
     vkapi::api_call "messages.send" "${params}"
@@ -458,14 +438,12 @@ vkapi::messages.send() {
 
 # Photos methods
 vkapi::photos.get() {
-    local func_name="vkapi::photos.get"
     local params="${1:-}"
     
     vkapi::api_call "photos.get" "${params}"
 }
 
 vkapi::photos.getWallUploadServer() {
-    local func_name="vkapi::photos.getWallUploadServer"
     local params="${1:-}"
     
     vkapi::api_call "photos.getWallUploadServer" "${params}"
@@ -473,14 +451,12 @@ vkapi::photos.getWallUploadServer() {
 
 # Status methods
 vkapi::status.get() {
-    local func_name="vkapi::status.get"
     local params="${1:-}"
     
     vkapi::api_call "status.get" "${params}"
 }
 
 vkapi::status.set() {
-    local func_name="vkapi::status.set"
     local params="${1:-}"
     
     vkapi::api_call "status.set" "${params}"
@@ -488,7 +464,6 @@ vkapi::status.set() {
 
 # Board methods (for groups)
 vkapi::board.getTopics() {
-    local func_name="vkapi::board.getTopics"
     local params="${1:-}"
     
     vkapi::api_call "board.getTopics" "${params}"
@@ -496,7 +471,6 @@ vkapi::board.getTopics() {
 
 # Market methods
 vkapi::market.get() {
-    local func_name="vkapi::market.get"
     local params="${1:-}"
     
     vkapi::api_call "market.get" "${params}"
@@ -504,7 +478,6 @@ vkapi::market.get() {
 
 # Polls methods
 vkapi::polls.getById() {
-    local func_name="vkapi::polls.getById"
     local params="${1:-}"
     
     vkapi::api_call "polls.getById" "${params}"
@@ -512,7 +485,6 @@ vkapi::polls.getById() {
 
 # Secure methods for app authentication
 vkapi::secure.checkToken() {
-    local func_name="vkapi::secure.checkToken"
     local token="${1:-}"
     local ip="${2:-}"
     
@@ -526,14 +498,12 @@ vkapi::secure.checkToken() {
 
 # Account methods
 vkapi::account.getInfo() {
-    local func_name="vkapi::account.getInfo"
     local params="${1:-}"
     
     vkapi::api_call "account.getInfo" "${params}"
 }
 
 vkapi::account.setOnline() {
-    local func_name="vkapi::account.setOnline"
     local params="${1:-}"
     
     vkapi::api_call "account.setOnline" "${params}"
@@ -541,14 +511,12 @@ vkapi::account.setOnline() {
 
 # Database methods
 vkapi::database.getCountries() {
-    local func_name="vkapi::database.getCountries"
     local params="${1:-}"
     
     vkapi::api_call "database.getCountries" "${params}" "true"  # Cache this
 }
 
 vkapi::database.getCities() {
-    local func_name="vkapi::database.getCities"
     local params="${1:-}"
     
     vkapi::api_call "database.getCities" "${params}"
@@ -556,11 +524,10 @@ vkapi::database.getCities() {
 
 # Execute method (for generic API calls)
 vkapi::execute() {
-    local func_name="vkapi::execute"
     local code="${1:-}"
     
     if [[ -z "${code}" ]]; then
-        errorhandler::throw "${func_name}" "VKScript code is required" \
+        error::throw "VKScript code is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -570,18 +537,16 @@ vkapi::execute() {
 # Utility functions for common operations
 # Get current user's profile
 vkapi::get_my_profile() {
-    local func_name="vkapi::get_my_profile"
     
     vkapi::users.get "fields=photo_200,status,last_seen,online"
 }
 
 # Get user profile by ID
 vkapi::get_user_profile() {
-    local func_name="vkapi::get_user_profile"
     local user_id="${1:-}"
     
     if [[ -z "${user_id}" ]]; then
-        errorhandler::throw "${func_name}" "User ID is required" \
+        error::throw "User ID is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -590,12 +555,11 @@ vkapi::get_user_profile() {
 
 # Search for users
 vkapi::search_users() {
-    local func_name="vkapi::search_users"
     local query="${1:-}"
     local count="${2:-10}"
     
     if [[ -z "${query}" ]]; then
-        errorhandler::throw "${func_name}" "Search query is required" \
+        error::throw "Search query is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -604,7 +568,6 @@ vkapi::search_users() {
 
 # Get user's groups
 vkapi::get_user_groups() {
-    local func_name="vkapi::get_user_groups"
     local user_id="${1:-}"
     local extended="${2:-1}"
     
@@ -618,11 +581,10 @@ vkapi::get_user_groups() {
 
 # Get group information
 vkapi::get_group_info() {
-    local func_name="vkapi::get_group_info"
     local group_id="${1:-}"
     
     if [[ -z "${group_id}" ]]; then
-        errorhandler::throw "${func_name}" "Group ID is required" \
+        error::throw "Group ID is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -631,7 +593,6 @@ vkapi::get_group_info() {
 
 # Get wall posts
 vkapi::get_wall_posts() {
-    local func_name="vkapi::get_wall_posts"
     local owner_id="${1:-}"
     local count="${2:-10}"
     local offset="${3:-0}"
@@ -646,12 +607,11 @@ vkapi::get_wall_posts() {
 
 # Post to wall
 vkapi::post_to_wall() {
-    local func_name="vkapi::post_to_wall"
     local message="${1:-}"
     local owner_id="${2:-}"
     
     if [[ -z "${message}" ]]; then
-        errorhandler::throw "${func_name}" "Message is required" \
+        error::throw "Message is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -665,13 +625,12 @@ vkapi::post_to_wall() {
 
 # Send message
 vkapi::send_message() {
-    local func_name="vkapi::send_message"
     local user_id="${1:-}"
     local message="${2:-}"
     local random_id="${3:-$(utils::now_s)}"
     
     if [[ -z "${user_id}" ]] || [[ -z "${message}" ]]; then
-        errorhandler::throw "${func_name}" "User ID and message are required" \
+        error::throw "User ID and message are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -680,7 +639,6 @@ vkapi::send_message() {
 
 # Get conversations
 vkapi::get_conversations() {
-    local func_name="vkapi::get_conversations"
     local count="${1:-20}"
     local offset="${2:-0}"
     
@@ -689,13 +647,12 @@ vkapi::get_conversations() {
 
 # Get message history
 vkapi::get_message_history() {
-    local func_name="vkapi::get_message_history"
     local peer_id="${1:-}"
     local count="${2:-20}"
     local offset="${3:-0}"
     
     if [[ -z "${peer_id}" ]]; then
-        errorhandler::throw "${func_name}" "Peer ID is required" \
+        error::throw "Peer ID is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -704,7 +661,6 @@ vkapi::get_message_history() {
 
 # Get online friends
 vkapi::get_online_friends() {
-    local func_name="vkapi::get_online_friends"
     local online_mobile="${1:-1}"
     local order="${2:-random}"
     
@@ -713,11 +669,10 @@ vkapi::get_online_friends() {
 
 # Set status
 vkapi::set_status() {
-    local func_name="vkapi::set_status"
     local text="${1:-}"
     
     if [[ -z "${text}" ]]; then
-        errorhandler::throw "${func_name}" "Status text is required" \
+        error::throw "Status text is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -726,7 +681,6 @@ vkapi::set_status() {
 
 # Get current status
 vkapi::get_status() {
-    local func_name="vkapi::get_status"
     local user_id="${1:-}"
     
     local params=""
@@ -739,7 +693,6 @@ vkapi::get_status() {
 
 # Get countries list (cached)
 vkapi::get_countries() {
-    local func_name="vkapi::get_countries"
     local need_all="${1:-1}"
     local count="${2:-1000}"
     
@@ -748,7 +701,6 @@ vkapi::get_countries() {
 
 # Clear cache
 vkapi::clear_cache() {
-    local func_name="vkapi::clear_cache"
     
     log::info "Clearing VK API cache..."
     
@@ -759,7 +711,6 @@ vkapi::clear_cache() {
 
 # Get API usage statistics
 vkapi::get_stats() {
-    local func_name="vkapi::get_stats"
     
     local cache_count
     cache_count=$(utils::quiet_err find "${VK_API_CACHE_DIR}" -name "*.json" | wc -l)

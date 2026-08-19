@@ -52,23 +52,22 @@ FRAMEWORKS_BASHINATOR_LEVEL="INFO"
 
 # Initialize frameworks integration
 frameworks::init() {
-    local func_name="frameworks::init"
     
     log::info "Initializing Frameworks Integration module..."
     
     # Create necessary directories
     mkdir -p "${FRAMEWORKS_CONFIG_DIR}" || {
-        errorhandler::throw "${func_name}" "Failed to create config directory" \
+        error::throw "Failed to create config directory" \
             "${LIB_ERROR_FILE_OPERATION}"
     }
     
     mkdir -p "${FRAMEWORKS_PLUGIN_DIR}" || {
-        errorhandler::throw "${func_name}" "Failed to create plugin directory" \
+        error::throw "Failed to create plugin directory" \
             "${LIB_ERROR_FILE_OPERATION}"
     }
     
     mkdir -p "${FRAMEWORKS_CACHE_DIR}" || {
-        errorhandler::throw "${func_name}" "Failed to create cache directory" \
+        error::throw "Failed to create cache directory" \
             "${LIB_ERROR_FILE_OPERATION}"
     }
     
@@ -87,7 +86,6 @@ frameworks::init() {
 # ============================================================================
 
 frameworks::bashit::init() {
-    local func_name="frameworks::bashit::init"
     
     log::debug "Initializing Bash-it integration..."
     
@@ -101,11 +99,10 @@ frameworks::bashit::init() {
 
 # Load Bash-it style plugin
 frameworks::bashit::load_plugin() {
-    local func_name="frameworks::bashit::load_plugin"
     local plugin_name="${1:-}"
     
     if [[ -z "${plugin_name}" ]]; then
-        errorhandler::throw "${func_name}" "Plugin name is required" \
+        error::throw "Plugin name is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -409,7 +406,6 @@ frameworks::bashit::plugins::tmux::load() {
 # ============================================================================
 
 frameworks::bashinator::init() {
-    local func_name="frameworks::bashinator::init"
     
     log::debug "Initializing Bashinator integration..."
     
@@ -430,13 +426,12 @@ frameworks::bashinator::init() {
 
 # Bashinator-style message handling
 frameworks::bashinator::log_message() {
-    local func_name="frameworks::bashinator::log_message"
     local level="${1:-INFO}"
     local message="${2:-}"
     local component="${3:-Bashinator}"
     
     if [[ -z "${message}" ]]; then
-        errorhandler::throw "${func_name}" "Message is required" \
+        error::throw "Message is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -472,7 +467,7 @@ frameworks::bashinator::function_template() {
     
     # Input validation
     if [[ -z "${param1}" ]]; then
-        errorhandler::throw "${func_name}" "param1 is required" \
+        error::throw "param1 is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -491,7 +486,6 @@ frameworks::bashinator::function_template() {
 # ============================================================================
 
 frameworks::bashly::init() {
-    local func_name="frameworks::bashly::init"
     
     log::debug "Initializing Bashly integration..."
     
@@ -505,7 +499,6 @@ frameworks::bashly::init() {
 
 # Parse command line arguments Bashly-style
 frameworks::bashly::parse_args() {
-    local func_name="frameworks::bashly::parse_args"
     
     # Initialize variables
     local args=()
@@ -553,11 +546,10 @@ frameworks::bashly::parse_args() {
 
 # Validate arguments against schema
 frameworks::bashly::validate_args() {
-    local func_name="frameworks::bashly::validate_args"
     local schema_file="${1:-}"
     
     if [[ -z "${schema_file}" ]]; then
-        errorhandler::throw "${func_name}" "Schema file is required" \
+        error::throw "Schema file is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -574,7 +566,6 @@ frameworks::bashly::validate_args() {
 
 # Generate help text
 frameworks::bashly::generate_help() {
-    local func_name="frameworks::bashly::generate_help"
     local command_name="${1:-command}"
     local description="${2:-Description not provided}"
     
@@ -603,7 +594,6 @@ EOF
 # ============================================================================
 
 frameworks::shellspec::init() {
-    local func_name="frameworks::shellspec::init"
     
     log::debug "Initializing ShellSpec integration..."
     
@@ -616,12 +606,11 @@ frameworks::shellspec::init() {
 
 # ShellSpec-style test definition
 frameworks::shellspec::describe() {
-    local func_name="frameworks::shellspec::describe"
     local description="${1:-}"
     local test_block="${2:-}"
     
     if [[ -z "${description}" ]]; then
-        errorhandler::throw "${func_name}" "Description is required" \
+        error::throw "Description is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -635,12 +624,11 @@ frameworks::shellspec::describe() {
 
 # ShellSpec-style test case
 frameworks::shellspec::it() {
-    local func_name="frameworks::shellspec::it"
     local description="${1:-}"
     local test_command="${2:-}"
     
     if [[ -z "${description}" ]]; then
-        errorhandler::throw "${func_name}" "Description is required" \
+        error::throw "Description is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -660,11 +648,10 @@ frameworks::shellspec::it() {
 
 # ShellSpec-style assertions
 frameworks::shellspec::assert() {
-    local func_name="frameworks::shellspec::assert"
     local condition="${1:-}"
     
     if [[ -z "${condition}" ]]; then
-        errorhandler::throw "${func_name}" "Condition is required" \
+        error::throw "Condition is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -700,7 +687,6 @@ frameworks::shellspec::matchers::exist() {
 
 # Run ShellSpec tests
 frameworks::shellspec::run() {
-    local func_name="frameworks::shellspec::run"
     
     log::info "Running ShellSpec tests..."
     
@@ -729,7 +715,6 @@ frameworks::shellspec::run() {
 # ============================================================================
 
 frameworks::mbfl::init() {
-    local func_name="frameworks::mbfl::init"
     
     log::debug "Initializing mbfl integration..."
     
@@ -776,7 +761,6 @@ frameworks::mbfl::die() {
 
 # MBFL-style argument parsing
 frameworks::mbfl::parse_args() {
-    local func_name="frameworks::mbfl::parse_args"
     
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -902,7 +886,6 @@ frameworks::mbfl::dir::remove() {
 
 # Get loaded frameworks status
 frameworks::status() {
-    local func_name="frameworks::status"
     
     cat << EOF
 Frameworks Integration Status:
@@ -924,7 +907,6 @@ EOF
 
 # Clear all framework integrations
 frameworks::clear() {
-    local func_name="frameworks::clear"
     
     log::info "Clearing all framework integrations..."
     

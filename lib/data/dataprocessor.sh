@@ -49,18 +49,17 @@ DATA_PROCESSOR_FORMATS=("json" "xml" "csv" "yaml" "tsv")
 
 # Module initialization
 dataprocessor::init() {
-    local func_name="dataprocessor::init"
     
     log::info "Initializing Data Processor module..."
     
     # Create necessary directories
     mkdir -p "${DATA_PROCESSOR_CONFIG_DIR}" || {
-        errorhandler::throw "${func_name}" "Failed to create config directory" \
+        error::throw "Failed to create config directory" \
             "${LIB_ERROR_FILE_OPERATION}"
     }
     
     mkdir -p "${DATA_PROCESSOR_CACHE_DIR}" || {
-        errorhandler::throw "${func_name}" "Failed to create cache directory" \
+        error::throw "Failed to create cache directory" \
             "${LIB_ERROR_FILE_OPERATION}"
     }
     
@@ -72,7 +71,6 @@ dataprocessor::init() {
 
 # Check dependencies
 dataprocessor::check_dependencies() {
-    local func_name="dataprocessor::check_dependencies"
     local missing_deps=()
     
     log::debug "Checking Data Processor dependencies..."
@@ -97,7 +95,6 @@ dataprocessor::check_dependencies() {
 
 # Install dependencies
 dataprocessor::install_dependencies() {
-    local func_name="dataprocessor::install_dependencies"
     local deps=("$@")
     
     log::info "Installing missing dependencies: ${deps[*]}..."
@@ -109,12 +106,12 @@ dataprocessor::install_dependencies() {
         dnf install -y jq libxml2 xmlstarlet python3
     elif platformcheck::is_macos; then
         if ! utils::has brew; then
-            errorhandler::throw "${func_name}" "Homebrew is required for macOS" \
+            error::throw "Homebrew is required for macOS" \
                 "${LIB_ERROR_DEPENDENCY_MISSING}"
         fi
         brew install jq libxml2 xmlstarlet python3
     else
-        errorhandler::throw "${func_name}" "Unsupported platform for dependency installation" \
+        error::throw "Unsupported platform for dependency installation" \
             "${LIB_ERROR_PLATFORM_UNSUPPORTED}"
     fi
     
@@ -128,11 +125,10 @@ dataprocessor::install_dependencies() {
 
 # Validate JSON
 dataprocessor::json::validate() {
-    local func_name="dataprocessor::json::validate"
     local json_data="${1:-}"
     
     if [[ -z "${json_data}" ]]; then
-        errorhandler::throw "${func_name}" "JSON data is required" \
+        error::throw "JSON data is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -145,112 +141,105 @@ dataprocessor::json::validate() {
 
 # Pretty print JSON
 dataprocessor::json::pretty() {
-    local func_name="dataprocessor::json::pretty"
     local json_data="${1:-}"
     
     if [[ -z "${json_data}" ]]; then
-        errorhandler::throw "${func_name}" "JSON data is required" \
+        error::throw "JSON data is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
     echo "${json_data}" | utils::quiet_err jq '.' || {
-        errorhandler::throw "${func_name}" "Invalid JSON data" \
+        error::throw "Invalid JSON data" \
             "${LIB_ERROR_INVALID_DATA}"
     }
 }
 
 # Minify JSON
 dataprocessor::json::minify() {
-    local func_name="dataprocessor::json::minify"
     local json_data="${1:-}"
     
     if [[ -z "${json_data}" ]]; then
-        errorhandler::throw "${func_name}" "JSON data is required" \
+        error::throw "JSON data is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
     echo "${json_data}" | utils::quiet_err jq -c '.' || {
-        errorhandler::throw "${func_name}" "Invalid JSON data" \
+        error::throw "Invalid JSON data" \
             "${LIB_ERROR_INVALID_DATA}"
     }
 }
 
 # Query JSON with JPath (jq syntax)
 dataprocessor::json::query() {
-    local func_name="dataprocessor::json::query"
     local json_data="${1:-}"
     local query="${2:-}"
     
     if [[ -z "${json_data}" ]] || [[ -z "${query}" ]]; then
-        errorhandler::throw "${func_name}" "JSON data and query are required" \
+        error::throw "JSON data and query are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
     echo "${json_data}" | utils::quiet_err jq -r "${query}" || {
-        errorhandler::throw "${func_name}" "Invalid query or JSON data" \
+        error::throw "Invalid query or JSON data" \
             "${LIB_ERROR_INVALID_DATA}"
     }
 }
 
 # Update JSON value
 dataprocessor::json::update() {
-    local func_name="dataprocessor::json::update"
     local json_data="${1:-}"
     local path="${2:-}"
     local new_value="${3:-}"
     
     if [[ -z "${json_data}" ]] || [[ -z "${path}" ]]; then
-        errorhandler::throw "${func_name}" "JSON data and path are required" \
+        error::throw "JSON data and path are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
     echo "${json_data}" | utils::quiet_err jq "${path} = ${new_value}" || {
-        errorhandler::throw "${func_name}" "Invalid JSON data or path" \
+        error::throw "Invalid JSON data or path" \
             "${LIB_ERROR_INVALID_DATA}"
     }
 }
 
 # Delete JSON key
 dataprocessor::json::delete() {
-    local func_name="dataprocessor::json::delete"
     local json_data="${1:-}"
     local path="${2:-}"
     
     if [[ -z "${json_data}" ]] || [[ -z "${path}" ]]; then
-        errorhandler::throw "${func_name}" "JSON data and path are required" \
+        error::throw "JSON data and path are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
     echo "${json_data}" | utils::quiet_err jq "del(${path})" || {
-        errorhandler::throw "${func_name}" "Invalid JSON data or path" \
+        error::throw "Invalid JSON data or path" \
             "${LIB_ERROR_INVALID_DATA}"
     }
 }
 
 # Merge JSON objects
 dataprocessor::json::merge() {
-    local func_name="dataprocessor::json::merge"
     local json1="${1:-}"
     local json2="${2:-}"
     
     if [[ -z "${json1}" ]] || [[ -z "${json2}" ]]; then
-        errorhandler::throw "${func_name}" "Two JSON objects are required" \
+        error::throw "Two JSON objects are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
     echo "${json1}" "${json2}" | utils::quiet_err jq -s '.[0] * .[1]' || {
-        errorhandler::throw "${func_name}" "Invalid JSON data" \
+        error::throw "Invalid JSON data" \
             "${LIB_ERROR_INVALID_DATA}"
     }
 }
 
 # Convert JSON to CSV
 dataprocessor::json::to_csv() {
-    local func_name="dataprocessor::json::to_csv"
     local json_data="${1:-}"
     
     if [[ -z "${json_data}" ]]; then
-        errorhandler::throw "${func_name}" "JSON data is required" \
+        error::throw "JSON data is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -260,7 +249,7 @@ dataprocessor::json::to_csv() {
     else
         # Fallback to jq
         echo "${json_data}" | utils::quiet_err jq -r '.[] | @csv' || {
-            errorhandler::throw "${func_name}" "Failed to convert JSON to CSV" \
+            error::throw "Failed to convert JSON to CSV" \
                 "${LIB_ERROR_CONVERSION_FAILED}"
         }
     fi
@@ -273,11 +262,10 @@ dataprocessor::json::to_csv() {
 
 # Validate XML
 dataprocessor::xml::validate() {
-    local func_name="dataprocessor::xml::validate"
     local xml_data="${1:-}"
     
     if [[ -z "${xml_data}" ]]; then
-        errorhandler::throw "${func_name}" "XML data is required" \
+        error::throw "XML data is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -286,40 +274,38 @@ dataprocessor::xml::validate() {
 
 # Pretty print XML
 dataprocessor::xml::pretty() {
-    local func_name="dataprocessor::xml::pretty"
     local xml_data="${1:-}"
     
     if [[ -z "${xml_data}" ]]; then
-        errorhandler::throw "${func_name}" "XML data is required" \
+        error::throw "XML data is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
     echo "${xml_data}" | utils::quiet_err xmllint --format - || {
-        errorhandler::throw "${func_name}" "Invalid XML data" \
+        error::throw "Invalid XML data" \
             "${LIB_ERROR_INVALID_DATA}"
     }
 }
 
 # Query XML with XPath
 dataprocessor::xml::xpath() {
-    local func_name="dataprocessor::xml::xpath"
     local xml_data="${1:-}"
     local xpath_query="${2:-}"
     
     if [[ -z "${xml_data}" ]] || [[ -z "${xpath_query}" ]]; then
-        errorhandler::throw "${func_name}" "XML data and XPath query are required" \
+        error::throw "XML data and XPath query are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
     # Try xmlstarlet first, then xmllint
     if utils::has xmlstarlet; then
         echo "${xml_data}" | utils::quiet_err xmlstarlet sel -t -v "${xpath_query}" - || {
-            errorhandler::throw "${func_name}" "Invalid XPath query or XML data" \
+            error::throw "Invalid XPath query or XML data" \
                 "${LIB_ERROR_INVALID_DATA}"
         }
     else
         echo "${xml_data}" | utils::quiet_err xmllint --xpath "${xpath_query}" - || {
-            errorhandler::throw "${func_name}" "Invalid XPath query or XML data" \
+            error::throw "Invalid XPath query or XML data" \
                 "${LIB_ERROR_INVALID_DATA}"
         }
     fi
@@ -327,11 +313,10 @@ dataprocessor::xml::xpath() {
 
 # Convert XML to JSON
 dataprocessor::xml::to_json() {
-    local func_name="dataprocessor::xml::to_json"
     local xml_data="${1:-}"
     
     if [[ -z "${xml_data}" ]]; then
-        errorhandler::throw "${func_name}" "XML data is required" \
+        error::throw "XML data is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -348,19 +333,18 @@ except Exception as e:
     sys.exit(1)
 "
     else
-        errorhandler::throw "${func_name}" "xmltodict python module not found. Install with: pip3 install xmltodict" \
+        error::throw "xmltodict python module not found. Install with: pip3 install xmltodict" \
             "${LIB_ERROR_DEPENDENCY_MISSING}"
     fi
 }
 
 # Convert XML to CSV
 dataprocessor::xml::to_csv() {
-    local func_name="dataprocessor::xml::to_csv"
     local xml_data="${1:-}"
     local xpath_query="${2:-//row}"
     
     if [[ -z "${xml_data}" ]]; then
-        errorhandler::throw "${func_name}" "XML data is required" \
+        error::throw "XML data is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -373,12 +357,11 @@ dataprocessor::xml::to_csv() {
 
 # Extract XML elements
 dataprocessor::xml::extract() {
-    local func_name="dataprocessor::xml::extract"
     local xml_data="${1:-}"
     local element_name="${2:-}"
     
     if [[ -z "${xml_data}" ]] || [[ -z "${element_name}" ]]; then
-        errorhandler::throw "${func_name}" "XML data and element name are required" \
+        error::throw "XML data and element name are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -392,11 +375,10 @@ dataprocessor::xml::extract() {
 
 # Validate CSV
 dataprocessor::csv::validate() {
-    local func_name="dataprocessor::csv::validate"
     local csv_data="${1:-}"
     
     if [[ -z "${csv_data}" ]]; then
-        errorhandler::throw "${func_name}" "CSV data is required" \
+        error::throw "CSV data is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -422,11 +404,10 @@ dataprocessor::csv::validate() {
 
 # Convert CSV to JSON
 dataprocessor::csv::to_json() {
-    local func_name="dataprocessor::csv::to_json"
     local csv_data="${1:-}"
     
     if [[ -z "${csv_data}" ]]; then
-        errorhandler::throw "${func_name}" "CSV data is required" \
+        error::throw "CSV data is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -480,13 +461,12 @@ dataprocessor::csv::to_json() {
 
 # Filter CSV data
 dataprocessor::csv::filter() {
-    local func_name="dataprocessor::csv::filter"
     local csv_data="${1:-}"
     local column="${2:-}"
     local value="${3:-}"
     
     if [[ -z "${csv_data}" ]] || [[ -z "${column}" ]]; then
-        errorhandler::throw "${func_name}" "CSV data and column are required" \
+        error::throw "CSV data and column are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -524,13 +504,12 @@ dataprocessor::csv::filter() {
 
 # Sort CSV data
 dataprocessor::csv::sort() {
-    local func_name="dataprocessor::csv::sort"
     local csv_data="${1:-}"
     local column="${2:-}"
     local direction="${3:-asc}"
     
     if [[ -z "${csv_data}" ]] || [[ -z "${column}" ]]; then
-        errorhandler::throw "${func_name}" "CSV data and column are required" \
+        error::throw "CSV data and column are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -564,11 +543,10 @@ dataprocessor::csv::sort() {
 
 # Convert YAML to JSON
 dataprocessor::yaml::to_json() {
-    local func_name="dataprocessor::yaml::to_json"
     local yaml_data="${1:-}"
     
     if [[ -z "${yaml_data}" ]]; then
-        errorhandler::throw "${func_name}" "YAML data is required" \
+        error::throw "YAML data is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -587,18 +565,17 @@ except Exception as e:
     sys.exit(1)
 "
     else
-        errorhandler::throw "${func_name}" "YAML processing tools not found. Install yq or python3-pyyaml" \
+        error::throw "YAML processing tools not found. Install yq or python3-pyyaml" \
             "${LIB_ERROR_DEPENDENCY_MISSING}"
     fi
 }
 
 # Convert JSON to YAML
 dataprocessor::json::to_yaml() {
-    local func_name="dataprocessor::json::to_yaml"
     local json_data="${1:-}"
     
     if [[ -z "${json_data}" ]]; then
-        errorhandler::throw "${func_name}" "JSON data is required" \
+        error::throw "JSON data is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -617,7 +594,7 @@ except Exception as e:
     sys.exit(1)
 "
     else
-        errorhandler::throw "${func_name}" "YAML processing tools not found. Install yq or python3-pyyaml" \
+        error::throw "YAML processing tools not found. Install yq or python3-pyyaml" \
             "${LIB_ERROR_DEPENDENCY_MISSING}"
     fi
 }
@@ -629,12 +606,11 @@ except Exception as e:
 
 # Auto-detect format and convert
 dataprocessor::convert() {
-    local func_name="dataprocessor::convert"
     local input_data="${1:-}"
     local output_format="${2:-}"
     
     if [[ -z "${input_data}" ]] || [[ -z "${output_format}" ]]; then
-        errorhandler::throw "${func_name}" "Input data and output format are required" \
+        error::throw "Input data and output format are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -643,7 +619,7 @@ dataprocessor::convert() {
     input_format=$(dataprocessor::detect_format "${input_data}")
     
     if [[ -z "${input_format}" ]]; then
-        errorhandler::throw "${func_name}" "Unable to detect input format" \
+        error::throw "Unable to detect input format" \
             "${LIB_ERROR_FORMAT_UNKNOWN}"
     fi
     
@@ -677,7 +653,7 @@ dataprocessor::convert() {
             dataprocessor::yaml::to_json "${input_data}"
             ;;
         *)
-            errorhandler::throw "${func_name}" "Conversion from ${input_format} to ${output_format} not supported" \
+            error::throw "Conversion from ${input_format} to ${output_format} not supported" \
                 "${LIB_ERROR_CONVERSION_NOT_SUPPORTED}"
             ;;
     esac
@@ -723,12 +699,11 @@ dataprocessor::detect_format() {
 
 # Query JSON with JSONPath
 dataprocessor::jpath::query() {
-    local func_name="dataprocessor::jpath::query"
     local json_data="${1:-}"
     local jpath_query="${2:-}"
     
     if [[ -z "${json_data}" ]] || [[ -z "${jpath_query}" ]]; then
-        errorhandler::throw "${func_name}" "JSON data and JPath query are required" \
+        error::throw "JSON data and JPath query are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -766,13 +741,12 @@ dataprocessor::jpath::to_jq() {
 
 # Query with advanced XPath features
 dataprocessor::xpath::query() {
-    local func_name="dataprocessor::xpath::query"
     local xml_data="${1:-}"
     local xpath_query="${2:-}"
     local options="${3:-}"
     
     if [[ -z "${xml_data}" ]] || [[ -z "${xpath_query}" ]]; then
-        errorhandler::throw "${func_name}" "XML data and XPath query are required" \
+        error::throw "XML data and XPath query are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -808,16 +782,15 @@ except Exception as e:
 
 # Get file info
 dataprocessor::file::info() {
-    local func_name="dataprocessor::file::info"
     local file_path="${1:-}"
     
     if [[ -z "${file_path}" ]]; then
-        errorhandler::throw "${func_name}" "File path is required" \
+        error::throw "File path is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
     if [[ ! -f "${file_path}" ]]; then
-        errorhandler::throw "${func_name}" "File not found: ${file_path}" \
+        error::throw "File not found: ${file_path}" \
             "${LIB_ERROR_FILE_NOT_FOUND}"
     fi
     
@@ -842,18 +815,17 @@ EOF
 
 # Process large files with streaming
 dataprocessor::stream::process() {
-    local func_name="dataprocessor::stream::process"
     local file_path="${1:-}"
     local processor="${2:-}"
     local chunk_size="${3:-1000}"
     
     if [[ -z "${file_path}" ]] || [[ -z "${processor}" ]]; then
-        errorhandler::throw "${func_name}" "File path and processor function are required" \
+        error::throw "File path and processor function are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
     if [[ ! -f "${file_path}" ]]; then
-        errorhandler::throw "${func_name}" "File not found: ${file_path}" \
+        error::throw "File not found: ${file_path}" \
             "${LIB_ERROR_FILE_NOT_FOUND}"
     fi
     
@@ -873,12 +845,11 @@ dataprocessor::stream::process() {
 
 # Validate data structure
 dataprocessor::validate() {
-    local func_name="dataprocessor::validate"
     local data="${1:-}"
     local format="${2:-auto}"
     
     if [[ -z "${data}" ]]; then
-        errorhandler::throw "${func_name}" "Data is required" \
+        error::throw "Data is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -897,7 +868,7 @@ dataprocessor::validate() {
             dataprocessor::csv::validate "${data}"
             ;;
         *)
-            errorhandler::throw "${func_name}" "Unknown format: ${format}" \
+            error::throw "Unknown format: ${format}" \
                 "${LIB_ERROR_FORMAT_UNKNOWN}"
             ;;
     esac

@@ -84,6 +84,20 @@ errorhandler::throw() {
 	return "${code}"
 }
 
+# @description Throw with the caller's name auto-detected via FUNCNAME.
+# / То же, что errorhandler::throw, но имя функции определяется само.
+#   Replaces the boilerplate pair / Заменяет пару бойлерплейта:
+#     local func_name="my::func"
+#     errorhandler::throw "${func_name}" "message" "${CODE}"
+# @param $1 Error message / Сообщение об ошибке
+# @param $2 [optional] Error code (default: E_ERROR) / Код ошибки
+# @return Error code / Код ошибки
+# @example
+#   error::throw "Something failed" "${LIB_ERROR_FILE_NOT_FOUND}"
+error::throw() {
+	errorhandler::throw "${FUNCNAME[1]}" "${@}"
+}
+
 # @description Exit BS application with cleanup / Выход из приложения BS с очисткой
 # @param $1 [optional] Exit code (default: 0) / Код выхода (по умолчанию 0)
 # @example

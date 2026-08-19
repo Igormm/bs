@@ -56,6 +56,22 @@ main() {
         testframework::assert_true "false" "throw logs the function name"
     fi
     
+    # Тест 3b: error::throw подставляет имя вызывающей функции сам
+    testframework::section "error::throw Auto Name / Авто-имя в error::throw"
+    
+    test::auto_name() {
+        error::throw "auto fail" 9
+    }
+    
+    local auto_out rc=0
+    auto_out=$(test::auto_name 2>&1) || rc=$?
+    testframework::assert_equal "9" "${rc}" "error::throw returns the given code"
+    if echo "${auto_out}" | grep -q "test::auto_name"; then
+        testframework::assert_true "true" "error::throw detects the caller name"
+    else
+        testframework::assert_true "false" "error::throw detects the caller name"
+    fi
+    
     # Тест 4: cleanup-стек идемпотентен
     testframework::section "Cleanup Stack / Стек очистки"
     

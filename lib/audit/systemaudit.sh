@@ -49,23 +49,22 @@ AUDIT_SUMMARY=""
 
 # Module initialization
 systemaudit::init() {
-    local func_name="systemaudit::init"
     
     log::info "Initializing System Audit module..."
     
     # Create necessary directories
     mkdir -p "${AUDIT_CONFIG_DIR}" || {
-        errorhandler::throw "${func_name}" "Failed to create config directory" \
+        error::throw "Failed to create config directory" \
             "${LIB_ERROR_FILE_OPERATION}"
     }
     
     mkdir -p "${AUDIT_REPORT_DIR}" || {
-        errorhandler::throw "${func_name}" "Failed to create report directory" \
+        error::throw "Failed to create report directory" \
             "${LIB_ERROR_FILE_OPERATION}"
     }
     
     mkdir -p "${AUDIT_CACHE_DIR}" || {
-        errorhandler::throw "${func_name}" "Failed to create cache directory" \
+        error::throw "Failed to create cache directory" \
             "${LIB_ERROR_FILE_OPERATION}"
     }
     
@@ -80,7 +79,6 @@ systemaudit::init() {
 
 # Check dependencies
 systemaudit::check_dependencies() {
-    local func_name="systemaudit::check_dependencies"
     local missing_deps=()
     
     log::debug "Checking System Audit dependencies..."
@@ -99,7 +97,6 @@ systemaudit::check_dependencies() {
 
 # Install dependencies
 systemaudit::install_dependencies() {
-    local func_name="systemaudit::install_dependencies"
     local deps=("$@")
     
     log::info "Installing missing dependencies: ${deps[*]}..."
@@ -111,12 +108,12 @@ systemaudit::install_dependencies() {
         dnf install -y coreutils procps net-tools iproute lsof findutils gawk sed
     elif platformcheck::is_macos; then
         if ! utils::has brew; then
-            errorhandler::throw "${func_name}" "Homebrew is required for macOS" \
+            error::throw "Homebrew is required for macOS" \
                 "${LIB_ERROR_DEPENDENCY_MISSING}"
         fi
         brew install coreutils findutils gnu-sed gawk
     else
-        errorhandler::throw "${func_name}" "Unsupported platform for dependency installation" \
+        error::throw "Unsupported platform for dependency installation" \
             "${LIB_ERROR_PLATFORM_UNSUPPORTED}"
     fi
     
@@ -125,7 +122,6 @@ systemaudit::install_dependencies() {
 
 # Initialize audit components
 systemaudit::init_components() {
-    local func_name="systemaudit::init_components"
     
     log::debug "Initializing audit components..."
     
@@ -147,7 +143,6 @@ systemaudit::init_components() {
 
 # Run comprehensive system audit
 systemaudit::run() {
-    local func_name="systemaudit::run"
     local audit_type="${1:-full}"
     local output_format="${2:-text}"
     
@@ -184,7 +179,7 @@ systemaudit::run() {
             systemaudit::run_full
             ;;
         *)
-            errorhandler::throw "${func_name}" "Unknown audit type: ${audit_type}" \
+            error::throw "Unknown audit type: ${audit_type}" \
                 "${LIB_ERROR_INVALID_ARGS}"
             ;;
     esac
@@ -1030,7 +1025,6 @@ systemaudit::create_finding() {
 
 # Calculate audit score
 systemaudit::calculate_score() {
-    local func_name="systemaudit::calculate_score"
     
     local initial_score=100
     local deductions=0
@@ -1080,7 +1074,6 @@ systemaudit::calculate_score() {
 
 # Generate audit report
 systemaudit::generate_report() {
-    local func_name="systemaudit::generate_report"
     local format="${1:-text}"
     local timestamp="$(date '+%Y%m%d_%H%M%S')"
     local report_file="${AUDIT_REPORT_DIR}/audit_${timestamp}.${format}"
@@ -1272,7 +1265,6 @@ systemaudit::generate_xml_report() {
 
 # Create baseline
 systemaudit::create_baseline() {
-    local func_name="systemaudit::create_baseline"
     
     log::info "Creating security baseline..."
     
@@ -1293,7 +1285,6 @@ systemaudit::create_baseline() {
 
 # Compare with baseline
 systemaudit::compare_baseline() {
-    local func_name="systemaudit::compare_baseline"
     
     if [[ ! -f "${AUDIT_BASELINE_FILE}" ]]; then
         log::warn "No baseline found. Create baseline first."

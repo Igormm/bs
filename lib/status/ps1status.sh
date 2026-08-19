@@ -128,7 +128,6 @@ ps1status::init() {
 # func_name - локальная переменная для этой функции
 # func_name - local variable for this function
 #
-    local func_name="ps1status::init"
 
     
 
@@ -140,7 +139,7 @@ ps1status::init() {
 
     mkdir -p "${PS1_STATUS_CONFIG_DIR}" || {
 
-        errorhandler::throw "${func_name}" "Failed to create config directory" \
+        error::throw "Failed to create config directory" \
 
             "${LIB_ERROR_FILE_OPERATION}"
 
@@ -150,7 +149,7 @@ ps1status::init() {
 
     mkdir -p "${PS1_STATUS_CACHE_DIR}" || {
 
-        errorhandler::throw "${func_name}" "Failed to create cache directory" \
+        error::throw "Failed to create cache directory" \
 
             "${LIB_ERROR_FILE_OPERATION}"
 
@@ -189,7 +188,6 @@ ps1status::check_dependencies() {
 # func_name - локальная переменная для этой функции
 # func_name - local variable for this function
 #
-    local func_name="ps1status::check_dependencies"
 
 #
 # ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
@@ -248,7 +246,6 @@ ps1status::install_dependencies() {
 # func_name - локальная переменная для этой функции
 # func_name - local variable for this function
 #
-    local func_name="ps1status::install_dependencies"
 
 #
 # ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
@@ -277,7 +274,7 @@ ps1status::install_dependencies() {
 
         if ! utils::has brew; then
 
-            errorhandler::throw "${func_name}" "Homebrew is required for macOS" \
+            error::throw "Homebrew is required for macOS" \
 
                 "${LIB_ERROR_DEPENDENCY_MISSING}"
 
@@ -287,7 +284,7 @@ ps1status::install_dependencies() {
 
     else
 
-        errorhandler::throw "${func_name}" "Unsupported platform for dependency installation" \
+        error::throw "Unsupported platform for dependency installation" \
 
             "${LIB_ERROR_PLATFORM_UNSUPPORTED}"
 
@@ -308,7 +305,6 @@ ps1status::init_components() {
 # func_name - локальная переменная для этой функции
 # func_name - local variable for this function
 #
-    local func_name="ps1status::init_components"
 
     
 
@@ -359,7 +355,6 @@ ps1status::start_monitoring() {
 # func_name - локальная переменная для этой функции
 # func_name - local variable for this function
 #
-    local func_name="ps1status::start_monitoring"
 
     
 
@@ -440,7 +435,6 @@ ps1status::stop_monitoring() {
 # func_name - локальная переменная для этой функции
 # func_name - local variable for this function
 #
-    local func_name="ps1status::stop_monitoring"
 
     
 
@@ -527,7 +521,6 @@ ps1status::wireguard::update() {
 # func_name - локальная переменная для этой функции
 # func_name - local variable for this function
 #
-    local func_name="ps1status::wireguard::update"
 
     
 
@@ -653,7 +646,6 @@ ps1status::network::update() {
 # func_name - локальная переменная для этой функции
 # func_name - local variable for this function
 #
-    local func_name="ps1status::network::update"
 
     
 
@@ -853,7 +845,6 @@ ps1status::speed::update() {
 # func_name - локальная переменная для этой функции
 # func_name - local variable for this function
 #
-    local func_name="ps1status::speed::update"
 
 #
 # ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
@@ -1005,7 +996,6 @@ ps1status::audio::update() {
 # func_name - локальная переменная для этой функции
 # func_name - local variable for this function
 #
-    local func_name="ps1status::audio::update"
 
     
 
@@ -1205,7 +1195,6 @@ ps1status::audio::toggle_mute() {
 # func_name - локальная переменная для этой функции
 # func_name - local variable for this function
 #
-    local func_name="ps1status::audio::toggle_mute"
 
     
 
@@ -1234,7 +1223,6 @@ ps1status::audio::adjust_volume() {
 # func_name - локальная переменная для этой функции
 # func_name - local variable for this function
 #
-    local func_name="ps1status::audio::adjust_volume"
 
 #
 # ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
@@ -1286,7 +1274,6 @@ ps1status::system::update() {
 # func_name - локальная переменная для этой функции
 # func_name - local variable for this function
 #
-    local func_name="ps1status::system::update"
 
     
 
@@ -1498,7 +1485,6 @@ ps1status::enable_component() {
 # func_name - локальная переменная для этой функции
 # func_name - local variable for this function
 #
-    local func_name="ps1status::enable_component"
 
 #
 # ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
@@ -1511,7 +1497,7 @@ ps1status::enable_component() {
 
     if [[ -z "${component}" ]]; then
 
-        errorhandler::throw "${func_name}" "Component name is required" \
+        error::throw "Component name is required" \
 
             "${LIB_ERROR_INVALID_ARGS}"
 
@@ -1523,7 +1509,7 @@ ps1status::enable_component() {
 
     if ! utils::has "ps1status::${component}::get_status"; then
 
-        errorhandler::throw "${func_name}" "Unknown component: ${component}" \
+        error::throw "Unknown component: ${component}" \
 
             "${LIB_ERROR_INVALID_ARGS}"
 
@@ -1556,7 +1542,6 @@ ps1status::disable_component() {
 # func_name - локальная переменная для этой функции
 # func_name - local variable for this function
 #
-    local func_name="ps1status::disable_component"
 
 #
 # ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
@@ -1569,7 +1554,7 @@ ps1status::disable_component() {
 
     if [[ -z "${component}" ]]; then
 
-        errorhandler::throw "${func_name}" "Component name is required" \
+        error::throw "Component name is required" \
 
             "${LIB_ERROR_INVALID_ARGS}"
 
@@ -1637,7 +1622,6 @@ ps1status::build_ps1() {
 # func_name - локальная переменная для этой функции
 # func_name - local variable for this function
 #
-    local func_name="ps1status::build_ps1"
 
     
 
@@ -1717,7 +1701,6 @@ ps1status::enable() {
 # func_name - локальная переменная для этой функции
 # func_name - local variable for this function
 #
-    local func_name="ps1status::enable"
 
     
 
@@ -1748,7 +1731,6 @@ ps1status::disable() {
 # func_name - локальная переменная для этой функции
 # func_name - local variable for this function
 #
-    local func_name="ps1status::disable"
 
     
 
@@ -1835,7 +1817,6 @@ ps1status::equalizer::toggle() {
 # func_name - локальная переменная для этой функции
 # func_name - local variable for this function
 #
-    local func_name="ps1status::equalizer::toggle"
 
     
 

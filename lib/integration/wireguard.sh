@@ -51,12 +51,11 @@ readonly WIREGUARD_DEFAULT_KEEPALIVE=25
 
 # Module initialization
 wireguard::init() {
-    local func_name="wireguard::init"
     log::info "Initializing WireGuard module..."
     
     # Check if running as root
     if [[ "$EUID" -ne 0 ]]; then
-        errorhandler::throw "${func_name}" "WireGuard operations require root privileges" \
+        error::throw "WireGuard operations require root privileges" \
             "${LIB_ERROR_PERMISSION_DENIED}"
     fi
     
@@ -71,7 +70,6 @@ wireguard::init() {
 
 # Check WireGuard dependencies
 wireguard::check_dependencies() {
-    local func_name="wireguard::check_dependencies"
     local missing_deps=()
     
     log::debug "Checking WireGuard dependencies..."
@@ -90,7 +88,6 @@ wireguard::check_dependencies() {
 
 # Install missing dependencies
 wireguard::install_dependencies() {
-    local func_name="wireguard::install_dependencies"
     local deps=("$@")
     
     log::info "Installing missing dependencies: ${deps[*]}..."
@@ -110,12 +107,12 @@ wireguard::install_dependencies() {
         fi
     elif platformcheck::is_macos; then
         if ! utils::has brew; then
-            errorhandler::throw "${func_name}" "Homebrew is required for macOS" \
+            error::throw "Homebrew is required for macOS" \
                 "${LIB_ERROR_DEPENDENCY_MISSING}"
         fi
         brew install wireguard-tools openssl
     else
-        errorhandler::throw "${func_name}" "Unsupported platform for dependency installation" \
+        error::throw "Unsupported platform for dependency installation" \
             "${LIB_ERROR_PLATFORM_UNSUPPORTED}"
     fi
     
@@ -124,22 +121,21 @@ wireguard::install_dependencies() {
 
 # Create necessary directories
 wireguard::create_directories() {
-    local func_name="wireguard::create_directories"
     
     log::debug "Creating WireGuard directories..."
     
     mkdir -p "${WIREGUARD_CONFIG_DIR}" || {
-        errorhandler::throw "${func_name}" "Failed to create config directory" \
+        error::throw "Failed to create config directory" \
             "${LIB_ERROR_FILE_OPERATION}"
     }
     
     mkdir -p "${WIREGUARD_KEY_DIR}" || {
-        errorhandler::throw "${func_name}" "Failed to create key directory" \
+        error::throw "Failed to create key directory" \
             "${LIB_ERROR_FILE_OPERATION}"
     }
     
     mkdir -p "${WIREGUARD_BACKUP_DIR}" || {
-        errorhandler::throw "${func_name}" "Failed to create backup directory" \
+        error::throw "Failed to create backup directory" \
             "${LIB_ERROR_FILE_OPERATION}"
     }
     
@@ -153,11 +149,10 @@ wireguard::create_directories() {
 
 # Generate WireGuard key pair
 wireguard::generate_keypair() {
-    local func_name="wireguard::generate_keypair"
     local interface="${1:-}"
     
     if [[ -z "${interface}" ]]; then
-        errorhandler::throw "${func_name}" "Interface name is required" \
+        error::throw "Interface name is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -170,7 +165,7 @@ wireguard::generate_keypair() {
     wg genkey | tee "${private_key_file}" | wg pubkey > "${public_key_file}"
     
     if [[ ! -f "${private_key_file}" ]] || [[ ! -f "${public_key_file}" ]]; then
-        errorhandler::throw "${func_name}" "Failed to generate key pair" \
+        error::throw "Failed to generate key pair" \
             "${LIB_ERROR_FILE_OPERATION}"
     fi
     
@@ -189,7 +184,6 @@ wireguard::generate_keypair() {
 
 # Create WireGuard interface configuration
 wireguard::create_interface() {
-    local func_name="wireguard::create_interface"
     local interface="${1:-}"
     local address="${2:-}"
     local listen_port="${3:-${WIREGUARD_DEFAULT_PORT}}"
@@ -197,7 +191,7 @@ wireguard::create_interface() {
     local wan_interface="${5:-}"
     
     if [[ -z "${interface}" ]] || [[ -z "${address}" ]]; then
-        errorhandler::throw "${func_name}" "Interface name and address are required" \
+        error::throw "Interface name and address are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -241,7 +235,7 @@ PostDown = ufw route delete allow in on ${interface} out on ${wan_interface}; ip
 EOF
     
     if [[ ! -f "${config_file}" ]]; then
-        errorhandler::throw "${func_name}" "Failed to create configuration file" \
+        error::throw "Failed to create configuration file" \
             "${LIB_ERROR_FILE_OPERATION}"
     fi
     
@@ -253,7 +247,6 @@ EOF
 
 # Add peer to interface
 wireguard::add_peer() {
-    local func_name="wireguard::add_peer"
     local interface="${1:-}"
     local peer_pubkey="${2:-}"
     local allowed_ips="${3:-}"
@@ -261,14 +254,14 @@ wireguard::add_peer() {
     local persistent_keepalive="${5:-${WIREGUARD_DEFAULT_KEEPALIVE}}"
     
     if [[ -z "${interface}" ]] || [[ -z "${peer_pubkey}" ]] || [[ -z "${allowed_ips}" ]]; then
-        errorhandler::throw "${func_name}" "Interface, peer public key, and allowed IPs are required" \
+        error::throw "Interface, peer public key, and allowed IPs are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
     local config_file="${WIREGUARD_CONFIG_DIR}/${interface}.conf"
     
     if [[ ! -f "${config_file}" ]]; then
-        errorhandler::throw "${func_name}" "Interface ${interface} does not exist" \
+        error::throw "Interface ${interface} does not exist" \
             "${LIB_ERROR_FILE_NOT_FOUND}"
     fi
     
@@ -301,19 +294,18 @@ EOF
 
 # Remove peer from interface
 wireguard::remove_peer() {
-    local func_name="wireguard::remove_peer"
     local interface="${1:-}"
     local peer_pubkey="${2:-}"
     
     if [[ -z "${interface}" ]] || [[ -z "${peer_pubkey}" ]]; then
-        errorhandler::throw "${func_name}" "Interface and peer public key are required" \
+        error::throw "Interface and peer public key are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
     local config_file="${WIREGUARD_CONFIG_DIR}/${interface}.conf"
     
     if [[ ! -f "${config_file}" ]]; then
-        errorhandler::throw "${func_name}" "Interface ${interface} does not exist" \
+        error::throw "Interface ${interface} does not exist" \
             "${LIB_ERROR_FILE_NOT_FOUND}"
     fi
     
@@ -342,11 +334,10 @@ wireguard::remove_peer() {
 
 # Start WireGuard interface
 wireguard::start_interface() {
-    local func_name="wireguard::start_interface"
     local interface="${1:-}"
     
     if [[ -z "${interface}" ]]; then
-        errorhandler::throw "${func_name}" "Interface name is required" \
+        error::throw "Interface name is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -360,7 +351,7 @@ wireguard::start_interface() {
     
     # Start interface using wg-quick
     wg-quick up "${interface}" || {
-        errorhandler::throw "${func_name}" "Failed to start interface ${interface}" \
+        error::throw "Failed to start interface ${interface}" \
             "${LIB_ERROR_COMMAND_FAILED}"
     }
     
@@ -369,11 +360,10 @@ wireguard::start_interface() {
 
 # Stop WireGuard interface
 wireguard::stop_interface() {
-    local func_name="wireguard::stop_interface"
     local interface="${1:-}"
     
     if [[ -z "${interface}" ]]; then
-        errorhandler::throw "${func_name}" "Interface name is required" \
+        error::throw "Interface name is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -387,7 +377,7 @@ wireguard::stop_interface() {
     
     # Stop interface using wg-quick
     wg-quick down "${interface}" || {
-        errorhandler::throw "${func_name}" "Failed to stop interface ${interface}" \
+        error::throw "Failed to stop interface ${interface}" \
             "${LIB_ERROR_COMMAND_FAILED}"
     }
     
@@ -396,11 +386,10 @@ wireguard::stop_interface() {
 
 # Get interface status
 wireguard::get_interface_status() {
-    local func_name="wireguard::get_interface_status"
     local interface="${1:-}"
     
     if [[ -z "${interface}" ]]; then
-        errorhandler::throw "${func_name}" "Interface name is required" \
+        error::throw "Interface name is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -418,7 +407,6 @@ wireguard::get_interface_status() {
 
 # List all WireGuard interfaces
 wireguard::list_interfaces() {
-    local func_name="wireguard::list_interfaces"
     
     log::debug "Listing all WireGuard interfaces..."
     
@@ -433,12 +421,11 @@ wireguard::list_interfaces() {
 
 # Backup WireGuard configuration
 wireguard::backup_config() {
-    local func_name="wireguard::backup_config"
     local interface="${1:-}"
     local backup_name="${2:-backup_$(utils::stamp)}"
     
     if [[ -z "${interface}" ]]; then
-        errorhandler::throw "${func_name}" "Interface name is required" \
+        error::throw "Interface name is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -446,7 +433,7 @@ wireguard::backup_config() {
     local backup_file="${WIREGUARD_BACKUP_DIR}/${interface}_${backup_name}.conf"
     
     if [[ ! -f "${config_file}" ]]; then
-        errorhandler::throw "${func_name}" "Configuration file not found" \
+        error::throw "Configuration file not found" \
             "${LIB_ERROR_FILE_NOT_FOUND}"
     fi
     
@@ -454,7 +441,7 @@ wireguard::backup_config() {
     
     # Copy configuration file
     cp "${config_file}" "${backup_file}" || {
-        errorhandler::throw "${func_name}" "Failed to create backup" \
+        error::throw "Failed to create backup" \
             "${LIB_ERROR_FILE_OPERATION}"
     }
     
@@ -476,17 +463,16 @@ wireguard::backup_config() {
 
 # Restore WireGuard configuration
 wireguard::restore_config() {
-    local func_name="wireguard::restore_config"
     local interface="${1:-}"
     local backup_file="${2:-}"
     
     if [[ -z "${interface}" ]] || [[ -z "${backup_file}" ]]; then
-        errorhandler::throw "${func_name}" "Interface name and backup file are required" \
+        error::throw "Interface name and backup file are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
     if [[ ! -f "${backup_file}" ]]; then
-        errorhandler::throw "${func_name}" "Backup file not found" \
+        error::throw "Backup file not found" \
             "${LIB_ERROR_FILE_NOT_FOUND}"
     fi
     
@@ -499,7 +485,7 @@ wireguard::restore_config() {
     
     # Restore configuration file
     cp "${backup_file}" "${WIREGUARD_CONFIG_DIR}/${interface}.conf" || {
-        errorhandler::throw "${func_name}" "Failed to restore configuration" \
+        error::throw "Failed to restore configuration" \
             "${LIB_ERROR_FILE_OPERATION}"
     }
     
@@ -508,11 +494,10 @@ wireguard::restore_config() {
 
 # Generate QR code for mobile clients (requires qrencode)
 wireguard::generate_qr() {
-    local func_name="wireguard::generate_qr"
     local interface="${1:-}"
     
     if [[ -z "${interface}" ]]; then
-        errorhandler::throw "${func_name}" "Interface name is required" \
+        error::throw "Interface name is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -527,7 +512,7 @@ wireguard::generate_qr() {
         elif platformcheck::is_macos; then
             brew install qrencode
         else
-            errorhandler::throw "${func_name}" "qrencode not available on this platform" \
+            error::throw "qrencode not available on this platform" \
                 "${LIB_ERROR_DEPENDENCY_MISSING}"
         fi
     fi
@@ -535,7 +520,7 @@ wireguard::generate_qr() {
     local config_file="${WIREGUARD_CONFIG_DIR}/${interface}.conf"
     
     if [[ ! -f "${config_file}" ]]; then
-        errorhandler::throw "${func_name}" "Configuration file not found" \
+        error::throw "Configuration file not found" \
             "${LIB_ERROR_FILE_NOT_FOUND}"
     fi
     
@@ -549,11 +534,10 @@ wireguard::generate_qr() {
 
 # Enable automatic startup
 wireguard::enable_autostart() {
-    local func_name="wireguard::enable_autostart"
     local interface="${1:-}"
     
     if [[ -z "${interface}" ]]; then
-        errorhandler::throw "${func_name}" "Interface name is required" \
+        error::throw "Interface name is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -564,7 +548,7 @@ wireguard::enable_autostart() {
         
         # Enable using wg-quick service
         systemctl enable wg-quick@${interface} || {
-            errorhandler::throw "${func_name}" "Failed to enable autostart" \
+            error::throw "Failed to enable autostart" \
                 "${LIB_ERROR_COMMAND_FAILED}"
         }
         
@@ -578,11 +562,10 @@ wireguard::enable_autostart() {
 
 # Disable automatic startup
 wireguard::disable_autostart() {
-    local func_name="wireguard::disable_autostart"
     local interface="${1:-}"
     
     if [[ -z "${interface}" ]]; then
-        errorhandler::throw "${func_name}" "Interface name is required" \
+        error::throw "Interface name is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
@@ -593,7 +576,7 @@ wireguard::disable_autostart() {
         
         # Disable using wg-quick service
         systemctl disable wg-quick@${interface} || {
-            errorhandler::throw "${func_name}" "Failed to disable autostart" \
+            error::throw "Failed to disable autostart" \
                 "${LIB_ERROR_COMMAND_FAILED}"
         }
         
@@ -607,7 +590,6 @@ wireguard::disable_autostart() {
 
 # Get public IP address for endpoint
 wireguard::get_public_ip() {
-    local func_name="wireguard::get_public_ip"
     
     log::debug "Getting public IP address..."
     
@@ -634,14 +616,13 @@ wireguard::get_public_ip() {
 
 # Create client configuration for road warrior setup
 wireguard::create_client_config() {
-    local func_name="wireguard::create_client_config"
     local client_name="${1:-}"
     local server_pubkey="${2:-}"
     local server_endpoint="${3:-}"
     local allowed_ips="${4:-0.0.0.0/0}"
     
     if [[ -z "${client_name}" ]] || [[ -z "${server_pubkey}" ]] || [[ -z "${server_endpoint}" ]]; then
-        errorhandler::throw "${func_name}" "Client name, server public key, and endpoint are required" \
+        error::throw "Client name, server public key, and endpoint are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
