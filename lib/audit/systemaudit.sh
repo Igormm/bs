@@ -21,13 +21,13 @@
 # @author BS Framework
 # @since 2026-01-06
 # @version 1.0.0
-# @depends core/const, core/logger, core/utils, core/errorhandler, lib/system/platformcheck
+# @depends core/const, core/logger, core/utils, core/errorhandler, lib/system/platformcheck, lib/system/processes
 
 # Source Guard / Защита от повторной загрузки
 bs::guard "AUDIT_SYSTEM" || return 0
 
 # Зависимости / Dependencies
-bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/errorhandler.sh" "../system/platformcheck.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/errorhandler.sh" "../system/platformcheck.sh" "../system/processes.sh"
 
 # Audit configuration
 readonly AUDIT_CONFIG_DIR="${HOME}/.config/systemaudit"
@@ -84,37 +84,9 @@ systemaudit::check_dependencies() {
     local missing_deps=()
     
     log::debug "Checking System Audit dependencies..."
-    
-    # Core tools
-    if ! utils::has uname; then
-        missing_deps+=("coreutils")
-    fi
-    
-    if ! utils::has ps; then
-        missing_deps+=("procps")
-    fi
-    
-    if ! utils::has netstat && ! utils::has ss; then
-        missing_deps+=("net-tools" "iproute2")
-    fi
-    
-    # Security tools
-    if ! utils::has lsof; then
-        missing_deps+=("lsof")
-    fi
-    
-    if ! utils::has find; then
-        missing_deps+=("findutils")
-    fi
-    
-    # Optional but recommended
-    if ! utils::has awk; then
-        missing_deps+=("gawk")
-    fi
-    
-    if ! utils::has sed; then
-        missing_deps+=("sed")
-    fi
+
+    deps::missing_tools missing_deps \
+        uname:coreutils ps:procps netstat|ss:"net-tools iproute2" lsof find:findutils awk:gawk sed
     
     # Install missing dependencies
     if [[ ${#missing_deps[@]} -gt 0 ]]; then
@@ -871,7 +843,7 @@ systemaudit::services::check_running_services() {
     local unnecessary_services=("telnet" "ftp" "rsh" "rlogin" "rexec")
     
     for service in "${unnecessary_services[@]}"; do
-        if utils::quiet pgrep -x "${service}"; then
+        if system::processes::is_running "${service}"; then
             finding=$(systemaudit::create_finding \
                 "Unnecessary service running: ${service}" \
                 "Legacy services are insecure" \
@@ -969,7 +941,7 @@ systemaudit::compliance::check_audit_logging() {
     local finding=""
     
     # Check if auditd is running
-    if ! utils::quiet pgrep -x auditd; then
+    if ! system::processes::is_running auditd; then
         finding=$(systemaudit::create_finding \
             "Audit daemon not running" \
             "Audit logging is required for security compliance" \
@@ -988,7 +960,7 @@ systemaudit::compliance::check_updates() {
     local last_update
     last_update=$(utils::quiet_err stat -c %Y /var/cache/apt/pkgcache.bin || echo "0")
     local current_time
-    current_time=$(date +%s)
+    current_time=$(utils::now_s)
     local days_since_update
     days_since_update=$(( (current_time - last_update) / 86400 ))
     
@@ -1042,7 +1014,7 @@ systemaudit::create_finding() {
     local severity="${3:-${AUDIT_SEVERITY_INFO}}"
     local category="${4:-general}"
     local recommendation="${5:-}"
-    local timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
+    local timestamp="$(utils::log_stamp)"
     
     local finding="{"
     finding="${finding} \"timestamp\": \"${timestamp}\","
@@ -1213,7 +1185,7 @@ systemaudit::generate_json_report() {
     {
         echo "{"
         echo "  \"audit\": {"
-        echo "    \"timestamp\": \"$(date '+%Y-%m-%d %H:%M:%S')\","
+        echo "    \"timestamp\": \"$(utils::log_stamp)\","
         echo "    \"score\": ${AUDIT_SCORE},"
         echo "    \"summary\": \"${AUDIT_SUMMARY}\","
         echo "    \"total_findings\": ${#AUDIT_FINDINGS[@]},"
@@ -1269,7 +1241,7 @@ systemaudit::generate_xml_report() {
     {
         echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
         echo "<audit>"
-        echo "  <timestamp>$(date '+%Y-%m-%d %H:%M:%S')</timestamp>"
+        echo "  <timestamp>$(utils::log_stamp)</timestamp>"
         echo "  <score>${AUDIT_SCORE}</score>"
         echo "  <summary>${AUDIT_SUMMARY}</summary>"
         echo "  <total_findings>${#AUDIT_FINDINGS[@]}</total_findings>"
@@ -1305,7 +1277,7 @@ systemaudit::create_baseline() {
     log::info "Creating security baseline..."
     
     local baseline="{"
-    baseline="${baseline} \"timestamp\": \"$(date '+%Y-%m-%d %H:%M:%S')\","
+    baseline="${baseline} \"timestamp\": \"$(utils::log_stamp)\","
     baseline="${baseline} \"hostname\": \"$(hostname)\","
     baseline="${baseline} \"kernel\": \"$(uname -r)\","
     baseline="${baseline} \"users\": $(getent passwd | wc -l),"
@@ -1325,7 +1297,7 @@ systemaudit::compare_baseline() {
     
     if [[ ! -f "${AUDIT_BASELINE_FILE}" ]]; then
         log::warn "No baseline found. Create baseline first."
-        return 1
+        return "${E_ERROR}"
     fi
     
     log::info "Comparing current state with baseline..."

@@ -116,26 +116,9 @@ vkapi::check_dependencies() {
     local missing_deps=()
     
     log::debug "Checking VK API dependencies..."
-    
-    # Check for curl
-    if ! utils::has curl; then
-        missing_deps+=("curl")
-    fi
-    
-    # Check for jq
-    if ! utils::has jq; then
-        missing_deps+=("jq")
-    fi
-    
-    # Check for openssl
-    if ! utils::has openssl; then
-        missing_deps+=("openssl")
-    fi
-    
-    # Check for base64
-    if ! utils::has base64; then
-        missing_deps+=("coreutils")
-    fi
+
+    deps::missing_tools missing_deps \
+        curl jq openssl base64:coreutils
     
     # Install missing dependencies based on platform
     if [[ ${#missing_deps[@]} -gt 0 ]]; then
@@ -210,7 +193,7 @@ vkapi::auth() {
 # Rate limiting delay
 vkapi::rate_limit_delay() {
     local current_time
-    current_time=$(date +%s.%N)
+    current_time=$(utils::now_float)
     
     local time_diff
     time_diff=$(echo "${current_time} - ${VK_API_LAST_REQUEST_TIME}" | utils::quiet_err bc -l || echo "1")
@@ -221,7 +204,7 @@ vkapi::rate_limit_delay() {
         sleep "${sleep_time}"
     fi
     
-    VK_API_LAST_REQUEST_TIME=$(date +%s.%N)
+    VK_API_LAST_REQUEST_TIME=$(utils::now_float)
 }
 
 # Generate cache key for request
@@ -241,7 +224,7 @@ vkapi::get_cached_response() {
     
     if [[ -f "${cache_file}" ]]; then
         local file_age
-        file_age=$(echo "$(date +%s) - $(utils::quiet_err stat -c %Y "${cache_file}" || utils::quiet_err stat -f %m "${cache_file}")" | bc)
+        file_age=$(echo "$(utils::now_s) - $(utils::quiet_err stat -c %Y "${cache_file}" || utils::quiet_err stat -f %m "${cache_file}")" | bc)
         
         if [[ "${file_age}" -lt "${VK_API_CACHE_TTL}" ]]; then
             cat "${cache_file}"
@@ -685,7 +668,7 @@ vkapi::send_message() {
     local func_name="vkapi::send_message"
     local user_id="${1:-}"
     local message="${2:-}"
-    local random_id="${3:-$(date +%s)}"
+    local random_id="${3:-$(utils::now_s)}"
     
     if [[ -z "${user_id}" ]] || [[ -z "${message}" ]]; then
         errorhandler::throw "${func_name}" "User ID and message are required" \

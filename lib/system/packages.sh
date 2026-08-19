@@ -2,13 +2,13 @@
 # shellcheck shell=bash
 # packages.sh — Package management for system setup / Управление пакетами для настройки
 # системы
-# @depends core/const, core/logger, core/utils
+# @depends core/const, core/logger, core/utils, lib/io/files
 
 # Source Guard / Защита от повторной загрузки
 bs::guard "SYSTEM_PACKAGES" || return 0
 
 # Зависимости / Dependencies
-bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../io/files.sh"
 
 # @description Update package list / Обновить список пакетов
 # @example
@@ -32,7 +32,7 @@ system::packages::update() {
         log::info "Zypper package list updated"
     else
         log::warn "No supported package manager found"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -43,7 +43,7 @@ system::packages::update() {
 system::packages::install() {
     if [[ $# -eq 0 ]]; then
         log::warn "No packages specified for installation"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # Detect package manager / Определить менеджер пакетов
@@ -64,7 +64,7 @@ system::packages::install() {
         log::info "Packages installed with Zypper: $*"
     else
         log::warn "No supported package manager found"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -75,7 +75,7 @@ system::packages::install() {
 system::packages::remove() {
     if [[ $# -eq 0 ]]; then
         log::warn "No packages specified for removal"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # Detect package manager / Определить менеджер пакетов
@@ -96,7 +96,7 @@ system::packages::remove() {
         log::info "Packages removed with Zypper: $*"
     else
         log::warn "No supported package manager found"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -122,7 +122,7 @@ system::packages::upgrade() {
         log::info "Packages upgraded with Zypper"
     else
         log::warn "No supported package manager found"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -135,7 +135,7 @@ system::packages::search() {
     
     if [[ -z "${search_term}" ]]; then
         log::warn "Search term not specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # Detect package manager / Определить менеджер пакетов
@@ -151,7 +151,7 @@ system::packages::search() {
         utils::quiet_err zypper search "${search_term}" || :
     else
         log::warn "No supported package manager found"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -172,7 +172,7 @@ system::packages::list() {
         utils::quiet_err zypper search -i || :
     else
         log::warn "No supported package manager found"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -185,7 +185,7 @@ system::packages::add_repo() {
     
     if [[ -z "${repo}" ]]; then
         log::warn "Repository specification not provided"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # Detect package manager / Определить менеджер пакетов
@@ -193,7 +193,7 @@ system::packages::add_repo() {
         if [[ "${repo}" == ppa:* ]]; then
             utils::quiet_err apt-add-repository -y "${repo}"
         else
-            echo "${repo}" >> /etc/apt/sources.list
+            io::files::append /etc/apt/sources.list "${repo}"
         fi
         log::info "Repository added for APT: ${repo}"
     elif utils::has yum; then
@@ -204,7 +204,7 @@ system::packages::add_repo() {
         log::info "Repository added for DNF: ${repo}"
     else
         log::warn "Repository management not implemented for this package manager"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -217,7 +217,7 @@ system::packages::remove_repo() {
     
     if [[ -z "${repo}" ]]; then
         log::warn "Repository specification not provided"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # Detect package manager / Определить менеджер пакетов
@@ -247,6 +247,6 @@ system::packages::remove_repo() {
         fi
     else
         log::warn "Repository management not implemented for this package manager"
-        return 1
+        return "${E_ERROR}"
     fi
 }

@@ -12,13 +12,13 @@
 #   automation::locale::check_locale
 #   automation::locale::set_locale "ru_RU.UTF-8"
 #   automation::locale::verify_locale "ru_RU.UTF-8"
-# @depends core/const, core/logger, core/utils, lib/system/distro
+# @depends core/const, core/logger, core/utils, lib/system/distro, lib/io/files, lib/system/processes
 
 # Source Guard / Защита от повторной загрузки
 bs::guard "AUTOMATION" || return 0
 
 # Зависимости / Dependencies
-bs::source_relative "../core/const.sh" "../core/logger.sh" "../core/utils.sh" "system/distro.sh"
+bs::source_relative "../core/const.sh" "../core/logger.sh" "../core/utils.sh" "system/distro.sh" "io/files.sh" "system/processes.sh"
 
 # @description Check current keyboard layout / Проверить текущую раскладку клавиатуры
 # @example
@@ -30,7 +30,7 @@ automation::locale::check_keyboard_layout() {
         log::info "Current keyboard layout: $(localectl status | grep "X11 Layout" | awk '{print $3}')"
     else
         log::warn "No keyboard layout tool available"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -43,12 +43,12 @@ automation::locale::set_keyboard_layout() {
     
     # For systemd-based systems / Для систем на базе systemd
     if utils::has localectl; then
-        utils::quiet_err localectl set-keymap "${layout}" || true
+        utils::attempt localectl set-keymap "${layout}"
     fi
     
     # For X11 systems / Для систем X11
     if utils::has setxkbmap; then
-        utils::quiet_err setxkbmap "${layout}" || true
+        utils::attempt setxkbmap "${layout}"
     fi
     
     log::info "Keyboard layout set to ${layout}"
@@ -68,7 +68,7 @@ automation::locale::verify_keyboard_layout() {
         current_layout=$(localectl status | grep "X11 Layout" | awk '{print $3}' | tr -d '()')
     else
         log::warn "No keyboard layout tool available"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if [[ "${current_layout}" == "${expected_layout}" ]]; then
@@ -107,7 +107,7 @@ automation::locale::set_locale() {
             sed -i "s/#${target_locale}/${target_locale}/" /etc/locale.gen
         else
             # Add the locale to the list if it doesn't exist
-            echo "${target_locale} UTF-8" >> /etc/locale.gen
+            io::files::append /etc/locale.gen "${target_locale} UTF-8"
         fi
         
         locale-gen
@@ -123,7 +123,7 @@ automation::locale::set_locale() {
         fi
     else
         log::warn "Unsupported distribution for locale configuration"
-        return 1
+        return "${E_ERROR}"
     fi
     
     log::info "Locale set to ${target_locale}"
@@ -251,11 +251,11 @@ automation::hardware::set_input_device() {
             log::info "Set ${property} to ${value} for device ${device_name}"
         else
             log::warn "Device ${device_name} not found"
-            return 1
+            return "${E_ERROR}"
         fi
     else
         log::warn "xinput not available"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -276,7 +276,7 @@ automation::hardware::check_input_device() {
         fi
     else
         log::warn "xinput not available"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -289,7 +289,7 @@ automation::hardware::detect_monitors() {
         xrandr --query | grep " connected"
     else
         log::warn "xrandr not available"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -311,7 +311,7 @@ automation::hardware::set_display_mode() {
         log::info "Set ${monitor} to ${resolution} with ${orientation} orientation"
     else
         log::warn "xrandr not available"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -333,7 +333,7 @@ automation::hardware::check_display_mode() {
         fi
     else
         log::warn "xrandr not available"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -371,7 +371,7 @@ automation::network::manage_interface() {
             ;;
         *)
             log::warn "Invalid action: ${action}. Use 'up' or 'down'."
-            return 1
+            return "${E_INVALID}"
             ;;
     esac
 }
@@ -459,9 +459,9 @@ automation::display::check_display_server() {
         display_server="Wayland (WAYLAND_DISPLAY=${WAYLAND_DISPLAY})"
     else
         # Check for running processes
-        if pgrep -x Xorg >/dev/null; then
+        if system::processes::is_running Xorg; then
             display_server="X11 (Xorg process running)"
-        elif pgrep -x weston >/dev/null || pgrep -x gnome-shell-wayland >/dev/null; then
+        elif system::processes::is_running weston || system::processes::is_running gnome-shell-wayland; then
             display_server="Wayland (process running)"
         fi
     fi
@@ -490,7 +490,7 @@ automation::display::install_display_server() {
                 system::distro::install_package "xorg-x11-server-Xorg" "xorg-x11-server-common"
             else
                 log::warn "Unsupported distribution for X11 installation"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         "wayland")
@@ -500,12 +500,12 @@ automation::display::install_display_server() {
                 system::distro::install_package "wayland" "weston"
             else
                 log::warn "Unsupported distribution for Wayland installation"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         *)
             log::warn "Invalid server type: ${server_type}. Use 'x11' or 'wayland'."
-            return 1
+            return "${E_INVALID}"
             ;;
     esac
     
@@ -549,23 +549,23 @@ automation::display::detect_desktop_environment() {
     local de=""
     
     # Check for running processes
-    if pgrep -x gnome-session >/dev/null; then
+    if system::processes::is_running gnome-session; then
         de="GNOME"
-    elif pgrep -x plasma_session >/dev/null; then
+    elif system::processes::is_running plasma_session; then
         de="KDE Plasma"
-    elif pgrep -x mate-session >/dev/null; then
+    elif system::processes::is_running mate-session; then
         de="MATE"
-    elif pgrep -x xfce4-session >/dev/null; then
+    elif system::processes::is_running xfce4-session; then
         de="XFCE"
-    elif pgrep -x lxsession >/dev/null; then
+    elif system::processes::is_running lxsession; then
         de="LXDE"
-    elif pgrep -x lxqt-session >/dev/null; then
+    elif system::processes::is_running lxqt-session; then
         de="LXQt"
-    elif pgrep -x enlightenment_start >/dev/null; then
+    elif system::processes::is_running enlightenment_start; then
         de="Enlightenment"
-    elif pgrep -x budgie-desktop >/dev/null; then
+    elif system::processes::is_running budgie-desktop; then
         de="Budgie"
-    elif pgrep -x cinnamon-session >/dev/null; then
+    elif system::processes::is_running cinnamon-session; then
         de="Cinnamon"
     fi
     
@@ -593,7 +593,7 @@ automation::display::install_desktop_environment() {
                 system::distro::install_package "gnome-desktop3" "gnome-shell"
             else
                 log::warn "Unsupported distribution for GNOME installation"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         "kde"|"plasma")
@@ -603,7 +603,7 @@ automation::display::install_desktop_environment() {
                 system::distro::install_package "kde-plasma-workspace" "plasma-desktop"
             else
                 log::warn "Unsupported distribution for KDE installation"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         "xfce")
@@ -613,7 +613,7 @@ automation::display::install_desktop_environment() {
                 system::distro::install_package "xfce4" "xfce4-session"
             else
                 log::warn "Unsupported distribution for XFCE installation"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         "mate")
@@ -623,12 +623,12 @@ automation::display::install_desktop_environment() {
                 system::distro::install_package "mate-desktop" "mate-session-manager"
             else
                 log::warn "Unsupported distribution for MATE installation"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         *)
             log::warn "Unsupported desktop environment: ${de}"
-            return 1
+            return "${E_INVALID}"
             ;;
     esac
     
@@ -658,11 +658,11 @@ automation::display::check_desktop_environment() {
             ;;
         *)
             log::warn "Unsupported desktop environment: ${de}"
-            return 1
+            return "${E_INVALID}"
             ;;
     esac
     
-    if pgrep -x "${process}" >/dev/null; then
+    if system::processes::is_running "${process}"; then
         log::info "[OK] ${de^} desktop environment is running"
         return 0
     else
@@ -714,7 +714,7 @@ automation::display::install_display_manager() {
         system::distro::install_package "${dm}"
     else
         log::warn "Unsupported distribution for display manager installation"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # Enable the display manager
@@ -791,7 +791,7 @@ automation::system::control_service() {
             ;;
         *)
             log::warn "Invalid action: ${action}. Use start, stop, restart, reload, enable, or disable."
-            return 1
+            return "${E_INVALID}"
             ;;
     esac
 }
@@ -869,7 +869,7 @@ automation::system::update_package_cache() {
             ;;
         *)
             log::warn "Unsupported package manager"
-            return 1
+            return "${E_ERROR}"
             ;;
     esac
     
@@ -906,7 +906,7 @@ automation::system::manage_packages() {
                     ;;
                 *)
                     log::warn "Unsupported package manager"
-                    return 1
+                    return "${E_ERROR}"
                     ;;
             esac
             ;;
@@ -929,13 +929,13 @@ automation::system::manage_packages() {
                     ;;
                 *)
                     log::warn "Unsupported package manager"
-                    return 1
+                    return "${E_ERROR}"
                     ;;
             esac
             ;;
         *)
             log::warn "Invalid action: ${action}. Use install or remove."
-            return 1
+            return "${E_INVALID}"
             ;;
     esac
     
@@ -964,7 +964,7 @@ automation::system::check_package_version() {
             ;;
         *)
             log::warn "Unsupported package manager"
-            return 1
+            return "${E_ERROR}"
             ;;
     esac
 }
@@ -989,7 +989,7 @@ automation::system::list_repositories() {
             ;;
         *)
             log::warn "Unsupported package manager"
-            return 1
+            return "${E_ERROR}"
             ;;
     esac
 }
@@ -1010,7 +1010,7 @@ automation::system::add_repository() {
             ;;
         *)
             log::warn "Adding repositories is not supported for this package manager"
-            return 1
+            return "${E_ERROR}"
             ;;
     esac
     
@@ -1030,7 +1030,7 @@ automation::system::check_repository_validity() {
             ;;
         *)
             log::warn "Repository validity check not supported for this package manager"
-            return 1
+            return "${E_ERROR}"
             ;;
     esac
     
@@ -1085,7 +1085,7 @@ automation::security::configure_firewall() {
                 ;;
             *)
                 log::warn "Invalid UFW action: ${action}"
-                return 1
+                return "${E_INVALID}"
                 ;;
         esac
     elif utils::has firewall-cmd; then
@@ -1104,12 +1104,12 @@ automation::security::configure_firewall() {
                 ;;
             *)
                 log::warn "Invalid Firewalld action: ${action}"
-                return 1
+                return "${E_INVALID}"
                 ;;
         esac
     else
         log::warn "No supported firewall command available"
-        return 1
+        return "${E_ERROR}"
     fi
     
     log::info "Firewall ${action}: ${rule}"
@@ -1195,11 +1195,11 @@ automation::security::test_log_writing() {
     # Create the log file if it doesn't exist
     utils::quiet_err touch "${log_file}" || {
         log::warn "Cannot write to ${log_file}"
-        return 1
+        return "${E_ERROR}"
     }
     
     # Write test message with timestamp
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - ${message}" >> "${log_file}"
+    io::files::append "${log_file}" "$(utils::log_stamp) - ${message}"
     
     log::info "Test message written to ${log_file}"
 }

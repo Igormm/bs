@@ -179,7 +179,7 @@ error::set_handler() {
         log::debug "Set custom handler for error ${error_code}: ${handler}"
     else
         log::warn "Handler function does not exist: ${handler}"
-        return 1
+        return "${E_ERROR:-1}"
     fi
 }
 

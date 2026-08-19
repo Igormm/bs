@@ -154,7 +154,7 @@ frameworks::bashit::load_plugin() {
             ;;
         *)
             log::warn "Unknown Bash-it plugin: ${plugin_name}"
-            return 1
+            return "${E_ERROR}"
             ;;
     esac
     
@@ -718,7 +718,7 @@ frameworks::shellspec::run() {
     log::info "Test Results: ${passed} passed, ${failed} failed"
     
     if [[ "${failed}" -gt 0 ]]; then
-        return 1
+        return "${E_ERROR}"
     else
         return 0
     fi

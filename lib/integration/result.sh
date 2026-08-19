@@ -34,7 +34,7 @@ declare -g IO_INTEGRATION_RESULT_VERSION="1.0.0"
 # @description Текущий timestamp в миллисекундах.
 # @stdout milliseconds since epoch
 __integration_result::now_ms() {
-  date +%s%3N
+  utils::now_ms
 }
 
 # @private

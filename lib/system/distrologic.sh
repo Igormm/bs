@@ -10,13 +10,13 @@
 #   load "lib/system/distrologic"
 #   system::distrologic::pkg_install_debian "curl"
 #   system::distrologic::service_manage_systemd "nginx" "start"
-# @depends core/const, core/logger, core/utils, lib/system/distro
+# @depends core/const, core/logger, core/utils, lib/system/distro, lib/io/files
 
 # Source Guard / Защита от повторной загрузки
 bs::guard "SYSTEM_DISTROLOGIC" || return 0
 
 # Зависимости / Dependencies
-bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "distro.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "distro.sh" "../io/files.sh"
 
 # @description Install package on Debian-based systems / Установить пакет в системах на
 # базе Debian
@@ -29,7 +29,7 @@ system::distrologic::pkg_install_debian() {
         apt-get install -y "$@"
     else
         log::warn "Not a Debian-based system"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -47,13 +47,13 @@ system::distrologic::pkg_install_fedora() {
             pkg_manager="yum"
         else
             log::error "No supported package manager found"
-            return 1
+            return "${E_ERROR}"
         fi
 
         ${pkg_manager} install -y "$@"
     else
         log::warn "Not a RedHat-based system"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -67,7 +67,7 @@ system::distrologic::pkg_install_arch() {
         pacman -S --noconfirm "$@"
     else
         log::warn "Not an Arch-based system"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -80,7 +80,7 @@ system::distrologic::pkg_install_suse() {
         zypper install -y "$@"
     else
         log::warn "Not a SUSE-based system"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -96,7 +96,7 @@ system::distrologic::pkg_install_alt() {
         apt-get install -y "$@"
     else
         log::warn "Not an ALT Linux system"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -110,7 +110,7 @@ system::distrologic::pkg_remove_debian() {
         apt-get remove -y "$@"
     else
         log::warn "Not a Debian-based system"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -128,13 +128,13 @@ system::distrologic::pkg_remove_fedora() {
             pkg_manager="yum"
         else
             log::error "No supported package manager found"
-            return 1
+            return "${E_ERROR}"
         fi
 
         ${pkg_manager} remove -y "$@"
     else
         log::warn "Not a RedHat-based system"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -164,7 +164,7 @@ system::distrologic::pkg_update_all() {
             ;;
         *)
             log::warn "Unknown distribution family: ${DISTRO_FAMILY}"
-            return 1
+            return "${E_ERROR}"
             ;;
     esac
 }
@@ -198,7 +198,7 @@ system::distrologic::pkg_search_cross() {
             ;;
         *)
             log::warn "Unknown distribution family: ${DISTRO_FAMILY}"
-            return 1
+            return "${E_ERROR}"
             ;;
     esac
 }
@@ -229,7 +229,7 @@ system::distrologic::pkg_clean_all() {
             ;;
         *)
             log::warn "Unknown distribution family: ${DISTRO_FAMILY}"
-            return 1
+            return "${E_ERROR}"
             ;;
     esac
 }
@@ -265,7 +265,7 @@ system::distrologic::service_manage_systemd() {
         systemctl "${action}" "${service}"
     else
         log::warn "systemd not available"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -282,7 +282,7 @@ system::distrologic::service_manage_sysvinit() {
         "/etc/init.d/${service}" "${action}"
     else
         log::warn "Service ${service} not found in /etc/init.d/"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -302,7 +302,7 @@ system::distrologic::service_manage_openrc() {
         fi
     else
         log::warn "OpenRC not available"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -318,7 +318,7 @@ system::distrologic::service_mask() {
         systemctl mask "${service}"
     else
         log::warn "Service masking only supported with systemd"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -333,7 +333,7 @@ system::distrologic::service_unmask() {
         systemctl unmask "${service}"
     else
         log::warn "Service unmasking only supported with systemd"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -348,7 +348,7 @@ system::distrologic::network_configure_nmcli() {
         nmcli "$@"
     else
         log::warn "nmcli not available"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -364,11 +364,11 @@ system::distrologic::network_configure_netplan() {
             netplan apply
         else
             log::warn "Netplan config file not found: ${config_file}"
-            return 1
+            return "${E_ERROR}"
         fi
     else
         log::warn "netplan not available"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -387,7 +387,7 @@ system::distrologic::security_configure_selinux() {
         /usr/sbin/sestatus -v | grep -q "SELinux status:.*enabled" && /usr/sbin/setenforce "$@"
     else
         log::warn "SELinux command 'se${cmd}' not available"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -425,12 +425,12 @@ system::distrologic::security_configure_apparmor() {
                 ;;
             *)
                 log::warn "Unknown AppArmor action: ${action}"
-                return 1
+                return "${E_ERROR}"
                 ;;
         esac
     else
         log::warn "AppArmor not available"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -446,7 +446,7 @@ system::distrologic::security_firewalld_setup() {
         fi
     else
         log::warn "firewall-cmd not available"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -459,7 +459,7 @@ system::distrologic::security_ufw_setup() {
         ufw "$@"
     else
         log::warn "ufw not available"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -473,7 +473,7 @@ system::distrologic::security_iptables_setup() {
         iptables "$@"
     else
         log::warn "iptables not available"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -488,7 +488,7 @@ system::distrologic::time_sync_systemd() {
         timedatectl set-timezone "${timezone}"
     else
         log::warn "timedatectl not available"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -501,7 +501,7 @@ system::distrologic::hwclock_sync() {
         hwclock --systohc
     else
         log::warn "hwclock not available"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -522,12 +522,12 @@ system::distrologic::sudo_configure() {
                 ;;
             *)
                 log::warn "Automatic sudo group configuration not supported for ${DISTRO_FAMILY}"
-                return 1
+                return "${E_ERROR}"
                 ;;
         esac
     else
         log::warn "usermod not available"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -545,7 +545,7 @@ system::distrologic::sysctl_configure() {
         sysctl -w "${param}=${value}"
     else
         log::warn "sysctl not available"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -566,7 +566,7 @@ system::distrologic::sysctl_persist() {
         log::info "sysctl parameter already persistent: ${line}"
         return 0
     fi
-    echo "${line}" >> "${config_file}"
+    io::files::append "${config_file}" "${line}"
 }
 
 # @description Format filesystem as ext4 / Форматировать файловую систему в ext4
@@ -580,7 +580,7 @@ system::distrologic::fs_format_ext4() {
         mkfs.ext4 "${device}"
     else
         log::warn "mkfs.ext4 not available"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -595,7 +595,7 @@ system::distrologic::fs_format_xfs() {
         mkfs.xfs "${device}"
     else
         log::warn "mkfs.xfs not available"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -626,7 +626,7 @@ system::distrologic::fs_check() {
                 "fsck.${fs_type}" -f "${device}"
             else
                 log::warn "e2fsck not available"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         xfs)
@@ -634,7 +634,7 @@ system::distrologic::fs_check() {
                 xfs_repair "${device}"
             else
                 log::warn "xfs_repair not available"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         btrfs)
@@ -642,7 +642,7 @@ system::distrologic::fs_check() {
                 btrfs check "${device}"
             else
                 log::warn "btrfs not available"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         *)
@@ -653,7 +653,7 @@ system::distrologic::fs_check() {
                 fsck -f "${device}"
             else
                 log::warn "fsck not available"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
     esac
@@ -683,7 +683,7 @@ system::distrologic::pkg_install_cross() {
             ;;
         *)
             log::warn "Unsupported distribution family: ${DISTRO_FAMILY}"
-            return 1
+            return "${E_ERROR}"
             ;;
     esac
 }

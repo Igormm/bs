@@ -38,13 +38,13 @@
 # @author BS Framework
 # @since 2026-01-06
 # @version 1.0.0
-# @depends core/const, core/logger, core/utils, core/errorhandler, lib/system/platformcheck, lib/integration/vkapi
+# @depends core/const, core/logger, core/utils, core/errorhandler, lib/system/platformcheck, lib/integration/vkapi, lib/io/files
 
 # Source Guard / Защита от повторной загрузки
 bs::guard "INTEGRATION_VK_MUSIC" || return 0
 
 # Зависимости / Dependencies
-bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/errorhandler.sh" "../system/platformcheck.sh" "vkapi.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/errorhandler.sh" "../system/platformcheck.sh" "vkapi.sh" "../io/files.sh"
 
 # VK Music configuration constants
 readonly VK_MUSIC_CACHE_DIR="/tmp/vk_music_cache"
@@ -93,26 +93,9 @@ vkmusic::check_dependencies() {
     local missing_deps=()
     
     log::debug "Checking VK Music dependencies..."
-    
-    # Check for curl
-    if ! utils::has curl; then
-        missing_deps+=("curl")
-    fi
-    
-    # Check for jq
-    if ! utils::has jq; then
-        missing_deps+=("jq")
-    fi
-    
-    # Check for ffmpeg
-    if ! utils::has ffmpeg; then
-        missing_deps+=("ffmpeg")
-    fi
-    
-    # Check for id3tag
-    if ! utils::has id3tag && ! utils::has eyeD3; then
-        missing_deps+=("id3tag")
-    fi
+
+    deps::missing_tools missing_deps \
+        curl jq ffmpeg id3tag|eyeD3:id3tag
     
     # Install missing dependencies based on platform
     if [[ ${#missing_deps[@]} -gt 0 ]]; then
@@ -200,7 +183,7 @@ vkmusic::search() {
     
     if [[ "${audio_count}" == "0" ]] || [[ "${audio_count}" == "null" ]]; then
         log::warn "No audio found for query: ${query}"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # Store results in array
@@ -223,7 +206,7 @@ vkmusic::display_search_results() {
     
     if [[ ${#VK_MUSIC_LAST_SEARCH_RESULTS[@]} -eq 0 ]]; then
         log::warn "No search results to display"
-        return 1
+        return "${E_ERROR}"
     fi
     
     log::info "Search Results:"
@@ -589,7 +572,7 @@ vkmusic::search_and_download() {
     
     if [[ -z "${search_results}" ]]; then
         log::warn "No results found for: ${query}"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # Download found audio
@@ -642,8 +625,8 @@ vkmusic::create_playlist_file() {
             echo "#EXTM3U" > "${playlist_file}"
             while IFS= read -r audio_id; do
                 if [[ -n "${audio_id}" ]]; then
-                    echo "#EXTINF:0,${audio_id}" >> "${playlist_file}"
-                    echo "${audio_id}" >> "${playlist_file}"
+                    io::files::append "${playlist_file}" "#EXTINF:0,${audio_id}"
+                    io::files::append "${playlist_file}" "${audio_id}"
                 fi
             done <<< "${audio_ids}"
             ;;
@@ -653,17 +636,17 @@ vkmusic::create_playlist_file() {
             while IFS= read -r audio_id; do
                 if [[ -n "${audio_id}" ]]; then
                     ((count++))
-                    echo "File${count}=${audio_id}" >> "${playlist_file}"
-                    echo "Title${count}=${audio_id}" >> "${playlist_file}"
-                    echo "Length${count}=-1" >> "${playlist_file}"
+                    io::files::append "${playlist_file}" "File${count}=${audio_id}"
+                    io::files::append "${playlist_file}" "Title${count}=${audio_id}"
+                    io::files::append "${playlist_file}" "Length${count}=-1"
                 fi
             done <<< "${audio_ids}"
-            echo "NumberOfEntries=${count}" >> "${playlist_file}"
-            echo "Version=2" >> "${playlist_file}"
+            io::files::append "${playlist_file}" "NumberOfEntries=${count}"
+            io::files::append "${playlist_file}" "Version=2"
             ;;
         *)
             log::warn "Unsupported playlist format: ${format}"
-            return 1
+            return "${E_INVALID}"
             ;;
     esac
     

@@ -21,18 +21,18 @@ system::keyboard::layout() {
     
     # For systemd-based systems with localectl / Для систем на базе systemd с localectl
     if utils::has localectl; then
-        utils::quiet_err localectl set-keymap "${layout}" || true
+        utils::attempt localectl set-keymap "${layout}"
         # For X11 sessions / Для сессий X11
-        utils::quiet_err localectl set-x11-keymap "${layout}" || true
+        utils::attempt localectl set-x11-keymap "${layout}"
     else
         # Fallback for non-systemd systems / Резервный вариант для систем без systemd
         if utils::has loadkeys; then
-            utils::quiet_err loadkeys "${layout}" || true
+            utils::attempt loadkeys "${layout}"
         fi
         
         # For X11 systems / Для систем X11
         if utils::has setxkbmap; then
-            utils::quiet_err setxkbmap "${layout}" || true
+            utils::attempt setxkbmap "${layout}"
         fi
     fi
     
@@ -48,7 +48,7 @@ system::keyboard::model() {
     local model="${1:-pc105}"
     
     if utils::has localectl; then
-        utils::quiet_err localectl set-keymap --keymap-model "${model}" || true
+        utils::attempt localectl set-keymap --keymap-model "${model}"
     fi
     
     log::info "Keyboard model set to ${model}"
@@ -63,7 +63,7 @@ system::keyboard::variant() {
     local variant="${1}"
     
     if utils::has localectl; then
-        utils::quiet_err localectl set-keymap --keymap-variant "${variant}" || true
+        utils::attempt localectl set-keymap --keymap-variant "${variant}"
     fi
     
     log::info "Keyboard variant set to ${variant}"
@@ -78,7 +78,7 @@ system::keyboard::options() {
     local options="${1}"
     
     if utils::has localectl; then
-        utils::quiet_err localectl set-keymap --keymap-options "${options}" || true
+        utils::attempt localectl set-keymap --keymap-options "${options}"
     fi
     
     log::info "Keyboard options set to ${options}"

@@ -213,7 +213,7 @@ platformcheck::check_dependencies() {
     done
 
     if [[ ${#missing_tools[@]} -eq 0 ]]; then
-        utils::quiet_err log::info "All required tools are available" || true
+        log::info "All required tools are available"
         return 0
     else
         utils::quiet_err log::error "Missing required tools: ${missing_tools[*]}" || {
@@ -244,10 +244,10 @@ platformcheck::check_macos_deps() {
     done
     
     if [[ ${#missing_tools[@]} -eq 0 ]]; then
-        utils::quiet_err log::info "All macOS tools are available" || true
+        log::info "All macOS tools are available"
         return 0
     else
-        utils::quiet_err log::warn "Missing macOS tools: ${missing_tools[*]}" || true
+        log::warn "Missing macOS tools: ${missing_tools[*]}"
         return 1
     fi
 }
@@ -273,10 +273,10 @@ platformcheck::check_linux_deps() {
     done
     
     if [[ ${#missing_tools[@]} -eq 0 ]]; then
-        utils::quiet_err log::info "All Linux tools are available" || true
+        log::info "All Linux tools are available"
         return 0
     else
-        utils::quiet_err log::warn "Missing Linux tools: ${missing_tools[*]}" || true
+        log::warn "Missing Linux tools: ${missing_tools[*]}"
         return 1
     fi
 }
@@ -291,7 +291,7 @@ platformcheck::check_linux_deps() {
 # @example
 #   platformcheck::install_dependencies
 platformcheck::install_dependencies() {
-    utils::quiet_err log::info "Checking and installing dependencies..." || true
+    log::info "Checking and installing dependencies..."
     
     if platformcheck::is_macos; then
         platformcheck::install_macos_deps
@@ -305,18 +305,18 @@ platformcheck::install_dependencies() {
 # @example
 #   platformcheck::install_macos_deps
 platformcheck::install_macos_deps() {
-    utils::quiet_err log::info "Installing macOS dependencies..." || true
+    log::info "Installing macOS dependencies..."
     
     # Проверяем Homebrew / Check Homebrew
     if ! utils::has brew; then
-        utils::quiet_err log::info "Homebrew not found. Installing..." || true
+        log::info "Homebrew not found. Installing..."
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     fi
     
     # Устанавливаем необходимые пакеты / Install necessary packages
     brew install coreutils gnu-sed grep
     
-    utils::quiet_err log::success "macOS dependencies installed" || true
+    log::success "macOS dependencies installed"
 }
 
 # @description Install Linux dependencies
@@ -324,14 +324,14 @@ platformcheck::install_macos_deps() {
 # @example
 #   platformcheck::install_linux_deps
 platformcheck::install_linux_deps() {
-    utils::quiet_err log::info "Installing Linux dependencies..." || true
+    log::info "Installing Linux dependencies..."
     
     load "lib/system/distrologic"
     
     # Устанавливаем необходимые пакеты / Install necessary packages
     system::distrologic::pkg_install_cross "curl" "wget" "git" "tree" "jq"
     
-    utils::quiet_err log::success "Linux dependencies installed" || true
+    log::success "Linux dependencies installed"
 }
 
 # ==========================================
@@ -343,8 +343,8 @@ platformcheck::install_linux_deps() {
 # @example
 #   platformcheck::show_report
 platformcheck::show_report() {
-    utils::quiet_err log::header "Platform Compatibility Report" || true
-    utils::quiet_err log::header "Отчет о совместимости платформы" || true
+    log::header "Platform Compatibility Report"
+    log::header "Отчет о совместимости платформы"
     
     platformcheck::get_report
     
@@ -375,5 +375,5 @@ platformcheck::show_report() {
 # Initialize module on load
 if [[ -z "${PLATFORM_CHECK_INITIALIZED:-}" ]]; then
     PLATFORM_CHECK_INITIALIZED="1"
-    utils::quiet_err log::debug "Platform check module initialized" || true
+    log::debug "Platform check module initialized"
 fi

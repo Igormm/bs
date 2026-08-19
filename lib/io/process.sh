@@ -225,12 +225,12 @@ io::process::__run_strace() {
 
   if ! utils::has strace; then
     log::debug "strace not available, skipping ${trace_expr} trace"
-    return 1
+    return "${E_ERROR}"
   fi
 
   if ! kill -0 "${pid}" 2>/dev/null; then
     log::debug "Process ${pid} not alive, skipping strace"
-    return 1
+    return "${E_ERROR}"
   fi
 
   local -a sudo_cmd=()
@@ -332,11 +332,11 @@ io::process::__terminate() {
   utils::ignore kill -s "${signal}" "${pid}"
 
   local deadline_ms
-  deadline_ms=$(( $(date +%s%3N) + grace * 1000 ))
+  deadline_ms=$(( $(utils::now_ms) + grace * 1000 ))
 
   while kill -0 "${pid}" 2>/dev/null; do
     local now_ms
-    now_ms=$(date +%s%3N)
+    now_ms=$(utils::now_ms)
     if [[ "${now_ms}" -ge "${deadline_ms}" ]]; then
       break
     fi
@@ -423,7 +423,7 @@ io::process::guard() {
   local timeout_ms=$(( IO_PROCESS_CONFIG[timeout] * 1000 ))
   local hang_after_ms=$(( IO_PROCESS_CONFIG[hang_after] * 1000 ))
   local start_ms
-  start_ms=$(date +%s%3N)
+  start_ms=$(utils::now_ms)
   local last_output_ms=${start_ms}
   local prev_stdout_size=0
   local prev_stderr_size=0
@@ -437,7 +437,7 @@ io::process::guard() {
     fi
 
     local now_ms
-    now_ms=$(date +%s%3N)
+    now_ms=$(utils::now_ms)
 
     if [[ "${IO_PROCESS_CONFIG[timeout]}" -gt 0 ]]; then
       if [[ $((now_ms - start_ms)) -ge "${timeout_ms}" ]]; then

@@ -2,13 +2,13 @@
 # shellcheck shell=bash
 # logging.sh — Logging configuration for system setup / Конфигурация логирования для
 # настройки системы
-# @depends core/const, core/logger, core/utils
+# @depends core/const, core/logger, core/utils, lib/io/files
 
 # Source Guard / Защита от повторной загрузки
 bs::guard "SYSTEM_LOGGING" || return 0
 
 # Зависимости / Dependencies
-bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../io/files.sh"
 
 # @description Configure system logging / Настроить системное логирование
 # @param $1 Log level (e.g., "info", "warn", "error") / Уровень логирования (например,
@@ -22,12 +22,12 @@ system::logging::configure() {
     if utils::has journalctl; then
         # Set log level for journald / Установить уровень логирования для journald
         if [[ -f "/etc/systemd/journald.conf" ]]; then
-            utils::quiet_err sed -i "s/^#MaxLevelStore=.*/MaxLevelStore=${log_level}/" /etc/systemd/journald.conf || true
-            utils::quiet_err sed -i "s/^#MaxLevelSyslog=.*/MaxLevelSyslog=${log_level}/" /etc/systemd/journald.conf || true
+            utils::attempt sed -i "s/^#MaxLevelStore=.*/MaxLevelStore=${log_level}/" /etc/systemd/journald.conf
+            utils::attempt sed -i "s/^#MaxLevelSyslog=.*/MaxLevelSyslog=${log_level}/" /etc/systemd/journald.conf
             # Restart journald to apply changes / Перезапустить journald для применения
             # изменений
             if utils::has systemctl; then
-                utils::quiet_err systemctl restart systemd-journald || true
+                utils::attempt systemctl restart systemd-journald
             fi
         fi
         log::info "System logging configured with level: ${log_level}"
@@ -35,13 +35,13 @@ system::logging::configure() {
         # For sysvinit systems with rsyslog / Для систем sysvinit с rsyslog
         if [[ -f "/etc/rsyslog.conf" ]]; then
             # Set log level in rsyslog / Установить уровень логирования в rsyslog
-            utils::quiet_err sed -i "s/^\$SystemLogRateLimitInterval.*/\$SystemLogRateLimitInterval 0/" /etc/rsyslog.conf || true
+            utils::attempt sed -i "s/^\$SystemLogRateLimitInterval.*/\$SystemLogRateLimitInterval 0/" /etc/rsyslog.conf
             # Restart rsyslog to apply changes / Перезапустить rsyslog для применения
             # изменений
             if utils::has systemctl; then
-                utils::quiet_err systemctl restart rsyslog || true
+                utils::attempt systemctl restart rsyslog
             elif utils::has service; then
-                utils::quiet_err service rsyslog restart || true
+                utils::attempt service rsyslog restart
             fi
         fi
         log::info "RSyslog configured"
@@ -62,7 +62,7 @@ system::logging::rotate() {
     
     if [[ -z "${log_file}" ]]; then
         log::warn "Log file path not specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # Create logrotate configuration
@@ -95,9 +95,9 @@ system::logging::view() {
     # For systemd-based systems
     if utils::has journalctl; then
         if [[ -n "${service}" ]]; then
-            utils::quiet_err journalctl -u "${service}" -n "${lines}" -f || true
+            utils::attempt journalctl -u "${service}" -n "${lines}" -f
         else
-            utils::quiet_err journalctl -n "${lines}" -f || true
+            utils::attempt journalctl -n "${lines}" -f
         fi
     else
         # For sysvinit systems
@@ -110,10 +110,10 @@ system::logging::view() {
         fi
         
         if [[ -f "${log_file}" ]]; then
-            utils::quiet_err tail -n "${lines}" "${log_file}" || true
+            utils::attempt tail -n "${lines}" "${log_file}"
         else
             log::warn "Log file ${log_file} not found"
-            return 1
+            return "${E_ERROR}"
         fi
     fi
 }
@@ -129,25 +129,25 @@ system::logging::remote() {
     
     if [[ -z "${server_ip}" ]]; then
         log::warn "Remote log server IP not specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # For rsyslog
     if [[ -f "/etc/rsyslog.conf" ]]; then
         # Add remote logging configuration
-        echo "*.* @${server_ip}:${server_port}" >> /etc/rsyslog.conf
+        io::files::append /etc/rsyslog.conf "*.* @${server_ip}:${server_port}"
         
         # Restart rsyslog to apply changes
         if utils::has systemctl; then
-            utils::quiet_err systemctl restart rsyslog || true
+            utils::attempt systemctl restart rsyslog
         elif utils::has service; then
-            utils::quiet_err service rsyslog restart || true
+            utils::attempt service rsyslog restart
         fi
         
         log::info "Remote logging configured to ${server_ip}:${server_port}"
     else
         log::warn "RSyslog configuration file not found"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -161,17 +161,17 @@ system::logging::audit() {
     if [[ "${enable}" == "true" ]]; then
         # Install auditd if not present
         if utils::has apt; then
-            utils::quiet_err apt install -y auditd || true
+            utils::attempt apt install -y auditd
         elif utils::has yum; then
-            utils::quiet_err yum install -y audit || true
+            utils::attempt yum install -y audit
         elif utils::has dnf; then
-            utils::quiet_err dnf install -y audit || true
+            utils::attempt dnf install -y audit
         fi
         
         # Enable and start auditd service
         if utils::has systemctl; then
-            utils::quiet_err systemctl enable auditd || true
-            utils::quiet_err systemctl start auditd || true
+            utils::attempt systemctl enable auditd
+            utils::attempt systemctl start auditd
         fi
         
         # Basic audit rules
@@ -191,19 +191,19 @@ EOF
         
         # Load audit rules
         if utils::has augenrules; then
-            utils::quiet_err augenrules --load || true
+            utils::attempt augenrules --load
         fi
         
         log::info "Audit logging enabled"
     else
         # Stop and disable auditd service
         if utils::has systemctl; then
-            utils::quiet_err systemctl stop auditd || true
-            utils::quiet_err systemctl disable auditd || true
+            utils::attempt systemctl stop auditd
+            utils::attempt systemctl disable auditd
         fi
         
         # Remove BS audit rules
-        utils::quiet_err rm -f /etc/audit/rules.d/BS.rules || true
+        utils::attempt rm -f /etc/audit/rules.d/BS.rules
         
         log::info "Audit logging disabled"
     fi
@@ -224,7 +224,7 @@ system::logging::permissions() {
     
     if [[ -z "${log_file}" ]]; then
         log::warn "Log file path not specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # Set default group if not specified
@@ -238,12 +238,12 @@ system::logging::permissions() {
     
     # Set permissions
     if [[ -f "${log_file}" ]]; then
-        utils::quiet_err chmod "${permissions}" "${log_file}" || true
-        utils::quiet_err chown "${owner}:${group}" "${log_file}" || true
+        utils::attempt chmod "${permissions}" "${log_file}"
+        utils::attempt chown "${owner}:${group}" "${log_file}"
         log::info "Permissions set for ${log_file}: ${permissions}, owner: ${owner}, group: ${group}"
     else
         log::warn "Log file ${log_file} not found"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -258,11 +258,11 @@ system::logging::clean() {
     
     if [[ ! -d "${directory}" ]]; then
         log::warn "Directory ${directory} not found"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # Find and remove old log files
-    utils::quiet_err find "${directory}" -name "*.log.*" -type f -mtime +${age} -delete || true
+    utils::attempt find "${directory}" -name "*.log.*" -type f -mtime +${age} -delete
     
     log::info "Old log files cleaned from ${directory} (older than ${age} days)"
 }

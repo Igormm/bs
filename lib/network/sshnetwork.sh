@@ -39,13 +39,13 @@
 # @author BS Framework
 # @since 2026-01-06
 # @version 1.0.0
-# @depends core/const, core/logger, core/utils, core/errorhandler, lib/system/platformcheck
+# @depends core/const, core/logger, core/utils, core/errorhandler, lib/system/platformcheck, lib/io/files
 
 # Source Guard / Защита от повторной загрузки
 bs::guard "NETWORK_SSH" || return 0
 
 # Зависимости / Dependencies
-bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/errorhandler.sh" "../system/platformcheck.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/errorhandler.sh" "../system/platformcheck.sh" "../io/files.sh"
 
 # SSH Network configuration constants
 readonly SSH_NETWORK_CONFIG_DIR="${HOME}/.config/sshnetwork"
@@ -102,36 +102,9 @@ sshnetwork::check_dependencies() {
     local missing_deps=()
     
     log::debug "Checking SSH Network dependencies..."
-    
-    # Check for ssh
-    if ! utils::has ssh; then
-        missing_deps+=("openssh-client")
-    fi
-    
-    # Check for scp
-    if ! utils::has scp; then
-        missing_deps+=("openssh-client")
-    fi
-    
-    # Check for rsync
-    if ! utils::has rsync; then
-        missing_deps+=("rsync")
-    fi
-    
-    # Check for nmap
-    if ! utils::has nmap; then
-        missing_deps+=("nmap")
-    fi
-    
-    # Check for ping
-    if ! utils::has ping; then
-        missing_deps+=("iputils-ping")
-    fi
-    
-    # Check for ssh-keygen
-    if ! utils::has ssh-keygen; then
-        missing_deps+=("openssh-client")
-    fi
+
+    deps::missing_tools missing_deps \
+        ssh:openssh-client scp:openssh-client rsync nmap ping:iputils-ping ssh-keygen:openssh-client
     
     # Install missing dependencies based on platform
     if [[ ${#missing_deps[@]} -gt 0 ]]; then
@@ -215,7 +188,7 @@ sshnetwork::discover_devices() {
     
     if [[ -z "${nmap_output}" ]]; then
         log::warn "No SSH devices found in network: ${network_range}"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # Parse nmap output
@@ -278,7 +251,7 @@ sshnetwork::get_local_network() {
         fi
     done
     
-    return 1
+    return "${E_ERROR}"
 }
 
 # Test SSH connection
@@ -315,13 +288,13 @@ sshnetwork::save_discovered_devices() {
     fi
     
     local timestamp
-    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    timestamp=$(utils::log_stamp)
     
-    echo "# SSH Network Discovery - ${timestamp}" >> "${SSH_NETWORK_KNOWN_HOSTS_FILE}"
+    io::files::append "${SSH_NETWORK_KNOWN_HOSTS_FILE}" "# SSH Network Discovery - ${timestamp}"
     for device in "${SSH_NETWORK_DISCOVERED_DEVICES[@]}"; do
-        echo "${device}" >> "${SSH_NETWORK_KNOWN_HOSTS_FILE}"
+        io::files::append "${SSH_NETWORK_KNOWN_HOSTS_FILE}" "${device}"
     done
-    echo "" >> "${SSH_NETWORK_KNOWN_HOSTS_FILE}"
+    io::files::append "${SSH_NETWORK_KNOWN_HOSTS_FILE}" ""
     
     log::debug "Saved ${#SSH_NETWORK_DISCOVERED_DEVICES[@]} devices to known hosts file"
 }
@@ -331,7 +304,7 @@ sshnetwork::load_known_devices() {
     local func_name="sshnetwork::load_known_devices"
     
     if [[ ! -f "${SSH_NETWORK_KNOWN_HOSTS_FILE}" ]]; then
-        return 1
+        return "${E_ERROR}"
     fi
     
     SSH_NETWORK_DISCOVERED_DEVICES=()
@@ -565,7 +538,7 @@ sshnetwork::execute_batch() {
     
     if [[ ${#failed_hosts[@]} -gt 0 ]]; then
         log::warn "Failed hosts: ${failed_hosts[*]}"
-        return 1
+        return "${E_ERROR}"
     fi
     
     return 0
@@ -635,7 +608,7 @@ sshnetwork::monitor_network() {
     
     while true; do
         local timestamp
-        timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+        timestamp=$(utils::log_stamp)
         
         echo "[${timestamp}] Network Status Check"
         
@@ -777,9 +750,9 @@ sshnetwork::log_activity() {
     fi
     
     local timestamp
-    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    timestamp=$(utils::log_stamp)
     
-    echo "[${timestamp}] ${message}" >> "${SSH_NETWORK_LOG_FILE}"
+    io::files::append "${SSH_NETWORK_LOG_FILE}" "[${timestamp}] ${message}"
 }
 
 # Get network statistics

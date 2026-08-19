@@ -44,7 +44,7 @@
 
 # @version 1.0.0
 
-# @depends core/const, core/logger, core/utils, core/errorhandler, lib/system/platformcheck
+# @depends core/const, core/logger, core/utils, core/errorhandler, lib/system/platformcheck, lib/system/processes
 
 # Source Guard / Защита от повторной загрузки
 
@@ -53,7 +53,7 @@ bs::guard "STATUS_PS1" || return 0
 
 # Зависимости / Dependencies
 
-bs::source_relative "../../core/const.sh"
+bs::source_relative "../../core/const.sh" "../system/processes.sh"
 
 bs::source_relative "../../core/logger.sh"
 
@@ -202,23 +202,8 @@ ps1status::check_dependencies() {
 
     log::debug "Checking PS1 Status dependencies..."
 
-    
-
-    # Check for basic network tools
-
-    if ! utils::has ping; then
-
-        missing_deps+=("iputils-ping")
-
-    fi
-
-    
-
-    if ! utils::has curl; then
-
-        missing_deps+=("curl")
-
-    fi
+    deps::missing_tools missing_deps \
+        ping:iputils-ping curl
 
     
 
@@ -875,7 +860,7 @@ ps1status::speed::update() {
 # current_time - локальная переменная для этой функции
 # current_time - local variable for this function
 #
-    local current_time=$(date +%s)
+    local current_time=$(utils::now_s)
 
     
 
@@ -900,7 +885,7 @@ ps1status::speed::update() {
 # start_time - локальная переменная для этой функции
 # start_time - local variable for this function
 #
-    local start_time=$(date +%s.%N)
+    local start_time=$(utils::now_float)
 
     
 
@@ -911,7 +896,7 @@ ps1status::speed::update() {
 # end_time - локальная переменная для этой функции
 # end_time - local variable for this function
 #
-        local end_time=$(date +%s.%N)
+        local end_time=$(utils::now_float)
 
 #
 # ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
@@ -1823,7 +1808,7 @@ ps1status::equalizer::get_status() {
 
         if utils::quiet_err systemctl --user is-active --quiet pulseeffects || \
 
-           utils::quiet pgrep -x "pulseeffects"; then
+           system::processes::is_running "pulseeffects"; then
 
             echo -e "${PS1_STATUS_COLOR_AUDIO_ON}EQ♪${PS1_STATUS_COLOR_RESET}"
 
@@ -1856,7 +1841,7 @@ ps1status::equalizer::toggle() {
 
     if utils::has pulseeffects; then
 
-        if utils::quiet pgrep -x "pulseeffects"; then
+        if system::processes::is_running "pulseeffects"; then
 
             pkill pulseeffects
 

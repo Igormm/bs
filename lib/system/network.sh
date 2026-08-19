@@ -2,13 +2,13 @@
 # shellcheck shell=bash
 # network.sh — Network configuration for system setup / Конфигурация сети для настройки
 # системы
-# @depends core/const, core/logger, core/utils
+# @depends core/const, core/logger, core/utils, lib/io/files
 
 # Source Guard / Защита от повторной загрузки
 bs::guard "SYSTEM_NETWORK" || return 0
 
 # Зависимости / Dependencies
-bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../io/files.sh"
 
 # @description Configure network interface / Настроить сетевой интерфейс
 # @param $1 Interface name (e.g., "eth0", "wlan0") / Имя интерфейса (например, "eth0",
@@ -22,51 +22,51 @@ system::network::interface() {
     
     if [[ -z "${interface}" ]]; then
         log::warn "Interface name not specified"
-        return 1
+        return "${E_INVALID}"
     fi
     
     # Using ip command (modern approach) / Использование команды ip (современный подход)
     if utils::has ip; then
         case "${action}" in
             up)
-                utils::quiet_err ip link set "${interface}" up || true
+                utils::attempt ip link set "${interface}" up
                 log::info "Interface ${interface} brought up"
                 ;;
             down)
-                utils::quiet_err ip link set "${interface}" down || true
+                utils::attempt ip link set "${interface}" down
                 log::info "Interface ${interface} brought down"
                 ;;
             restart)
-                utils::quiet_err ip link set "${interface}" down || true
+                utils::attempt ip link set "${interface}" down
                 sleep 1
-                utils::quiet_err ip link set "${interface}" up || true
+                utils::attempt ip link set "${interface}" up
                 log::info "Interface ${interface} restarted"
                 ;;
             *)
                 log::warn "Unknown action: ${action}"
-                return 1
+                return "${E_INVALID}"
                 ;;
         esac
     else
         # Fallback to ifconfig / Резервный вариант ifconfig
         case "${action}" in
             up)
-                utils::quiet_err ifconfig "${interface}" up || true
+                utils::attempt ifconfig "${interface}" up
                 log::info "Interface ${interface} brought up"
                 ;;
             down)
-                utils::quiet_err ifconfig "${interface}" down || true
+                utils::attempt ifconfig "${interface}" down
                 log::info "Interface ${interface} brought down"
                 ;;
             restart)
-                utils::quiet_err ifconfig "${interface}" down || true
+                utils::attempt ifconfig "${interface}" down
                 sleep 1
-                utils::quiet_err ifconfig "${interface}" up || true
+                utils::attempt ifconfig "${interface}" up
                 log::info "Interface ${interface} restarted"
                 ;;
             *)
                 log::warn "Unknown action: ${action}"
-                return 1
+                return "${E_INVALID}"
                 ;;
         esac
     fi
@@ -85,12 +85,12 @@ system::network::static_ip() {
     
     if [[ -z "${interface}" ]] || [[ -z "${ip_address}" ]]; then
         log::warn "Interface name and IP address must be specified"
-        return 1
+        return "${E_INVALID}"
     fi
     
     # Using ip command / Использование команды ip
     if utils::has ip; then
-        utils::quiet_err ip addr add "${ip_address}" dev "${interface}" || true
+        utils::attempt ip addr add "${ip_address}" dev "${interface}"
         log::info "Static IP ${ip_address} assigned to ${interface}"
     else
         # Fallback to ifconfig / Резервный вариант ifconfig
@@ -107,7 +107,7 @@ system::network::static_ip() {
             netmask="255.0.0.0"
         fi
         
-        utils::quiet_err ifconfig "${interface}" "${ip}" netmask "${netmask}" || true
+        utils::attempt ifconfig "${interface}" "${ip}" netmask "${netmask}"
         log::info "Static IP ${ip} with netmask ${netmask} assigned to ${interface}"
     fi
 }
@@ -121,16 +121,16 @@ system::network::gateway() {
     
     if [[ -z "${gateway}" ]]; then
         log::warn "Gateway IP address not specified"
-        return 1
+        return "${E_INVALID}"
     fi
     
     # Using ip command / Использование команды ip
     if utils::has ip; then
-        utils::quiet_err ip route add default via "${gateway}" || true
+        utils::attempt ip route add default via "${gateway}"
         log::info "Default gateway set to ${gateway}"
     else
         # Fallback to route / Резервный вариант route
-        utils::quiet_err route add default gw "${gateway}" || true
+        utils::attempt route add default gw "${gateway}"
         log::info "Default gateway set to ${gateway}"
     fi
 }
@@ -142,24 +142,24 @@ system::network::gateway() {
 system::network::dns() {
     if [[ $# -eq 0 ]]; then
         log::warn "At least one DNS server must be specified"
-        return 1
+        return "${E_INVALID}"
     fi
     
     # Create or overwrite resolv.conf / Создать или перезаписать resolv.conf
     local resolv_conf="/etc/resolv.conf"
     if [[ -w "${resolv_conf}" ]]; then
         # Clear existing nameservers / Очистить существующие nameserver
-        utils::quiet_err sed -i '/^nameserver/d' "${resolv_conf}" || true
+        utils::attempt sed -i '/^nameserver/d' "${resolv_conf}"
         
         # Add new nameservers / Добавить новые nameserver
         for dns in "$@"; do
-            echo "nameserver ${dns}" >> "${resolv_conf}"
+            io::files::append "${resolv_conf}" "nameserver ${dns}"
         done
         
         log::info "DNS servers configured: $*"
     else
         log::warn "Cannot write to ${resolv_conf}"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -184,15 +184,15 @@ system::network::status() {
     
     if [[ -n "${interface}" ]]; then
         if utils::has ip; then
-            utils::quiet_err ip addr show "${interface}" || true
+            utils::attempt ip addr show "${interface}"
         else
-            utils::quiet_err ifconfig "${interface}" || true
+            utils::attempt ifconfig "${interface}"
         fi
     else
         if utils::has ip; then
-            utils::quiet_err ip addr show || true
+            utils::attempt ip addr show
         else
-            utils::quiet_err ifconfig || true
+            utils::attempt ifconfig
         fi
     fi
 }

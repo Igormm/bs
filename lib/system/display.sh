@@ -31,7 +31,7 @@ system::display::server() {
                 fi
             else
                 log::warn "X11 not installed"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         wayland)
@@ -40,12 +40,12 @@ system::display::server() {
                 log::info "Wayland display server available"
             else
                 log::warn "Wayland not installed"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         *)
             log::warn "Unknown display server type: ${server_type}"
-            return 1
+            return "${E_ERROR}"
             ;;
     esac
     
@@ -71,7 +71,7 @@ system::display::desktop() {
                 fi
             else
                 log::warn "GNOME not installed"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         kde)
@@ -84,7 +84,7 @@ system::display::desktop() {
                 fi
             else
                 log::warn "KDE not installed"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         xfce)
@@ -97,7 +97,7 @@ system::display::desktop() {
                 fi
             else
                 log::warn "XFCE not installed"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         mate)
@@ -110,7 +110,7 @@ system::display::desktop() {
                 fi
             else
                 log::warn "MATE not installed"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         cinnamon)
@@ -123,7 +123,7 @@ system::display::desktop() {
                 fi
             else
                 log::warn "Cinnamon not installed"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         lxde)
@@ -136,7 +136,7 @@ system::display::desktop() {
                 fi
             else
                 log::warn "LXDE not installed"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         none)
@@ -148,7 +148,7 @@ system::display::desktop() {
             ;;
         *)
             log::warn "Unknown desktop environment: ${de}"
-            return 1
+            return "${E_ERROR}"
             ;;
     esac
     
@@ -179,7 +179,7 @@ system::display::manager() {
                 fi
             else
                 log::warn "GDM not installed"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         sddm)
@@ -193,7 +193,7 @@ system::display::manager() {
                 fi
             else
                 log::warn "SDDM not installed"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         lightdm)
@@ -207,7 +207,7 @@ system::display::manager() {
                 fi
             else
                 log::warn "LightDM not installed"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         lxdm)
@@ -221,7 +221,7 @@ system::display::manager() {
                 fi
             else
                 log::warn "LXDM not installed"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         none)
@@ -234,7 +234,7 @@ system::display::manager() {
             ;;
         *)
             log::warn "Unknown display manager: ${dm}"
-            return 1
+            return "${E_ERROR}"
             ;;
     esac
     
@@ -252,7 +252,7 @@ system::display::resolution() {
     
     if [[ -z "${resolution}" ]]; then
         log::warn "Resolution not specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # For X11 systems
@@ -275,7 +275,7 @@ system::display::resolution() {
         log::info "Display resolution set to ${resolution}"
     else
         log::warn "xrandr not available, cannot set resolution"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -290,7 +290,7 @@ system::display::refresh() {
     
     if [[ -z "${rate}" ]]; then
         log::warn "Refresh rate not specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # For X11 systems
@@ -313,7 +313,7 @@ system::display::refresh() {
         log::info "Display refresh rate set to ${rate}Hz"
     else
         log::warn "xrandr not available, cannot set refresh rate"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -326,7 +326,7 @@ system::display::list_modes() {
         utils::quiet_err xrandr --query || :
     else
         log::warn "xrandr not available, cannot list display modes"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -368,11 +368,11 @@ system::display::multi() {
                 ;;
             *)
                 log::warn "Unknown layout: ${layout}"
-                return 1
+                return "${E_ERROR}"
                 ;;
         esac
     else
         log::warn "xrandr not available, cannot configure multiple displays"
-        return 1
+        return "${E_ERROR}"
     fi
 }

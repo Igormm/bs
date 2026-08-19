@@ -544,4 +544,4 @@ io::streams::list_fds() {
 # shellcheck disable=SC2034
 declare -g IO_STREAMS_LOADED="1"
 
-utils::quiet_err log::debug "IO streams module initialized, version: ${IO_STREAMS_VERSION}" || true
+log::debug "IO streams module initialized, version: ${IO_STREAMS_VERSION}"

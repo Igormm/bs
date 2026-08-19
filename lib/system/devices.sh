@@ -22,7 +22,7 @@ system::devices::mouse() {
     
     if [[ -z "${setting}" ]] || [[ -z "${value}" ]]; then
         log::warn "Mouse setting and value must be specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # For X11 systems / Для систем X11
@@ -60,12 +60,12 @@ system::devices::mouse() {
                 ;;
             *)
                 log::warn "Unknown mouse setting: ${setting}"
-                return 1
+                return "${E_ERROR}"
                 ;;
         esac
     else
         log::warn "xinput not available, cannot configure mouse"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -80,7 +80,7 @@ system::devices::keyboard() {
     
     if [[ -z "${setting}" ]] || [[ -z "${value}" ]]; then
         log::warn "Keyboard setting and value must be specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     case "${setting}" in
@@ -93,7 +93,7 @@ system::devices::keyboard() {
                 log::info "Keyboard repeat rate set to ${value}"
             else
                 log::warn "xset not available, cannot set keyboard repeat rate"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         repeat-delay)
@@ -101,26 +101,26 @@ system::devices::keyboard() {
             if utils::has xset; then
                 # Get current rate
                 local rate=$(utils::quiet_err xset q | grep rate | awk '{print $5}')
-                utils::quiet_err xset r rate "${value}" "${rate}" || true
+                utils::attempt xset r rate "${value}" "${rate}"
                 log::info "Keyboard repeat delay set to ${value}"
             else
                 log::warn "xset not available, cannot set keyboard repeat delay"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         layout)
             # Set keyboard layout
             if utils::has setxkbmap; then
-                utils::quiet_err setxkbmap "${value}" || true
+                utils::attempt setxkbmap "${value}"
                 log::info "Keyboard layout set to ${value}"
             else
                 log::warn "setxkbmap not available, cannot set keyboard layout"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         *)
             log::warn "Unknown keyboard setting: ${setting}"
-            return 1
+            return "${E_ERROR}"
             ;;
     esac
 }
@@ -136,7 +136,7 @@ system::devices::touchpad() {
     
     if [[ -z "${setting}" ]] || [[ -z "${value}" ]]; then
         log::warn "Touchpad setting and value must be specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # For X11 systems with libinput
@@ -153,32 +153,32 @@ system::devices::touchpad() {
             tap-to-click)
                 # Enable/disable tap to click
                 for touchpad in ${touchpads}; do
-                    utils::quiet_err xinput set-prop "${touchpad}" "libinput Tapping Enabled" "${bool_value}" || true
+                    utils::attempt xinput set-prop "${touchpad}" "libinput Tapping Enabled" "${bool_value}"
                 done
                 log::info "Touchpad tap-to-click set to ${value}"
                 ;;
             natural-scroll)
                 # Enable/disable natural scrolling
                 for touchpad in ${touchpads}; do
-                    utils::quiet_err xinput set-prop "${touchpad}" "libinput Natural Scrolling Enabled" "${bool_value}" || true
+                    utils::attempt xinput set-prop "${touchpad}" "libinput Natural Scrolling Enabled" "${bool_value}"
                 done
                 log::info "Touchpad natural scrolling set to ${value}"
                 ;;
             disable-while-typing)
                 # Enable/disable disable-while-typing
                 for touchpad in ${touchpads}; do
-                    utils::quiet_err xinput set-prop "${touchpad}" "libinput Disable While Typing Enabled" "${bool_value}" || true
+                    utils::attempt xinput set-prop "${touchpad}" "libinput Disable While Typing Enabled" "${bool_value}"
                 done
                 log::info "Touchpad disable-while-typing set to ${value}"
                 ;;
             *)
                 log::warn "Unknown touchpad setting: ${setting}"
-                return 1
+                return "${E_ERROR}"
                 ;;
         esac
     else
         log::warn "xinput not available, cannot configure touchpad"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -188,18 +188,18 @@ system::devices::touchpad() {
 system::devices::list() {
     # For X11 systems
     if utils::has xinput; then
-        utils::quiet_err xinput list || true
+        utils::attempt xinput list
     else
         # Fallback to lsinput if available
         if utils::has lsinput; then
-            utils::quiet_err lsinput || true
+            utils::attempt lsinput
         else
             # Fallback to /proc/bus/input/devices
             if [[ -f "/proc/bus/input/devices" ]]; then
-                utils::quiet_err cat /proc/bus/input/devices || true
+                utils::attempt cat /proc/bus/input/devices
             else
                 log::warn "No method available to list input devices"
-                return 1
+                return "${E_ERROR}"
             fi
         fi
     fi
@@ -216,7 +216,7 @@ system::devices::audio() {
     
     if [[ -z "${setting}" ]] || [[ -z "${value}" ]]; then
         log::warn "Audio setting and value must be specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # For systems with PulseAudio
@@ -224,27 +224,27 @@ system::devices::audio() {
         case "${setting}" in
             volume)
                 # Set volume
-                utils::quiet_err pactl set-sink-volume @DEFAULT_SINK@ "${value}%" || true
+                utils::attempt pactl set-sink-volume @DEFAULT_SINK@ "${value}%"
                 log::info "Audio volume set to ${value}%"
                 ;;
             mute)
                 # Mute/unmute
                 if [[ "${value}" == "true" ]] || [[ "${value}" == "1" ]]; then
-                    utils::quiet_err pactl set-sink-mute @DEFAULT_SINK@ 1 || true
+                    utils::attempt pactl set-sink-mute @DEFAULT_SINK@ 1
                     log::info "Audio muted"
                 else
-                    utils::quiet_err pactl set-sink-mute @DEFAULT_SINK@ 0 || true
+                    utils::attempt pactl set-sink-mute @DEFAULT_SINK@ 0
                     log::info "Audio unmuted"
                 fi
                 ;;
             output-device)
                 # Set output device
-                utils::quiet_err pactl set-default-sink "${value}" || true
+                utils::attempt pactl set-default-sink "${value}"
                 log::info "Audio output device set to ${value}"
                 ;;
             *)
                 log::warn "Unknown audio setting: ${setting}"
-                return 1
+                return "${E_ERROR}"
                 ;;
         esac
     # For systems with ALSA
@@ -252,27 +252,27 @@ system::devices::audio() {
         case "${setting}" in
             volume)
                 # Set volume
-                utils::quiet_err amixer set Master "${value}%" || true
+                utils::attempt amixer set Master "${value}%"
                 log::info "Audio volume set to ${value}%"
                 ;;
             mute)
                 # Mute/unmute
                 if [[ "${value}" == "true" ]] || [[ "${value}" == "1" ]]; then
-                    utils::quiet_err amixer set Master mute || true
+                    utils::attempt amixer set Master mute
                     log::info "Audio muted"
                 else
-                    utils::quiet_err amixer set Master unmute || true
+                    utils::attempt amixer set Master unmute
                     log::info "Audio unmuted"
                 fi
                 ;;
             *)
                 log::warn "Unknown audio setting: ${setting}"
-                return 1
+                return "${E_ERROR}"
                 ;;
         esac
     else
         log::warn "No audio control utility available"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -287,7 +287,7 @@ system::devices::display() {
     
     if [[ -z "${setting}" ]] || [[ -z "${value}" ]]; then
         log::warn "Display setting and value must be specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     case "${setting}" in
@@ -300,7 +300,7 @@ system::devices::display() {
                 if [[ -n "${primary}" ]]; then
                     # xrandr uses values from 0.0 to 1.0
                     local brightness=$(echo "scale=2; ${value}/100" | utils::quiet_err bc || echo "0.${value}")
-                    utils::quiet_err xrandr --output "${primary}" --brightness "${brightness}" || true
+                    utils::attempt xrandr --output "${primary}" --brightness "${brightness}"
                     log::info "Display brightness set to ${value}%"
                 fi
             # Try sysfs
@@ -308,36 +308,36 @@ system::devices::display() {
                 # Calculate value based on max_brightness
                 local max_brightness=$(cat /sys/class/backlight/intel_backlight/max_brightness)
                 local brightness=$(echo "${value} * ${max_brightness} / 100" | utils::quiet_err bc || echo $((value * max_brightness / 100)))
-                utils::quiet_err echo "${brightness}" > /sys/class/backlight/intel_backlight/brightness || true
+                utils::attempt echo "${brightness}" > /sys/class/backlight/intel_backlight/brightness
                 log::info "Display brightness set to ${value}%"
             else
                 log::warn "No method available to set display brightness"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         primary)
             # Set primary display
             if utils::has xrandr; then
-                utils::quiet_err xrandr --output "${value}" --primary || true
+                utils::attempt xrandr --output "${value}" --primary
                 log::info "Primary display set to ${value}"
             else
                 log::warn "xrandr not available, cannot set primary display"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         off)
             # Turn off display
             if utils::has xrandr; then
-                utils::quiet_err xrandr --output "${value}" --off || true
+                utils::attempt xrandr --output "${value}" --off
                 log::info "Display ${value} turned off"
             else
                 log::warn "xrandr not available, cannot turn off display"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         *)
             log::warn "Unknown display setting: ${setting}"
-            return 1
+            return "${E_ERROR}"
             ;;
     esac
 }

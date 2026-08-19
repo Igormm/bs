@@ -410,7 +410,7 @@ args::parse() {
     fi
 
     if [[ ${#__ARGS_TREE[@]} -eq 0 ]] && [[ ${#__ARGS_FLAGS[@]} -eq 0 ]]; then
-        log::error "args::parse: parameter tree is empty, call args::define, args::level or args::flag first" >&2
+        log::error "args::parse: parameter tree is empty, call args::define, args::level or args::flag first"
         return "${E_ERROR:-1}"
     fi
 
@@ -442,7 +442,7 @@ args::parse() {
 
             # Неизвестный флаг / Unknown flag
             if [[ -z "${__ARGS_FLAGS["${flag_name}"]:-}" ]]; then
-                printf 'ERROR: unknown flag: "--%s"\n' "${flag_name}" >&2
+                log::error "unknown flag: \"--${flag_name}\""
                 args::help >&2
                 return "${E_INVALID:-2}"
             fi
@@ -455,7 +455,7 @@ args::parse() {
                 else
                     ((++i))
                     if [[ ${i} -ge ${argc} ]]; then
-                        printf 'ERROR: flag "--%s" requires a value\n' "${flag_name}" >&2
+                        log::error "flag \"--${flag_name}\" requires a value"
                         args::help >&2
                         return "${E_INVALID:-2}"
                     fi
@@ -464,7 +464,7 @@ args::parse() {
             else
                 # bool-флаг не принимает значение / bool flag takes no value
                 if [[ "${has_inline}" == "true" ]]; then
-                    printf 'ERROR: flag "--%s" does not take a value\n' "${flag_name}" >&2
+                    log::error "flag \"--${flag_name}\" does not take a value"
                     args::help >&2
                     return "${E_INVALID:-2}"
                 fi
@@ -481,8 +481,7 @@ args::parse() {
         # Параметров больше, чем уровней в дереве
         # More parameters than tree levels
         if [[ "${position}" -gt "${max_level}" ]]; then
-            printf 'ERROR: too many parameters: "%s" is beyond level %d\n' \
-                "${param}" "${max_level}" >&2
+            log::error "too many parameters: \"${param}\" is beyond level ${max_level}"
             args::help >&2
             return "${E_INVALID:-2}"
         fi
@@ -499,10 +498,9 @@ args::parse() {
         local real_level
         real_level="$(args::__level_of "${param}")"
         if [[ -n "${real_level}" ]]; then
-            printf 'ERROR: parameter "%s" belongs to level %s, but was used at level %d\n' \
-                "${param}" "${real_level}" "${position}" >&2
+            log::error "parameter \"${param}\" belongs to level ${real_level}, but was used at level ${position}"
         else
-            printf 'ERROR: unknown parameter: "%s"\n' "${param}" >&2
+            log::error "unknown parameter: \"${param}\""
         fi
         args::help >&2
         return "${E_INVALID:-2}"

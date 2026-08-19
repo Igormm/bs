@@ -28,7 +28,7 @@ safety::set_level() {
             ;;
         *)
             log::error "Invalid safety level: ${level}. Use: paranoid, strict, normal, relaxed"
-            return 1
+            return "${E_ERROR}"
             ;;
     esac
 }
@@ -48,7 +48,7 @@ safety::dry_run() {
             ;;
         *)
             log::error "Invalid dry-run value: ${enable}. Use: true, false"
-            return 1
+            return "${E_ERROR}"
             ;;
     esac
 }
@@ -120,7 +120,7 @@ safety::execute() {
     if safety::needs_confirmation "${risk}"; then
         if ! safety::confirm "${description}"; then
             log::info "Operation cancelled by user"
-            return 1
+            return "${E_ERROR}"
         fi
     fi
 
@@ -156,7 +156,7 @@ safety::validate_path() {
     for dangerous in "${dangerous_paths[@]}"; do
         if [[ "${path}" == "${dangerous}" ]]; then
             log::error "Dangerous path: ${path} (system directory)"
-            return 1
+            return "${E_ERROR}"
         fi
     done
 
@@ -164,7 +164,7 @@ safety::validate_path() {
     # для записи
     if [[ -e "${path}" && ! -w "${path}" ]]; then
         log::error "Path not writable: ${path}"
-        return 1
+        return "${E_ERROR}"
     fi
 
     return 0

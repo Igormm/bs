@@ -2,13 +2,13 @@
 # shellcheck shell=bash
 # security.sh — Security configuration for system setup / Конфигурация безопасности для
 # настройки системы
-# @depends core/const, core/logger, core/utils
+# @depends core/const, core/logger, core/utils, lib/io/files
 
 # Source Guard / Защита от повторной загрузки
 bs::guard "SYSTEM_SECURITY" || return 0
 
 # Зависимости / Dependencies
-bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../io/files.sh"
 
 # @description Set up firewall with basic rules / Настроить файрвол с базовыми правилами
 # @param $1 Action ("enable", "disable", "status") / Действие ("enable", "disable",
@@ -34,7 +34,7 @@ system::security::firewall() {
                 ;;
             *)
                 log::warn "Unknown action: ${action}"
-                return 1
+                return "${E_ERROR}"
                 ;;
         esac
     # Try firewalld (RedHat/CentOS/Fedora) / Попробовать firewalld (RedHat/CentOS/Fedora)
@@ -55,7 +55,7 @@ system::security::firewall() {
                 ;;
             *)
                 log::warn "Unknown action: ${action}"
-                return 1
+                return "${E_ERROR}"
                 ;;
         esac
     # Try iptables / Попробовать iptables
@@ -83,12 +83,12 @@ system::security::firewall() {
                 ;;
             *)
                 log::warn "Unknown action: ${action}"
-                return 1
+                return "${E_ERROR}"
                 ;;
         esac
     else
         log::warn "No supported firewall found"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -204,7 +204,7 @@ APT::Periodic::Unattended-Upgrade "1";' > /etc/apt/apt.conf.d/20auto-upgrades 2>
         fi
     else
         log::warn "Automatic security updates not supported on this system"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -253,7 +253,7 @@ system::security::password_policy() {
     if [[ -f "/etc/pam.d/common-password" ]]; then
         # For Debian/Ubuntu systems
         if ! grep -q "pam_pwquality.so" /etc/pam.d/common-password; then
-            echo "password requisite pam_pwquality.so retry=3 minlen=8 difok=3 ucredit=-1 lcredit=-1 dcredit=-1 ocredit=-1" >> /etc/pam.d/common-password
+            io::files::append /etc/pam.d/common-password "password requisite pam_pwquality.so retry=3 minlen=8 difok=3 ucredit=-1 lcredit=-1 dcredit=-1 ocredit=-1"
         fi
     elif [[ -f "/etc/pam.d/system-auth" ]]; then
         # For RedHat/CentOS systems

@@ -24,13 +24,13 @@ system::users::create() {
     
     if [[ -z "${username}" ]]; then
         log::warn "Username not specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # Check if user already exists / Проверить, существует ли пользователь
     if utils::quiet id "${username}"; then
         log::warn "User ${username} already exists"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # Try useradd (most common) / Попробовать useradd (наиболее распространенный)
@@ -40,7 +40,7 @@ system::users::create() {
             return 0
         else
             log::error "Failed to create user ${username}"
-            return 1
+            return "${E_ERROR}"
         fi
     # Fallback to adduser (some Debian-based systems) / Резервный вариант adduser
     # (некоторые Debian-системы)
@@ -50,11 +50,11 @@ system::users::create() {
             return 0
         else
             log::error "Failed to create user ${username}"
-            return 1
+            return "${E_ERROR}"
         fi
     else
         log::error "No suitable command found to create user (useradd/adduser)"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -71,13 +71,13 @@ system::users::delete() {
     
     if [[ -z "${username}" ]]; then
         log::warn "Username not specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # Check if user exists / Проверить, существует ли пользователь
     if ! utils::quiet id "${username}"; then
         log::warn "User ${username} does not exist"
-        return 1
+        return "${E_ERROR}"
     fi
     
     local remove_flag=""
@@ -91,11 +91,11 @@ system::users::delete() {
             return 0
         else
             log::error "Failed to delete user ${username}"
-            return 1
+            return "${E_ERROR}"
         fi
     else
         log::error "userdel command not found"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -115,12 +115,12 @@ system::users::set_password() {
     
     if [[ -z "${username}" ]]; then
         log::warn "Username not specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if ! utils::quiet id "${username}"; then
         log::warn "User ${username} does not exist"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if utils::has chpasswd; then
@@ -131,7 +131,7 @@ system::users::set_password() {
                 return 0
             else
                 log::error "Failed to change password for ${username}"
-                return 1
+                return "${E_ERROR}"
             fi
         else
             # Interactive password change / Интерактивное изменение пароля
@@ -140,7 +140,7 @@ system::users::set_password() {
                 return 0
             else
                 log::error "Failed to change password for ${username}"
-                return 1
+                return "${E_ERROR}"
             fi
         fi
     elif utils::has passwd; then
@@ -158,11 +158,11 @@ system::users::set_password() {
             return 0
         else
             log::error "Failed to change password for ${username}"
-            return 1
+            return "${E_ERROR}"
         fi
     else
         log::error "No suitable command found to change password (chpasswd/passwd)"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -177,17 +177,17 @@ system::users::add_to_group() {
     
     if [[ -z "${username}" ]] || [[ -z "${group}" ]]; then
         log::warn "Username and group must be specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if ! utils::quiet id "${username}"; then
         log::warn "User ${username} does not exist"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if ! utils::quiet getent group "${group}"; then
         log::warn "Group ${group} does not exist"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if utils::has usermod; then
@@ -196,7 +196,7 @@ system::users::add_to_group() {
             return 0
         else
             log::error "Failed to add ${username} to group ${group}"
-            return 1
+            return "${E_ERROR}"
         fi
     elif utils::has gpasswd; then
         if utils::quiet_err gpasswd -a "${username}" "${group}"; then
@@ -204,11 +204,11 @@ system::users::add_to_group() {
             return 0
         else
             log::error "Failed to add ${username} to group ${group}"
-            return 1
+            return "${E_ERROR}"
         fi
     else
         log::error "No suitable command found (usermod/gpasswd)"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -222,7 +222,7 @@ system::users::list() {
         cut -d: -f1 /etc/passwd | sort
     else
         log::error "Cannot list users (getent or /etc/passwd not available)"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -235,12 +235,12 @@ system::users::info() {
     
     if [[ -z "${username}" ]]; then
         log::warn "Username not specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if ! utils::quiet id "${username}"; then
         log::warn "User ${username} does not exist"
-        return 1
+        return "${E_ERROR}"
     fi
     
     local info
@@ -274,12 +274,12 @@ system::users::lock() {
     
     if [[ -z "${username}" ]]; then
         log::warn "Username not specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if ! utils::quiet id "${username}"; then
         log::warn "User ${username} does not exist"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if utils::has usermod; then
@@ -288,7 +288,7 @@ system::users::lock() {
             return 0
         else
             log::error "Failed to lock user ${username}"
-            return 1
+            return "${E_ERROR}"
         fi
     elif utils::has passwd; then
         if utils::quiet_err passwd -l "${username}"; then
@@ -296,11 +296,11 @@ system::users::lock() {
             return 0
         else
             log::error "Failed to lock user ${username}"
-            return 1
+            return "${E_ERROR}"
         fi
     else
         log::error "No suitable command found to lock user"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -313,12 +313,12 @@ system::users::unlock() {
     
     if [[ -z "${username}" ]]; then
         log::warn "Username not specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if ! utils::quiet id "${username}"; then
         log::warn "User ${username} does not exist"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if utils::has usermod; then
@@ -327,7 +327,7 @@ system::users::unlock() {
             return 0
         else
             log::error "Failed to unlock user ${username}"
-            return 1
+            return "${E_ERROR}"
         fi
     elif utils::has passwd; then
         if utils::quiet_err passwd -u "${username}"; then
@@ -335,11 +335,11 @@ system::users::unlock() {
             return 0
         else
             log::error "Failed to unlock user ${username}"
-            return 1
+            return "${E_ERROR}"
         fi
     else
         log::error "No suitable command found to unlock user"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -352,12 +352,12 @@ system::users::group_create() {
     
     if [[ -z "${groupname}" ]]; then
         log::warn "Group name not specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if utils::quiet getent group "${groupname}"; then
         log::warn "Group ${groupname} already exists"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if utils::has groupadd; then
@@ -366,11 +366,11 @@ system::users::group_create() {
             return 0
         else
             log::error "Failed to create group ${groupname}"
-            return 1
+            return "${E_ERROR}"
         fi
     else
         log::error "groupadd command not found"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -383,12 +383,12 @@ system::users::group_delete() {
     
     if [[ -z "${groupname}" ]]; then
         log::warn "Group name not specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if ! utils::quiet getent group "${groupname}"; then
         log::warn "Group ${groupname} does not exist"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if utils::has groupdel; then
@@ -397,11 +397,11 @@ system::users::group_delete() {
             return 0
         else
             log::error "Failed to delete group ${groupname}"
-            return 1
+            return "${E_ERROR}"
         fi
     else
         log::error "groupdel command not found"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -415,7 +415,7 @@ system::users::group_list() {
         cut -d: -f1 /etc/group | sort
     else
         log::error "Cannot list groups (getent or /etc/group not available)"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 

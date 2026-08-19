@@ -76,31 +76,14 @@ dataprocessor::check_dependencies() {
     local missing_deps=()
     
     log::debug "Checking Data Processor dependencies..."
-    
-    # Check for jq (JSON)
-    if ! utils::has jq; then
-        missing_deps+=("jq")
-    fi
-    
-    # Check for xmllint (XML)
-    if ! utils::has xmllint; then
-        missing_deps+=("libxml2-utils")
-    fi
-    
-    # Check for xmlstarlet (XPath)
-    if ! utils::has xmlstarlet; then
-        missing_deps+=("xmlstarlet")
-    fi
+
+    deps::missing_tools missing_deps \
+        jq xmllint:libxml2-utils xmlstarlet python3
     
     # Check for csvkit (CSV)
     if ! utils::has csvkit; then
         # csvkit is optional, we'll provide fallback
         log::debug "csvkit not found - CSV functionality will be limited"
-    fi
-    
-    # Check for python3 (for advanced XPath)
-    if ! utils::has python3; then
-        missing_deps+=("python3")
     fi
     
     # Install missing dependencies

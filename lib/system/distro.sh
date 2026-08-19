@@ -243,7 +243,7 @@ system::distro::package_command() {
 system::distro::install_package() {
     if [[ $# -eq 0 ]]; then
         log::warn "No packages specified"
-        return 1
+        return "${E_ERROR}"
     fi
 
     # Detect if not already done / Определить если еще не сделано
@@ -264,7 +264,7 @@ system::distro::install_package() {
         emerge) install_cmd=(emerge) ;;
         *)
             log::error "Cannot determine package manager for installation"
-            return 1
+            return "${E_ERROR}"
             ;;
     esac
 
@@ -274,7 +274,7 @@ system::distro::install_package() {
         return 0
     else
         log::error "Failed to install packages"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 

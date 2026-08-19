@@ -27,12 +27,12 @@ system::keyboard_layout() {
     
     # For systemd-based systems / Для систем на базе systemd
     if utils::has localectl; then
-        utils::quiet_err localectl set-keymap "${layout}" || true
+        utils::attempt localectl set-keymap "${layout}"
     fi
     
     # For X11 systems / Для систем X11
     if utils::has setxkbmap; then
-        utils::quiet_err setxkbmap "${layout}" || true
+        utils::attempt setxkbmap "${layout}"
     fi
     
     log::info "Keyboard layout set to ${layout}"
@@ -48,7 +48,7 @@ system::localization() {
     
     # For systemd-based systems / Для систем на базе systemd
     if utils::has localectl; then
-        utils::quiet_err localectl set-locale "${locale}" || true
+        utils::attempt localectl set-locale "${locale}"
     fi
     
     log::info "System locale set to ${locale}"
@@ -64,7 +64,7 @@ system::date_time() {
     
     # For systemd-based systems / Для систем на базе systemd
     if utils::has timedatectl; then
-        utils::quiet_err timedatectl set-timezone "${timezone}" || true
+        utils::attempt timedatectl set-timezone "${timezone}"
     fi
     
     log::info "System timezone set to ${timezone}"

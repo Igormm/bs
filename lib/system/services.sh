@@ -19,7 +19,7 @@ system::services::start() {
     
     if [[ -z "${service}" ]]; then
         log::warn "Service name not specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # Try systemd first / Попробовать systemd сначала
@@ -38,7 +38,7 @@ system::services::start() {
                 log::info "Service ${service} started (init.d)"
             else
                 log::warn "No suitable method to start service ${service}"
-                return 1
+                return "${E_ERROR}"
             fi
         fi
     fi
@@ -53,7 +53,7 @@ system::services::stop() {
     
     if [[ -z "${service}" ]]; then
         log::warn "Service name not specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # Try systemd first / Попробовать systemd сначала
@@ -72,7 +72,7 @@ system::services::stop() {
                 log::info "Service ${service} stopped (init.d)"
             else
                 log::warn "No suitable method to stop service ${service}"
-                return 1
+                return "${E_ERROR}"
             fi
         fi
     fi
@@ -88,7 +88,7 @@ system::services::enable() {
     
     if [[ -z "${service}" ]]; then
         log::warn "Service name not specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # Try systemd first / Попробовать systemd сначала
@@ -106,7 +106,7 @@ system::services::enable() {
             log::info "Service ${service} enabled (chkconfig)"
         else
             log::warn "No suitable method to enable service ${service}"
-            return 1
+            return "${E_ERROR}"
         fi
     fi
 }
@@ -121,7 +121,7 @@ system::services::disable() {
     
     if [[ -z "${service}" ]]; then
         log::warn "Service name not specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # Try systemd first / Попробовать systemd сначала
@@ -139,7 +139,7 @@ system::services::disable() {
             log::info "Service ${service} disabled (chkconfig)"
         else
             log::warn "No suitable method to disable service ${service}"
-            return 1
+            return "${E_ERROR}"
         fi
     fi
 }
@@ -153,7 +153,7 @@ system::services::restart() {
     
     if [[ -z "${service}" ]]; then
         log::warn "Service name not specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # Try systemd first / Попробовать systemd сначала
@@ -172,7 +172,7 @@ system::services::restart() {
                 log::info "Service ${service} restarted (init.d)"
             else
                 log::warn "No suitable method to restart service ${service}"
-                return 1
+                return "${E_ERROR}"
             fi
         fi
     fi
@@ -188,7 +188,7 @@ system::services::status() {
     
     if [[ -z "${service}" ]]; then
         log::warn "Service name not specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # Try systemd first / Попробовать systemd сначала
@@ -210,7 +210,7 @@ system::services::status() {
                 utils::ignore "/etc/init.d/${service}" status
             else
                 log::warn "No suitable method to check status of service ${service}"
-                return 1
+                return "${E_ERROR}"
             fi
         fi
     fi
@@ -229,7 +229,7 @@ system::services::list() {
             utils::quiet_err ls -1 /etc/init.d/ | grep -v "README"
         else
             log::warn "No suitable method to list services"
-            return 1
+            return "${E_ERROR}"
         fi
     fi
 }

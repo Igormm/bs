@@ -23,12 +23,12 @@ system::permissions::chmod() {
     
     if [[ -z "${target}" ]] || [[ -z "${permissions}" ]]; then
         log::warn "File path and permissions must be specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if [[ ! -e "${target}" ]]; then
         log::warn "File or directory '${target}' does not exist"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if utils::quiet_err chmod "${permissions}" "${target}"; then
@@ -36,7 +36,7 @@ system::permissions::chmod() {
         return 0
     else
         log::error "Failed to change permissions for ${target}"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -53,12 +53,12 @@ system::permissions::chown() {
     
     if [[ -z "${target}" ]] || [[ -z "${owner}" ]]; then
         log::warn "File path and owner must be specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if [[ ! -e "${target}" ]]; then
         log::warn "File or directory '${target}' does not exist"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if utils::quiet_err chown "${owner}" "${target}"; then
@@ -66,7 +66,7 @@ system::permissions::chown() {
         return 0
     else
         log::error "Failed to change owner for ${target}"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -79,7 +79,7 @@ system::permissions::readable() {
     
     if [[ -z "${target}" ]]; then
         log::warn "File path must be specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     system::permissions::chmod "${target}" "a+r"
@@ -94,7 +94,7 @@ system::permissions::writable() {
     
     if [[ -z "${target}" ]]; then
         log::warn "File path must be specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     system::permissions::chmod "${target}" "a+w"
@@ -109,14 +109,14 @@ system::permissions::executable() {
     
     if [[ -z "${target}" ]]; then
         log::warn "File path must be specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if system::permissions::chmod "${target}" "a+x"; then
         log::info "File ${target} is now executable"
         return 0
     else
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -129,12 +129,12 @@ system::permissions::view() {
     
     if [[ -z "${target}" ]]; then
         log::warn "File path must be specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if [[ ! -e "${target}" ]]; then
         log::warn "File or directory '${target}' does not exist"
-        return 1
+        return "${E_ERROR}"
     fi
     
     echo "=== Permissions for ${target} ==="
@@ -171,7 +171,7 @@ system::permissions::view() {
         fi
     else
         log::error "ls command not found"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -186,12 +186,12 @@ system::permissions::recursive() {
     
     if [[ -z "${target}" ]] || [[ -z "${permissions}" ]]; then
         log::warn "Directory path and permissions must be specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if [[ ! -d "${target}" ]]; then
         log::warn "Directory '${target}' does not exist"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if utils::quiet_err chmod -R "${permissions}" "${target}"; then
@@ -199,7 +199,7 @@ system::permissions::recursive() {
         return 0
     else
         log::error "Failed to change permissions recursively for ${target}"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -230,7 +230,7 @@ system::permissions::default() {
         return 0
     else
         log::error "Failed to set umask"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -243,12 +243,12 @@ system::permissions::sticky() {
     
     if [[ -z "${target}" ]]; then
         log::warn "Directory path must be specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if [[ ! -d "${target}" ]]; then
         log::warn "Directory '${target}' does not exist"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if utils::quiet_err chmod +t "${target}"; then
@@ -256,7 +256,7 @@ system::permissions::sticky() {
         return 0
     else
         log::error "Failed to set sticky bit on ${target}"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -269,12 +269,12 @@ system::permissions::setuid() {
     
     if [[ -z "${target}" ]]; then
         log::warn "File path must be specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if [[ ! -f "${target}" ]]; then
         log::warn "File '${target}' does not exist or is not a file"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if utils::quiet_err chmod u+s "${target}"; then
@@ -283,7 +283,7 @@ system::permissions::setuid() {
         return 0
     else
         log::error "Failed to set setuid bit on ${target}"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -296,12 +296,12 @@ system::permissions::setgid() {
     
     if [[ -z "${target}" ]]; then
         log::warn "File or directory path must be specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if [[ ! -e "${target}" ]]; then
         log::warn "File or directory '${target}' does not exist"
-        return 1
+        return "${E_ERROR}"
     fi
     
     if utils::quiet_err chmod g+s "${target}"; then
@@ -309,7 +309,7 @@ system::permissions::setgid() {
         return 0
     else
         log::error "Failed to set setgid bit on ${target}"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 

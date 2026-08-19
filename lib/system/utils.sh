@@ -7,13 +7,13 @@
 # extensive list.
 # / Этот модуль предоставляет широкий спектр функций системных утилит на основе обширного
 # списка пользователя.
-# @depends core/const, core/logger, core/utils, lib/system/distro
+# @depends core/const, core/logger, core/utils, lib/system/distro, lib/io/files
 
 # Source Guard / Защита от повторной загрузки
 bs::guard "SYSTEM_UTILS" || return 0
 
 # Зависимости / Dependencies
-bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "distro.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "distro.sh" "../io/files.sh"
 
 # @description Get OS type / Получить тип ОС
 # @return OS type string / Строка типа ОС
@@ -253,7 +253,7 @@ system::utils::file_write() {
 system::utils::file_append() {
     local file_path="${1}"
     local content="${2}"
-    echo "${content}" >> "${file_path}"
+    io::files::append "${file_path}" "${content}"
 }
 
 # @description Copy file / Копирование файла
@@ -412,7 +412,7 @@ system::utils::network_download() {
         fi
     else
         log::error "Neither wget nor curl available"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -439,7 +439,7 @@ system::utils::security_hash_password() {
     else
         # Never return the plain password / Никогда не возвращаем пароль открытым текстом
         log::error "htpasswd not available, cannot hash password"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -458,7 +458,7 @@ system::utils::notify_email() {
         echo "${body}" | mail -s "${subject}" "${recipient}"
     else
         log::warn "mail command not available"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -688,7 +688,7 @@ system::utils::json_validate() {
         echo "${json_str}" | utils::quiet_err jq empty
     else
         log::warn "jq command not available, cannot validate JSON"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -761,7 +761,7 @@ system::utils::dependency_check() {
     
     if [[ ${#missing_deps[@]} -gt 0 ]]; then
         log::warn "Missing dependencies: ${missing_deps[*]}"
-        return 1
+        return "${E_ERROR}"
     else
         log::info "All dependencies found"
         return 0
@@ -790,10 +790,10 @@ system::utils::api_call() {
             wget -qO- "${url}"
         else
             log::warn "wget does not support ${method} method well, recommend using curl"
-            return 1
+            return "${E_ERROR}"
         fi
     else
         log::error "Neither curl nor wget available"
-        return 1
+        return "${E_ERROR}"
     fi
 }

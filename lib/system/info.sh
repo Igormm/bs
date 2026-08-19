@@ -39,7 +39,7 @@ system::info::os() {
         utils::quiet_err uname -a
     else
         log::warn "Cannot determine OS information"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -59,7 +59,7 @@ system::info::kernel() {
         echo "Full: $(uname -a)"
     else
         log::error "uname command not found"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -81,7 +81,7 @@ system::info::hostname() {
         echo "Hostname: $(utils::quiet_err cat /etc/hostname)"
     else
         log::warn "Cannot determine hostname"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -105,7 +105,7 @@ system::info::uptime() {
         fi
     else
         log::warn "Cannot determine uptime"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -127,7 +127,7 @@ system::info::cpu() {
         utils::quiet_err lscpu
     else
         log::warn "Cannot determine CPU information"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -154,7 +154,7 @@ system::info::memory() {
         echo "Swap Free: $(utils::quiet_err grep SwapFree /proc/meminfo | awk '{print $2 $3}')"
     else
         log::warn "Cannot determine memory information"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -171,7 +171,7 @@ system::info::disk() {
         utils::quiet_err df -i | head -10
     else
         log::warn "df command not found"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -214,7 +214,7 @@ system::info::version() {
         utils::quiet_err uname -r
     else
         echo "Unknown"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -235,7 +235,7 @@ system::info::load() {
         echo "15 min: $(echo ${load} | awk '{print $3}')"
     else
         log::warn "Cannot determine load average"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -253,7 +253,7 @@ system::info::interfaces() {
         utils::quiet_err ifconfig
     else
         log::warn "Cannot show network interfaces (ip/ifconfig not found)"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -267,7 +267,7 @@ system::info::arch() {
         utils::quiet_err arch
     else
         log::warn "Cannot determine architecture"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 

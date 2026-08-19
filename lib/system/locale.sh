@@ -20,16 +20,16 @@ system::locale::set() {
     
     # For systemd-based systems / Для систем на базе systemd
     if utils::has localectl; then
-        utils::quiet_err localectl set-locale "${locale}" || true
+        utils::attempt localectl set-locale "${locale}"
     else
         # Fallback for non-systemd systems / Резервный вариант для систем без systemd
         if [[ -f "/etc/locale.gen" ]]; then
             # Uncomment the locale in /etc/locale.gen / Раскомментировать локаль в
             # /etc/locale.gen
-            utils::quiet_err sed -i "s/^#${locale}/${locale}/" /etc/locale.gen || true
+            utils::attempt sed -i "s/^#${locale}/${locale}/" /etc/locale.gen
             # Generate the locale / Сгенерировать локаль
             if utils::has locale-gen; then
-                utils::quiet_err locale-gen || true
+                utils::attempt locale-gen
             fi
         fi
         
@@ -49,9 +49,9 @@ system::locale::set() {
 #   system::locale::list
 system::locale::list() {
     if utils::has localectl; then
-        utils::quiet_err localectl list-locales || true
+        utils::attempt localectl list-locales
     else
-        utils::quiet_err locale -a || true
+        utils::attempt locale -a
     fi
 }
 

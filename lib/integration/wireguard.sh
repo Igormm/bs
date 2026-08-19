@@ -34,13 +34,13 @@
 # @author BS Framework
 # @since 2026-01-06
 # @version 1.0.0
-# @depends core/const, core/logger, core/utils, core/errorhandler, lib/system/platformcheck
+# @depends core/const, core/logger, core/utils, core/errorhandler, lib/system/platformcheck, lib/io/files
 
 # Source Guard / Защита от повторной загрузки
 bs::guard "INTEGRATION_WIREGUARD" || return 0
 
 # Зависимости / Dependencies
-bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/errorhandler.sh" "../system/platformcheck.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/errorhandler.sh" "../system/platformcheck.sh" "../io/files.sh"
 
 # WireGuard configuration constants
 readonly WIREGUARD_CONFIG_DIR="/etc/wireguard"
@@ -75,26 +75,9 @@ wireguard::check_dependencies() {
     local missing_deps=()
     
     log::debug "Checking WireGuard dependencies..."
-    
-    # Check for wg command
-    if ! utils::has wg; then
-        missing_deps+=("wireguard-tools")
-    fi
-    
-    # Check for wg-quick command
-    if ! utils::has wg-quick; then
-        missing_deps+=("wireguard-tools")
-    fi
-    
-    # Check for openssl
-    if ! utils::has openssl; then
-        missing_deps+=("openssl")
-    fi
-    
-    # Check for ip command
-    if ! utils::has ip; then
-        missing_deps+=("iproute2")
-    fi
+
+    deps::missing_tools missing_deps \
+        wg:wireguard-tools wg-quick:wireguard-tools openssl ip:iproute2
     
     # Install missing dependencies based on platform
     if [[ ${#missing_deps[@]} -gt 0 ]]; then
@@ -292,7 +275,7 @@ wireguard::add_peer() {
     log::info "Adding peer to interface: ${interface}"
     
     # Backup original config
-    cp "${config_file}" "${config_file}.backup.$(date +%s)"
+    cp "${config_file}" "${config_file}.backup.$(utils::now_s)"
     
     # Add peer configuration
     cat >> "${config_file}" << EOF
@@ -305,12 +288,12 @@ EOF
     
     # Add endpoint if provided
     if [[ -n "${endpoint}" ]]; then
-        echo "Endpoint = ${endpoint}" >> "${config_file}"
+        io::files::append "${config_file}" "Endpoint = ${endpoint}"
     fi
     
     # Add persistent keepalive
     if [[ -n "${persistent_keepalive}" ]]; then
-        echo "PersistentKeepalive = ${persistent_keepalive}" >> "${config_file}"
+        io::files::append "${config_file}" "PersistentKeepalive = ${persistent_keepalive}"
     fi
     
     log::success "Peer added to ${interface} successfully"
@@ -337,7 +320,7 @@ wireguard::remove_peer() {
     log::info "Removing peer from interface: ${interface}"
     
     # Backup original config
-    cp "${config_file}" "${config_file}.backup.$(date +%s)"
+    cp "${config_file}" "${config_file}.backup.$(utils::now_s)"
     
     # Create temporary file
     local temp_file
@@ -426,7 +409,7 @@ wireguard::get_interface_status() {
     # Check if interface exists
     if ! utils::quiet wg show "${interface}"; then
         log::info "Interface ${interface} is not running"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # Get detailed status
@@ -452,7 +435,7 @@ wireguard::list_interfaces() {
 wireguard::backup_config() {
     local func_name="wireguard::backup_config"
     local interface="${1:-}"
-    local backup_name="${2:-backup_$(date +%Y%m%d_%H%M%S)}"
+    local backup_name="${2:-backup_$(utils::stamp)}"
     
     if [[ -z "${interface}" ]]; then
         errorhandler::throw "${func_name}" "Interface name is required" \
@@ -646,7 +629,7 @@ wireguard::get_public_ip() {
     done
     
     log::warn "Failed to get public IP address"
-    return 1
+    return "${E_ERROR}"
 }
 
 # Create client configuration for road warrior setup

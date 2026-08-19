@@ -21,7 +21,7 @@ system::time::timezone() {
     # Validate timezone / Проверить валидность часового пояса
     if [[ ! -f "/usr/share/zoneinfo/${timezone}" ]]; then
         log::warn "Invalid timezone: ${timezone}"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # For systemd-based systems / Для систем на базе systemd
@@ -96,7 +96,7 @@ system::time::set() {
     
     if [[ -z "${datetime}" ]]; then
         log::warn "Date and time not specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # For systemd-based systems / Для систем на базе systemd

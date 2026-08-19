@@ -1,13 +1,13 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
 # routing.sh — Routing table configuration for system setup
-# @depends core/const, core/logger, core/utils
+# @depends core/const, core/logger, core/utils, lib/io/files
 
 # Source Guard / Защита от повторной загрузки
 bs::guard "SYSTEM_ROUTING" || return 0
 
 # Зависимости / Dependencies
-bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../io/files.sh"
 
 # @description Add static route
 # @param $1 Destination network (e.g., "192.168.2.0/24")
@@ -22,23 +22,23 @@ system::routing::add() {
     
     if [[ -z "${destination}" ]] || [[ -z "${gateway}" ]]; then
         log::warn "Destination network and gateway must be specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # Using ip command (modern approach)
     if utils::has ip; then
         if [[ -n "${interface}" ]]; then
-            utils::quiet_err ip route add "${destination}" via "${gateway}" dev "${interface}" || true
+            utils::attempt ip route add "${destination}" via "${gateway}" dev "${interface}"
         else
-            utils::quiet_err ip route add "${destination}" via "${gateway}" || true
+            utils::attempt ip route add "${destination}" via "${gateway}"
         fi
         log::info "Static route added: ${destination} via ${gateway}"
     else
         # Fallback to route command
         if [[ -n "${interface}" ]]; then
-            utils::quiet_err route add -net "${destination}" gw "${gateway}" dev "${interface}" || true
+            utils::attempt route add -net "${destination}" gw "${gateway}" dev "${interface}"
         else
-            utils::quiet_err route add -net "${destination}" gw "${gateway}" || true
+            utils::attempt route add -net "${destination}" gw "${gateway}"
         fi
         log::info "Static route added: ${destination} via ${gateway}"
     fi
@@ -55,23 +55,23 @@ system::routing::delete() {
     
     if [[ -z "${destination}" ]]; then
         log::warn "Destination network must be specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # Using ip command (modern approach)
     if utils::has ip; then
         if [[ -n "${gateway}" ]]; then
-            utils::quiet_err ip route del "${destination}" via "${gateway}" || true
+            utils::attempt ip route del "${destination}" via "${gateway}"
         else
-            utils::quiet_err ip route del "${destination}" || true
+            utils::attempt ip route del "${destination}"
         fi
         log::info "Static route deleted: ${destination}"
     else
         # Fallback to route command
         if [[ -n "${gateway}" ]]; then
-            utils::quiet_err route del -net "${destination}" gw "${gateway}" || true
+            utils::attempt route del -net "${destination}" gw "${gateway}"
         else
-            utils::quiet_err route del -net "${destination}" || true
+            utils::attempt route del -net "${destination}"
         fi
         log::info "Static route deleted: ${destination}"
     fi
@@ -88,31 +88,31 @@ system::routing::default() {
     
     if [[ -z "${gateway}" ]]; then
         log::warn "Gateway IP must be specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     # Using ip command (modern approach)
     if utils::has ip; then
         # Delete existing default route
-        utils::quiet_err ip route del default || true
+        utils::attempt ip route del default
         
         # Add new default route
         if [[ -n "${interface}" ]]; then
-            utils::quiet_err ip route add default via "${gateway}" dev "${interface}" || true
+            utils::attempt ip route add default via "${gateway}" dev "${interface}"
         else
-            utils::quiet_err ip route add default via "${gateway}" || true
+            utils::attempt ip route add default via "${gateway}"
         fi
         log::info "Default gateway set to ${gateway}"
     else
         # Fallback to route command
         # Delete existing default route
-        utils::quiet_err route del default || true
+        utils::attempt route del default
         
         # Add new default route
         if [[ -n "${interface}" ]]; then
-            utils::quiet_err route add default gw "${gateway}" dev "${interface}" || true
+            utils::attempt route add default gw "${gateway}" dev "${interface}"
         else
-            utils::quiet_err route add default gw "${gateway}" || true
+            utils::attempt route add default gw "${gateway}"
         fi
         log::info "Default gateway set to ${gateway}"
     fi
@@ -124,10 +124,10 @@ system::routing::default() {
 system::routing::show() {
     # Using ip command (modern approach)
     if utils::has ip; then
-        utils::quiet_err ip route show || true
+        utils::attempt ip route show
     else
         # Fallback to route command
-        utils::quiet_err route -n || true
+        utils::attempt route -n
     fi
 }
 
@@ -142,7 +142,7 @@ system::routing::table() {
     
     if [[ -z "${table}" ]]; then
         log::warn "Routing table name or number must be specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     case "${action}" in
@@ -151,38 +151,38 @@ system::routing::table() {
             if [[ -w "/etc/iproute2/rt_tables" ]]; then
                 # Check if table already exists
                 if ! utils::quiet_err grep -q "^${table} " /etc/iproute2/rt_tables; then
-                    echo "${table} custom" >> /etc/iproute2/rt_tables
+                    io::files::append /etc/iproute2/rt_tables "${table} custom"
                     log::info "Routing table ${table} added"
                 else
                     log::info "Routing table ${table} already exists"
                 fi
             else
                 log::warn "Cannot write to /etc/iproute2/rt_tables"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         delete)
             # Remove routing table entry from /etc/iproute2/rt_tables
             if [[ -w "/etc/iproute2/rt_tables" ]]; then
-                utils::quiet_err sed -i "/^${table} /d" /etc/iproute2/rt_tables || true
+                utils::attempt sed -i "/^${table} /d" /etc/iproute2/rt_tables
                 log::info "Routing table ${table} removed"
             else
                 log::warn "Cannot write to /etc/iproute2/rt_tables"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         show)
             # Show routing table
             if utils::has ip; then
-                utils::quiet_err ip route show table "${table}" || true
+                utils::attempt ip route show table "${table}"
             else
                 log::warn "ip command not available"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         *)
             log::warn "Unknown action: ${action}"
-            return 1
+            return "${E_ERROR}"
             ;;
     esac
 }
@@ -198,33 +198,33 @@ system::routing::policy() {
     
     if [[ -z "${rule}" ]]; then
         log::warn "Routing rule must be specified"
-        return 1
+        return "${E_ERROR}"
     fi
     
     case "${action}" in
         add)
             # Add policy routing rule
             if utils::has ip; then
-                utils::quiet_err ip rule add ${rule} || true
+                utils::attempt ip rule add ${rule}
                 log::info "Policy routing rule added: ${rule}"
             else
                 log::warn "ip command not available"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         delete)
             # Delete policy routing rule
             if utils::has ip; then
-                utils::quiet_err ip rule del ${rule} || true
+                utils::attempt ip rule del ${rule}
                 log::info "Policy routing rule deleted: ${rule}"
             else
                 log::warn "ip command not available"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         *)
             log::warn "Unknown action: ${action}"
-            return 1
+            return "${E_ERROR}"
             ;;
     esac
 }
@@ -235,10 +235,10 @@ system::routing::policy() {
 system::routing::rules() {
     # Show policy routing rules
     if utils::has ip; then
-        utils::quiet_err ip rule show || true
+        utils::attempt ip rule show
     else
         log::warn "ip command not available"
-        return 1
+        return "${E_ERROR}"
     fi
 }
 
@@ -253,26 +253,26 @@ system::routing::ipv6() {
         enable)
             # Enable IPv6 forwarding
             if [[ -w "/proc/sys/net/ipv6/conf/all/forwarding" ]]; then
-                utils::quiet_err echo 1 > /proc/sys/net/ipv6/conf/all/forwarding || true
+                utils::attempt echo 1 > /proc/sys/net/ipv6/conf/all/forwarding
                 log::info "IPv6 routing enabled"
             else
                 log::warn "Cannot write to /proc/sys/net/ipv6/conf/all/forwarding"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         disable)
             # Disable IPv6 forwarding
             if [[ -w "/proc/sys/net/ipv6/conf/all/forwarding" ]]; then
-                utils::quiet_err echo 0 > /proc/sys/net/ipv6/conf/all/forwarding || true
+                utils::attempt echo 0 > /proc/sys/net/ipv6/conf/all/forwarding
                 log::info "IPv6 routing disabled"
             else
                 log::warn "Cannot write to /proc/sys/net/ipv6/conf/all/forwarding"
-                return 1
+                return "${E_ERROR}"
             fi
             ;;
         *)
             log::warn "Unknown action: ${action}"
-            return 1
+            return "${E_ERROR}"
             ;;
     esac
 }
