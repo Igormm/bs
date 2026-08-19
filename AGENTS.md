@@ -85,6 +85,17 @@ For focused development tasks, use the dedicated prompt files:
 - `ai/lib-prompt.md` — implement or modify `lib/` modules.
 - `ai/core-prompt.md` — implement or modify `core/` modules.
 
+## Agent skills
+
+Reusable workflow skills live in `.agents/skills/` (Kimi Code / agents-compatible format):
+
+- `bs-new-lib-module` — scaffold a new `lib/` module (skeleton, guard, `@depends`, metadata).
+- `bs-new-core-module` — add a `core/` module and register it in `bootstrap/init.sh` + `bs doctor`.
+- `bs-write-test` — unit/integration test skeleton and `testframework.sh` assert API.
+- `bs-validate` — the mandatory validation cycle after any change.
+- `bs-docs-sync` — keep `documentation/en/` and `documentation/ru/` in sync.
+- `bs-commit-style` — commit message conventions and history-safety rules.
+
 ## MCP / API provider suggestions
 
 - **MCP**: expose `bs` CLI commands (`bs doctor`, `bs list`, `bs run`) plus the validator/test scripts as tools.
