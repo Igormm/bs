@@ -96,6 +96,14 @@ load "lib/data/dataprocessor"
 
 Ключевые функции: `automation::locale::set_locale`, `automation::system::manage_packages`, `automation::display::detect_desktop_environment`, `automation::network::manage_interface`.
 
+## hw — `lib/system/hw.sh`
+
+Информация об оборудовании в двух слоях: геттеры возвращают одно машиночитаемое значение (`system::hw::cpu_model`, `system::hw::mem_total`, ...), отчёты печатают человекочитаемые сводки. «Лингвистические» обёртки над `/proc/cpuinfo`, `free`, `lsblk`, `lspci`, `lsusb`, `dmidecode`, `hdparm`, `badblocks` и `dmesg`; каждая функция мягко деградирует при отсутствии инструмента.
+
+Ключевые функции: `system::hw::summary`, `system::hw::cpu`, `system::hw::memory`, `system::hw::block`, `system::hw::pci`, `system::hw::dmi`, `system::hw::badblocks_scan`.
+
+Подробности: [hw.md](hw.md)
+
 ## См. также
 
 - [args.md](args.md) — модуль разбора аргументов `core/args`, используемый многими скриптами

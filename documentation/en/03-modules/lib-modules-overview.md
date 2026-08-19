@@ -96,6 +96,14 @@ A single high-level module that composes the `lib/system/` building blocks into 
 
 Key functions: `automation::locale::set_locale`, `automation::system::manage_packages`, `automation::display::detect_desktop_environment`, `automation::network::manage_interface`.
 
+## hw — `lib/system/hw.sh`
+
+Hardware information in two layers: getters return single machine-readable values (`system::hw::cpu_model`, `system::hw::mem_total`, ...), reports print human-readable summaries. Linguistic wrappers over `/proc/cpuinfo`, `free`, `lsblk`, `lspci`, `lsusb`, `dmidecode`, `hdparm`, `badblocks` and `dmesg`; every function degrades gracefully when a tool is missing.
+
+Key functions: `system::hw::summary`, `system::hw::cpu`, `system::hw::memory`, `system::hw::block`, `system::hw::pci`, `system::hw::dmi`, `system::hw::badblocks_scan`.
+
+Details: [hw.md](hw.md)
+
 ## See also
 
 - [args.md](args.md) — the `core/args` argument-parsing module used by many scripts
