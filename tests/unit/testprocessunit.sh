@@ -119,6 +119,32 @@ main() {
     testframework::assert_equal "${E_INVALID}" "${rc}" "missing command rejected"
 
     # ==========================================
+    # Background execution / Фоновое выполнение
+    # ==========================================
+    testframework::section "Background and detach"
+
+    local bg_pid
+    bg_pid="$(io::process::background sleep 0.1)"
+    testframework::assert_true "'${bg_pid}' =~ ^[0-9]+$" "background returns a numeric PID"
+    wait "${bg_pid}" 2>/dev/null || true
+
+    rc=0
+    io::process::background || rc=$?
+    testframework::assert_equal "${E_INVALID}" "${rc}" "background rejects missing command"
+
+    export FRAMEWORK_DRY_RUN=true
+    local dry_out
+    dry_out="$(io::process::background sleep 1 2>&1)"
+    testframework::assert_true "'${dry_out}' == *'DRY-RUN'*" "background honors dry-run"
+    dry_out="$(io::process::detach /tmp/bs_test_detach.log true 2>&1)"
+    testframework::assert_true "'${dry_out}' == *'DRY-RUN'*" "detach honors dry-run"
+    unset FRAMEWORK_DRY_RUN
+
+    rc=0
+    io::process::detach "" || rc=$?
+    testframework::assert_equal "${E_INVALID}" "${rc}" "detach rejects missing arguments"
+
+    # ==========================================
     # Cleanup
     # ==========================================
     rm -rf "${tmp_dir}"

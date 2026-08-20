@@ -89,6 +89,19 @@ export FRAMEWORK_DRY_RUN=true
 io::process::guard --timeout 60 -- sleep 10
 ```
 
+## Background execution
+
+```bash
+# Run in background, get the PID — replaces: cmd &; echo $!
+pid="$(io::process::background sleep 60)"
+
+# Detach from the terminal (nohup-style) with a proper log file
+# instead of a shared nohup.out
+io::process::detach /var/log/myapp.log my_daemon --serve
+```
+
+Both honor dry-run mode (log only, nothing is spawned).
+
 ## See also
 
 - [io-streams.md](io-streams.md) — I/O stream management.

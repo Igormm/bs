@@ -98,6 +98,52 @@ error::throw() {
 	errorhandler::throw "${FUNCNAME[1]}" "${@}"
 }
 
+# @description Subscribe a function to a signal / Подписать функцию на сигнал
+#   Linguistic wrapper over `trap "handler" SIG`; accepts INT or SIGINT.
+#   «Лингвистическая» обёртка над trap; принимает INT или SIGINT.
+# @param $1 Signal name (with or without SIG) / Имя сигнала
+# @param $2 Handler function / Функция-обработчик
+# @return 0 on success, E_INVALID on unknown signal, E_ERROR on bad handler
+# @example
+#   signal::on SIGINT my::cleanup
+signal::on() {
+	local -r signal="${1:?signal name required}"
+	local -r handler="${2:?handler function required}"
+
+	if ! declare -F -- "${handler}" >/dev/null 2>&1; then
+		log::error "signal::on: handler function not found: ${handler}"
+		return "${E_ERROR:-1}"
+	fi
+
+	if ! trap "${handler}" "${signal}" 2>/dev/null; then
+		log::error "signal::on: unknown signal: ${signal}"
+		return "${E_INVALID:-2}"
+	fi
+}
+
+# @description Ignore a signal / Игнорировать сигнал (trap '' SIG)
+# @param $1 Signal name / Имя сигнала
+# @example
+#   signal::ignore SIGHUP
+signal::ignore() {
+	trap '' "${1:?signal name required}" 2>/dev/null || {
+		log::error "signal::ignore: unknown signal: ${1}"
+		return "${E_INVALID:-2}"
+	}
+}
+
+# @description Reset a signal to its default disposition / Сбросить перехват сигнала
+#   (trap - SIG)
+# @param $1 Signal name / Имя сигнала
+# @example
+#   signal::reset SIGINT
+signal::reset() {
+	trap - "${1:?signal name required}" 2>/dev/null || {
+		log::error "signal::reset: unknown signal: ${1}"
+		return "${E_INVALID:-2}"
+	}
+}
+
 # @description Exit BS application with cleanup / Выход из приложения BS с очисткой
 # @param $1 [optional] Exit code (default: 0) / Код выхода (по умолчанию 0)
 # @example

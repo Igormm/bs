@@ -108,6 +108,42 @@ main() {
     marker="still alive"
     testframework::assert_equal "still alive" "$marker" "Shell continues after log::fatal"
     
+    # Тест 6: signal::on / ignore / reset управляют перехватом сигналов
+    testframework::section "Signal API / API сигналов"
+    
+    test::usr1_handler() { :; }
+    
+    signal::on SIGUSR1 test::usr1_handler
+    if trap -p SIGUSR1 | grep -q "test::usr1_handler"; then
+        testframework::assert_true "true" "signal::on installs the handler"
+    else
+        testframework::assert_true "false" "signal::on installs the handler"
+    fi
+    
+    signal::ignore SIGUSR1
+    if trap -p SIGUSR1 | grep -q "''"; then
+        testframework::assert_true "true" "signal::ignore installs empty handler"
+    else
+        testframework::assert_true "false" "signal::ignore installs empty handler"
+    fi
+    
+    signal::reset SIGUSR1
+    if [[ -z "$(trap -p SIGUSR1)" ]]; then
+        testframework::assert_true "true" "signal::reset restores default disposition"
+    else
+        testframework::assert_true "false" "signal::reset restores default disposition"
+    fi
+    
+    rc=0
+    utils::quiet_err signal::on NOTASIGNAL test::usr1_handler || rc=$?
+    testframework::assert_equal "${E_INVALID}" "${rc}" "signal::on rejects unknown signal"
+    
+    rc=0
+    utils::quiet_err signal::on SIGUSR1 not-a-real-function || rc=$?
+    testframework::assert_equal "${E_ERROR}" "${rc}" "signal::on rejects missing handler"
+    
+    unset -f test::usr1_handler
+    
     # Вывод сводки
     testframework::summary
 }

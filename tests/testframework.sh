@@ -23,10 +23,17 @@ declare -g tests_failed=0
 # Заголовок
 # @description Print a header banner
 # @param $1 Header text / Текст заголовка
+# @description Print a header banner (Unicode box / рамка Unicode)
+# @param $1 Header text / Текст заголовка
 print_header() {
-    echo -e "${BLUE}========================================${NC}"
-    echo -e "${BLUE}$1${NC}"
-    echo -e "${BLUE}========================================${NC}"
+    local text="$1"
+    local inner=" ${text} "
+    local line
+    printf -v line '%*s' "${#inner}" ''
+    line="${line// /─}"
+    echo -e "${BLUE}╭${line}╮${NC}"
+    echo -e "${BLUE}│${inner}│${NC}"
+    echo -e "${BLUE}╰${line}╯${NC}"
     echo
 }
 
@@ -170,10 +177,12 @@ testframework::assert_command() {
 # @example testframework::section "Testing Logger"
 testframework::section() {
     local section_name="$1"
+    local line
+    printf -v line '%*s' "$((${#section_name} + 2))" ''
+    line="${line// /─}"
     echo
-    echo -e "${BLUE}▶ $section_name${NC}"
-    echo -e "${BLUE}▶ $section_name${NC}"
-    echo "----------------------------------------"
+    echo -e "${BLUE}▶ ${section_name}${NC}"
+    echo -e "${BLUE}${line}${NC}"
 }
 
 # Функция вывода сводки тестов
@@ -181,10 +190,7 @@ testframework::section() {
 # @example testframework::summary
 testframework::summary() {
     echo
-    echo -e "${BLUE}========================================${NC}"
-    echo -e "${BLUE}TEST SUMMARY / СВОДКА ТЕСТОВ${NC}"
-    echo -e "${BLUE}========================================${NC}"
-    echo
+    print_header "TEST SUMMARY / СВОДКА ТЕСТОВ"
     echo -e "${BLUE}Tests run / Тестов запущено:${NC} $tests_run"
     echo -e "${GREEN}Passed / Пройдено:${NC} $tests_passed"
     echo -e "${RED}Failed / Провалено:${NC} $tests_failed"

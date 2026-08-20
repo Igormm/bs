@@ -295,20 +295,40 @@ log::print() {
 }
 
 # @description Вывести заголовок / Output header
+#   Default style: Unicode box / По умолчанию — Unicode-рамка:
+#     ╭─────────╮
+#     │  Text   │
+#     ╰─────────╯
+#   Pass a char as $2 for the classic underline / Передайте символ во $2 для
+#   классического подчёркивания:
+#     log::header "Text" "="  →  Text\n====
 # @param $1 Header text / Текст заголовка
-# @param $2 Character for underline (optional, default: "=") / Символ подчеркивания
-# (опционально, по умолчанию: "=")
+# @param $2 [optional] "box" (default) or a char for classic underline /
+#   "box" (по умолчанию) или символ классического подчёркивания
 # @example
 #   log::header "Starting deployment"
 log::header() {
     local text="${1:?Missing header text}"
-    local char="${2:-=}"
+    local char="${2:-box}"
     local line
-    
-    # Создаем линию подчеркивания / Create underline
+
+    if [[ "${char}" == "box" ]]; then
+        # Рамка: ширина по длине текста + пробелы-паддинги
+        # Box: width = text length + padding spaces
+        local inner=" ${text} "
+        printf -v line '%*s' "${#inner}" ''
+        line="${line// /─}"
+
+        log::info "╭${line}╮"
+        log::info "│${inner}│"
+        log::info "╰${line}╯"
+        return 0
+    fi
+
+    # Классическое подчёркивание / Classic underline
     printf -v line '%*s' "${#text}" ''
     line="${line// /$char}"
-    
+
     log::info ""
     log::info "$text"
     log::info "$line"

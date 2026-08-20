@@ -88,6 +88,19 @@ export FRAMEWORK_DRY_RUN=true
 io::process::guard --timeout 60 -- sleep 10
 ```
 
+## Фоновое выполнение
+
+```bash
+# Запуск в фоне, PID на stdout — заменяет: cmd &; echo $!
+pid="$(io::process::background sleep 60)"
+
+# Отсоединение от терминала (в стиле nohup) с нормальным лог-файлом
+# вместо общего nohup.out
+io::process::detach /var/log/myapp.log my_daemon --serve
+```
+
+Обе функции учитывают dry-run (только логируют, процесс не создаётся).
+
 ## См. также
 
 - [io-streams.md](io-streams.md) — управление потоками ввода/вывода.

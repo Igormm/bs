@@ -189,15 +189,15 @@ io::process::__use_sudo() {
 io::process::__ensure_diagnostic_dir() {
   local dir="${IO_PROCESS_CONFIG[diagnostic_dir]}"
 
-  if [[ -z "${dir}" ]]; then
+  if is::empty "${dir}"; then
     dir="$(mktemp -d)"
-    if [[ -z "${dir}" || ! -d "${dir}" ]]; then
+    if is::empty "${dir}" || ! is::dir "${dir}"; then
       log::error "Failed to create diagnostic directory"
       return "${LIB_ERROR_FILE_OPERATION}"
     fi
     IO_PROCESS_CONFIG[diagnostic_dir]="${dir}"
     IO_PROCESS_CONFIG[auto_diag_dir]="true"
-  elif [[ ! -d "${dir}" ]]; then
+  elif ! is::dir "${dir}"; then
     if ! mkdir -p -- "${dir}"; then
       log::error "Failed to create diagnostic directory: ${dir}"
       return "${LIB_ERROR_FILE_OPERATION}"
@@ -280,7 +280,7 @@ io::process::__diagnose() {
     ps -p "${pid}" -o pid,ppid,user,comm,cmd,etime,%cpu,%mem,stat 2>/dev/null || echo "unavailable"
     echo ""
 
-    if [[ -d "/proc/${pid}" ]]; then
+    if is::dir "/proc/${pid}"; then
       echo "=== /proc/${pid}/status ==="
       cat "/proc/${pid}/status" 2>/dev/null || echo "unavailable"
       echo ""
@@ -354,7 +354,7 @@ io::process::__terminate() {
 # @description Обработчик очистки, зарегистрированный через cleanup::add.
 io::process::__cleanup_handler() {
   local pid="${IO_PROCESS_CURRENT_PID:-}"
-  if [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null; then
+  if is::not_empty "${pid}" && kill -0 "${pid}" 2>/dev/null; then
     utils::ignore kill -KILL "${pid}"
     utils::ignore wait "${pid}"
   fi
@@ -362,7 +362,7 @@ io::process::__cleanup_handler() {
 
   if [[ "${IO_PROCESS_CONFIG[auto_diag_dir]:-false}" == "true" ]]; then
     local dir="${IO_PROCESS_CONFIG[diagnostic_dir]:-}"
-    if [[ -n "${dir}" && -d "${dir}" ]]; then
+    if is::not_empty "${dir}" && is::dir "${dir}"; then
       utils::ignore rm -rf "${dir}"
     fi
   fi
@@ -464,7 +464,7 @@ io::process::guard() {
     sleep 0.5
   done
 
-  if [[ -n "${reason}" ]]; then
+  if is::not_empty "${reason}"; then
     io::process::__diagnose "${pid}" "${reason}" "${diag_dir}"
     io::process::__terminate "${pid}"
     wait "${pid}"
@@ -493,10 +493,10 @@ io::process::guard() {
   cmd_rc=$?
 
   # Replay captured output / Проигрываем захваченный вывод
-  if [[ -s "${stdout_log}" ]]; then
+  if is::file_not_empty "${stdout_log}"; then
     cat "${stdout_log}"
   fi
-  if [[ -s "${stderr_log}" ]]; then
+  if is::file_not_empty "${stderr_log}"; then
     cat "${stderr_log}" >&2
   fi
 
@@ -507,4 +507,62 @@ io::process::guard() {
 
   IO_PROCESS_CURRENT_PID=""
   return "${cmd_rc}"
+}
+
+# ==========================================
+# Background execution / Фоновое выполнение
+# ==========================================
+
+# @description Run a command in the background and print its PID.
+# @description Запустить команду в фоне и напечатать её PID.
+#   Linguistic replacement for `cmd &; echo $!`.
+# @param $@ Command and arguments / Команда и аргументы
+# @stdout PID of the background process / PID фонового процесса
+# @example
+#   pid="$(io::process::background sleep 60)"
+io::process::background() {
+  if [[ $# -eq 0 ]]; then
+    log::warn "io::process::background: command required"
+    return "${E_INVALID}"
+  fi
+
+  if [[ "${FRAMEWORK_DRY_RUN:-false}" == "true" ]]; then
+    log::warn "[DRY-RUN] background: $*"
+    return "${E_SUCCESS}"
+  fi
+
+  "$@" &
+  printf '%s\n' "$!"
+}
+
+# @description Detach a command from the terminal (nohup-style) with a proper
+#   log file instead of a shared nohup.out.
+# @description Отсоединить команду от терминала (в стиле nohup) с нормальным
+#   лог-файлом вместо общего nohup.out.
+# @param $1 Log file path / Путь к лог-файлу
+# @param $@ Command and arguments / Команда и аргументы
+# @stdout PID of the detached process / PID отсоединённого процесса
+# @example
+#   io::process::detach /var/log/myapp.log my_daemon --serve
+io::process::detach() {
+  local -r log_file="${1:-}"
+
+  if is::empty "${log_file}" || [[ $# -lt 2 ]]; then
+    log::warn "io::process::detach: log file and command required"
+    return "${E_INVALID}"
+  fi
+  shift
+
+  if [[ "${FRAMEWORK_DRY_RUN:-false}" == "true" ]]; then
+    log::warn "[DRY-RUN] detach (log: ${log_file}): $*"
+    return "${E_SUCCESS}"
+  fi
+
+  if ! utils::has nohup; then
+    log::error "nohup not found (install package: coreutils)"
+    return "${E_ERROR}"
+  fi
+
+  nohup "$@" >> "${log_file}" 2>&1 &
+  printf '%s\n' "$!"
 }
