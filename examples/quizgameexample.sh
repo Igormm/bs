@@ -27,8 +27,8 @@ main() {
     args::flag auto
     args::flag_describe auto "Non-interactive demo mode"
 
-    args::parse "$@" || exit "${E_INVALID}"
-    [[ "${ARGS_HELP_REQUESTED}" == "1" ]] && exit "${E_SUCCESS}"
+    args::parse "$@" || bs::exit "${E_INVALID}"
+    [[ "${ARGS_HELP_REQUESTED}" == "1" ]] && bs::exit "${E_SUCCESS}"
 
     log::header "Timed quiz / Викторина с таймаутом"
     io::streams::print "Question: 2 + 2 = ?"
@@ -40,7 +40,7 @@ main() {
         log::warn "No interactive stdin (or --auto): answering for you"
         io::streams::feed "${QUIZ_ANSWER}" io::streams::read_line auto_answer
         io::streams::print "Auto answer: ${auto_answer} — correct!"
-        exit "${E_SUCCESS}"
+        bs::exit "${E_SUCCESS}"
     fi
 
     io::streams::printn "> "

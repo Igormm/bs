@@ -26,7 +26,7 @@ The simplest case — one parameter per level. Name N occupies level N:
 
 ```bash
 args::define first middle last
-args::parse "$@" || exit $?
+args::parse "$@" || bs::exit "${E_INVALID}"
 ```
 
 ## Tree branching: `args::level`
@@ -83,7 +83,7 @@ if utils::quiet args::flag_get dry-run; then ...; fi
 ## Validation: `args::parse`, `args::get`
 
 ```bash
-args::parse "$@" || exit $?
+args::parse "$@" || bs::exit "${E_INVALID}"
 action="$(args::get 1)"
 ```
 
@@ -103,10 +103,10 @@ On failure it prints the reason and the help to stderr and returns
 
 ```bash
 if ! args::parse "$@"; then
-    exit "${E_INVALID}"
+    bs::exit "${E_INVALID}"
 fi
 if [[ "${ARGS_HELP_REQUESTED}" == "1" ]]; then
-    exit "${E_SUCCESS}"
+    bs::exit "${E_SUCCESS}"
 fi
 ```
 
@@ -190,9 +190,9 @@ args::flag dry-run
 args::flag_describe env "Target environment (staging, production)"
 
 if ! args::parse "$@"; then
-    exit "${E_INVALID}"
+    bs::exit "${E_INVALID}"
 fi
-[[ "${ARGS_HELP_REQUESTED}" == "1" ]] && exit "${E_SUCCESS}"
+[[ "${ARGS_HELP_REQUESTED}" == "1" ]] && bs::exit "${E_SUCCESS}"
 
 action="${ARGS_PARAMS[0]:-status}"
 env="$(args::flag_get env || printf 'staging')"

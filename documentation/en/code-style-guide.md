@@ -280,6 +280,12 @@ preserve the exit code:
 | `cmd >/dev/null 2>&1`           | `utils::quiet cmd` | run, suppress stdout and stderr           |
 | `cmd 2>/dev/null`               | `utils::quiet_err cmd` | run, suppress stderr only             |
 | `cmd >/dev/null 2>&1 \|\| true` | `utils::ignore cmd` | run and ignore the result (always returns 0) |
+| `cmd 2>/dev/null \|\| true`     | `utils::attempt cmd` | best-effort run, keep stdout, ignore failure |
+
+For conditions, use the `is::*` predicates from [core/lang.sh](../../core/lang.sh)
+instead of test flags — `is::empty "${var}"` instead of `[[ -z "${var}" ]]`,
+`is::file "${path}"` instead of `[[ -f "${path}" ]]`, `is::command cmd` instead
+of `command -v ...`, and so on (full table: [core-api.md](04-api-reference/core-api.md)).
 
 ```bash
 if utils::has dnf; then

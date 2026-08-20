@@ -43,7 +43,7 @@ main() {
     # ==========================================
     log::header "io::streams::run_line_buffered — stdbuf -oL -eL"
 
-    if command -v stdbuf >/dev/null 2>&1; then
+    if is::command stdbuf; then
         # Полезно для длинных задач в pipe: строки видны сразу,
         # а не после заполнения 4-8 КБ буфера
         # Useful for long tasks in a pipe: lines appear immediately

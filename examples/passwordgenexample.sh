@@ -43,8 +43,8 @@ main() {
     args::flag_describe count "How many passwords to generate (default: 3)"
     args::flag_describe hex "Hex output instead of base64"
 
-    args::parse "$@" || exit "${E_INVALID}"
-    [[ "${ARGS_HELP_REQUESTED}" == "1" ]] && exit "${E_SUCCESS}"
+    args::parse "$@" || bs::exit "${E_INVALID}"
+    [[ "${ARGS_HELP_REQUESTED}" == "1" ]] && bs::exit "${E_SUCCESS}"
 
     local length count
     length="$(args::flag_get length || printf '16')"
@@ -52,10 +52,10 @@ main() {
 
     # Валидация чисел / Number validation
     if ! [[ "${length}" =~ ^[0-9]+$ ]] || [[ "${length}" -lt 4 ]]; then
-        log::fatal "--length must be an integer >= 4, got: ${length}" || exit "${E_INVALID}"
+        error::exit "--length must be an integer >= 4, got: ${length}" "${E_INVALID}"
     fi
     if ! [[ "${count}" =~ ^[0-9]+$ ]] || [[ "${count}" -lt 1 ]]; then
-        log::fatal "--count must be a positive integer, got: ${count}" || exit "${E_INVALID}"
+        error::exit "--count must be a positive integer, got: ${count}" "${E_INVALID}"
     fi
 
     log::header "Password generator / Генератор паролей"

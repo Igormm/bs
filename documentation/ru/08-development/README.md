@@ -118,6 +118,8 @@ system::distro::is_package_installed() {
 | `cmd >/dev/null 2>&1` | `utils::quiet cmd` | код возврата сохраняется |
 | `cmd 2>/dev/null` | `utils::quiet_err cmd` | код возврата сохраняется |
 | `cmd >/dev/null 2>&1 \|\| true` | `utils::ignore cmd` | неудача действительно не важна |
+| `cmd 2>/dev/null \|\| true` | `utils::attempt cmd` | best-effort, stdout виден |
+| `[[ -z/-n ... ]]`, `[[ -f/-d ... ]]` | `is::empty`, `is::file`, ... | предикаты из `core/lang.sh` |
 
 Реальное использование — [lib/system/distro.sh](../../../lib/system/distro.sh):
 

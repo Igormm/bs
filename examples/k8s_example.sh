@@ -54,7 +54,7 @@ main() {
     echo ""
     echo "--- Structured result (kubectl missing, expect error) ---"
     local result_json
-    result_json="$(k8s::result get pods 2>/dev/null || true)"
+    result_json="$(utils::attempt k8s::result get pods)"
     echo "${result_json}"
 
     rm -rf "${tmp_dir}"

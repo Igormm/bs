@@ -160,7 +160,7 @@ Bash 4+ (без внешних команд). Автозагружается с�
 #### `log::fatal <message...>`
 - Параметры: `$@` — текст сообщения
 - Возвращает: `E_ERROR` (или 1, если `core/const.sh` не загружен); **не** завершает скрипт — решение за вызывающим
-- Пример: `log::fatal "Critical error, cannot continue" || exit 1`
+- Пример: `log::fatal "Critical error, cannot continue" || bs::exit "${E_ERROR}"` (или одним вызовом: `error::exit "Critical error, cannot continue"`)
 
 #### `log::print <message...>`
 - Алиас для `log::info` (обратная совместимость)

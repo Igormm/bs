@@ -161,7 +161,7 @@ Level weights: `TRACE`=0, `DEBUG`=10, `INFO`=20, `SUCCESS`=25, `WARN`=30, `ERROR
 #### `log::fatal <message...>`
 - Parameters: `$@` — message text
 - Returns: `E_ERROR` (or 1 if `core/const.sh` is not loaded); does **not** exit — the caller decides
-- Example: `log::fatal "Critical error, cannot continue" || exit 1`
+- Example: `log::fatal "Critical error, cannot continue" || bs::exit "${E_ERROR}"` (or simply `error::exit "Critical error, cannot continue"`)
 
 #### `log::print <message...>`
 - Alias for `log::info` (backward compatibility)

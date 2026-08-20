@@ -285,6 +285,12 @@ connect() {
 | `cmd >/dev/null 2>&1`            | `utils::quiet cmd` | выполнить, подавив stdout и stderr         |
 | `cmd 2>/dev/null`                | `utils::quiet_err cmd` | выполнить, подавив только stderr       |
 | `cmd >/dev/null 2>&1 \|\| true`  | `utils::ignore cmd` | выполнить и проигнорировать результат (всегда возвращает 0) |
+| `cmd 2>/dev/null \|\| true`      | `utils::attempt cmd` | best-effort, stdout виден, неудача игнорируется |
+
+Для условий используйте предикаты `is::*` из [core/lang.sh](../../core/lang.sh)
+вместо тестовых флагов — `is::empty "${var}"` вместо `[[ -z "${var}" ]]`,
+`is::file "${path}"` вместо `[[ -f "${path}" ]]`, `is::command cmd` вместо
+`command -v ...` и т.д. (полная таблица: [core-api.md](04-api-reference/core-api.md)).
 
 ```bash
 if utils::has dnf; then

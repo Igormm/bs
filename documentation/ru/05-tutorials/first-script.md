@@ -70,11 +70,11 @@ main "$@"
 Добавьте `args::parse` после объявлений:
 
 ```bash
-    args::parse "$@" || exit "${E_INVALID}"
-    [[ "${ARGS_HELP_REQUESTED}" == "1" ]] && exit "${E_SUCCESS}"
+    args::parse "$@" || bs::exit "${E_INVALID}"
+    [[ "${ARGS_HELP_REQUESTED}" == "1" ]] && bs::exit "${E_SUCCESS}"
 ```
 
-- При любом неверном вводе `args::parse` сам печатает причину и help в stderr и возвращает `E_INVALID` — остаётся выйти с этим кодом.
+- При любом неверном вводе `args::parse` сам печатает причину и help в stderr и возвращает `E_INVALID` — мы выходим с этим кодом через `bs::exit`, который выполняет стек очистки.
 - `-h`/`--help` печатает help, выставляет `ARGS_HELP_REQUESTED=1` и возвращает 0.
 - `E_SUCCESS`, `E_ERROR`, `E_INVALID` (0/1/2) — константы из [core/const.sh](../../../core/const.sh), загружаемые точкой входа BS.
 
@@ -115,7 +115,7 @@ Flags / Флаги:
         staging|production) ;;
         *)
             log::error "Unknown environment: ${env} (expected staging or production)"
-            exit "${E_ERROR}"
+            bs::exit "${E_ERROR}"
             ;;
     esac
 
@@ -214,8 +214,8 @@ main() {
     args::flag_describe dry-run "Print the plan without executing"
 
     # 2. Validate input; on error parse prints the reason and help itself
-    args::parse "$@" || exit "${E_INVALID}"
-    [[ "${ARGS_HELP_REQUESTED}" == "1" ]] && exit "${E_SUCCESS}"
+    args::parse "$@" || bs::exit "${E_INVALID}"
+    [[ "${ARGS_HELP_REQUESTED}" == "1" ]] && bs::exit "${E_SUCCESS}"
 
     # 3. Work with validated values
     local action="${ARGS_PARAMS[0]:-status}"
@@ -227,7 +227,7 @@ main() {
         staging|production) ;;
         *)
             log::error "Unknown environment: ${env} (expected staging or production)"
-            exit "${E_ERROR}"
+            bs::exit "${E_ERROR}"
             ;;
     esac
 

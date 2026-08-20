@@ -94,7 +94,7 @@ load "core/args"
 load "lib/io/streams"
 
 args::define hello
-args::parse "$@" || exit 2
+args::parse "$@" || bs::exit "${E_INVALID}"
 io::streams::print "works: $(args::get 1)"
 ```
 

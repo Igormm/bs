@@ -116,6 +116,8 @@ keep the exit code semantics visible:
 | `cmd >/dev/null 2>&1` | `utils::quiet cmd` | exit code preserved |
 | `cmd 2>/dev/null` | `utils::quiet_err cmd` | exit code preserved |
 | `cmd >/dev/null 2>&1 \|\| true` | `utils::ignore cmd` | failure truly irrelevant |
+| `cmd 2>/dev/null \|\| true` | `utils::attempt cmd` | best-effort, stdout kept |
+| `[[ -z/-n ... ]]`, `[[ -f/-d ... ]]` | `is::empty`, `is::file`, ... | predicates from `core/lang.sh` |
 
 Real usage — [lib/system/distro.sh](../../../lib/system/distro.sh):
 
