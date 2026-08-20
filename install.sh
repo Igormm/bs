@@ -48,9 +48,19 @@ if [[ ! -f "${SCRIPT_DIR}/core/utils.sh" ]]; then
 fi
 
 # modules sourcing
-# Подключить Utils как можно раньше
-if ! source -- "${SCRIPT_DIR}/core/utils.sh"; then
-  printf 'ERROR: failed to source file: %s\n' "${SCRIPT_DIR}/core/utils.sh" >&2
+# Подключаем полное ядро через bootstrap (utils.sh больше нельзя
+# подключать в одиночку: он использует bs::guard, is::*, log::*).
+# Bootstrap loads the full core (utils.sh can no longer be sourced alone:
+# it relies on bs::guard, is::*, log::*).
+if [[ ! -f "${SCRIPT_DIR}/bootstrap/init.sh" ]]; then
+  printf 'ERROR: bootstrap init not found: %s\n' "${SCRIPT_DIR}/bootstrap/init.sh" >&2
+  exit 1
+fi
+
+BS_SILENT=1
+# shellcheck disable=SC1090
+if ! source -- "${SCRIPT_DIR}/bootstrap/init.sh"; then
+  printf 'ERROR: failed to source bootstrap: %s\n' "${SCRIPT_DIR}/bootstrap/init.sh" >&2
   exit 1
 fi
 

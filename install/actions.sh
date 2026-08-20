@@ -71,7 +71,7 @@ do_uninstall() {
   printf "  TARGET_LIB: %s\n" "${TARGET_LIB}"
 
   # Remove wrapper
-  if [[ -f "${TARGET_BIN}" ]]; then
+  if is::file "${TARGET_BIN}"; then
     rm -f "${TARGET_BIN}"
     printf "Удален: %s\n" "${TARGET_BIN}"
   else
@@ -79,7 +79,7 @@ do_uninstall() {
   fi
 
   # Remove libs
-  if [[ -d "${TARGET_LIB}" ]]; then
+  if is::dir "${TARGET_LIB}"; then
     rm -rf "${TARGET_LIB}"
     printf "Удален: %s\n" "${TARGET_LIB}"
   else
@@ -89,11 +89,11 @@ do_uninstall() {
   # Do NOT wipe user's ~/.local trees; only tidy empty parents
   if [[ "${MODE}" == "local" ]]; then
     # Attempt to remove empty BIN_DIR
-    if [[ -d "${BIN_DIR}" ]] && rmdir "${BIN_DIR}" 2>/dev/null; then
+    if is::dir "${BIN_DIR}" && utils::quiet_err rmdir "${BIN_DIR}"; then
       printf "Удален пустой каталог: %s\n" "${BIN_DIR}"
     fi
     # Attempt to remove empty LIB_DIR
-    if [[ -d "${LIB_DIR}" ]] && rmdir "${LIB_DIR}" 2>/dev/null; then
+    if is::dir "${LIB_DIR}" && utils::quiet_err rmdir "${LIB_DIR}"; then
       printf "Удален пустой каталог: %s\n" "${LIB_DIR}"
     fi
   fi

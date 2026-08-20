@@ -64,7 +64,7 @@ source "${BS_ROOT}/bootstrap/init.sh"
 errorhandler::setup_trap
 
 # 5. Утилитные функции 
-die()  { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+die()  { error::exit "$*"; }
 
 
 help() {
@@ -98,9 +98,9 @@ env_cmd() { printf 'BS_ROOT=%s\nPATH=%s\n' "$BS_ROOT" "$PATH"; }
 list_cmd() {
   echo 'Available modules:'
   for cat in core lib; do
-    [[ -d "${BS_ROOT}/${cat}" ]] || continue
+    is::dir "${BS_ROOT}/${cat}" || continue
     for m in "${BS_ROOT}/${cat}"/*.sh; do
-      [[ -f "$m" ]] && printf '  %s/%s\n' "$cat" "${m##*/}"
+      is::file "$m" && printf '  %s/%s\n' "$cat" "${m##*/}"
     done
   done
 }
@@ -121,7 +121,7 @@ doctor_cmd() {
   # Required core files / Обязательные файлы ядра
   local req=(bootstrap/init.sh bootstrap/loader.sh core/prereq.sh core/lang.sh core/const.sh core/logger.sh core/errorhandler.sh core/version.sh core/utils.sh core/config.sh core/deps.sh)
   for f in "${req[@]}"; do
-    if [[ -f "${BS_ROOT}/${f}" ]]; then
+    if is::file "${BS_ROOT}/${f}"; then
       echo "  [OK] ${f}"
     else
       echo "  [FAIL] ${f}"; fail=1
@@ -130,7 +130,7 @@ doctor_cmd() {
 
   # Required directories / Обязательные директории
   for d in core lib; do
-    if [[ -d "${BS_ROOT}/${d}" ]]; then
+    if is::dir "${BS_ROOT}/${d}"; then
       echo "  [OK] dir ${d}"
     else
       echo "  [FAIL] dir ${d}"; fail=1
@@ -140,7 +140,7 @@ doctor_cmd() {
   # Optional external tools / Опциональные внешние инструменты
   local opt
   for opt in shellcheck jq curl wget kubectl; do
-    if command -v "${opt}" >/dev/null 2>&1; then
+    if is::command "${opt}"; then
       echo "  [OK] optional tool: ${opt}"
     else
       echo "  [OPTIONAL] missing tool: ${opt}"
@@ -148,16 +148,16 @@ doctor_cmd() {
   done
 
   # Optional dependency check for lib modules / Проверка опциональных зависимостей lib-модулей
-  if command -v deps::check_module >/dev/null 2>&1; then
+  if is::function deps::check_module; then
     echo "Module dependency check:"
     local module
     for module in lib/integration/result lib/integration/http lib/integration/llm lib/integration/k8s; do
-      if [[ -f "${BS_ROOT}/${module}.sh" ]]; then
-        if deps::check_module "${module}" >/dev/null 2>&1; then
+      if is::file "${BS_ROOT}/${module}.sh"; then
+        if utils::quiet deps::check_module "${module}"; then
           echo "  [OK] ${module}: dependencies satisfied"
         else
           local missing
-          missing="$(deps::list_missing "${module}" 2>/dev/null || true)"
+          missing="$(utils::attempt deps::list_missing "${module}")"
           echo "  [OPTIONAL] ${module}: missing dependencies: ${missing}"
         fi
       fi
@@ -170,7 +170,7 @@ doctor_cmd() {
 run_cmd() {
   [[ $# -eq 0 ]] && die "run: script path required"
   local script=$1; shift
-  [[ -f "$script" ]] || die "run: file not found: $script"
+  is::file "$script" || die "run: file not found: $script"
   # Запускаем скрипт в новом bash с уже загруженным BS-окружением
   # Сбрасываем унаследованный BS_INITIALIZED, иначе init.sh пропустит загрузку
   exec bash -c '

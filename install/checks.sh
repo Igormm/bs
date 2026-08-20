@@ -4,12 +4,12 @@
 
 # Check if already installed
 is_already_installed() {
-  [[ -d "${TARGET_LIB}" && -f "${TARGET_BIN}" ]]
+  is::dir "${TARGET_LIB}" && is::file "${TARGET_BIN}"
 }
 
 # Check shell environment
 check_shell_environment() {
-  if [[ -z "${BASH_VERSION:-}" ]]; then
+  if is::empty "${BASH_VERSION:-}"; then
     printf "ERROR: This installer requires bash.\n" >&2
     printf "Установщик требует bash. Запустите: bash ./install.sh\n" >&2
     exit 1
@@ -19,7 +19,7 @@ check_shell_environment() {
   local shell_name="${ZSH_VERSION:+zsh}${BASH_VERSION:+bash}${KSH_VERSION:+ksh}"
   
   # If shell wasn't detected from version vars, check $0
-  if [[ -z "$shell_name" ]]; then
+  if is::empty "${shell_name}"; then
       case "${0##*/}" in
           *bash*) shell_name="bash" ;;
           *zsh*) shell_name="zsh" ;;

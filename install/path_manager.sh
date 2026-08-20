@@ -35,7 +35,7 @@ update_path_bashrc() {
   local bashrc="${HOME}/.bashrc"
   local line='export PATH="$HOME/.local/bin:$PATH"'
 
-  [[ -f "${bashrc}" ]] || touch "${bashrc}"
+  is::file "${bashrc}" || touch "${bashrc}"
 
   if grep -Fqx "${line}" "${bashrc}"; then
     printf "PATH уже настроен в %s\n" "${bashrc}"
@@ -57,8 +57,8 @@ auto_update_path() {
   local line='export PATH="$HOME/.local/bin:$PATH"'
 
   # bashrc
-  if [[ -f "${bashrc}" || ! -f "${zshrc}" ]]; then
-    if ! grep -Fqx "${line}" "${bashrc}" 2>/dev/null; then
+  if is::file "${bashrc}" || ! is::file "${zshrc}"; then
+    if ! utils::quiet_err grep -Fqx "${line}" "${bashrc}"; then
       printf "\n%s\n" "${line}" >> "${bashrc}"
       printf "Автоматически добавлено ~/.local/bin в PATH в %s\n" "${bashrc}"
     else
@@ -67,8 +67,8 @@ auto_update_path() {
   fi
 
   # zshrc
-  if [[ -f "${zshrc}" ]]; then
-    if ! grep -Fqx "${line}" "${zshrc}" 2>/dev/null; then
+  if is::file "${zshrc}"; then
+    if ! utils::quiet_err grep -Fqx "${line}" "${zshrc}"; then
       printf "\n%s\n" "${line}" >> "${zshrc}"
       printf "Автоматически добавлено ~/.local/bin в PATH в %s\n" "${zshrc}"
     else
