@@ -13,10 +13,11 @@ Implement or modify `core/` modules so they remain small, stable, backward-compa
 
 ## Core design principles
 
-1. **Core is loaded as a unit**: `bootstrap/init.sh` loads `core/prereq`, then `core/const`, `core/logger`, `core/errorhandler`, `core/version`, `core/utils`, `core/config`, `core/deps`. `core/args` is loaded on demand.
+1. **Core is loaded as a unit**: `bootstrap/init.sh` loads `core/prereq`, `core/lang`, then `core/const`, `core/logger`, `core/errorhandler`, `core/version`, `core/utils`, `core/config`, `core/deps`. `core/args` is loaded on demand.
 2. **Do not source `core/prereq.sh` from core modules**: `bs::guard`, `bs::guard_loaded`, and `bs::source_relative` are available a priori.
-3. **Minimize core dependencies**: `core/prereq.sh` has no dependencies. Other core modules should depend only on already-loaded core pieces.
-4. **Keep public surface small**: core functions are used by the entire framework; breaking changes require updating all callers.
+3. **`core/lang.sh` is the language kernel**: introspection (`bs::func_name`, `bs::type_of`), strings (`str::*`), collections (`arr::*`, `map::*`), predicates (`is::*`). New language-level primitives belong there — not scattered across modules.
+4. **Minimize core dependencies**: `core/prereq.sh` has no dependencies. Other core modules should depend only on already-loaded core pieces.
+5. **Keep public surface small**: core functions are used by the entire framework; breaking changes require updating all callers.
 
 ## Always follow these rules
 

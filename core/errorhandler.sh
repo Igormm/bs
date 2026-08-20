@@ -28,7 +28,7 @@ declare -ga BS_CLEANUP_STACK=()
 #   cleanup::add my_cleanup_function
 cleanup::add() {
 	local fn="${1-}"
-	if [[ -z "${fn}" ]]; then
+	if is::empty "${fn}"; then
 		log::warn "cleanup::add: не указана функция"
 		return "${E_INVALID:-2}"
 	fi
@@ -413,13 +413,13 @@ error::handler::command_not_found() {
     if command -v apt >/dev/null 2>&1; then
         local package
         package=$(apt-cache search "${cmd}" | head -n 1 | awk '{print $1}')
-        if [[ -n "${package}" ]]; then
+        if is::not_empty "${package}"; then
             log::info "You might need to install package: ${package}"
         fi
     elif command -v dnf >/dev/null 2>&1; then
         local package
         package=$(dnf search "${cmd}" 2>/dev/null | grep -E '^\w' | head -n 1 | awk '{print $1}')
-        if [[ -n "${package}" ]]; then
+        if is::not_empty "${package}"; then
             log::info "You might need to install package: ${package}"
         fi
     fi

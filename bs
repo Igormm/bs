@@ -20,7 +20,7 @@ if [[ -z "${BASH_VERSION:-}" || ${BASH_VERSINFO[0]} -lt 4 ]]; then
 fi
 
 # 1. Версия фреймворка 
-readonly BS_VERSION='0.3.0'
+readonly BS_VERSION='0.4.0'
 
 # 3. Определение BS_ROOT (если ещё не задан) 
 if [[ -z "${BS_ROOT:-}" ]]; then

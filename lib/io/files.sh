@@ -25,13 +25,13 @@
 #   BS_FILES_ATOMIC_FALLBACK=true|false
 #   BS_FILES_BACKUP_SUFFIX=.suffix
 #
-# @depends core/const, core/logger, core/utils, lib/system/permissions
+# @depends core/const, core/logger, core/utils, core/errorhandler, lib/system/permissions
 
 # Source Guard / Защита от повторной загрузки
 bs::guard "IO_FILES" || return 0
 
 # Зависимости / Dependencies
-bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../system/permissions.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/errorhandler.sh" "../system/permissions.sh"
 
 # Module version / Версия модуля
 # shellcheck disable=SC2034
@@ -393,6 +393,85 @@ io::files::append() {
   fi
 
   return "${E_SUCCESS}"
+}
+
+# ==========================================
+# Temporary files / Временные файлы
+# ==========================================
+
+# Registry of temp paths created with --cleanup / Реестр временных путей с --cleanup
+declare -ga IO_FILES_TEMPFILES=()
+
+# @private
+# @description Remove all registered temp paths (called via the cleanup stack).
+# @description Удалить все зарегистрированные временные пути (через cleanup-стек).
+io::files::__cleanup_registered() {
+  local p
+  for p in "${IO_FILES_TEMPFILES[@]:-}"; do
+    is::not_empty "${p}" && io::files::__cleanup_temp "${p}"
+  done
+  IO_FILES_TEMPFILES=()
+}
+
+# @description Create a temporary file with a unified policy.
+# @description Создать временный файл с единой политикой.
+#   With --cleanup the file is removed automatically on script exit via the
+#   cleanup stack (requires the entry point to use errorhandler::setup_trap,
+#   as the `bs` interpreter does).
+#   С --cleanup файл удаляется автоматически при выходе через cleanup-стек
+#   (точка входа должна использовать errorhandler::setup_trap, как `bs`).
+#   NOTE: takes a variable NAME (nameref), not command substitution —
+#   `tmp="$(io::files::tempfile)"` would lose the cleanup registration
+#   in a subshell.
+#   ВНИМАНИЕ: принимает ИМЯ переменной (nameref), а не $() — подстановка
+#   команды потеряла бы регистрацию очистки в subshell.
+# @param $1 Output variable name / Имя выходной переменной
+# @param $2 [--cleanup] / Авто-удаление при выходе
+# @example
+#   io::files::tempfile tmp --cleanup
+#   printf 'data' >> "${tmp}"
+io::files::tempfile() {
+  local -rn __tmp_out="${1:?output variable name required}"
+  shift
+  local cleanup=false
+  [[ "${1:-}" == "--cleanup" ]] && { cleanup=true; shift; }
+
+  if ! __tmp_out="$(mktemp "$@")"; then
+    log::error "Failed to create temporary file"
+    return "${LIB_ERROR_FILE_OPERATION}"
+  fi
+
+  if [[ "${cleanup}" == "true" ]]; then
+    IO_FILES_TEMPFILES+=("${__tmp_out}")
+    if [[ "${#IO_FILES_TEMPFILES[@]}" -eq 1 ]]; then
+      cleanup::add io::files::__cleanup_registered
+    fi
+  fi
+}
+
+# @description Create a temporary directory (same policy as tempfile).
+# @description Создать временный каталог (та же политика, что у tempfile).
+# @param $1 Output variable name / Имя выходной переменной
+# @param $2 [--cleanup] / Авто-удаление при выходе
+# @example
+#   io::files::tempdir tmpdir --cleanup
+io::files::tempdir() {
+  local -rn __tmp_out="${1:?output variable name required}"
+  shift
+  local cleanup=false
+  [[ "${1:-}" == "--cleanup" ]] && { cleanup=true; shift; }
+
+  if ! __tmp_out="$(mktemp -d "$@")"; then
+    log::error "Failed to create temporary directory"
+    return "${LIB_ERROR_FILE_OPERATION}"
+  fi
+
+  if [[ "${cleanup}" == "true" ]]; then
+    IO_FILES_TEMPFILES+=("${__tmp_out}")
+    if [[ "${#IO_FILES_TEMPFILES[@]}" -eq 1 ]]; then
+      cleanup::add io::files::__cleanup_registered
+    fi
+  fi
 }
 
 # ==========================================

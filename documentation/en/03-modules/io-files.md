@@ -46,6 +46,19 @@ io::files::append "${log_file}" "[${timestamp}] started"
 io::files::append "${log_file}" ""      # empty line
 ```
 
+## Temporary files
+
+```bash
+# Takes a variable NAME (nameref), not $() — command substitution would
+# lose the cleanup registration in a subshell.
+io::files::tempfile tmp                  # unified mktemp
+io::files::tempdir build_dir             # unified mktemp -d
+io::files::tempfile tmp --cleanup        # auto-removed on script exit
+```
+
+With `--cleanup` the path is registered and removed via the cleanup stack
+on exit (entry point must use `errorhandler::setup_trap`, as `bs` does).
+
 ## Copy
 
 ```bash

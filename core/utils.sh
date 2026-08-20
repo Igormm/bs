@@ -142,7 +142,7 @@ utils::split() {
 
   local IFS="${delim}"
   # Пустая строка даёт пустой массив, а не массив из одной пустой строки
-  if [[ -z "${str}" ]]; then
+  if is::empty "${str}"; then
     __utils_split_ref=()
     return 0
   fi
@@ -175,10 +175,10 @@ utils::ensure_source() {
   local -r func="${2:?Function name is required}"
 
   #  валидация аргументов 
-  [[ -n ${file} ]] || { log::error "file argument is empty"; return "${E_INVALID:-2}"; }
-  [[ -n ${func} ]] || { log::error "function argument is empty"; return "${E_INVALID:-2}"; }
+  is::not_empty ${file} || { log::error "file argument is empty"; return "${E_INVALID:-2}"; }
+  is::not_empty ${func} || { log::error "function argument is empty"; return "${E_INVALID:-2}"; }
 
-  if [[ ! -f "${file}" ]]; then
+  if ! is::file "${file}"; then
     log::error "file not found: ${file}"
     return "${E_ERROR:-1}"
   fi
@@ -200,7 +200,7 @@ utils::ensure_source() {
 utils::ensure_shell_version() {
     local -r required_version="${1:-4}"  # Default to version 4 if not specified
 
-    if [[ -z "${SHELL:-}" ]]; then
+    if is::empty "${SHELL:-}"; then
         log::error "SHELL variable is not set, cannot verify shell version"
         return "${E_ERROR:-1}"
     fi
@@ -208,13 +208,13 @@ utils::ensure_shell_version() {
 
     case "${shell_name}" in
         "bash")
-            if [[ -z "${BASH_VERSION:-}" ]] || [[ "${BASH_VERSION%%.*}" -lt "${required_version}" ]]; then
+            if is::empty "${BASH_VERSION:-}" || [[ "${BASH_VERSION%%.*}" -lt "${required_version}" ]]; then
                 log::error "Bash version ${required_version} or higher is required but you have version ${BASH_VERSION:-unknown}"
                 return "${E_ERROR:-1}"
             fi
             ;;
         "zsh")
-            if [[ -z "${ZSH_VERSION:-}" ]] || [[ "${ZSH_VERSION%%.*}" -lt "${required_version}" ]]; then
+            if is::empty "${ZSH_VERSION:-}" || [[ "${ZSH_VERSION%%.*}" -lt "${required_version}" ]]; then
                 log::error "Zsh version ${required_version} or higher is required but you have version ${ZSH_VERSION:-unknown}"
                 return "${E_ERROR:-1}"
             fi
@@ -236,7 +236,7 @@ utils::detect_root() {
     local script_source
     
     # 1. Пробуем получить из переменной окружения
-    if [[ -n "${FRAMEWORK_ROOT:-}" ]] && [[ -d "${FRAMEWORK_ROOT}" ]]; then
+    if is::not_empty "${FRAMEWORK_ROOT:-}" && is::dir "${FRAMEWORK_ROOT}"; then
         # log:: опционален для utils (нижний уровень) / log:: is optional for utils
         if declare -F log::debug >/dev/null 2>&1; then
             log::debug "FRAMEWORK_ROOT задан явно: ${FRAMEWORK_ROOT}"
@@ -252,7 +252,7 @@ utils::detect_root() {
     fi
     
     # 3. Обработка симлинков
-    if [[ -L "${script_source}" ]]; then
+    if is::symlink "${script_source}"; then
         script_source="$(readlink -f -- "${script_source}")"
     fi
     

@@ -158,7 +158,7 @@ log::__format_message() {
             # JSON формат / JSON format
             local escaped_text
             escaped_text="$(log::__json_escape "${text}")"
-            if [[ -n "$timestamp" ]]; then
+            if is::not_empty "$timestamp"; then
                 printf '{"timestamp":"%s","level":"%s","message":"%s"}\n' \
                     "$timestamp" "$level" "$escaped_text"
             else
@@ -167,7 +167,7 @@ log::__format_message() {
             ;;
         structured)
             # Структурированный формат / Structured format
-            if [[ -n "$timestamp" ]]; then
+            if is::not_empty "$timestamp"; then
                 printf '[%s] %-5s | %s\n' "$timestamp" "$level" "$text"
             else
                 printf '[%-5s] %s\n' "$level" "$text"
@@ -186,7 +186,7 @@ log::__format_message() {
                     color="${color}${bold}"
                 fi
                 
-                if [[ -n "$timestamp" ]]; then
+                if is::not_empty "$timestamp"; then
                     printf '%s[%s]%s %s%-5s%s %s\n' \
                         '\033[90m' "$timestamp" "$color_reset" \
                         "$color" "$level" "$color_reset" \
@@ -198,7 +198,7 @@ log::__format_message() {
                 fi
             else
                 # Текстовый формат без цветов / Text format without colors
-                if [[ -n "$timestamp" ]]; then
+                if is::not_empty "$timestamp"; then
                     printf '[%s] %-5s %s\n' "$timestamp" "$level" "$text"
                 else
                     printf '[%-5s] %s\n' "$level" "$text"
@@ -406,7 +406,7 @@ log::clear_line() {
 # ==========================================
 
 # Проверяем доступность core/const.sh / Check if core/const.sh is available
-if [[ -z "${E_SUCCESS:-}" ]]; then
+if is::empty "${E_SUCCESS:-}"; then
     echo "logger: warning: core/const.sh not loaded, using default constants" >&2
     readonly E_SUCCESS=0
     readonly E_ERROR=1

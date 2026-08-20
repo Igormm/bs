@@ -15,3 +15,6 @@
 # Local promo/article drafts that should never be committed
 *_DRAFT.md
 PROMO_DRAFT.md
+
+# Local reference books / Локальные справочники
+*.pdf

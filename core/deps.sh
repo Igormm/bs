@@ -35,14 +35,14 @@ __deps::parse_optdeps() {
   local module_path="${1:-}"
   local module_file="${BS_ROOT}/${module_path}.sh"
 
-  if [[ -z "${module_path}" || ! -f "${module_file}" ]]; then
+  if is::empty "${module_path}" || ! is::file "${module_file}"; then
     return 0
   fi
 
   local line
   line=$(grep -m1 "^[[:space:]]*#.*@optdeps" "${module_file}" 2>/dev/null || true)
 
-  if [[ -z "${line}" ]]; then
+  if is::empty "${line}"; then
     return 0
   fi
 
@@ -62,7 +62,7 @@ __deps::parse_optdeps() {
 deps::has() {
   local cmd="${1:-}"
 
-  if [[ -z "${cmd}" ]]; then
+  if is::empty "${cmd}"; then
     log::warn "deps::has: command name required"
     return 1
   fi
@@ -87,7 +87,7 @@ deps::require() {
   local cmd="${1:-}"
   local message="${2:-}"
 
-  if [[ -z "${cmd}" ]]; then
+  if is::empty "${cmd}"; then
     log::warn "deps::require: command name required"
     return "${E_INVALID}"
   fi
@@ -96,7 +96,7 @@ deps::require() {
     return 0
   fi
 
-  if [[ -n "${message}" ]]; then
+  if is::not_empty "${message}"; then
     log::error "${message}"
   else
     log::error "Required dependency not found: ${cmd}"
@@ -115,7 +115,7 @@ deps::require() {
 deps::list_missing() {
   local module_path="${1:-}"
 
-  if [[ -z "${module_path}" ]]; then
+  if is::empty "${module_path}"; then
     log::warn "deps::list_missing: module path required"
     return "${E_INVALID}"
   fi
@@ -123,7 +123,7 @@ deps::list_missing() {
   local optdeps
   optdeps="$(__deps::parse_optdeps "${module_path}")"
 
-  if [[ -z "${optdeps}" ]]; then
+  if is::empty "${optdeps}"; then
     return 0
   fi
 
@@ -155,7 +155,7 @@ deps::list_missing() {
 deps::check_module() {
   local module_path="${1:-}"
 
-  if [[ -z "${module_path}" ]]; then
+  if is::empty "${module_path}"; then
     log::warn "deps::check_module: module path required"
     return "${E_INVALID}"
   fi
@@ -163,7 +163,7 @@ deps::check_module() {
   local missing
   missing="$(deps::list_missing "${module_path}" 2>/dev/null || true)"
 
-  if [[ -n "${missing}" ]]; then
+  if is::not_empty "${missing}"; then
     log::warn "Module ${module_path} is missing optional dependencies: ${missing}"
     return 1
   fi

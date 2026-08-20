@@ -57,6 +57,30 @@ main() {
     io::files::append "" "nothing" || rc=$?
     testframework::assert_equal "${E_INVALID}" "${rc}" "append rejects empty file path"
 
+    # ==========================================
+    # tempfile / tempdir
+    # ==========================================
+    testframework::section "tempfile and tempdir"
+
+    local tmp_file
+    io::files::tempfile tmp_file
+    testframework::assert_command "is::file '${tmp_file}'" "tempfile creates a file"
+
+    local tmp_dir_auto
+    io::files::tempdir tmp_dir_auto --cleanup
+    testframework::assert_command "is::dir '${tmp_dir_auto}'" "tempdir creates a directory"
+
+    local tmp_auto
+    io::files::tempfile tmp_auto --cleanup
+    testframework::assert_true "${#IO_FILES_TEMPFILES[@]} -ge 2" "--cleanup registers paths"
+
+    io::files::__cleanup_registered
+    testframework::assert_false "is::exists '${tmp_auto}'" "cleanup removes tempfile"
+    testframework::assert_false "is::exists '${tmp_dir_auto}'" "cleanup removes tempdir"
+    testframework::assert_equal "0" "${#IO_FILES_TEMPFILES[@]}" "registry empty after cleanup"
+
+    rm -f "${tmp_file}"
+
     export FRAMEWORK_DRY_RUN=true
     io::files::append "${tmp_dir}/dry_log.txt" "should not appear"
     testframework::assert_false "io::files::exists '${tmp_dir}/dry_log.txt'" "append honors dry-run"

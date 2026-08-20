@@ -63,10 +63,21 @@ declare -g GROUP_MODULE_LOADED="1"
 
 ## Error handling
 
-- Use `return "${E_ERROR}"` or specific `LIB_ERROR_*` / `INTEGRATION_ERROR_*` codes from `core/const.sh`.
-- Validate arguments with `"${1:?message}"`.
+- Use `return "${E_ERROR}"` or specific `LIB_ERROR_*` / `INTEGRATION_ERROR_*` codes from `core/const.sh`. Never bare `return 1`/`return 2` for error statuses (boolean predicates returning 0/1 as true/false are the exception).
+- Report errors with `error::throw "message" "${CODE}"` — the caller's function name is auto-detected via `FUNCNAME`; do NOT write `local func_name="..."` boilerplate.
+- Validate arguments with `"${1:?message}"` and `is::empty`/`is::not_empty` checks.
 - Log warnings/errors with `log::warn` / `log::error`.
 - For fatal errors use `log::fatal` only in entry points.
+
+## Language layer (always loaded — use it, never hand-roll)
+
+- Predicates: `is::empty`, `is::not_empty`, `is::file`, `is::dir`, `is::exists`, `is::number`, `is::command`, `is::function` — instead of `[[ -z/-n/-f/... ]]` and `command -v ... >/dev/null 2>&1`.
+- Silence idioms: `utils::quiet` (`>/dev/null 2>&1`), `utils::quiet_err` (`2>/dev/null`), `utils::ignore` (`>/dev/null 2>&1 || true`), `utils::attempt` (`2>/dev/null || true`).
+- Strings/collections: `str::upper/lower/trim/replace/contains/starts_with/ends_with`, `arr::push/length/join/contains/from_lines`, `map::has`.
+- Signals: `signal::on SIGINT fn` / `signal::ignore` / `signal::reset` — instead of raw `trap`.
+- Files: `io::files::append` instead of `echo ... >> file`.
+- Time: `utils::now_s/now_ms/now_float/stamp/log_stamp` instead of raw `date +...`.
+- Tools: `system::processes::is_running name` instead of `pgrep -x ... >/dev/null`; `deps::missing_tools` for dependency checks.
 
 ## Testing conventions
 

@@ -46,6 +46,19 @@ io::files::append "${log_file}" "[${timestamp}] started"
 io::files::append "${log_file}" ""      # пустая строка
 ```
 
+## Временные файлы
+
+```bash
+# Принимает ИМЯ переменной (nameref), а не $() — подстановка команды
+# потеряла бы регистрацию очистки в subshell.
+io::files::tempfile tmp                  # единый mktemp
+io::files::tempdir build_dir             # единый mktemp -d
+io::files::tempfile tmp --cleanup        # авто-удаление при выходе
+```
+
+С `--cleanup` путь регистрируется и удаляется через cleanup-стек при выходе
+(точка входа должна использовать `errorhandler::setup_trap`, как `bs`).
+
 ## Копирование
 
 ```bash

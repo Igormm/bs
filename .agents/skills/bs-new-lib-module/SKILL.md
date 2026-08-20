@@ -47,6 +47,10 @@ group::module::function() {
 - Guard name: `SCREAMING_SNAKE_CASE` of the module path (e.g. `lib/io/files.sh` → `IO_FILES`).
 - Public functions: `group::module::name` namespace, with DocBlock (`@description`, `@param`, `@stdout`, `@return`). Private helpers: `group::module::__name` with `@private`.
 - Use framework abstractions instead of raw commands: `io::streams::print` over `echo`, `utils::has` over `command -v ... >/dev/null 2>&1`, `utils::quiet`/`utils::quiet_err` over output redirects, `utils::ignore` over `>/dev/null 2>&1 || true`, `utils::attempt` over `2>/dev/null || true`, return codes from `core/const.sh` (`E_SUCCESS`, `E_INVALID`, ...). Never use bare `return 1`/`return 2` for error statuses — only in boolean predicates where 0/1 is a true/false protocol.
+- Use the `is::*` predicates instead of test flags: `is::empty`/`is::not_empty` for `[[ -z/-n ]]`, `is::file`/`is::dir`/`is::exists` for `[[ -f/-d/-e ]]`, `is::number`, `is::command`, `is::function`.
+- Report errors with `error::throw "msg" "${CODE}"` (caller name auto-detected) — never the `local func_name="..."` + `errorhandler::throw` pair.
+- Signals via `signal::on`/`signal::ignore`/`signal::reset`, not raw `trap`.
+- Strings/collections via `str::*`, `arr::*` (incl. `arr::from_lines`), `map::has`; appends via `io::files::append`; time via `utils::now_*`/`stamp`/`log_stamp`.
 - Constants are `readonly` `SCREAMING_SNAKE_CASE`; locals are `local -r lower_snake_case`. No CamelCase/mixedCase anywhere — single unix-like style (code-style-guide §2.1).
 - 2-space indent, 80-char lines, `[[ ... ]]`, always quote `"${var}"`.
 - Bilingual (ru/en) comments, matching existing modules.

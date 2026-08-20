@@ -115,7 +115,7 @@ args::__is_allowed_at() {
     local level="${1}"
     local name="${2}"
 
-    [[ -z "${__ARGS_TREE["${level}"]:-}" ]] && return "${E_ERROR:-1}"
+    is::empty "${__ARGS_TREE["${level}"]:-}" && return "${E_ERROR:-1}"
 
     local item
     local IFS=' '
@@ -178,7 +178,7 @@ args::level() {
     local level="${1:-}"
     shift $(( $# > 0 ? 1 : 0 ))
 
-    if [[ -z "${level}" ]] || ! [[ "${level}" =~ ^[0-9]+$ ]] || [[ "${level}" -eq 0 ]]; then
+    if is::empty "${level}" || ! [[ "${level}" =~ ^[0-9]+$ ]] || [[ "${level}" -eq 0 ]]; then
         log::warn "args::level: level must be a positive integer, got: ${level}"
         return "${E_ERROR:-1}"
     fi
@@ -189,14 +189,14 @@ args::level() {
 
     local name
     for name in "$@"; do
-        if [[ -z "${name}" ]]; then
+        if is::empty "${name}"; then
             log::warn "args::level: empty parameter name at level ${level}"
             return "${E_ERROR:-1}"
         fi
         if args::__is_allowed_at "${level}" "${name}"; then
             continue  # Уже объявлен / Already declared
         fi
-        if [[ -n "${__ARGS_TREE["${level}"]:-}" ]]; then
+        if is::not_empty "${__ARGS_TREE["${level}"]:-}"; then
             __ARGS_TREE["${level}"]+=" ${name}"
         else
             __ARGS_TREE["${level}"]="${name}"
@@ -216,7 +216,7 @@ args::describe() {
     local name="${1:-}"
     local text="${2:-}"
 
-    if [[ -z "${name}" ]]; then
+    if is::empty "${name}"; then
         log::warn "args::describe: parameter name not specified"
         return "${E_ERROR:-1}"
     fi
@@ -245,7 +245,7 @@ args::flag() {
     # Убираем префикс --, если передан / Strip the -- prefix if given
     name="${name#--}"
 
-    if [[ -z "${name}" ]]; then
+    if is::empty "${name}"; then
         log::warn "args::flag: flag name not specified"
         return "${E_ERROR:-1}"
     fi
@@ -269,7 +269,7 @@ args::flag_describe() {
 
     name="${name#--}"
 
-    if [[ -z "${name}" ]]; then
+    if is::empty "${name}"; then
         log::warn "args::flag_describe: flag name not specified"
         return "${E_ERROR:-1}"
     fi
@@ -288,7 +288,7 @@ args::flag_get() {
     name="${name#--}"
 
     local value="${ARGS_FLAGS["${name}"]:-}"
-    if [[ -z "${value}" ]]; then
+    if is::empty "${value}"; then
         return "${E_ERROR:-1}"
     fi
     printf '%s\n' "${value}"
@@ -330,11 +330,11 @@ args::help() {
 
     local item
     for ((level = 1; level <= max_level; level++)); do
-        if [[ -n "${__ARGS_TREE["${level}"]:-}" ]]; then
+        if is::not_empty "${__ARGS_TREE["${level}"]:-}"; then
             local IFS=' '
             local choices=""
             for item in ${__ARGS_TREE["${level}"]}; do
-                if [[ -n "${choices}" ]]; then
+                if is::not_empty "${choices}"; then
                     choices+="|${item}"
                 else
                     choices="${item}"
@@ -349,11 +349,11 @@ args::help() {
         printf '\nParameters / Параметры:\n'
 
         for ((level = 1; level <= max_level; level++)); do
-            [[ -z "${__ARGS_TREE["${level}"]:-}" ]] && continue
+            is::empty "${__ARGS_TREE["${level}"]:-}" && continue
             printf '  level %d: %s\n' "${level}" "${__ARGS_TREE[${level}]// / | }"
             local IFS=' '
             for item in ${__ARGS_TREE["${level}"]}; do
-                if [[ -n "${__ARGS_DESCRIPTIONS["${item}"]:-}" ]]; then
+                if is::not_empty "${__ARGS_DESCRIPTIONS["${item}"]:-}"; then
                     printf '    %-16s — %s\n' "${item}" "${__ARGS_DESCRIPTIONS["${item}"]}"
                 fi
             done
@@ -373,7 +373,7 @@ args::help() {
             if [[ "${__ARGS_FLAGS["${flag_name}"]:-}" == "value" ]]; then
                 flag_label="--${flag_name} <value>"
             fi
-            if [[ -n "${__ARGS_FLAG_DESCRIPTIONS["${flag_name}"]:-}" ]]; then
+            if is::not_empty "${__ARGS_FLAG_DESCRIPTIONS["${flag_name}"]:-}"; then
                 printf '    %-22s — %s\n' "${flag_label}" "${__ARGS_FLAG_DESCRIPTIONS["${flag_name}"]}"
             else
                 printf '    %s\n' "${flag_label}"
@@ -441,7 +441,7 @@ args::parse() {
             fi
 
             # Неизвестный флаг / Unknown flag
-            if [[ -z "${__ARGS_FLAGS["${flag_name}"]:-}" ]]; then
+            if is::empty "${__ARGS_FLAGS["${flag_name}"]:-}"; then
                 log::error "unknown flag: \"--${flag_name}\""
                 args::help >&2
                 return "${E_INVALID:-2}"
@@ -497,7 +497,7 @@ args::parse() {
         # Parameter exists in the tree but at another level
         local real_level
         real_level="$(args::__level_of "${param}")"
-        if [[ -n "${real_level}" ]]; then
+        if is::not_empty "${real_level}"; then
             log::error "parameter \"${param}\" belongs to level ${real_level}, but was used at level ${position}"
         else
             log::error "unknown parameter: \"${param}\""
@@ -518,13 +518,13 @@ args::parse() {
 args::get() {
     local -r position="${1:-}"
 
-    if [[ -z "${position}" ]] || ! [[ "${position}" =~ ^[0-9]+$ ]] || [[ "${position}" -eq 0 ]]; then
+    if is::empty "${position}" || ! [[ "${position}" =~ ^[0-9]+$ ]] || [[ "${position}" -eq 0 ]]; then
         log::warn "args::get: position must be a positive integer, got: ${position}"
         return "${E_ERROR:-1}"
     fi
 
     local value="${ARGS_PARAMS[$((position - 1))]:-}"
-    if [[ -z "${value}" ]]; then
+    if is::empty "${value}"; then
         return "${E_ERROR:-1}"
     fi
     printf '%s\n' "${value}"
@@ -590,12 +590,12 @@ ${func_name}() {
 EOF
 
     # После value-флага значение не дополняем / Do not complete after a value flag
-    if [[ -n "${value_flags}" ]]; then
+    if is::not_empty "${value_flags}"; then
         local IFS=' '
         local vf_patterns=""
         local vf
         for vf in ${value_flags}; do
-            if [[ -n "${vf_patterns}" ]]; then
+            if is::not_empty "${vf_patterns}"; then
                 vf_patterns+="|${vf}"
             else
                 vf_patterns="${vf}"
@@ -626,7 +626,7 @@ EOF
         case "\${word}" in
 EOF
 
-    if [[ -n "${value_flags}" ]]; then
+    if is::not_empty "${value_flags}"; then
         cat <<EOF
             ${vf_patterns}) ((++i)) ;;   # пропускаем значение value-флага / skip value flag value
 EOF
@@ -645,7 +645,7 @@ EOF
 
     local item
     for ((level = 1; level <= max_level; level++)); do
-        if [[ -n "${__ARGS_TREE["${level}"]:-}" ]]; then
+        if is::not_empty "${__ARGS_TREE["${level}"]:-}"; then
             printf '        %d) choices="%s" ;;\n' "${level}" "${__ARGS_TREE[${level}]}"
         fi
     done

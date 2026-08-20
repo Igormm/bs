@@ -59,7 +59,7 @@ __config::set_defaults() {
 # @return 0 if file loaded or does not exist, 1 on load error
 __config::load_file() {
   local file="${1:-}"
-  [[ -n "${file}" && -f "${file}" ]] || return 0
+  is::not_empty "${file}" && is::file "${file}" || return 0
 
   log::debug "Loading config file: ${file}"
 
@@ -67,9 +67,9 @@ __config::load_file() {
   local value
   local line
 
-  while IFS= read -r line || [[ -n "${line}" ]]; do
+  while IFS= read -r line || is::not_empty "${line}"; do
     # Skip comments and empty lines / Пропускаем комментарии и пустые строки
-    [[ -z "${line}" || "${line}" =~ ^[[:space:]]*# ]] && continue
+    is::empty "${line}" || [[ "${line}" =~ ^[[:space:]]*# ]] && continue
 
     # Parse KEY="value" or KEY=value / Разбираем KEY="value" или KEY=value
     if [[ "${line}" =~ ^([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*=[[:space:]]*(.*)$ ]]; then
@@ -96,7 +96,7 @@ __config::load_file() {
 __config::export_to_env() {
   local key
   for key in "${!BS_CONFIG[@]}"; do
-    if [[ -n "${BS_CONFIG[${key}]:-}" ]]; then
+    if is::not_empty "${BS_CONFIG[${key}]:-}"; then
       printf -v "${key}" '%s' "${BS_CONFIG[${key}]}"
       export "${key}"
     fi
@@ -118,7 +118,7 @@ config::load() {
   __config::set_defaults
 
   # Ensure user config directory exists / Создаём директорию пользовательского конфига
-  if [[ ! -d "${BS_CONFIG_USER_DIR}" ]]; then
+  if ! is::dir "${BS_CONFIG_USER_DIR}"; then
     utils::ignore mkdir -p "${BS_CONFIG_USER_DIR}"
   fi
 
@@ -126,14 +126,14 @@ config::load() {
   __config::load_file "${BS_CONFIG_USER_FILE}"
 
   # Load project-local config / Локальный конфиг проекта
-  if [[ -f "${BS_CONFIG_LOCAL_FILE}" ]]; then
+  if is::file "${BS_CONFIG_LOCAL_FILE}"; then
     __config::load_file "${BS_CONFIG_LOCAL_FILE}"
   fi
 
   # Environment variables override / Переменные окружения имеют приоритет
   local key
   for key in "${!BS_CONFIG[@]}"; do
-    if [[ -n "${!key:-}" ]]; then
+    if is::not_empty "${!key:-}"; then
       BS_CONFIG["${key}"]="${!key}"
     fi
   done
@@ -155,14 +155,14 @@ config::get() {
   local key="${1:-}"
   local default_value="${2:-}"
 
-  if [[ -z "${key}" ]]; then
+  if is::empty "${key}"; then
     log::warn "config::get: key required"
     return "${E_INVALID}"
   fi
 
   if [[ -v "BS_CONFIG[${key}]" ]]; then
     printf '%s' "${BS_CONFIG[${key}]}"
-  elif [[ -n "${default_value}" ]]; then
+  elif is::not_empty "${default_value}"; then
     printf '%s' "${default_value}"
   else
     return "${E_INVALID}"
@@ -182,7 +182,7 @@ config::set() {
   local key="${1:-}"
   local value="${2:-}"
 
-  if [[ -z "${key}" ]]; then
+  if is::empty "${key}"; then
     log::warn "config::set: key required"
     return "${E_INVALID}"
   fi
