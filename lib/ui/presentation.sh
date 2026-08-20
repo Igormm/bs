@@ -262,31 +262,58 @@ presentation::table() {
     done
 }
 
+# @private
+# @description Display width of a string (wide chars/emoji count as 2 cells).
+# @description Ширина строки на экране (широкие символы/эмодзи = 2 клетки).
+presentation::__disp_width() {
+    local s="$1" w=0 c blen i
+    for ((i = 0; i < ${#s}; i++)); do
+        c="${s:i:1}"
+        blen=$(LC_ALL=C printf '%s' "$c" | wc -c)
+        if (( blen >= 4 )); then (( w += 2 )); else (( w += 1 )); fi
+    done
+    printf '%s' "$w"
+}
+
 # @description Print a box around text
-# @param $1 Text to box (multiple lines separated by \n)
+# @param $1 Text to box (multiple lines separated by \n or real newlines)
+# @param $2 [optional] "round" for rounded corners / скруглённые углы
 # @example
 #   presentation::boxed "Line 1\nLine 2\nLine 3"
+#   presentation::boxed "Text" round
 presentation::boxed() {
     local text="$1"
+    local -r style="${2:-square}"
+
+    # Литеральные \n тоже считаем переносами / literal \n counts as newline
+    text="${text//\\n/$'\n'}"
+
     local -a lines
-    IFS=$'\n' read -ra lines <<< "$text"
-    
-    local max_len=0
-    local line
+    mapfile -t lines <<< "${text}"
+
+    # Ширина в экранных клетках (printf %-*s считает байты и ломает Unicode)
+    # Width in display cells (printf %-*s counts bytes and breaks Unicode)
+    local max_w=0 w line
     for line in "${lines[@]}"; do
-        if [[ ${#line} -gt $max_len ]]; then
-            max_len=${#line}
-        fi
+        w="$(presentation::__disp_width "$line")"
+        (( w > max_w )) && max_w=${w}
     done
-    
-    local border_len=$((max_len + 2))
-    local border=$(printf '%*s' "$border_len" | tr ' ' '─')
-    
-    echo "┌${border}┐"
+
+    local border
+    printf -v border '%*s' "$((max_w + 2))" ''
+    border="${border// /─}"
+
+    local tl='┌' tr='┐' bl='└' br='┘'
+    if [[ "${style}" == "round" ]]; then
+        tl='╭' tr='╮' bl='╰' br='╯'
+    fi
+
+    echo "${tl}${border}${tr}"
     for line in "${lines[@]}"; do
-        printf "│ %-${max_len}s │\n" "$line"
+        w="$(presentation::__disp_width "$line")"
+        printf '│ %s%*s │\n' "${line}" "$((max_w - w))" ''
     done
-    echo "└${border}┘"
+    echo "${bl}${border}${br}"
 }
 
 # @description Print a colorful title
