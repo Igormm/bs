@@ -160,7 +160,7 @@ Bash 4+ (без внешних команд). Автозагружается с�
 #### `log::fatal <message...>`
 - Параметры: `$@` — текст сообщения
 - Возвращает: `E_ERROR` (или 1, если `core/const.sh` не загружен); **не** завершает скрипт — решение за вызывающим
-- Пример: `log::fatal "Critical error, cannot continue" || bs::exit "${E_ERROR}"` (или одним вызовом: `error::exit "Critical error, cannot continue"`)
+- Пример: `log::fatal "Critical error, cannot continue" || bs::exit error` (или одним вызовом: `error::exit "Critical error, cannot continue"`)
 
 #### `log::print <message...>`
 - Алиас для `log::info` (обратная совместимость)
@@ -230,10 +230,10 @@ Bash 4+ (без внешних команд). Автозагружается с�
 - Возвращает: 0
 - Пример: `errorhandler::setup_trap`
 
-#### `bs::exit [code]`
-- Параметры: `$1` — код выхода (опционально, по умолчанию 0)
+#### `bs::exit [code|name]`
+- Параметры: `$1` — код выхода числом ИЛИ именем (опционально, по умолчанию 0): `success` → `E_SUCCESS`, `invalid` → `E_INVALID`, `file_not_found` → `LIB_ERROR_FILE_NOT_FOUND`, …
 - Не возвращается: выполняет весь стек очистки, затем `exit`
-- Пример: `bs::exit 1`
+- Пример: `bs::exit invalid`
 
 ### Отчёты об ошибках
 

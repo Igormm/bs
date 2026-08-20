@@ -249,7 +249,7 @@ main() {
         0)
             log::info "Exiting PS1 configuration example"
             log::info "Выход из примера конфигурации PS1"
-            bs::exit "${E_SUCCESS}"
+            bs::exit success
             ;;
         *)
             log::error "Invalid option: ${choice}"

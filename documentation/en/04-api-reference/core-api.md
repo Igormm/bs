@@ -161,7 +161,7 @@ Level weights: `TRACE`=0, `DEBUG`=10, `INFO`=20, `SUCCESS`=25, `WARN`=30, `ERROR
 #### `log::fatal <message...>`
 - Parameters: `$@` — message text
 - Returns: `E_ERROR` (or 1 if `core/const.sh` is not loaded); does **not** exit — the caller decides
-- Example: `log::fatal "Critical error, cannot continue" || bs::exit "${E_ERROR}"` (or simply `error::exit "Critical error, cannot continue"`)
+- Example: `log::fatal "Critical error, cannot continue" || bs::exit error` (or simply `error::exit "Critical error, cannot continue"`)
 
 #### `log::print <message...>`
 - Alias for `log::info` (backward compatibility)
@@ -231,10 +231,10 @@ Any module can register a cleanup function; the stack runs in LIFO order when th
 - Returns: 0
 - Example: `errorhandler::setup_trap`
 
-#### `bs::exit [code]`
-- Parameters: `$1` — exit code (optional, default 0)
+#### `bs::exit [code|name]`
+- Parameters: `$1` — exit code number OR name (optional, default 0): `success` → `E_SUCCESS`, `invalid` → `E_INVALID`, `file_not_found` → `LIB_ERROR_FILE_NOT_FOUND`, …
 - Does not return: runs the whole cleanup stack, then `exit`
-- Example: `bs::exit 1`
+- Example: `bs::exit invalid`
 
 ### Reporting errors
 

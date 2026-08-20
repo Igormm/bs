@@ -145,15 +145,33 @@ signal::reset() {
 }
 
 # @description Exit BS application with cleanup / Выход из приложения BS с очисткой
-# @param $1 [optional] Exit code (default: 0) / Код выхода (по умолчанию 0)
+#   Accepts a number or a code name / Принимает число или имя кода:
+#     bs::exit 0            — numeric code / числовой код
+#     bs::exit success      — E_SUCCESS
+#     bs::exit invalid      — E_INVALID
+#     bs::exit file_not_found — LIB_ERROR_FILE_NOT_FOUND
+# @param $1 [optional] Exit code or name (default: 0) / Код или имя (по умолчанию 0)
 # @example
-#   BS::exit
-#   BS::exit 1
+#   bs::exit
+#   bs::exit invalid
 bs::exit() {
-    local -r exit_code="${1:-0}"
+    local code="${1:-0}"
+
+    # Именованные коды: E_<NAME>, затем LIB_ERROR_<NAME>
+    # Named codes: E_<NAME>, then LIB_ERROR_<NAME>
+    if ! is::number "${code}"; then
+        local var="E_${code^^}"
+        [[ -z "${!var:-}" ]] && var="LIB_ERROR_${code^^}"
+        code="${!var:-}"
+        if is::empty "${code}"; then
+            log::error "bs::exit: unknown exit code name: ${1}"
+            code="${E_ERROR:-1}"
+        fi
+    fi
+
     # Run all cleanup functions / Запустить все функции очистки
     cleanup::__run_all
-    exit "${exit_code}"
+    exit "${code}"
 }
 
 # @description Exit with error message and cleanup / Выход с сообщением об ошибке и

@@ -54,10 +54,10 @@ main() {
     #   source <(bs run examples/deploytoolexample.sh --emit-completion)
     if [[ "${1:-}" == "--emit-completion" ]]; then
         args::completion "$(basename "$0")"
-        bs::exit "${E_SUCCESS}"
+        bs::exit success
     fi
 
-    args::parse_or_exit "$@"
+    args::require "$@"
 
     # ==========================================
     # Выполнение команды
@@ -69,7 +69,7 @@ main() {
 
     if [[ "${action}" == "status" ]]; then
         io::streams::printf '  %-12s %s\n' "environment" "${env}" "release" "v1.4.2" "health" "green"
-        bs::exit "${E_SUCCESS}"
+        bs::exit success
     fi
 
     # Сухой прогон / Dry run

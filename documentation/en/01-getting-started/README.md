@@ -94,7 +94,7 @@ load "core/args"
 load "lib/io/streams"
 
 args::define hello
-args::parse_or_exit "$@"
+args::require "$@"
 io::streams::print "works: $(args::get 1)"
 ```
 

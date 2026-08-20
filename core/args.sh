@@ -396,7 +396,7 @@ args::help() {
 # @param $@ Script parameters (обычно "$@") / Script parameters (usually "$@")
 # @return 0 on success, E_INVALID on validation error / 0 при успехе, E_INVALID при ошибке
 # @example
-#   args::parse_or_exit "$@"   # or: args::parse "$@" || bs::exit "${E_INVALID}"
+#   args::require "$@"   # or: args::parse "$@" || bs::exit invalid
 args::parse() {
     ARGS_PARAMS=()
     ARGS_FLAGS=()
@@ -509,18 +509,18 @@ args::parse() {
     return "${E_SUCCESS:-0}"
 }
 
-# @description Parse args or exit with cleanup on failure — the one-liner.
-# @description Разобрать аргументы или выйти с очисткой при ошибке — одна строка.
-#   Replaces the two-line idiom / Заменяет двухстрочную идиому:
-#     args::parse "$@" || bs::exit "${E_INVALID}"
-#     [[ "${ARGS_HELP_REQUESTED}" == "1" ]] && bs::exit "${E_SUCCESS}"
+# @description Require valid args — parse, or exit with cleanup. The one-liner.
+# @description Требовать валидные аргументы: разбор или выход с очисткой.
+#   Одна строка вместо идиомы:
+#     args::parse "$@" || bs::exit invalid
+#     [[ "${ARGS_HELP_REQUESTED}" == "1" ]] && bs::exit success
 # @param $@ Script parameters (usually "$@") / Параметры скрипта (обычно "$@")
 # @example
-#   args::parse_or_exit "$@"
-args::parse_or_exit() {
-    args::parse "$@" || bs::exit "${E_INVALID:-2}"
+#   args::require "$@"
+args::require() {
+    args::parse "$@" || bs::exit invalid
     if [[ "${ARGS_HELP_REQUESTED:-0}" == "1" ]]; then
-        bs::exit "${E_SUCCESS:-0}"
+        bs::exit success
     fi
     return "${E_SUCCESS:-0}"
 }

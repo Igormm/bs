@@ -26,7 +26,7 @@ load "core/args"
 
 ```bash
 args::define first middle last
-args::parse_or_exit "$@"
+args::require "$@"
 ```
 
 ## Ветвление дерева: `args::level`
@@ -83,11 +83,11 @@ if utils::quiet args::flag_get dry-run; then ...; fi
 ## Валидация: `args::parse`, `args::get`
 
 ```bash
-args::parse_or_exit "$@"
+args::require "$@"
 action="$(args::get 1)"
 ```
 
-`args::parse_or_exit` — однострочник: при ошибке `args::parse` печатает
+`args::require` — однострочник: при ошибке `args::parse` печатает
 причину и help, затем выход с `E_INVALID` через `bs::exit` (выполняется стек
 очистки); `--help` печатает help и выходит с кодом 0. Ручная двухшаговая
 форма ниже — для случаев, где нужна своя обработка.
@@ -107,10 +107,10 @@ action="$(args::get 1)"
 
 ```bash
 if ! args::parse "$@"; then
-    bs::exit "${E_INVALID}"
+    bs::exit invalid
 fi
 if [[ "${ARGS_HELP_REQUESTED}" == "1" ]]; then
-    bs::exit "${E_SUCCESS}"
+    bs::exit success
 fi
 ```
 
@@ -193,9 +193,9 @@ args::flag dry-run
 args::flag_describe env "Target environment (staging, production)"
 
 if ! args::parse "$@"; then
-    bs::exit "${E_INVALID}"
+    bs::exit invalid
 fi
-[[ "${ARGS_HELP_REQUESTED}" == "1" ]] && bs::exit "${E_SUCCESS}"
+[[ "${ARGS_HELP_REQUESTED}" == "1" ]] && bs::exit success
 
 action="${ARGS_PARAMS[0]:-status}"
 env="$(args::flag_get env || printf 'staging')"

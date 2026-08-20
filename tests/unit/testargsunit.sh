@@ -259,23 +259,23 @@ main() {
     args::reset
     testframework::assert_false "args::completion x" "Completion fails with empty tree"
 
-    # parse_or_exit: выход с кодом при ошибке / exits with code on failure
-    testframework::section "args::parse_or_exit / parse_or_exit"
+    # args::require: выход с кодом при ошибке / exits with code on failure
+    testframework::section "args::require"
 
     args::reset
     args::define deploy
 
     local rc=0
-    ( args::parse_or_exit deploy 2>/dev/null ) || rc=$?
-    testframework::assert_equal "0" "${rc}" "parse_or_exit passes on valid input"
+    ( args::require deploy 2>/dev/null ) || rc=$?
+    testframework::assert_equal "0" "${rc}" "args::require passes on valid input"
 
     rc=0
-    ( args::parse_or_exit bogus 2>/dev/null ) || rc=$?
-    testframework::assert_equal "${E_INVALID}" "${rc}" "parse_or_exit exits E_INVALID on bad input"
+    ( args::require bogus 2>/dev/null ) || rc=$?
+    testframework::assert_equal "${E_INVALID}" "${rc}" "args::require exits E_INVALID on bad input"
 
     rc=0
-    ( args::parse_or_exit --help >/dev/null 2>&1 ) || rc=$?
-    testframework::assert_equal "0" "${rc}" "parse_or_exit exits 0 on --help"
+    ( args::require --help >/dev/null 2>&1 ) || rc=$?
+    testframework::assert_equal "0" "${rc}" "args::require exits 0 on --help"
 
     args::reset
 

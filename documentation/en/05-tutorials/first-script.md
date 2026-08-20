@@ -67,14 +67,14 @@ The script still prints nothing new — the tree is declared but not used yet.
 
 ## Step 3: Validation and automatic help
 
-Add `args::parse_or_exit` after the declarations:
+Add `args::require` after the declarations:
 
 ```bash
-    args::parse_or_exit "$@"
+    args::require "$@"
 ```
 
-- On any invalid input `args::parse` prints the reason and the help to stderr itself and returns `E_INVALID` — `args::parse_or_exit` then exits with that code via `bs::exit`, which runs the cleanup stack.
-- `-h`/`--help` prints the help and `args::parse_or_exit` exits 0 — no extra line needed.
+- On any invalid input `args::parse` prints the reason and the help to stderr itself and returns `E_INVALID` — `args::require` then exits with that code via `bs::exit`, which runs the cleanup stack.
+- `-h`/`--help` prints the help and `args::require` exits 0 — no extra line needed.
 - `E_SUCCESS`, `E_ERROR`, `E_INVALID` (0/1/2) are constants from [core/const.sh](../../../core/const.sh), loaded by the BS entry point.
 
 Run:
@@ -114,7 +114,7 @@ After `args::parse` succeeds, positionals are in the `ARGS_PARAMS` array and fla
         staging|production) ;;
         *)
             log::error "Unknown environment: ${env} (expected staging or production)"
-            bs::exit "${E_ERROR}"
+            bs::exit error
             ;;
     esac
 
@@ -213,7 +213,7 @@ main() {
     args::flag_describe dry-run "Print the plan without executing"
 
     # 2. Validate input; on error parse prints the reason and help itself
-    args::parse_or_exit "$@"
+    args::require "$@"
 
     # 3. Work with validated values
     local action="${ARGS_PARAMS[0]:-status}"
@@ -225,7 +225,7 @@ main() {
         staging|production) ;;
         *)
             log::error "Unknown environment: ${env} (expected staging or production)"
-            bs::exit "${E_ERROR}"
+            bs::exit error
             ;;
     esac
 

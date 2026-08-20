@@ -43,7 +43,7 @@ main() {
     args::flag_describe count "How many passwords to generate (default: 3)"
     args::flag_describe hex "Hex output instead of base64"
 
-    args::parse_or_exit "$@"
+    args::require "$@"
 
     local length count
     length="$(args::flag_get length || printf '16')"

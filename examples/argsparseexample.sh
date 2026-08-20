@@ -57,19 +57,19 @@ main() {
     #   source <(bs run examples/argsparseexample.sh --emit-completion)
     if [[ "${1:-}" == "--emit-completion" ]]; then
         args::completion "$(basename "$0")"
-        bs::exit "${E_SUCCESS}"
+        bs::exit success
     fi
 
     # При ошибке parse сам печатает причину и help в stderr
     # On error parse prints the reason and help to stderr itself
     if ! args::parse "$@"; then
-        bs::exit "${E_INVALID}"
+        bs::exit invalid
     fi
 
     # -h/--help уже обработан: help напечатан, просто выходим
     # -h/--help is already handled: help was printed, just exit
     if [[ "${ARGS_HELP_REQUESTED}" == "1" ]]; then
-        bs::exit "${E_SUCCESS}"
+        bs::exit success
     fi
 
     # ==========================================

@@ -144,6 +144,29 @@ main() {
     
     unset -f test::usr1_handler
     
+    # Тест 7: bs::exit принимает именованные коды
+    testframework::section "bs::exit Named Codes / Именованные коды bs::exit"
+    
+    rc=0
+    ( bs::exit success ) || rc=$?
+    testframework::assert_equal "0" "${rc}" "bs::exit success exits 0"
+    
+    rc=0
+    ( bs::exit invalid ) || rc=$?
+    testframework::assert_equal "2" "${rc}" "bs::exit invalid exits E_INVALID"
+    
+    rc=0
+    ( bs::exit error ) || rc=$?
+    testframework::assert_equal "1" "${rc}" "bs::exit error exits E_ERROR"
+    
+    rc=0
+    ( bs::exit 7 ) || rc=$?
+    testframework::assert_equal "7" "${rc}" "bs::exit keeps numeric codes"
+    
+    rc=0
+    ( bs::exit bogus_name 2>/dev/null ) || rc=$?
+    testframework::assert_equal "1" "${rc}" "bs::exit falls back to E_ERROR on unknown name"
+    
     # Вывод сводки
     testframework::summary
 }
