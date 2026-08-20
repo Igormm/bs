@@ -21,12 +21,12 @@ system::permissions::chmod() {
     local target="${1}"
     local permissions="${2}"
     
-    if [[ -z "${target}" ]] || [[ -z "${permissions}" ]]; then
+    if is::empty "${target}" || is::empty "${permissions}"; then
         log::warn "File path and permissions must be specified"
         return "${E_ERROR}"
     fi
     
-    if [[ ! -e "${target}" ]]; then
+    if ! is::exists "${target}"; then
         log::warn "File or directory '${target}' does not exist"
         return "${E_ERROR}"
     fi
@@ -51,12 +51,12 @@ system::permissions::chown() {
     local target="${1}"
     local owner="${2}"
     
-    if [[ -z "${target}" ]] || [[ -z "${owner}" ]]; then
+    if is::empty "${target}" || is::empty "${owner}"; then
         log::warn "File path and owner must be specified"
         return "${E_ERROR}"
     fi
     
-    if [[ ! -e "${target}" ]]; then
+    if ! is::exists "${target}"; then
         log::warn "File or directory '${target}' does not exist"
         return "${E_ERROR}"
     fi
@@ -77,7 +77,7 @@ system::permissions::chown() {
 system::permissions::readable() {
     local target="${1}"
     
-    if [[ -z "${target}" ]]; then
+    if is::empty "${target}"; then
         log::warn "File path must be specified"
         return "${E_ERROR}"
     fi
@@ -92,7 +92,7 @@ system::permissions::readable() {
 system::permissions::writable() {
     local target="${1}"
     
-    if [[ -z "${target}" ]]; then
+    if is::empty "${target}"; then
         log::warn "File path must be specified"
         return "${E_ERROR}"
     fi
@@ -107,7 +107,7 @@ system::permissions::writable() {
 system::permissions::executable() {
     local target="${1}"
     
-    if [[ -z "${target}" ]]; then
+    if is::empty "${target}"; then
         log::warn "File path must be specified"
         return "${E_ERROR}"
     fi
@@ -127,12 +127,12 @@ system::permissions::executable() {
 system::permissions::view() {
     local target="${1}"
     
-    if [[ -z "${target}" ]]; then
+    if is::empty "${target}"; then
         log::warn "File path must be specified"
         return "${E_ERROR}"
     fi
     
-    if [[ ! -e "${target}" ]]; then
+    if ! is::exists "${target}"; then
         log::warn "File or directory '${target}' does not exist"
         return "${E_ERROR}"
     fi
@@ -147,7 +147,7 @@ system::permissions::view() {
         local perms
         perms=$(utils::quiet_err ls -ld "${target}" | awk '{print $1}')
         
-        if [[ -n "${perms}" ]]; then
+        if is::not_empty "${perms}"; then
             echo ""
             echo "Permission breakdown:"
             echo "  Type: ${perms:0:1}"
@@ -159,14 +159,14 @@ system::permissions::view() {
         # Show numeric permissions / Показать числовые права доступа
         local numeric
         numeric=$(utils::quiet_err stat -c "%a" "${target}" || utils::quiet_err stat -f "%OLp" "${target}")
-        if [[ -n "${numeric}" ]]; then
+        if is::not_empty "${numeric}"; then
             echo "  Numeric: ${numeric}"
         fi
         
         # Show owner and group / Показать владельца и группу
         local owner_info
         owner_info=$(utils::quiet_err ls -ld "${target}" | awk '{print $3":"$4}')
-        if [[ -n "${owner_info}" ]]; then
+        if is::not_empty "${owner_info}"; then
             echo "  Owner:Group: ${owner_info}"
         fi
     else
@@ -184,12 +184,12 @@ system::permissions::recursive() {
     local target="${1}"
     local permissions="${2}"
     
-    if [[ -z "${target}" ]] || [[ -z "${permissions}" ]]; then
+    if is::empty "${target}" || is::empty "${permissions}"; then
         log::warn "Directory path and permissions must be specified"
         return "${E_ERROR}"
     fi
     
-    if [[ ! -d "${target}" ]]; then
+    if ! is::dir "${target}"; then
         log::warn "Directory '${target}' does not exist"
         return "${E_ERROR}"
     fi
@@ -241,12 +241,12 @@ system::permissions::default() {
 system::permissions::sticky() {
     local target="${1}"
     
-    if [[ -z "${target}" ]]; then
+    if is::empty "${target}"; then
         log::warn "Directory path must be specified"
         return "${E_ERROR}"
     fi
     
-    if [[ ! -d "${target}" ]]; then
+    if ! is::dir "${target}"; then
         log::warn "Directory '${target}' does not exist"
         return "${E_ERROR}"
     fi
@@ -267,12 +267,12 @@ system::permissions::sticky() {
 system::permissions::setuid() {
     local target="${1}"
     
-    if [[ -z "${target}" ]]; then
+    if is::empty "${target}"; then
         log::warn "File path must be specified"
         return "${E_ERROR}"
     fi
     
-    if [[ ! -f "${target}" ]]; then
+    if ! is::file "${target}"; then
         log::warn "File '${target}' does not exist or is not a file"
         return "${E_ERROR}"
     fi
@@ -294,12 +294,12 @@ system::permissions::setuid() {
 system::permissions::setgid() {
     local target="${1}"
     
-    if [[ -z "${target}" ]]; then
+    if is::empty "${target}"; then
         log::warn "File or directory path must be specified"
         return "${E_ERROR}"
     fi
     
-    if [[ ! -e "${target}" ]]; then
+    if ! is::exists "${target}"; then
         log::warn "File or directory '${target}' does not exist"
         return "${E_ERROR}"
     fi

@@ -133,7 +133,7 @@ k8s::context::list() {
 k8s::context::use() {
   local context="${1:-}"
 
-  if [[ -z "${context}" ]]; then
+  if is::empty "${context}"; then
     log::warn "k8s::context::use: context name required"
     return "${E_INVALID}"
   fi
@@ -168,7 +168,7 @@ k8s::pod::logs() {
   local pod="${1:-}"
   local namespace="${2:-${K8S_NAMESPACE}}"
 
-  if [[ -z "${pod}" ]]; then
+  if is::empty "${pod}"; then
     log::warn "k8s::pod::logs: pod name required"
     return "${E_INVALID}"
   fi
@@ -186,7 +186,7 @@ k8s::pod::exec() {
   local cmd="${2:-}"
   local namespace="${3:-${K8S_NAMESPACE}}"
 
-  if [[ -z "${pod}" || -z "${cmd}" ]]; then
+  if is::empty "${pod}" || is::empty "${cmd}"; then
     log::warn "k8s::pod::exec: pod and command required"
     return "${E_INVALID}"
   fi
@@ -204,7 +204,7 @@ k8s::deployment::restart() {
   local deployment="${1:-}"
   local namespace="${2:-${K8S_NAMESPACE}}"
 
-  if [[ -z "${deployment}" ]]; then
+  if is::empty "${deployment}"; then
     log::warn "k8s::deployment::restart: deployment name required"
     return "${E_INVALID}"
   fi
@@ -222,7 +222,7 @@ k8s::deployment::scale() {
   local replicas="${2:-}"
   local namespace="${3:-${K8S_NAMESPACE}}"
 
-  if [[ -z "${deployment}" || -z "${replicas}" ]]; then
+  if is::empty "${deployment}" || is::empty "${replicas}"; then
     log::warn "k8s::deployment::scale: deployment and replicas required"
     return "${E_INVALID}"
   fi
@@ -240,12 +240,12 @@ k8s::apply() {
   local target="${1:-}"
   local namespace="${2:-${K8S_NAMESPACE}}"
 
-  if [[ -z "${target}" ]]; then
+  if is::empty "${target}"; then
     log::warn "k8s::apply: file or directory required"
     return "${E_INVALID}"
   fi
 
-  if [[ ! -e "${target}" ]]; then
+  if ! is::exists "${target}"; then
     log::error "Manifest not found: ${target}"
     return "${LIB_ERROR_FILE_NOT_FOUND}"
   fi
@@ -261,7 +261,7 @@ k8s::apply() {
 k8s::get() {
   local resource="${1:-}"
 
-  if [[ -z "${resource}" ]]; then
+  if is::empty "${resource}"; then
     log::warn "k8s::get: resource type required"
     return "${E_INVALID}"
   fi

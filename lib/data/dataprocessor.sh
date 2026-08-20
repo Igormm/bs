@@ -127,7 +127,7 @@ dataprocessor::install_dependencies() {
 dataprocessor::json::validate() {
     local json_data="${1:-}"
     
-    if [[ -z "${json_data}" ]]; then
+    if is::empty "${json_data}"; then
         error::throw "JSON data is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -143,7 +143,7 @@ dataprocessor::json::validate() {
 dataprocessor::json::pretty() {
     local json_data="${1:-}"
     
-    if [[ -z "${json_data}" ]]; then
+    if is::empty "${json_data}"; then
         error::throw "JSON data is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -158,7 +158,7 @@ dataprocessor::json::pretty() {
 dataprocessor::json::minify() {
     local json_data="${1:-}"
     
-    if [[ -z "${json_data}" ]]; then
+    if is::empty "${json_data}"; then
         error::throw "JSON data is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -174,7 +174,7 @@ dataprocessor::json::query() {
     local json_data="${1:-}"
     local query="${2:-}"
     
-    if [[ -z "${json_data}" ]] || [[ -z "${query}" ]]; then
+    if is::empty "${json_data}" || is::empty "${query}"; then
         error::throw "JSON data and query are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -191,7 +191,7 @@ dataprocessor::json::update() {
     local path="${2:-}"
     local new_value="${3:-}"
     
-    if [[ -z "${json_data}" ]] || [[ -z "${path}" ]]; then
+    if is::empty "${json_data}" || is::empty "${path}"; then
         error::throw "JSON data and path are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -207,7 +207,7 @@ dataprocessor::json::delete() {
     local json_data="${1:-}"
     local path="${2:-}"
     
-    if [[ -z "${json_data}" ]] || [[ -z "${path}" ]]; then
+    if is::empty "${json_data}" || is::empty "${path}"; then
         error::throw "JSON data and path are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -223,7 +223,7 @@ dataprocessor::json::merge() {
     local json1="${1:-}"
     local json2="${2:-}"
     
-    if [[ -z "${json1}" ]] || [[ -z "${json2}" ]]; then
+    if is::empty "${json1}" || is::empty "${json2}"; then
         error::throw "Two JSON objects are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -238,7 +238,7 @@ dataprocessor::json::merge() {
 dataprocessor::json::to_csv() {
     local json_data="${1:-}"
     
-    if [[ -z "${json_data}" ]]; then
+    if is::empty "${json_data}"; then
         error::throw "JSON data is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -264,7 +264,7 @@ dataprocessor::json::to_csv() {
 dataprocessor::xml::validate() {
     local xml_data="${1:-}"
     
-    if [[ -z "${xml_data}" ]]; then
+    if is::empty "${xml_data}"; then
         error::throw "XML data is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -276,7 +276,7 @@ dataprocessor::xml::validate() {
 dataprocessor::xml::pretty() {
     local xml_data="${1:-}"
     
-    if [[ -z "${xml_data}" ]]; then
+    if is::empty "${xml_data}"; then
         error::throw "XML data is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -292,7 +292,7 @@ dataprocessor::xml::xpath() {
     local xml_data="${1:-}"
     local xpath_query="${2:-}"
     
-    if [[ -z "${xml_data}" ]] || [[ -z "${xpath_query}" ]]; then
+    if is::empty "${xml_data}" || is::empty "${xpath_query}"; then
         error::throw "XML data and XPath query are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -315,7 +315,7 @@ dataprocessor::xml::xpath() {
 dataprocessor::xml::to_json() {
     local xml_data="${1:-}"
     
-    if [[ -z "${xml_data}" ]]; then
+    if is::empty "${xml_data}"; then
         error::throw "XML data is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -343,7 +343,7 @@ dataprocessor::xml::to_csv() {
     local xml_data="${1:-}"
     local xpath_query="${2:-//row}"
     
-    if [[ -z "${xml_data}" ]]; then
+    if is::empty "${xml_data}"; then
         error::throw "XML data is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -360,7 +360,7 @@ dataprocessor::xml::extract() {
     local xml_data="${1:-}"
     local element_name="${2:-}"
     
-    if [[ -z "${xml_data}" ]] || [[ -z "${element_name}" ]]; then
+    if is::empty "${xml_data}" || is::empty "${element_name}"; then
         error::throw "XML data and element name are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -377,7 +377,7 @@ dataprocessor::xml::extract() {
 dataprocessor::csv::validate() {
     local csv_data="${1:-}"
     
-    if [[ -z "${csv_data}" ]]; then
+    if is::empty "${csv_data}"; then
         error::throw "CSV data is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -388,7 +388,7 @@ dataprocessor::csv::validate() {
     
     local line_num=2
     while IFS= read -r line; do
-        if [[ -n "${line}" ]]; then
+        if is::not_empty "${line}"; then
             local line_cols
             line_cols=$(echo "${line}" | awk -F',' '{print NF}')
             
@@ -406,7 +406,7 @@ dataprocessor::csv::validate() {
 dataprocessor::csv::to_json() {
     local csv_data="${1:-}"
     
-    if [[ -z "${csv_data}" ]]; then
+    if is::empty "${csv_data}"; then
         error::throw "CSV data is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -424,7 +424,7 @@ dataprocessor::csv::to_json() {
         
         local first=true
         while IFS= read -r line; do
-            if [[ -n "${line}" ]] && [[ "${line}" != "${header}" ]]; then
+            if is::not_empty "${line}" && [[ "${line}" != "${header}" ]]; then
                 if [[ "${first}" == "true" ]]; then
                     first=false
                 else
@@ -465,7 +465,7 @@ dataprocessor::csv::filter() {
     local column="${2:-}"
     local value="${3:-}"
     
-    if [[ -z "${csv_data}" ]] || [[ -z "${column}" ]]; then
+    if is::empty "${csv_data}" || is::empty "${column}"; then
         error::throw "CSV data and column are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -492,7 +492,7 @@ dataprocessor::csv::filter() {
         
         # Filter rows
         while IFS= read -r line; do
-            if [[ -n "${line}" ]] && [[ "${line}" != "${header}" ]]; then
+            if is::not_empty "${line}" && [[ "${line}" != "${header}" ]]; then
                 IFS=',' read -ra values <<< "${line}"
                 if [[ "${values[$((col_index - 1))]}" == "${value}" ]]; then
                     echo "${line}"
@@ -508,7 +508,7 @@ dataprocessor::csv::sort() {
     local column="${2:-}"
     local direction="${3:-asc}"
     
-    if [[ -z "${csv_data}" ]] || [[ -z "${column}" ]]; then
+    if is::empty "${csv_data}" || is::empty "${column}"; then
         error::throw "CSV data and column are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -545,7 +545,7 @@ dataprocessor::csv::sort() {
 dataprocessor::yaml::to_json() {
     local yaml_data="${1:-}"
     
-    if [[ -z "${yaml_data}" ]]; then
+    if is::empty "${yaml_data}"; then
         error::throw "YAML data is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -574,7 +574,7 @@ except Exception as e:
 dataprocessor::json::to_yaml() {
     local json_data="${1:-}"
     
-    if [[ -z "${json_data}" ]]; then
+    if is::empty "${json_data}"; then
         error::throw "JSON data is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -609,7 +609,7 @@ dataprocessor::convert() {
     local input_data="${1:-}"
     local output_format="${2:-}"
     
-    if [[ -z "${input_data}" ]] || [[ -z "${output_format}" ]]; then
+    if is::empty "${input_data}" || is::empty "${output_format}"; then
         error::throw "Input data and output format are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -618,7 +618,7 @@ dataprocessor::convert() {
     local input_format
     input_format=$(dataprocessor::detect_format "${input_data}")
     
-    if [[ -z "${input_format}" ]]; then
+    if is::empty "${input_format}"; then
         error::throw "Unable to detect input format" \
             "${LIB_ERROR_FORMAT_UNKNOWN}"
     fi
@@ -702,7 +702,7 @@ dataprocessor::jpath::query() {
     local json_data="${1:-}"
     local jpath_query="${2:-}"
     
-    if [[ -z "${json_data}" ]] || [[ -z "${jpath_query}" ]]; then
+    if is::empty "${json_data}" || is::empty "${jpath_query}"; then
         error::throw "JSON data and JPath query are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -745,7 +745,7 @@ dataprocessor::xpath::query() {
     local xpath_query="${2:-}"
     local options="${3:-}"
     
-    if [[ -z "${xml_data}" ]] || [[ -z "${xpath_query}" ]]; then
+    if is::empty "${xml_data}" || is::empty "${xpath_query}"; then
         error::throw "XML data and XPath query are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -784,12 +784,12 @@ except Exception as e:
 dataprocessor::file::info() {
     local file_path="${1:-}"
     
-    if [[ -z "${file_path}" ]]; then
+    if is::empty "${file_path}"; then
         error::throw "File path is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
-    if [[ ! -f "${file_path}" ]]; then
+    if ! is::file "${file_path}"; then
         error::throw "File not found: ${file_path}" \
             "${LIB_ERROR_FILE_NOT_FOUND}"
     fi
@@ -819,12 +819,12 @@ dataprocessor::stream::process() {
     local processor="${2:-}"
     local chunk_size="${3:-1000}"
     
-    if [[ -z "${file_path}" ]] || [[ -z "${processor}" ]]; then
+    if is::empty "${file_path}" || is::empty "${processor}"; then
         error::throw "File path and processor function are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
-    if [[ ! -f "${file_path}" ]]; then
+    if ! is::file "${file_path}"; then
         error::throw "File not found: ${file_path}" \
             "${LIB_ERROR_FILE_NOT_FOUND}"
     fi
@@ -848,7 +848,7 @@ dataprocessor::validate() {
     local data="${1:-}"
     local format="${2:-auto}"
     
-    if [[ -z "${data}" ]]; then
+    if is::empty "${data}"; then
         error::throw "Data is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi

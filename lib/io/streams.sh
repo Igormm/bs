@@ -60,7 +60,7 @@ io::streams::__is_fd() {
 io::streams::__check_file() {
     local file="${1}"
 
-    if [[ -z "${file}" ]]; then
+    if is::empty "${file}"; then
         log::warn "Redirection target file not specified"
         return "${E_ERROR:-1}"
     fi
@@ -101,7 +101,7 @@ io::streams::printn() {
 io::streams::printf() {
     local format="${1}"
 
-    if [[ -z "${format}" ]]; then
+    if is::empty "${format}"; then
         log::warn "Format string not specified"
         return "${E_ERROR:-1}"
     fi
@@ -126,7 +126,7 @@ io::streams::eprint() {
 # @example
 #   io::streams::tty_print "password prompt"
 io::streams::tty_print() {
-    if [[ -w "/dev/tty" ]]; then
+    if is::writable "/dev/tty"; then
         printf '%s\n' "$*" > /dev/tty
     else
         log::warn "No controlling terminal available (/dev/tty)"
@@ -149,7 +149,7 @@ io::streams::read_line() {
     local var_name="${1}"
     local fd="${2:-${IO_STREAMS_STDIN}}"
 
-    if [[ -z "${var_name}" ]]; then
+    if is::empty "${var_name}"; then
         log::warn "Result variable name not specified"
         return "${E_ERROR:-1}"
     fi
@@ -454,7 +454,7 @@ io::streams::wait_readable() {
         log::warn "Invalid file descriptor: ${fd}"
         return "${E_ERROR:-1}"
     fi
-    if [[ -z "${timeout}" ]]; then
+    if is::empty "${timeout}"; then
         log::warn "Timeout not specified"
         return "${E_ERROR:-1}"
     fi
@@ -498,7 +498,7 @@ io::streams::random_bytes() {
         log::warn "Byte count must be a positive integer, got: ${count}"
         return "${E_ERROR:-1}"
     fi
-    if [[ ! -r "/dev/urandom" ]]; then
+    if ! is::readable "/dev/urandom"; then
         log::error "/dev/urandom is not readable"
         return "${E_ERROR:-1}"
     fi
@@ -526,9 +526,9 @@ io::streams::fd_path() {
 # @example
 #   io::streams::list_fds
 io::streams::list_fds() {
-    if [[ -d "/proc/self/fd" ]]; then
+    if is::dir "/proc/self/fd"; then
         utils::quiet_err ls -l /proc/self/fd
-    elif [[ -d "/dev/fd" ]]; then
+    elif is::dir "/dev/fd"; then
         utils::quiet_err ls -l /dev/fd
     else
         log::warn "No method available to list file descriptors"

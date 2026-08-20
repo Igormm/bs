@@ -177,7 +177,7 @@ vkapi::install_dependencies() {
 vkapi::auth() {
     local access_token="${1:-}"
     
-    if [[ -z "${access_token}" ]]; then
+    if is::empty "${access_token}"; then
         error::throw "Access token is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -217,7 +217,7 @@ vkapi::get_cached_response() {
     
     local cache_file="${VK_API_CACHE_DIR}/${cache_key}.json"
     
-    if [[ -f "${cache_file}" ]]; then
+    if is::file "${cache_file}"; then
         local file_age
         file_age=$(echo "$(utils::now_s) - $(utils::quiet_err stat -c %Y "${cache_file}" || utils::quiet_err stat -f %m "${cache_file}")" | bc)
         
@@ -247,12 +247,12 @@ vkapi::api_request() {
     local params="${2:-}"
     local use_cache="${3:-true}"
     
-    if [[ -z "${method}" ]]; then
+    if is::empty "${method}"; then
         error::throw "API method is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
-    if [[ -z "${VK_API_ACCESS_TOKEN}" ]]; then
+    if is::empty "${VK_API_ACCESS_TOKEN}"; then
         error::throw "Access token not set. Use vkapi::auth() first." \
             "${LIB_ERROR_INVALID_STATE}"
     fi
@@ -277,7 +277,7 @@ vkapi::api_request() {
     local url="${VK_API_BASE_URL}/${method}"
     local data="access_token=${VK_API_ACCESS_TOKEN}&v=${VK_API_VERSION}"
     
-    if [[ -n "${params}" ]]; then
+    if is::not_empty "${params}"; then
         data="${data}&${params}"
     fi
     
@@ -320,7 +320,7 @@ vkapi::api_request() {
     fi
     
     # Cache successful response
-    if [[ "${use_cache}" == "true" ]] && [[ -n "${cache_key:-}" ]]; then
+    if [[ "${use_cache}" == "true" ]] && is::not_empty "${cache_key:-}"; then
         vkapi::cache_response "${cache_key}" "${response}"
     fi
     
@@ -331,7 +331,7 @@ vkapi::api_request() {
 vkapi::parse_response() {
     local response="${1:-}"
     
-    if [[ -z "${response}" ]]; then
+    if is::empty "${response}"; then
         error::throw "Empty response" \
             "${LIB_ERROR_INVALID_RESPONSE}"
     fi
@@ -340,7 +340,7 @@ vkapi::parse_response() {
     local error_msg
     error_msg=$(echo "${response}" | utils::quiet_err jq -r '.error.error_msg' || echo "")
     
-    if [[ -n "${error_msg}" ]] && [[ "${error_msg}" != "null" ]]; then
+    if is::not_empty "${error_msg}" && [[ "${error_msg}" != "null" ]]; then
         local error_code
         error_code=$(echo "${response}" | utils::quiet_err jq -r '.error.error_code' || echo "0")
         error::throw "VK API Error ${error_code}: ${error_msg}" \
@@ -489,7 +489,7 @@ vkapi::secure.checkToken() {
     local ip="${2:-}"
     
     local params="token=${token}"
-    if [[ -n "${ip}" ]]; then
+    if is::not_empty "${ip}"; then
         params="${params}&ip=${ip}"
     fi
     
@@ -526,7 +526,7 @@ vkapi::database.getCities() {
 vkapi::execute() {
     local code="${1:-}"
     
-    if [[ -z "${code}" ]]; then
+    if is::empty "${code}"; then
         error::throw "VKScript code is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -545,7 +545,7 @@ vkapi::get_my_profile() {
 vkapi::get_user_profile() {
     local user_id="${1:-}"
     
-    if [[ -z "${user_id}" ]]; then
+    if is::empty "${user_id}"; then
         error::throw "User ID is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -558,7 +558,7 @@ vkapi::search_users() {
     local query="${1:-}"
     local count="${2:-10}"
     
-    if [[ -z "${query}" ]]; then
+    if is::empty "${query}"; then
         error::throw "Search query is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -572,7 +572,7 @@ vkapi::get_user_groups() {
     local extended="${2:-1}"
     
     local params="extended=${extended}"
-    if [[ -n "${user_id}" ]]; then
+    if is::not_empty "${user_id}"; then
         params="${params}&user_id=${user_id}"
     fi
     
@@ -583,7 +583,7 @@ vkapi::get_user_groups() {
 vkapi::get_group_info() {
     local group_id="${1:-}"
     
-    if [[ -z "${group_id}" ]]; then
+    if is::empty "${group_id}"; then
         error::throw "Group ID is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -598,7 +598,7 @@ vkapi::get_wall_posts() {
     local offset="${3:-0}"
     
     local params="count=${count}&offset=${offset}"
-    if [[ -n "${owner_id}" ]]; then
+    if is::not_empty "${owner_id}"; then
         params="${params}&owner_id=${owner_id}"
     fi
     
@@ -610,13 +610,13 @@ vkapi::post_to_wall() {
     local message="${1:-}"
     local owner_id="${2:-}"
     
-    if [[ -z "${message}" ]]; then
+    if is::empty "${message}"; then
         error::throw "Message is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
     local params="message=${message}"
-    if [[ -n "${owner_id}" ]]; then
+    if is::not_empty "${owner_id}"; then
         params="${params}&owner_id=${owner_id}"
     fi
     
@@ -629,7 +629,7 @@ vkapi::send_message() {
     local message="${2:-}"
     local random_id="${3:-$(utils::now_s)}"
     
-    if [[ -z "${user_id}" ]] || [[ -z "${message}" ]]; then
+    if is::empty "${user_id}" || is::empty "${message}"; then
         error::throw "User ID and message are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -651,7 +651,7 @@ vkapi::get_message_history() {
     local count="${2:-20}"
     local offset="${3:-0}"
     
-    if [[ -z "${peer_id}" ]]; then
+    if is::empty "${peer_id}"; then
         error::throw "Peer ID is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -671,7 +671,7 @@ vkapi::get_online_friends() {
 vkapi::set_status() {
     local text="${1:-}"
     
-    if [[ -z "${text}" ]]; then
+    if is::empty "${text}"; then
         error::throw "Status text is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -684,7 +684,7 @@ vkapi::get_status() {
     local user_id="${1:-}"
     
     local params=""
-    if [[ -n "${user_id}" ]]; then
+    if is::not_empty "${user_id}"; then
         params="user_id=${user_id}"
     fi
     

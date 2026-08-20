@@ -140,16 +140,16 @@ ps1config::list_themes() {
 # @example
 #   ps1config::git_info
 ps1config::git_info() {
-    if [[ -d .git ]] || utils::quiet git rev-parse --git-dir; then
+    if is::dir .git || utils::quiet git rev-parse --git-dir; then
         local branch
         branch=$(utils::quiet_err git symbolic-ref --short HEAD || utils::quiet_err git describe --tags --exact-match)
         
-        if [[ -n "$branch" ]]; then
+        if is::not_empty "$branch"; then
             local git_status=""
             
             # Проверяем состояние репозитория
             # Check repository status
-            if [[ -n $(utils::quiet_err git status --porcelain) ]]; then
+            if is::not_empty $(utils::quiet_err git status --porcelain); then
                 git_status="*"  # Есть изменения / Has changes
             fi
             
@@ -184,7 +184,7 @@ ps1config::set_git_info() {
 # @example
 #   ps1config::detect_ssh
 ps1config::detect_ssh() {
-    if [[ -n "${SSH_CLIENT:-}" ]] || [[ -n "${SSH_TTY:-}" ]]; then
+    if is::not_empty "${SSH_CLIENT:-}" || is::not_empty "${SSH_TTY:-}"; then
         PS1_CONFIG_SSH_INFO="\[\033[38;5;208m\][SSH]\[\033[00m\] "
     else
         PS1_CONFIG_SSH_INFO=""
@@ -200,11 +200,11 @@ ps1config::detect_ssh() {
 # @example
 #   ps1config::detect_virtualenv
 ps1config::detect_virtualenv() {
-    if [[ -n "${VIRTUAL_ENV:-}" ]]; then
+    if is::not_empty "${VIRTUAL_ENV:-}"; then
         local venv_name
         venv_name=$(basename "$VIRTUAL_ENV")
         PS1_CONFIG_VIRTUALENV_INFO="\[\033[38;5;106m\]($venv_name)\[\033[00m\] "
-    elif [[ -n "${CONDA_DEFAULT_ENV:-}" ]]; then
+    elif is::not_empty "${CONDA_DEFAULT_ENV:-}"; then
         PS1_CONFIG_VIRTUALENV_INFO="\[\033[38;5;106m\]($CONDA_DEFAULT_ENV)\[\033[00m\] "
     else
         PS1_CONFIG_VIRTUALENV_INFO=""
@@ -265,7 +265,7 @@ ps1config::setup_prompt_command() {
     
     # Добавляем к существующей PROMPT_COMMAND
     # Add to existing PROMPT_COMMAND
-    if [[ -z "${PROMPT_COMMAND:-}" ]]; then
+    if is::empty "${PROMPT_COMMAND:-}"; then
         PROMPT_COMMAND="ps1config::update_prompt"
     elif [[ "${PROMPT_COMMAND}" != *"ps1config::update_prompt"* ]]; then
         PROMPT_COMMAND="$PROMPT_COMMAND; ps1config::update_prompt"
@@ -373,7 +373,7 @@ ps1config::disable_enhancements() {
 
 # Инициализируем модуль при загрузке
 # Initialize module on load
-if [[ -z "${PS1_CONFIG_INITIALIZED:-}" ]]; then
+if is::empty "${PS1_CONFIG_INITIALIZED:-}"; then
     PS1_CONFIG_INITIALIZED="1"
     ps1config::init
 fi

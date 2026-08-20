@@ -19,7 +19,7 @@ system::time::timezone() {
     local timezone="${1:-UTC}"
     
     # Validate timezone / Проверить валидность часового пояса
-    if [[ ! -f "/usr/share/zoneinfo/${timezone}" ]]; then
+    if ! is::file "/usr/share/zoneinfo/${timezone}"; then
         log::warn "Invalid timezone: ${timezone}"
         return "${E_ERROR}"
     fi
@@ -29,13 +29,13 @@ system::time::timezone() {
         utils::ignore timedatectl set-timezone "${timezone}"
     else
         # Fallback for non-systemd systems / Резервный вариант для систем без systemd
-        if [[ -f "/etc/localtime" ]]; then
+        if is::file "/etc/localtime"; then
             ln -sf "/usr/share/zoneinfo/${timezone}" /etc/localtime
         fi
         
         # Set timezone in configuration file / Установить часовой пояс в файле
         # конфигурации
-        if [[ -f "/etc/timezone" ]]; then
+        if is::file "/etc/timezone"; then
             echo "${timezone}" > /etc/timezone
         fi
     fi
@@ -94,7 +94,7 @@ system::time::ntp() {
 system::time::set() {
     local datetime="${1}"
     
-    if [[ -z "${datetime}" ]]; then
+    if is::empty "${datetime}"; then
         log::warn "Date and time not specified"
         return "${E_ERROR}"
     fi
@@ -122,7 +122,7 @@ system::time::list_timezones() {
         utils::ignore timedatectl list-timezones
     else
         # Fallback for non-systemd systems / Резервный вариант для систем без systemd
-        if [[ -d "/usr/share/zoneinfo" ]]; then
+        if is::dir "/usr/share/zoneinfo"; then
             find /usr/share/zoneinfo -type f -not -path "*/.*" -not -path "*/posix/*" -not -path "*/right/*" | \
                 sed 's|/usr/share/zoneinfo/||' | sort
         fi

@@ -91,7 +91,7 @@ io::files::__require_two_paths() {
   local src="${1:-}"
   local dst="${2:-}"
 
-  if [[ -z "${src}" || -z "${dst}" ]]; then
+  if is::empty "${src}" || is::empty "${dst}"; then
     log::warn "Source and destination paths are required"
     return "${E_INVALID}"
   fi
@@ -121,7 +121,7 @@ io::files::__atomic_temp() {
   local parent_dir
 
   parent_dir="$(dirname -- "${dst}")"
-  if [[ ! -d "${parent_dir}" ]]; then
+  if ! is::dir "${parent_dir}"; then
     log::error "Parent directory does not exist for atomic temp: ${parent_dir}"
     return "${E_ERROR}"
   fi
@@ -142,7 +142,7 @@ io::files::__atomic_temp() {
 # @param $1 Path to clean / Путь для удаления
 io::files::__cleanup_temp() {
   local path="${1:-}"
-  [[ -n "${path}" && -e "${path}" ]] || return 0
+  is::not_empty "${path}" && is::exists "${path}" || return 0
   utils::ignore rm -rf -- "${path}"
 }
 
@@ -156,7 +156,7 @@ io::files::__backup_if_needed() {
   local dst="${1:-}"
   local suffix="${2:-}"
 
-  [[ -n "${suffix}" ]] || return 0
+  is::not_empty "${suffix}" || return 0
   io::files::exists "${dst}" || return 0
 
   local backup="${dst}${suffix}"
@@ -186,7 +186,7 @@ io::files::__atomic_replace() {
   local dst="${2:-}"
   local is_dir="${3:-false}"
 
-  if [[ -z "${temp_path}" || -z "${dst}" ]]; then
+  if is::empty "${temp_path}" || is::empty "${dst}"; then
     log::warn "atomic_replace: temp and dst required"
     return "${E_ERROR}"
   fi
@@ -233,7 +233,7 @@ io::files::__atomic_copy_file() {
   local temp_path
 
   temp_path="$(io::files::__atomic_temp "${dst}" false)"
-  [[ -n "${temp_path}" ]] || return "${E_ERROR}"
+  is::not_empty "${temp_path}" || return "${E_ERROR}"
 
   if [[ "${FRAMEWORK_DRY_RUN:-false}" == "true" ]]; then
     log::warn "[DRY-RUN] atomic copy: cp -p -- ${src} ${temp_path}; mv -- ${temp_path} ${dst}"
@@ -266,7 +266,7 @@ io::files::__atomic_copy_dir() {
   local temp_path
 
   temp_path="$(io::files::__atomic_temp "${dst}" true)"
-  [[ -n "${temp_path}" ]] || return "${E_ERROR}"
+  is::not_empty "${temp_path}" || return "${E_ERROR}"
 
   if [[ "${FRAMEWORK_DRY_RUN:-false}" == "true" ]]; then
     log::warn "[DRY-RUN] atomic copy dir: cp -a ${src}/. ${temp_path}/; mv -- ${temp_path} ${dst}"
@@ -293,29 +293,32 @@ io::files::__atomic_copy_dir() {
 
 # @description Check if path exists.
 # @description Проверить существование пути.
+#   Delegates to is::exists / Делегирует is::exists.
 # @param $1 Path / Путь
 # @return 0 if exists, 1 otherwise / 0 если существует
 io::files::exists() {
   local path="${1:-}"
-  [[ -n "${path}" && -e "${path}" ]]
+  is::not_empty "${path}" && is::exists "${path}"
 }
 
 # @description Check if path is a regular file.
 # @description Проверить, что путь — обычный файл.
+#   Delegates to is::file / Делегирует is::file.
 # @param $1 Path / Путь
 # @return 0 if regular file, 1 otherwise / 0 если файл
 io::files::is_file() {
   local path="${1:-}"
-  [[ -n "${path}" && -f "${path}" ]]
+  is::not_empty "${path}" && is::file "${path}"
 }
 
 # @description Check if path is a directory.
 # @description Проверить, что путь — каталог.
+#   Delegates to is::dir / Делегирует is::dir.
 # @param $1 Path / Путь
 # @return 0 if directory, 1 otherwise / 0 если каталог
 io::files::is_dir() {
   local path="${1:-}"
-  [[ -n "${path}" && -d "${path}" ]]
+  is::not_empty "${path}" && is::dir "${path}"
 }
 
 # ==========================================
@@ -331,7 +334,7 @@ io::files::ensure_dir() {
   local dir_path="${1:-}"
   local mode="${2:-}"
 
-  if [[ -z "${dir_path}" ]]; then
+  if is::empty "${dir_path}"; then
     log::warn "Directory path is required"
     return "${E_INVALID}"
   fi
@@ -343,7 +346,7 @@ io::files::ensure_dir() {
     return "${LIB_ERROR_FILE_OPERATION}"
   fi
 
-  if [[ -n "${mode}" ]]; then
+  if is::not_empty "${mode}"; then
     if [[ "${FRAMEWORK_DRY_RUN:-false}" == "true" ]]; then
       log::warn "[DRY-RUN] chmod ${mode} ${dir_path}"
     elif ! system::permissions::chmod "${dir_path}" "${mode}"; then
@@ -372,7 +375,7 @@ io::files::ensure_dir() {
 io::files::append() {
   local file_path="${1:-}"
 
-  if [[ -z "${file_path}" ]]; then
+  if is::empty "${file_path}"; then
     log::warn "File path is required"
     return "${E_INVALID}"
   fi
@@ -440,7 +443,7 @@ io::files::copy_file() {
 
   local parent_dir
   parent_dir="$(dirname -- "${dst}")"
-  if [[ ! -d "${parent_dir}" ]]; then
+  if ! is::dir "${parent_dir}"; then
     if ! io::files::ensure_dir "${parent_dir}"; then
       return "${LIB_ERROR_FILE_OPERATION}"
     fi
@@ -502,7 +505,7 @@ io::files::copy_dir() {
 
   local parent_dir
   parent_dir="$(dirname -- "${dst}")"
-  if [[ ! -d "${parent_dir}" ]]; then
+  if ! is::dir "${parent_dir}"; then
     if ! io::files::ensure_dir "${parent_dir}"; then
       return "${LIB_ERROR_FILE_OPERATION}"
     fi
@@ -584,7 +587,7 @@ io::files::sync_dir() {
     local rel_path
     while IFS= read -r -d '' dst_item; do
       rel_path="${dst_item#${dst}/}"
-      if [[ ! -e "${src}/${rel_path}" ]]; then
+      if ! is::exists "${src}/${rel_path}"; then
         log::debug "Removing extra item: ${dst_item}"
         if ! io::files::remove "${dst_item}" true; then
           log::error "Failed to remove extra item: ${dst_item}"
@@ -629,7 +632,7 @@ io::files::copy_matching() {
   local -a include_args=()
   local -a exclude_args=()
 
-  if [[ -n "${include}" ]]; then
+  if is::not_empty "${include}"; then
     local -a include_patterns=()
     read -ra include_patterns <<< "${include}"
     local pattern
@@ -645,7 +648,7 @@ io::files::copy_matching() {
     include_args+=(")")
   fi
 
-  if [[ -n "${exclude}" ]]; then
+  if is::not_empty "${exclude}"; then
     local -a exclude_patterns=()
     read -ra exclude_patterns <<< "${exclude}"
     local pattern
@@ -730,7 +733,7 @@ io::files::move() {
 
   local parent_dir
   parent_dir="$(dirname -- "${dst}")"
-  if [[ ! -d "${parent_dir}" ]]; then
+  if ! is::dir "${parent_dir}"; then
     if ! io::files::ensure_dir "${parent_dir}"; then
       return "${LIB_ERROR_FILE_OPERATION}"
     fi
@@ -812,7 +815,7 @@ io::files::remove() {
   local path="${1:-}"
   local recursive="${2:-false}"
 
-  if [[ -z "${path}" ]]; then
+  if is::empty "${path}"; then
     log::warn "Path is required"
     return "${E_INVALID}"
   fi

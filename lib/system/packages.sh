@@ -133,7 +133,7 @@ system::packages::upgrade() {
 system::packages::search() {
     local search_term="${1}"
     
-    if [[ -z "${search_term}" ]]; then
+    if is::empty "${search_term}"; then
         log::warn "Search term not specified"
         return "${E_ERROR}"
     fi
@@ -183,7 +183,7 @@ system::packages::list() {
 system::packages::add_repo() {
     local repo="${1}"
     
-    if [[ -z "${repo}" ]]; then
+    if is::empty "${repo}"; then
         log::warn "Repository specification not provided"
         return "${E_ERROR}"
     fi
@@ -215,7 +215,7 @@ system::packages::add_repo() {
 system::packages::remove_repo() {
     local repo="${1}"
     
-    if [[ -z "${repo}" ]]; then
+    if is::empty "${repo}"; then
         log::warn "Repository specification not provided"
         return "${E_ERROR}"
     fi
@@ -233,7 +233,7 @@ system::packages::remove_repo() {
         # For YUM, we need to find and remove the repo file / Для YUM нужно найти и
         # удалить файл репозитория
         local repo_file=$(utils::quiet_err find /etc/yum.repos.d/ -name "*.repo" -exec grep -l "${repo}" {} \;)
-        if [[ -n "${repo_file}" ]]; then
+        if is::not_empty "${repo_file}"; then
             utils::quiet_err rm -f "${repo_file}"
             log::info "Repository file removed for YUM: ${repo_file}"
         fi
@@ -241,7 +241,7 @@ system::packages::remove_repo() {
         # For DNF, we need to find and remove the repo file / Для DNF нужно найти и
         # удалить файл репозитория
         local repo_file=$(utils::quiet_err find /etc/yum.repos.d/ -name "*.repo" -exec grep -l "${repo}" {} \;)
-        if [[ -n "${repo_file}" ]]; then
+        if is::not_empty "${repo_file}"; then
             utils::quiet_err rm -f "${repo_file}"
             log::info "Repository file removed for DNF: ${repo_file}"
         fi

@@ -20,7 +20,7 @@ system::devices::mouse() {
     local setting="${1}"
     local value="${2}"
     
-    if [[ -z "${setting}" ]] || [[ -z "${value}" ]]; then
+    if is::empty "${setting}" || is::empty "${value}"; then
         log::warn "Mouse setting and value must be specified"
         return "${E_ERROR}"
     fi
@@ -78,7 +78,7 @@ system::devices::keyboard() {
     local setting="${1}"
     local value="${2}"
     
-    if [[ -z "${setting}" ]] || [[ -z "${value}" ]]; then
+    if is::empty "${setting}" || is::empty "${value}"; then
         log::warn "Keyboard setting and value must be specified"
         return "${E_ERROR}"
     fi
@@ -134,7 +134,7 @@ system::devices::touchpad() {
     local setting="${1}"
     local value="${2}"
     
-    if [[ -z "${setting}" ]] || [[ -z "${value}" ]]; then
+    if is::empty "${setting}" || is::empty "${value}"; then
         log::warn "Touchpad setting and value must be specified"
         return "${E_ERROR}"
     fi
@@ -195,7 +195,7 @@ system::devices::list() {
             utils::attempt lsinput
         else
             # Fallback to /proc/bus/input/devices
-            if [[ -f "/proc/bus/input/devices" ]]; then
+            if is::file "/proc/bus/input/devices"; then
                 utils::attempt cat /proc/bus/input/devices
             else
                 log::warn "No method available to list input devices"
@@ -214,7 +214,7 @@ system::devices::audio() {
     local setting="${1}"
     local value="${2}"
     
-    if [[ -z "${setting}" ]] || [[ -z "${value}" ]]; then
+    if is::empty "${setting}" || is::empty "${value}"; then
         log::warn "Audio setting and value must be specified"
         return "${E_ERROR}"
     fi
@@ -285,7 +285,7 @@ system::devices::display() {
     local setting="${1}"
     local value="${2}"
     
-    if [[ -z "${setting}" ]] || [[ -z "${value}" ]]; then
+    if is::empty "${setting}" || is::empty "${value}"; then
         log::warn "Display setting and value must be specified"
         return "${E_ERROR}"
     fi
@@ -297,14 +297,14 @@ system::devices::display() {
             if utils::has xrandr; then
                 # Get primary output
                 local primary=$(xrandr --query | grep " connected" | head -n 1 | awk '{print $1}')
-                if [[ -n "${primary}" ]]; then
+                if is::not_empty "${primary}"; then
                     # xrandr uses values from 0.0 to 1.0
                     local brightness=$(echo "scale=2; ${value}/100" | utils::quiet_err bc || echo "0.${value}")
                     utils::attempt xrandr --output "${primary}" --brightness "${brightness}"
                     log::info "Display brightness set to ${value}%"
                 fi
             # Try sysfs
-            elif [[ -w "/sys/class/backlight/intel_backlight/brightness" ]]; then
+            elif is::writable "/sys/class/backlight/intel_backlight/brightness"; then
                 # Calculate value based on max_brightness
                 local max_brightness=$(cat /sys/class/backlight/intel_backlight/max_brightness)
                 local brightness=$(echo "${value} * ${max_brightness} / 100" | utils::quiet_err bc || echo $((value * max_brightness / 100)))

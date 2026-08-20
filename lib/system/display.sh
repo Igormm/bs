@@ -22,7 +22,7 @@ system::display::server() {
             if utils::has Xorg; then
                 log::info "X11 display server available"
                 # Check if xorg.conf exists, if not, generate one
-                if [[ ! -f "/etc/X11/xorg.conf" ]]; then
+                if ! is::file "/etc/X11/xorg.conf"; then
                     if utils::has Xorg; then
                         # This would typically require root privileges and is better done
                         # manually
@@ -250,19 +250,19 @@ system::display::resolution() {
     local resolution="${1}"
     local output="${2}"
     
-    if [[ -z "${resolution}" ]]; then
+    if is::empty "${resolution}"; then
         log::warn "Resolution not specified"
         return "${E_ERROR}"
     fi
     
     # For X11 systems
     if utils::has xrandr; then
-        if [[ -n "${output}" ]]; then
+        if is::not_empty "${output}"; then
             utils::quiet_err xrandr --output "${output}" --mode "${resolution}"
         else
             # Apply to primary display
             local primary=$(xrandr --query | grep " connected" | head -n 1 | awk '{print $1}')
-            if [[ -n "${primary}" ]]; then
+            if is::not_empty "${primary}"; then
                 utils::quiet_err xrandr --output "${primary}" --mode "${resolution}"
             else
                 # Apply to all connected displays
@@ -288,19 +288,19 @@ system::display::refresh() {
     local rate="${1}"
     local output="${2}"
     
-    if [[ -z "${rate}" ]]; then
+    if is::empty "${rate}"; then
         log::warn "Refresh rate not specified"
         return "${E_ERROR}"
     fi
     
     # For X11 systems
     if utils::has xrandr; then
-        if [[ -n "${output}" ]]; then
+        if is::not_empty "${output}"; then
             utils::quiet_err xrandr --output "${output}" --rate "${rate}"
         else
             # Apply to primary display
             local primary=$(xrandr --query | grep " connected" | head -n 1 | awk '{print $1}')
-            if [[ -n "${primary}" ]]; then
+            if is::not_empty "${primary}"; then
                 utils::quiet_err xrandr --output "${primary}" --rate "${rate}"
             else
                 # Apply to common outputs
@@ -344,7 +344,7 @@ system::display::multi() {
         case "${layout}" in
             extend)
                 # Extend displays
-                if [[ -n "${primary}" ]]; then
+                if is::not_empty "${primary}"; then
                     utils::quiet_err xrandr --output "${primary}" --primary
                 fi
                 log::info "Displays extended"
@@ -356,7 +356,7 @@ system::display::multi() {
                 ;;
             primary)
                 # Use only primary display
-                if [[ -n "${primary}" ]]; then
+                if is::not_empty "${primary}"; then
                     utils::quiet_err xrandr --output "${primary}" --primary
                     # Turn off other displays
                     local outputs=$(xrandr --query | grep " connected" | grep -v "${primary}" | awk '{print $1}')

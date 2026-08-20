@@ -151,7 +151,7 @@ wireguard::create_directories() {
 wireguard::generate_keypair() {
     local interface="${1:-}"
     
-    if [[ -z "${interface}" ]]; then
+    if is::empty "${interface}"; then
         error::throw "Interface name is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -164,7 +164,7 @@ wireguard::generate_keypair() {
     # Generate private key
     wg genkey | tee "${private_key_file}" | wg pubkey > "${public_key_file}"
     
-    if [[ ! -f "${private_key_file}" ]] || [[ ! -f "${public_key_file}" ]]; then
+    if ! is::file "${private_key_file}" || ! is::file "${public_key_file}"; then
         error::throw "Failed to generate key pair" \
             "${LIB_ERROR_FILE_OPERATION}"
     fi
@@ -190,13 +190,13 @@ wireguard::create_interface() {
     local dns="${4:-1.1.1.1,8.8.8.8}"
     local wan_interface="${5:-}"
     
-    if [[ -z "${interface}" ]] || [[ -z "${address}" ]]; then
+    if is::empty "${interface}" || is::empty "${address}"; then
         error::throw "Interface name and address are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
     # Autodetect WAN interface from the default route if not specified
-    if [[ -z "${wan_interface}" ]]; then
+    if is::empty "${wan_interface}"; then
         wan_interface=$(utils::quiet_err ip route show default | awk '/^default/ {print $5; exit}')
         wan_interface="${wan_interface:-eth0}"
     fi
@@ -207,7 +207,7 @@ wireguard::create_interface() {
     
     # Generate key pair if not exists
     local private_key_file="${WIREGUARD_KEY_DIR}/${interface}_private.key"
-    if [[ ! -f "${private_key_file}" ]]; then
+    if ! is::file "${private_key_file}"; then
         wireguard::generate_keypair "${interface}"
     fi
     
@@ -234,7 +234,7 @@ PostDown = ufw route delete allow in on ${interface} out on ${wan_interface}; ip
 
 EOF
     
-    if [[ ! -f "${config_file}" ]]; then
+    if ! is::file "${config_file}"; then
         error::throw "Failed to create configuration file" \
             "${LIB_ERROR_FILE_OPERATION}"
     fi
@@ -253,14 +253,14 @@ wireguard::add_peer() {
     local endpoint="${4:-}"
     local persistent_keepalive="${5:-${WIREGUARD_DEFAULT_KEEPALIVE}}"
     
-    if [[ -z "${interface}" ]] || [[ -z "${peer_pubkey}" ]] || [[ -z "${allowed_ips}" ]]; then
+    if is::empty "${interface}" || is::empty "${peer_pubkey}" || is::empty "${allowed_ips}"; then
         error::throw "Interface, peer public key, and allowed IPs are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
     local config_file="${WIREGUARD_CONFIG_DIR}/${interface}.conf"
     
-    if [[ ! -f "${config_file}" ]]; then
+    if ! is::file "${config_file}"; then
         error::throw "Interface ${interface} does not exist" \
             "${LIB_ERROR_FILE_NOT_FOUND}"
     fi
@@ -280,12 +280,12 @@ AllowedIPs = ${allowed_ips}
 EOF
     
     # Add endpoint if provided
-    if [[ -n "${endpoint}" ]]; then
+    if is::not_empty "${endpoint}"; then
         io::files::append "${config_file}" "Endpoint = ${endpoint}"
     fi
     
     # Add persistent keepalive
-    if [[ -n "${persistent_keepalive}" ]]; then
+    if is::not_empty "${persistent_keepalive}"; then
         io::files::append "${config_file}" "PersistentKeepalive = ${persistent_keepalive}"
     fi
     
@@ -297,14 +297,14 @@ wireguard::remove_peer() {
     local interface="${1:-}"
     local peer_pubkey="${2:-}"
     
-    if [[ -z "${interface}" ]] || [[ -z "${peer_pubkey}" ]]; then
+    if is::empty "${interface}" || is::empty "${peer_pubkey}"; then
         error::throw "Interface and peer public key are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
     local config_file="${WIREGUARD_CONFIG_DIR}/${interface}.conf"
     
-    if [[ ! -f "${config_file}" ]]; then
+    if ! is::file "${config_file}"; then
         error::throw "Interface ${interface} does not exist" \
             "${LIB_ERROR_FILE_NOT_FOUND}"
     fi
@@ -336,7 +336,7 @@ wireguard::remove_peer() {
 wireguard::start_interface() {
     local interface="${1:-}"
     
-    if [[ -z "${interface}" ]]; then
+    if is::empty "${interface}"; then
         error::throw "Interface name is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -362,7 +362,7 @@ wireguard::start_interface() {
 wireguard::stop_interface() {
     local interface="${1:-}"
     
-    if [[ -z "${interface}" ]]; then
+    if is::empty "${interface}"; then
         error::throw "Interface name is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -388,7 +388,7 @@ wireguard::stop_interface() {
 wireguard::get_interface_status() {
     local interface="${1:-}"
     
-    if [[ -z "${interface}" ]]; then
+    if is::empty "${interface}"; then
         error::throw "Interface name is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -424,7 +424,7 @@ wireguard::backup_config() {
     local interface="${1:-}"
     local backup_name="${2:-backup_$(utils::stamp)}"
     
-    if [[ -z "${interface}" ]]; then
+    if is::empty "${interface}"; then
         error::throw "Interface name is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -432,7 +432,7 @@ wireguard::backup_config() {
     local config_file="${WIREGUARD_CONFIG_DIR}/${interface}.conf"
     local backup_file="${WIREGUARD_BACKUP_DIR}/${interface}_${backup_name}.conf"
     
-    if [[ ! -f "${config_file}" ]]; then
+    if ! is::file "${config_file}"; then
         error::throw "Configuration file not found" \
             "${LIB_ERROR_FILE_NOT_FOUND}"
     fi
@@ -449,11 +449,11 @@ wireguard::backup_config() {
     local private_key_file="${WIREGUARD_KEY_DIR}/${interface}_private.key"
     local public_key_file="${WIREGUARD_KEY_DIR}/${interface}_public.key"
     
-    if [[ -f "${private_key_file}" ]]; then
+    if is::file "${private_key_file}"; then
         cp "${private_key_file}" "${WIREGUARD_BACKUP_DIR}/${interface}_${backup_name}_private.key"
     fi
     
-    if [[ -f "${public_key_file}" ]]; then
+    if is::file "${public_key_file}"; then
         cp "${public_key_file}" "${WIREGUARD_BACKUP_DIR}/${interface}_${backup_name}_public.key"
     fi
     
@@ -466,12 +466,12 @@ wireguard::restore_config() {
     local interface="${1:-}"
     local backup_file="${2:-}"
     
-    if [[ -z "${interface}" ]] || [[ -z "${backup_file}" ]]; then
+    if is::empty "${interface}" || is::empty "${backup_file}"; then
         error::throw "Interface name and backup file are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
-    if [[ ! -f "${backup_file}" ]]; then
+    if ! is::file "${backup_file}"; then
         error::throw "Backup file not found" \
             "${LIB_ERROR_FILE_NOT_FOUND}"
     fi
@@ -496,7 +496,7 @@ wireguard::restore_config() {
 wireguard::generate_qr() {
     local interface="${1:-}"
     
-    if [[ -z "${interface}" ]]; then
+    if is::empty "${interface}"; then
         error::throw "Interface name is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -519,7 +519,7 @@ wireguard::generate_qr() {
     
     local config_file="${WIREGUARD_CONFIG_DIR}/${interface}.conf"
     
-    if [[ ! -f "${config_file}" ]]; then
+    if ! is::file "${config_file}"; then
         error::throw "Configuration file not found" \
             "${LIB_ERROR_FILE_NOT_FOUND}"
     fi
@@ -536,7 +536,7 @@ wireguard::generate_qr() {
 wireguard::enable_autostart() {
     local interface="${1:-}"
     
-    if [[ -z "${interface}" ]]; then
+    if is::empty "${interface}"; then
         error::throw "Interface name is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -564,7 +564,7 @@ wireguard::enable_autostart() {
 wireguard::disable_autostart() {
     local interface="${1:-}"
     
-    if [[ -z "${interface}" ]]; then
+    if is::empty "${interface}"; then
         error::throw "Interface name is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -604,7 +604,7 @@ wireguard::get_public_ip() {
         local ip
         ip=$(utils::quiet_err curl -s --connect-timeout 5 --max-time 10 "${service}")
         
-        if [[ -n "${ip}" ]] && [[ "${ip}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        if is::not_empty "${ip}" && [[ "${ip}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "${ip}"
             return 0
         fi
@@ -621,7 +621,7 @@ wireguard::create_client_config() {
     local server_endpoint="${3:-}"
     local allowed_ips="${4:-0.0.0.0/0}"
     
-    if [[ -z "${client_name}" ]] || [[ -z "${server_pubkey}" ]] || [[ -z "${server_endpoint}" ]]; then
+    if is::empty "${client_name}" || is::empty "${server_pubkey}" || is::empty "${server_endpoint}"; then
         error::throw "Client name, server public key, and endpoint are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -633,7 +633,7 @@ wireguard::create_client_config() {
     log::info "Creating client configuration: ${client_name}"
     
     # Generate client key pair
-    if [[ ! -f "${client_private_key_file}" ]]; then
+    if ! is::file "${client_private_key_file}"; then
         wg genkey | tee "${client_private_key_file}" | wg pubkey > "${client_public_key_file}"
         chmod 600 "${client_private_key_file}"
         chmod 644 "${client_public_key_file}"

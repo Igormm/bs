@@ -22,7 +22,7 @@ system::users::create() {
     local home_dir="${2:-/home/${username}}"
     local shell="${3:-/bin/bash}"
     
-    if [[ -z "${username}" ]]; then
+    if is::empty "${username}"; then
         log::warn "Username not specified"
         return "${E_ERROR}"
     fi
@@ -69,7 +69,7 @@ system::users::delete() {
     local username="${1}"
     local remove_home="${2:-no}"
     
-    if [[ -z "${username}" ]]; then
+    if is::empty "${username}"; then
         log::warn "Username not specified"
         return "${E_ERROR}"
     fi
@@ -113,7 +113,7 @@ system::users::set_password() {
     local username="${1}"
     local password="${2:-}"
     
-    if [[ -z "${username}" ]]; then
+    if is::empty "${username}"; then
         log::warn "Username not specified"
         return "${E_ERROR}"
     fi
@@ -124,7 +124,7 @@ system::users::set_password() {
     fi
     
     if utils::has chpasswd; then
-        if [[ -n "${password}" ]]; then
+        if is::not_empty "${password}"; then
             echo "${username}:${password}" | utils::quiet_err chpasswd
             if [[ $? -eq 0 ]]; then
                 log::info "Password for ${username} changed successfully"
@@ -144,7 +144,7 @@ system::users::set_password() {
             fi
         fi
     elif utils::has passwd; then
-        if [[ -n "${password}" ]]; then
+        if is::not_empty "${password}"; then
             echo "${username}:${password}" | utils::quiet_err passwd --stdin "${username}" || {
                 log::warn "passwd --stdin not supported, using interactive mode"
                 log::warn "passwd --stdin не поддерживается, используется интерактивный режим"
@@ -175,7 +175,7 @@ system::users::add_to_group() {
     local username="${1}"
     local group="${2}"
     
-    if [[ -z "${username}" ]] || [[ -z "${group}" ]]; then
+    if is::empty "${username}" || is::empty "${group}"; then
         log::warn "Username and group must be specified"
         return "${E_ERROR}"
     fi
@@ -218,7 +218,7 @@ system::users::add_to_group() {
 system::users::list() {
     if utils::has getent; then
         getent passwd | cut -d: -f1 | sort
-    elif [[ -f /etc/passwd ]]; then
+    elif is::file /etc/passwd; then
         cut -d: -f1 /etc/passwd | sort
     else
         log::error "Cannot list users (getent or /etc/passwd not available)"
@@ -233,7 +233,7 @@ system::users::list() {
 system::users::info() {
     local username="${1}"
     
-    if [[ -z "${username}" ]]; then
+    if is::empty "${username}"; then
         log::warn "Username not specified"
         return "${E_ERROR}"
     fi
@@ -251,7 +251,7 @@ system::users::info() {
     if utils::has getent; then
         local passwd_info
         passwd_info=$(utils::quiet_err getent passwd "${username}")
-        if [[ -n "${passwd_info}" ]]; then
+        if is::not_empty "${passwd_info}"; then
             echo "  Full name: $(echo "${passwd_info}" | cut -d: -f5)"
             echo "  Home: $(echo "${passwd_info}" | cut -d: -f6)"
             echo "  Shell: $(echo "${passwd_info}" | cut -d: -f7)"
@@ -259,7 +259,7 @@ system::users::info() {
         
         local groups
         groups=$(utils::quiet_err groups "${username}" | cut -d: -f2)
-        if [[ -n "${groups}" ]]; then
+        if is::not_empty "${groups}"; then
             echo "  Groups:${groups}"
         fi
     fi
@@ -272,7 +272,7 @@ system::users::info() {
 system::users::lock() {
     local username="${1}"
     
-    if [[ -z "${username}" ]]; then
+    if is::empty "${username}"; then
         log::warn "Username not specified"
         return "${E_ERROR}"
     fi
@@ -311,7 +311,7 @@ system::users::lock() {
 system::users::unlock() {
     local username="${1}"
     
-    if [[ -z "${username}" ]]; then
+    if is::empty "${username}"; then
         log::warn "Username not specified"
         return "${E_ERROR}"
     fi
@@ -350,7 +350,7 @@ system::users::unlock() {
 system::users::group_create() {
     local groupname="${1}"
     
-    if [[ -z "${groupname}" ]]; then
+    if is::empty "${groupname}"; then
         log::warn "Group name not specified"
         return "${E_ERROR}"
     fi
@@ -381,7 +381,7 @@ system::users::group_create() {
 system::users::group_delete() {
     local groupname="${1}"
     
-    if [[ -z "${groupname}" ]]; then
+    if is::empty "${groupname}"; then
         log::warn "Group name not specified"
         return "${E_ERROR}"
     fi
@@ -411,7 +411,7 @@ system::users::group_delete() {
 system::users::group_list() {
     if utils::has getent; then
         getent group | cut -d: -f1 | sort
-    elif [[ -f /etc/group ]]; then
+    elif is::file /etc/group; then
         cut -d: -f1 /etc/group | sort
     else
         log::error "Cannot list groups (getent or /etc/group not available)"

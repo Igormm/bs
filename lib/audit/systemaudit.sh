@@ -246,7 +246,7 @@ systemaudit::security::run() {
 systemaudit::security::check_root_login() {
     local finding=""
     
-    if [[ -f /etc/ssh/sshd_config ]]; then
+    if is::file /etc/ssh/sshd_config; then
         if grep -q "^PermitRootLogin yes" /etc/ssh/sshd_config; then
             finding=$(systemaudit::create_finding \
                 "Root login enabled via SSH" \
@@ -264,7 +264,7 @@ systemaudit::security::check_password_policy() {
     local finding=""
     
     # Check password expiration
-    if [[ -f /etc/login.defs ]]; then
+    if is::file /etc/login.defs; then
         local pass_max_days
         pass_max_days=$(grep "^PASS_MAX_DAYS" /etc/login.defs | awk '{print $2}' || echo "99999")
         
@@ -284,7 +284,7 @@ systemaudit::security::check_password_policy() {
 systemaudit::security::check_ssh_config() {
     local finding=""
     
-    if [[ -f /etc/ssh/sshd_config ]]; then
+    if is::file /etc/ssh/sshd_config; then
         # Check for protocol version
         if ! grep -q "^Protocol 2" /etc/ssh/sshd_config; then
             finding=$(systemaudit::create_finding \
@@ -385,7 +385,7 @@ systemaudit::security::check_kernel_parameters() {
     local finding=""
     
     # Check IP forwarding
-    if [[ -f /proc/sys/net/ipv4/ip_forward ]]; then
+    if is::file /proc/sys/net/ipv4/ip_forward; then
         local ip_forward
         ip_forward=$(cat /proc/sys/net/ipv4/ip_forward)
         
@@ -431,7 +431,7 @@ systemaudit::security::check_world_writable_dirs() {
     local world_writable
     world_writable=$(utils::quiet_err find / -type d -perm -o+w | grep -v "/proc\|/sys\|/tmp" | head -10)
     
-    if [[ -n "${world_writable}" ]]; then
+    if is::not_empty "${world_writable}"; then
         finding=$(systemaudit::create_finding \
             "World-writable directories found" \
             "World-writable directories can be security risks" \
@@ -450,7 +450,7 @@ systemaudit::security::check_processes() {
     local suspicious_processes
     suspicious_processes=$(ps aux | grep -E "(nc|netcat|python.*-m.*http)" | grep -v grep)
     
-    if [[ -n "${suspicious_processes}" ]]; then
+    if is::not_empty "${suspicious_processes}"; then
         finding=$(systemaudit::create_finding \
             "Potentially suspicious processes detected" \
             "Some processes may indicate compromise" \
@@ -489,7 +489,7 @@ systemaudit::users::check_sudo_users() {
     local sudo_users
     sudo_users=$(getent group sudo | cut -d: -f4 || echo "")
     
-    if [[ -n "${sudo_users}" ]]; then
+    if is::not_empty "${sudo_users}"; then
         local user_count
         user_count=$(echo "${sudo_users}" | tr ',' '\n' | wc -l)
         
@@ -509,7 +509,7 @@ systemaudit::users::check_sudo_users() {
 systemaudit::users::check_passwordless_sudo() {
     local finding=""
     
-    if [[ -f /etc/sudoers ]]; then
+    if is::file /etc/sudoers; then
         if grep -q "NOPASSWD" /etc/sudoers; then
             finding=$(systemaudit::create_finding \
                 "Passwordless sudo configuration found" \
@@ -530,7 +530,7 @@ systemaudit::users::check_locked_accounts() {
     local empty_passwords
     empty_passwords=$(utils::quiet_err awk -F: '($2 == "" ) {print $1}' /etc/shadow || true)
     
-    if [[ -n "${empty_passwords}" ]]; then
+    if is::not_empty "${empty_passwords}"; then
         finding=$(systemaudit::create_finding \
             "Accounts with empty passwords found" \
             "Empty passwords are security risks" \
@@ -548,7 +548,7 @@ systemaudit::users::check_uid_zero() {
     local uid_zero
     uid_zero=$(awk -F: '($3 == 0) {print $1}' /etc/passwd | grep -v root || true)
     
-    if [[ -n "${uid_zero}" ]]; then
+    if is::not_empty "${uid_zero}"; then
         finding=$(systemaudit::create_finding \
             "Additional UID 0 accounts found: ${uid_zero}" \
             "Only root should have UID 0" \
@@ -567,7 +567,7 @@ systemaudit::users::check_home_permissions() {
     local world_readable_homes
     world_readable_homes=$(utils::quiet_err find /home -type d -perm -o+r | head -10)
     
-    if [[ -n "${world_readable_homes}" ]]; then
+    if is::not_empty "${world_readable_homes}"; then
         finding=$(systemaudit::create_finding \
             "World-readable home directories found" \
             "Home directories should not be world-readable" \
@@ -672,7 +672,7 @@ systemaudit::network::check_ip_forwarding() {
     local finding=""
     
     # This is already checked in security audit, but let's verify again
-    if [[ -f /proc/sys/net/ipv4/ip_forward ]]; then
+    if is::file /proc/sys/net/ipv4/ip_forward; then
         local ip_forward
         ip_forward=$(cat /proc/sys/net/ipv4/ip_forward)
         
@@ -693,7 +693,7 @@ systemaudit::network::check_icmp_redirects() {
     local finding=""
     
     # Check for ICMP redirect acceptance
-    if [[ -f /proc/sys/net/ipv4/conf/all/accept_redirects ]]; then
+    if is::file /proc/sys/net/ipv4/conf/all/accept_redirects; then
         local icmp_redirects
         icmp_redirects=$(cat /proc/sys/net/ipv4/conf/all/accept_redirects)
         
@@ -737,7 +737,7 @@ systemaudit::filesystem::check_world_writable() {
     world_writable_files=$(utils::quiet_err find / -type f -perm -o+w | \
         grep -v "/proc\|/sys\|/tmp\|/dev/shm" | head -20)
     
-    if [[ -n "${world_writable_files}" ]]; then
+    if is::not_empty "${world_writable_files}"; then
         finding=$(systemaudit::create_finding \
             "World-writable files found" \
             "World-writable files can be modified by any user" \
@@ -756,7 +756,7 @@ systemaudit::filesystem::check_suid_files() {
     local suid_files
     suid_files=$(utils::quiet_err find / -type f -perm -4000 -ls | head -10)
     
-    if [[ -n "${suid_files}" ]]; then
+    if is::not_empty "${suid_files}"; then
         # This is informational - SUID files are normal but should be monitored
         finding=$(systemaudit::create_finding \
             "SUID files present in system" \
@@ -776,7 +776,7 @@ systemaudit::filesystem::check_sticky_bits() {
     local public_dirs=("/tmp" "/var/tmp")
     
     for dir in "${public_dirs[@]}"; do
-        if [[ -d "${dir}" ]]; then
+        if is::dir "${dir}"; then
             local perms
             perms=$(utils::quiet_err stat -c %a "${dir}" || echo "000")
             
@@ -801,7 +801,7 @@ systemaudit::filesystem::check_dot_files() {
     local dot_files
     dot_files=$(utils::quiet_err find /home -name ".rhosts" -o -name ".netrc")
     
-    if [[ -n "${dot_files}" ]]; then
+    if is::not_empty "${dot_files}"; then
         finding=$(systemaudit::create_finding \
             "Legacy authentication files found" \
             ".rhosts and .netrc files are insecure" \
@@ -855,7 +855,7 @@ systemaudit::services::check_inetd_services() {
     local finding=""
     
     # Check for inetd configuration
-    if [[ -f /etc/inetd.conf ]]; then
+    if is::file /etc/inetd.conf; then
         local active_services
         active_services=$(grep -v "^#" /etc/inetd.conf | grep -v "^$" | wc -l)
         
@@ -876,11 +876,11 @@ systemaudit::services::check_service_permissions() {
     local finding=""
     
     # Check systemd service files
-    if [[ -d /etc/systemd/system ]]; then
+    if is::dir /etc/systemd/system; then
         local world_writable_services
         world_writable_services=$(utils::quiet_err find /etc/systemd/system -type f -perm -o+w)
         
-        if [[ -n "${world_writable_services}" ]]; then
+        if is::not_empty "${world_writable_services}"; then
             finding=$(systemaudit::create_finding \
                 "World-writable service files found" \
                 "Service files should not be world-writable" \
@@ -915,7 +915,7 @@ systemaudit::compliance::run() {
 systemaudit::compliance::check_password_complexity() {
     local finding=""
     
-    if [[ -f /etc/security/pwquality.conf ]]; then
+    if is::file /etc/security/pwquality.conf; then
         local minlen
         minlen=$(grep "^minlen" /etc/security/pwquality.conf | awk '{print $3}' || echo "0")
         
@@ -1286,7 +1286,7 @@ systemaudit::create_baseline() {
 # Compare with baseline
 systemaudit::compare_baseline() {
     
-    if [[ ! -f "${AUDIT_BASELINE_FILE}" ]]; then
+    if ! is::file "${AUDIT_BASELINE_FILE}"; then
         log::warn "No baseline found. Create baseline first."
         return "${E_ERROR}"
     fi

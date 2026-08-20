@@ -181,7 +181,7 @@ __llm::request() {
     openai)
       url="${LLM_OPENAI_URL}"
       headers+=("Content-Type: application/json")
-      if [[ -n "${api_key}" ]]; then
+      if is::not_empty "${api_key}"; then
         headers+=("Authorization: Bearer ${api_key}")
       fi
       ;;
@@ -253,7 +253,7 @@ llm::is_available() {
 
   case "${provider}" in
     openai)
-      [[ -n "${OPENAI_API_KEY:-}" ]] || [[ -n "${LLM_OPENAI_API_KEY:-}" ]]
+      is::not_empty "${OPENAI_API_KEY:-}" || is::not_empty "${LLM_OPENAI_API_KEY:-}"
       return
       ;;
     ollama)
@@ -289,7 +289,7 @@ llm::chat() {
   local model="${2:-}"
   local message="${3:-}"
 
-  if [[ -z "${provider}" || -z "${model}" || -z "${message}" ]]; then
+  if is::empty "${provider}" || is::empty "${model}" || is::empty "${message}"; then
     log::warn "llm::chat: provider, model and message required"
     return "${E_INVALID}"
   fi
@@ -301,7 +301,7 @@ llm::chat() {
   local api_key=""
   if [[ "${provider}" == "openai" ]]; then
     api_key="${OPENAI_API_KEY:-${LLM_OPENAI_API_KEY:-}}"
-    if [[ -z "${api_key}" && "${FRAMEWORK_DRY_RUN:-false}" != "true" ]]; then
+    if is::empty "${api_key}" && [[ "${FRAMEWORK_DRY_RUN:-false}" != "true" ]]; then
       log::error "OpenAI API key not set (OPENAI_API_KEY or LLM_OPENAI_API_KEY)"
       return "${INTEGRATION_ERROR_LLM}"
     fi
@@ -325,7 +325,7 @@ llm::chat() {
     return "${rc}"
   fi
 
-  if [[ -z "${response}" ]]; then
+  if is::empty "${response}"; then
     log::error "LLM returned empty response"
     return "${INTEGRATION_ERROR_LLM}"
   fi
@@ -346,7 +346,7 @@ llm::chat() {
       ;;
   esac
 
-  if [[ -z "${content}" ]]; then
+  if is::empty "${content}"; then
     log::warn "LLM response did not contain expected content"
     printf '%s' "${response}"
     return "${INTEGRATION_ERROR_LLM}"
@@ -370,12 +370,12 @@ llm::chat_file() {
   local model="${2:-}"
   local file="${3:-}"
 
-  if [[ -z "${file}" ]]; then
+  if is::empty "${file}"; then
     log::warn "llm::chat_file: file path required"
     return "${E_INVALID}"
   fi
 
-  if [[ ! -f "${file}" ]]; then
+  if ! is::file "${file}"; then
     log::error "File not found: ${file}"
     return "${LIB_ERROR_FILE_NOT_FOUND}"
   fi

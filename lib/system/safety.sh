@@ -162,7 +162,7 @@ safety::validate_path() {
 
     # Check if path exists and is writable / Проверить существует ли путь и доступен ли
     # для записи
-    if [[ -e "${path}" && ! -w "${path}" ]]; then
+    if is::exists "${path}" && ! is::writable "${path}"; then
         log::error "Path not writable: ${path}"
         return "${E_ERROR}"
     fi

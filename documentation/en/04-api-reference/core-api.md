@@ -95,9 +95,28 @@ result; `str::contains`, `str::starts_with`, `str::ends_with` are predicates
 - `arr::push <array> <element>` — append in place (nameref)
 - `arr::length <array>` — element count
 - `arr::join <array> <sep>` — joins with a multi-char separator (unlike `"${a[*]}"` with IFS)
+- `arr::from_lines <array>` — reads stdin lines into an array via `mapfile`; use `arr::from_lines arr < file` or `< <(cmd)` (a pipeline would run in a subshell and lose the array)
 - `map::has <map> <key>` — predicate
 
 All take the variable NAME (not the value), e.g. `arr::join my_tools ", "`.
+
+### `is::` — predicates for humans
+
+Friendly replacements for `[[ ... ]]` test flags — no need to remember that
+`-n` means "non-empty" and `-f` means "regular file":
+
+| Bare bash | BS |
+|---|---|
+| `[[ -z "$s" ]]` | `is::empty "$s"` |
+| `[[ -n "$s" ]]` | `is::not_empty "$s"` |
+| `[[ -e/-f/-d/-L "$p" ]]` | `is::exists` / `is::file` / `is::dir` / `is::symlink "$p"` |
+| `[[ -s "$p" ]]` | `is::file_not_empty "$p"` |
+| `[[ -x/-r/-w "$p" ]]` | `is::executable` / `is::readable` / `is::writable "$p"` |
+| `[[ "$s" =~ ^[0-9]+$ ]]` | `is::number "$s"` |
+| `command -v c >/dev/null 2>&1` | `is::command c` |
+| `declare -F f >/dev/null 2>&1` | `is::function f` |
+
+Negation reads naturally: `if ! is::file "${path}"; then`.
 
 ---
 
@@ -227,6 +246,11 @@ Any module can register a cleanup function; the stack runs in LIFO order when th
 #### `error::throw <message> [code]`
 - Like `errorhandler::throw`, but the caller's function name is auto-detected via `FUNCNAME` — no `local func_name="..."` boilerplate, and the name stays correct after renames
 - Example: `error::throw "Something failed" "${LIB_ERROR_FILE_NOT_FOUND}"`
+
+#### `signal::on <signal> <handler>` / `signal::ignore <signal>` / `signal::reset <signal>`
+- Linguistic wrappers over `trap`: subscribe a function to a signal, ignore a signal, restore the default disposition. Names with or without `SIG` are accepted
+- Returns: `E_INVALID` on unknown signal, `E_ERROR` if the handler function does not exist
+- Example: `signal::on SIGINT my::cleanup`
 
 #### `error::log <message>`
 - Parameters: `$1` — message

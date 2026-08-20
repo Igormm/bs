@@ -20,14 +20,14 @@ system::routing::add() {
     local gateway="${2}"
     local interface="${3}"
     
-    if [[ -z "${destination}" ]] || [[ -z "${gateway}" ]]; then
+    if is::empty "${destination}" || is::empty "${gateway}"; then
         log::warn "Destination network and gateway must be specified"
         return "${E_ERROR}"
     fi
     
     # Using ip command (modern approach)
     if utils::has ip; then
-        if [[ -n "${interface}" ]]; then
+        if is::not_empty "${interface}"; then
             utils::attempt ip route add "${destination}" via "${gateway}" dev "${interface}"
         else
             utils::attempt ip route add "${destination}" via "${gateway}"
@@ -35,7 +35,7 @@ system::routing::add() {
         log::info "Static route added: ${destination} via ${gateway}"
     else
         # Fallback to route command
-        if [[ -n "${interface}" ]]; then
+        if is::not_empty "${interface}"; then
             utils::attempt route add -net "${destination}" gw "${gateway}" dev "${interface}"
         else
             utils::attempt route add -net "${destination}" gw "${gateway}"
@@ -53,14 +53,14 @@ system::routing::delete() {
     local destination="${1}"
     local gateway="${2}"
     
-    if [[ -z "${destination}" ]]; then
+    if is::empty "${destination}"; then
         log::warn "Destination network must be specified"
         return "${E_ERROR}"
     fi
     
     # Using ip command (modern approach)
     if utils::has ip; then
-        if [[ -n "${gateway}" ]]; then
+        if is::not_empty "${gateway}"; then
             utils::attempt ip route del "${destination}" via "${gateway}"
         else
             utils::attempt ip route del "${destination}"
@@ -68,7 +68,7 @@ system::routing::delete() {
         log::info "Static route deleted: ${destination}"
     else
         # Fallback to route command
-        if [[ -n "${gateway}" ]]; then
+        if is::not_empty "${gateway}"; then
             utils::attempt route del -net "${destination}" gw "${gateway}"
         else
             utils::attempt route del -net "${destination}"
@@ -86,7 +86,7 @@ system::routing::default() {
     local gateway="${1}"
     local interface="${2}"
     
-    if [[ -z "${gateway}" ]]; then
+    if is::empty "${gateway}"; then
         log::warn "Gateway IP must be specified"
         return "${E_ERROR}"
     fi
@@ -97,7 +97,7 @@ system::routing::default() {
         utils::attempt ip route del default
         
         # Add new default route
-        if [[ -n "${interface}" ]]; then
+        if is::not_empty "${interface}"; then
             utils::attempt ip route add default via "${gateway}" dev "${interface}"
         else
             utils::attempt ip route add default via "${gateway}"
@@ -109,7 +109,7 @@ system::routing::default() {
         utils::attempt route del default
         
         # Add new default route
-        if [[ -n "${interface}" ]]; then
+        if is::not_empty "${interface}"; then
             utils::attempt route add default gw "${gateway}" dev "${interface}"
         else
             utils::attempt route add default gw "${gateway}"
@@ -140,7 +140,7 @@ system::routing::table() {
     local table="${1}"
     local action="${2:-show}"
     
-    if [[ -z "${table}" ]]; then
+    if is::empty "${table}"; then
         log::warn "Routing table name or number must be specified"
         return "${E_ERROR}"
     fi
@@ -148,7 +148,7 @@ system::routing::table() {
     case "${action}" in
         add)
             # Add routing table entry to /etc/iproute2/rt_tables
-            if [[ -w "/etc/iproute2/rt_tables" ]]; then
+            if is::writable "/etc/iproute2/rt_tables"; then
                 # Check if table already exists
                 if ! utils::quiet_err grep -q "^${table} " /etc/iproute2/rt_tables; then
                     io::files::append /etc/iproute2/rt_tables "${table} custom"
@@ -163,7 +163,7 @@ system::routing::table() {
             ;;
         delete)
             # Remove routing table entry from /etc/iproute2/rt_tables
-            if [[ -w "/etc/iproute2/rt_tables" ]]; then
+            if is::writable "/etc/iproute2/rt_tables"; then
                 utils::attempt sed -i "/^${table} /d" /etc/iproute2/rt_tables
                 log::info "Routing table ${table} removed"
             else
@@ -196,7 +196,7 @@ system::routing::policy() {
     local rule="${1}"
     local action="${2:-add}"
     
-    if [[ -z "${rule}" ]]; then
+    if is::empty "${rule}"; then
         log::warn "Routing rule must be specified"
         return "${E_ERROR}"
     fi
@@ -252,7 +252,7 @@ system::routing::ipv6() {
     case "${action}" in
         enable)
             # Enable IPv6 forwarding
-            if [[ -w "/proc/sys/net/ipv6/conf/all/forwarding" ]]; then
+            if is::writable "/proc/sys/net/ipv6/conf/all/forwarding"; then
                 utils::attempt echo 1 > /proc/sys/net/ipv6/conf/all/forwarding
                 log::info "IPv6 routing enabled"
             else
@@ -262,7 +262,7 @@ system::routing::ipv6() {
             ;;
         disable)
             # Disable IPv6 forwarding
-            if [[ -w "/proc/sys/net/ipv6/conf/all/forwarding" ]]; then
+            if is::writable "/proc/sys/net/ipv6/conf/all/forwarding"; then
                 utils::attempt echo 0 > /proc/sys/net/ipv6/conf/all/forwarding
                 log::info "IPv6 routing disabled"
             else

@@ -371,7 +371,7 @@ ps1status::start_monitoring() {
 
     
 
-    if [[ -n "${monitor_pid}" ]]; then
+    if is::not_empty "${monitor_pid}"; then
 
         log::debug "PS1 monitoring already running (PID: ${monitor_pid})"
 
@@ -447,7 +447,7 @@ ps1status::stop_monitoring() {
 
     
 
-    if [[ -f "${pid_file}" ]]; then
+    if is::file "${pid_file}"; then
 
 #
 # ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
@@ -502,7 +502,7 @@ ps1status::wireguard::init() {
 
         while IFS= read -r interface; do
 
-            if [[ -n "${interface}" ]]; then
+            if is::not_empty "${interface}"; then
 
                 PS1_STATUS_WIREGUARD_INTERFACES+=("${interface}")
 
@@ -581,7 +581,7 @@ ps1status::wireguard::get_status() {
 
     
 
-    if [[ -f "${status_file}" ]]; then
+    if is::file "${status_file}"; then
 
         status=$(cat "${status_file}")
 
@@ -766,7 +766,7 @@ ps1status::network::get_status() {
 
     
 
-    if [[ -f "${status_file}" ]]; then
+    if is::file "${status_file}"; then
 
         status=$(cat "${status_file}")
 
@@ -774,7 +774,7 @@ ps1status::network::get_status() {
 
     
 
-    if [[ -f "${latency_file}" ]]; then
+    if is::file "${latency_file}"; then
 
         latency=$(cat "${latency_file}")
 
@@ -943,7 +943,7 @@ ps1status::speed::get_status() {
 
     
 
-    if [[ -f "${speed_file}" ]]; then
+    if is::file "${speed_file}"; then
 
         speed=$(cat "${speed_file}")
 
@@ -1030,7 +1030,7 @@ ps1status::audio::update() {
 
         
 
-        if [[ -n "${sink_info}" ]]; then
+        if is::not_empty "${sink_info}"; then
 
 #
 # ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
@@ -1045,7 +1045,7 @@ ps1status::audio::update() {
 
             # Extract volume percentage
 
-            if [[ -n "${sink_volume}" ]]; then
+            if is::not_empty "${sink_volume}"; then
 
                 volume=$(echo "${sink_volume}" | sed 's/.*\([0-9]*\)%.*/\1/' || echo "0")
 
@@ -1078,7 +1078,7 @@ ps1status::audio::update() {
 
         
 
-        if [[ -n "${mixer_info}" ]]; then
+        if is::not_empty "${mixer_info}"; then
 
             # Extract volume
 
@@ -1146,7 +1146,7 @@ ps1status::audio::get_status() {
 
     
 
-    if [[ -f "${volume_file}" ]]; then
+    if is::file "${volume_file}"; then
 
         volume=$(cat "${volume_file}")
 
@@ -1154,7 +1154,7 @@ ps1status::audio::get_status() {
 
     
 
-    if [[ -f "${muted_file}" ]]; then
+    if is::file "${muted_file}"; then
 
         muted=$(cat "${muted_file}")
 
@@ -1390,7 +1390,7 @@ ps1status::system::get_status() {
 
     
 
-    if [[ -f "${cpu_file}" ]]; then
+    if is::file "${cpu_file}"; then
 
         cpu=$(cat "${cpu_file}")
 
@@ -1398,7 +1398,7 @@ ps1status::system::get_status() {
 
     
 
-    if [[ -f "${mem_file}" ]]; then
+    if is::file "${mem_file}"; then
 
         mem=$(cat "${mem_file}")
 
@@ -1406,7 +1406,7 @@ ps1status::system::get_status() {
 
     
 
-    if [[ -f "${load_file}" ]]; then
+    if is::file "${load_file}"; then
 
         load=$(cat "${load_file}")
 
@@ -1495,7 +1495,7 @@ ps1status::enable_component() {
 
     
 
-    if [[ -z "${component}" ]]; then
+    if is::empty "${component}"; then
 
         error::throw "Component name is required" \
 
@@ -1552,7 +1552,7 @@ ps1status::disable_component() {
 
     
 
-    if [[ -z "${component}" ]]; then
+    if is::empty "${component}"; then
 
         error::throw "Component name is required" \
 

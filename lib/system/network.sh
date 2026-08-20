@@ -20,7 +20,7 @@ system::network::interface() {
     local interface="${1}"
     local action="${2:-up}"
     
-    if [[ -z "${interface}" ]]; then
+    if is::empty "${interface}"; then
         log::warn "Interface name not specified"
         return "${E_INVALID}"
     fi
@@ -83,7 +83,7 @@ system::network::static_ip() {
     local interface="${1}"
     local ip_address="${2}"
     
-    if [[ -z "${interface}" ]] || [[ -z "${ip_address}" ]]; then
+    if is::empty "${interface}" || is::empty "${ip_address}"; then
         log::warn "Interface name and IP address must be specified"
         return "${E_INVALID}"
     fi
@@ -119,7 +119,7 @@ system::network::static_ip() {
 system::network::gateway() {
     local gateway="${1}"
     
-    if [[ -z "${gateway}" ]]; then
+    if is::empty "${gateway}"; then
         log::warn "Gateway IP address not specified"
         return "${E_INVALID}"
     fi
@@ -147,7 +147,7 @@ system::network::dns() {
     
     # Create or overwrite resolv.conf / Создать или перезаписать resolv.conf
     local resolv_conf="/etc/resolv.conf"
-    if [[ -w "${resolv_conf}" ]]; then
+    if is::writable "${resolv_conf}"; then
         # Clear existing nameservers / Очистить существующие nameserver
         utils::attempt sed -i '/^nameserver/d' "${resolv_conf}"
         
@@ -182,7 +182,7 @@ system::network::list_interfaces() {
 system::network::status() {
     local interface="${1:-}"
     
-    if [[ -n "${interface}" ]]; then
+    if is::not_empty "${interface}"; then
         if utils::has ip; then
             utils::attempt ip addr show "${interface}"
         else

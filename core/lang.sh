@@ -191,6 +191,23 @@ arr::join() {
   printf '%s\n' "${out%"${sep}"}"
 }
 
+# @description Read lines from stdin into an array (mapfile).
+# @description Прочитать строки со stdin в массив (mapfile).
+#   Linguistic replacement for `mapfile -t arr < file` and the dangerous
+#   `for i in $(cmd)` loop. NOTE: `cmd | arr::from_lines arr` runs in a
+#   subshell — the array will NOT survive; use process substitution.
+#   ВНИМАНИЕ: `cmd | arr::from_lines arr` выполняется в subshell — массив
+#   НЕ сохранится; используйте подстановку процесса.
+# @param $1 Array name / Имя массива
+# @stdin lines to read / строки для чтения
+# @example
+#   arr::from_lines my_files < listing.txt
+#   arr::from_lines my_pids < <(pgrep bash)
+arr::from_lines() {
+  local -rn __arr_ref="${1:?array name required}"
+  mapfile -t __arr_ref
+}
+
 # @description Predicate: map has a key / Ассоциативный массив содержит ключ.
 # @param $1 Map name / Имя map
 # @param $2 Key / Ключ
@@ -198,4 +215,82 @@ arr::join() {
 map::has() {
   local -rn __map_ref="${1:?map name required}"
   [[ -v __map_ref["${2-}"] ]]
+}
+
+# ==========================================
+# is:: — predicates for humans / предикаты для людей
+#
+# Дружелюбные замены для тестовых идиом bash: не нужно помнить,
+# что -n значит "непусто", а -f — "обычный файл".
+# Friendly replacements for bash test idioms: no need to remember
+# that -n means "non-empty" and -f means "regular file".
+# ==========================================
+
+# @description Predicate: string is empty / Строка пуста. Replaces: [[ -z "$s" ]]
+is::empty() {
+  [[ -z "${1-}" ]]
+}
+
+# @description Predicate: string is not empty / Строка непуста.
+#   Replaces: [[ -n "$s" ]]
+is::not_empty() {
+  [[ -n "${1-}" ]]
+}
+
+# @description Predicate: path exists / Путь существует. Replaces: [[ -e "$p" ]]
+is::exists() {
+  [[ -e "${1-}" ]]
+}
+
+# @description Predicate: regular file / Обычный файл. Replaces: [[ -f "$p" ]]
+is::file() {
+  [[ -f "${1-}" ]]
+}
+
+# @description Predicate: directory / Каталог. Replaces: [[ -d "$p" ]]
+is::dir() {
+  [[ -d "${1-}" ]]
+}
+
+# @description Predicate: symbolic link / Симлинк. Replaces: [[ -L "$p" ]]
+is::symlink() {
+  [[ -L "${1-}" ]]
+}
+
+# @description Predicate: file is not empty / Файл непустой. Replaces: [[ -s "$p" ]]
+is::file_not_empty() {
+  [[ -s "${1-}" ]]
+}
+
+# @description Predicate: executable / Исполняемый. Replaces: [[ -x "$p" ]]
+is::executable() {
+  [[ -x "${1-}" ]]
+}
+
+# @description Predicate: readable / Доступен на чтение. Replaces: [[ -r "$p" ]]
+is::readable() {
+  [[ -r "${1-}" ]]
+}
+
+# @description Predicate: writable / Доступен на запись. Replaces: [[ -w "$p" ]]
+is::writable() {
+  [[ -w "${1-}" ]]
+}
+
+# @description Predicate: string is a number / Строка — число.
+#   Replaces: [[ "$s" =~ ^[0-9]+$ ]]
+is::number() {
+  [[ "${1-}" =~ ^[0-9]+$ ]]
+}
+
+# @description Predicate: command is available / Команда доступна.
+#   Alias of utils::has. Replaces: command -v cmd >/dev/null 2>&1
+is::command() {
+  utils::has "${1:?command name required}"
+}
+
+# @description Predicate: function is defined / Функция определена.
+#   Alias of bs::is_function.
+is::function() {
+  bs::is_function "${1:?function name required}"
 }

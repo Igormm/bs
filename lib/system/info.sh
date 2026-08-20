@@ -19,7 +19,7 @@ system::info::os() {
     
     # Try /etc/os-release first (modern standard) / Попробовать /etc/os-release сначала
     # (современный стандарт)
-    if [[ -f /etc/os-release ]]; then
+    if is::file /etc/os-release; then
         # Read in a subshell to avoid polluting current environment
         # Читаем в подshell, чтобы не засорять текущее окружение
         (
@@ -77,7 +77,7 @@ system::info::hostname() {
     elif utils::has hostnamectl; then
         utils::quiet_err hostnamectl
     # Fallback to /etc/hostname / Резервный вариант /etc/hostname
-    elif [[ -f /etc/hostname ]]; then
+    elif is::file /etc/hostname; then
         echo "Hostname: $(utils::quiet_err cat /etc/hostname)"
     else
         log::warn "Cannot determine hostname"
@@ -94,10 +94,10 @@ system::info::uptime() {
     if utils::has uptime; then
         utils::quiet_err uptime
     # Fallback to /proc/uptime / Резервный вариант /proc/uptime
-    elif [[ -r /proc/uptime ]]; then
+    elif is::readable /proc/uptime; then
         local uptime_seconds
         uptime_seconds=$(utils::quiet_err cut -d' ' -f1 /proc/uptime | cut -d. -f1)
-        if [[ -n "${uptime_seconds}" ]]; then
+        if is::not_empty "${uptime_seconds}"; then
             local days=$((uptime_seconds / 86400))
             local hours=$(((uptime_seconds % 86400) / 3600))
             local minutes=$(((uptime_seconds % 3600) / 60))
@@ -116,7 +116,7 @@ system::info::cpu() {
     echo "=== CPU Information ==="
     
     # Try /proc/cpuinfo / Попробовать /proc/cpuinfo
-    if [[ -r /proc/cpuinfo ]]; then
+    if is::readable /proc/cpuinfo; then
         echo "Model: $(utils::quiet_err grep -m1 "model name" /proc/cpuinfo | cut -d: -f2 | sed 's/^[ \t]*//')"
         echo "Cores: $(utils::quiet_err grep -c "^processor" /proc/cpuinfo)"
         echo "Physical CPUs: $(utils::quiet_err grep "physical id" /proc/cpuinfo | sort -u | wc -l)"
@@ -144,7 +144,7 @@ system::info::memory() {
         echo "Detailed:"
         utils::quiet_err free -m
     # Fallback to /proc/meminfo / Резервный вариант /proc/meminfo
-    elif [[ -r /proc/meminfo ]]; then
+    elif is::readable /proc/meminfo; then
         echo "Total: $(utils::quiet_err grep MemTotal /proc/meminfo | awk '{print $2 $3}')"
         echo "Free: $(utils::quiet_err grep MemFree /proc/meminfo | awk '{print $2 $3}')"
         echo "Available: $(utils::quiet_err grep MemAvailable /proc/meminfo | awk '{print $2 $3}')"
@@ -199,7 +199,7 @@ system::info::all() {
 #   system::info::version
 system::info::version() {
     # Try /etc/os-release first / Попробовать /etc/os-release сначала
-    if [[ -f /etc/os-release ]]; then
+    if is::file /etc/os-release; then
         # Read in a subshell to avoid polluting current environment
         # Читаем в подshell, чтобы не засорять текущее окружение
         (
@@ -227,7 +227,7 @@ system::info::load() {
     if utils::has uptime; then
         utils::quiet_err uptime | awk -F'load average:' '{print $2}'
     # Fallback to /proc/loadavg / Резервный вариант /proc/loadavg
-    elif [[ -r /proc/loadavg ]]; then
+    elif is::readable /proc/loadavg; then
         local load
         load=$(utils::quiet_err cat /proc/loadavg)
         echo "1 min: $(echo ${load} | awk '{print $1}')"

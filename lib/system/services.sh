@@ -17,7 +17,7 @@ bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/uti
 system::services::start() {
     local service="${1}"
     
-    if [[ -z "${service}" ]]; then
+    if is::empty "${service}"; then
         log::warn "Service name not specified"
         return "${E_ERROR}"
     fi
@@ -33,7 +33,7 @@ system::services::start() {
             log::info "Service ${service} started (service)"
         else
             # Fallback to direct init script / Резервный вариант прямого init скрипта
-            if [[ -x "/etc/init.d/${service}" ]]; then
+            if is::executable "/etc/init.d/${service}"; then
                 utils::ignore "/etc/init.d/${service}" start
                 log::info "Service ${service} started (init.d)"
             else
@@ -51,7 +51,7 @@ system::services::start() {
 system::services::stop() {
     local service="${1}"
     
-    if [[ -z "${service}" ]]; then
+    if is::empty "${service}"; then
         log::warn "Service name not specified"
         return "${E_ERROR}"
     fi
@@ -67,7 +67,7 @@ system::services::stop() {
             log::info "Service ${service} stopped (service)"
         else
             # Fallback to direct init script / Резервный вариант прямого init скрипта
-            if [[ -x "/etc/init.d/${service}" ]]; then
+            if is::executable "/etc/init.d/${service}"; then
                 utils::ignore "/etc/init.d/${service}" stop
                 log::info "Service ${service} stopped (init.d)"
             else
@@ -86,7 +86,7 @@ system::services::stop() {
 system::services::enable() {
     local service="${1}"
     
-    if [[ -z "${service}" ]]; then
+    if is::empty "${service}"; then
         log::warn "Service name not specified"
         return "${E_ERROR}"
     fi
@@ -119,7 +119,7 @@ system::services::enable() {
 system::services::disable() {
     local service="${1}"
     
-    if [[ -z "${service}" ]]; then
+    if is::empty "${service}"; then
         log::warn "Service name not specified"
         return "${E_ERROR}"
     fi
@@ -151,7 +151,7 @@ system::services::disable() {
 system::services::restart() {
     local service="${1}"
     
-    if [[ -z "${service}" ]]; then
+    if is::empty "${service}"; then
         log::warn "Service name not specified"
         return "${E_ERROR}"
     fi
@@ -167,7 +167,7 @@ system::services::restart() {
             log::info "Service ${service} restarted (service)"
         else
             # Fallback to direct init script / Резервный вариант прямого init скрипта
-            if [[ -x "/etc/init.d/${service}" ]]; then
+            if is::executable "/etc/init.d/${service}"; then
                 utils::ignore "/etc/init.d/${service}" restart
                 log::info "Service ${service} restarted (init.d)"
             else
@@ -186,7 +186,7 @@ system::services::restart() {
 system::services::status() {
     local service="${1}"
     
-    if [[ -z "${service}" ]]; then
+    if is::empty "${service}"; then
         log::warn "Service name not specified"
         return "${E_ERROR}"
     fi
@@ -206,7 +206,7 @@ system::services::status() {
             utils::ignore service "${service}" status
         else
             # Fallback to direct init script / Резервный вариант прямого init скрипта
-            if [[ -x "/etc/init.d/${service}" ]]; then
+            if is::executable "/etc/init.d/${service}"; then
                 utils::ignore "/etc/init.d/${service}" status
             else
                 log::warn "No suitable method to check status of service ${service}"
@@ -225,7 +225,7 @@ system::services::list() {
         utils::quiet_err systemctl list-units --type=service --all | grep -E "^[a-zA-Z]" | awk '{print $1}'
     else
         # Fallback to listing init scripts / Резервный вариант списка init скриптов
-        if [[ -d "/etc/init.d" ]]; then
+        if is::dir "/etc/init.d"; then
             utils::quiet_err ls -1 /etc/init.d/ | grep -v "README"
         else
             log::warn "No suitable method to list services"
@@ -279,7 +279,7 @@ function service::restart() {
                     utils::quiet_err service "${service}" restart || exit_code=$?
                 else
                     # Fallback to direct init script
-                    if [[ -x "/etc/init.d/${service}" ]]; then
+                    if is::executable "/etc/init.d/${service}"; then
                         utils::quiet_err "/etc/init.d/${service}" restart || exit_code=$?
                     else
                         log::error "${FN}: метод перезапуска не найден для ${service}"

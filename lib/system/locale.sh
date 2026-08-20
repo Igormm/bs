@@ -23,7 +23,7 @@ system::locale::set() {
         utils::attempt localectl set-locale "${locale}"
     else
         # Fallback for non-systemd systems / Резервный вариант для систем без systemd
-        if [[ -f "/etc/locale.gen" ]]; then
+        if is::file "/etc/locale.gen"; then
             # Uncomment the locale in /etc/locale.gen / Раскомментировать локаль в
             # /etc/locale.gen
             utils::attempt sed -i "s/^#${locale}/${locale}/" /etc/locale.gen
@@ -34,7 +34,7 @@ system::locale::set() {
         fi
         
         # Set the system locale / Установить системную локаль
-        if [[ -f "/etc/default/locale" ]]; then
+        if is::file "/etc/default/locale"; then
             echo "LANG=${locale}" > /etc/default/locale
         else
             export LANG="${locale}"

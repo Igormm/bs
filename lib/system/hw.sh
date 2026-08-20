@@ -59,13 +59,13 @@ system::hw::__dmi_value() {
   local -r keyword="${2:?dmidecode keyword required}"
   local value=""
 
-  if [[ -r "/sys/class/dmi/id/${field}" ]]; then
+  if is::readable "/sys/class/dmi/id/${field}"; then
     value="$(cat "/sys/class/dmi/id/${field}")"
   elif utils::has dmidecode; then
     value="$(utils::quiet_err dmidecode -s "${keyword}")"
   fi
 
-  if [[ -z "${value}" ]]; then
+  if is::empty "${value}"; then
     log::error "DMI value '${field}' unavailable (needs root?)"
     return "${E_ERROR}"
   fi
@@ -151,7 +151,7 @@ system::hw::bios_version() {
 # @example
 #   system::hw::cpu
 system::hw::cpu() {
-  if [[ ! -r /proc/cpuinfo ]]; then
+  if ! is::readable /proc/cpuinfo; then
     log::error "Cannot read /proc/cpuinfo"
     return "${E_ERROR}"
   fi
@@ -173,7 +173,7 @@ system::hw::memory() {
     return "${E_SUCCESS}"
   fi
 
-  if [[ -r /proc/meminfo ]]; then
+  if is::readable /proc/meminfo; then
     awk '/^MemTotal|^MemAvailable|^MemFree|^SwapTotal|^SwapFree/ \
       {printf "%-14s %8.1f GiB\n", $1, $2 / 1048576}' /proc/meminfo
     return "${E_SUCCESS}"
@@ -197,7 +197,7 @@ system::hw::block() {
 system::hw::disk_params() {
   local -r dev="${1:-}"
 
-  if [[ -z "${dev}" ]] || [[ ! -b "${dev}" ]]; then
+  if is::empty "${dev}" || [[ ! -b "${dev}" ]]; then
     log::error "Block device required (got: '${dev}')"
     return "${E_INVALID}"
   fi
@@ -214,7 +214,7 @@ system::hw::disk_params() {
 system::hw::badblocks_scan() {
   local -r dev="${1:-}"
 
-  if [[ -z "${dev}" ]] || [[ ! -b "${dev}" ]]; then
+  if is::empty "${dev}" || [[ ! -b "${dev}" ]]; then
     log::error "Block device required (got: '${dev}')"
     return "${E_INVALID}"
   fi
@@ -259,7 +259,7 @@ system::hw::dmi() {
 
   system::hw::__require_tool dmidecode dmidecode || return "${E_ERROR}"
 
-  if [[ -n "${dtype}" ]]; then
+  if is::not_empty "${dtype}"; then
     dmidecode -t "${dtype}"
   else
     printf 'Vendor:  %s\n' "$(system::hw::vendor)"

@@ -31,7 +31,7 @@ declare -g -A PLATFORM_CHECK_RESULTS
 # @example
 #   if platformcheck::is_macos; then ...
 platformcheck::is_macos() {
-    if [[ "$OSTYPE" == "darwin"* ]] || [[ -n "${MACOS:-}" ]]; then
+    if [[ "$OSTYPE" == "darwin"* ]] || is::not_empty "${MACOS:-}"; then
         return 0
     else
         return 1
@@ -44,7 +44,7 @@ platformcheck::is_macos() {
 # @example
 #   if platformcheck::is_alma; then ...
 platformcheck::is_alma() {
-    if [[ -f /etc/almalinux-release ]] || [[ -f /etc/redhat-release && $(cat /etc/redhat-release) == *"AlmaLinux"* ]]; then
+    if is::file /etc/almalinux-release || { is::file /etc/redhat-release && [[ $(cat /etc/redhat-release) == *"AlmaLinux"* ]]; }; then
         return 0
     else
         return 1
@@ -57,7 +57,7 @@ platformcheck::is_alma() {
 # @example
 #   if platformcheck::is_debian; then ...
 platformcheck::is_debian() {
-    if [[ -f /etc/debian_version ]] && [[ ! -f /etc/lsb-release ]]; then
+    if is::file /etc/debian_version && ! is::file /etc/lsb-release; then
         return 0
     else
         return 1
@@ -70,7 +70,7 @@ platformcheck::is_debian() {
 # @example
 #   if platformcheck::is_ubuntu; then ...
 platformcheck::is_ubuntu() {
-    if [[ -f /etc/lsb-release ]] && [[ $(cat /etc/lsb-release) == *"Ubuntu"* ]]; then
+    if is::file /etc/lsb-release && [[ $(cat /etc/lsb-release) == *"Ubuntu"* ]]; then
         return 0
     else
         return 1
@@ -83,7 +83,7 @@ platformcheck::is_ubuntu() {
 # @example
 #   if platformcheck::is_fedora; then ...
 platformcheck::is_fedora() {
-    if [[ -f /etc/fedora-release ]] || [[ -f /etc/redhat-release && $(cat /etc/redhat-release) == *"Fedora"* ]]; then
+    if is::file /etc/fedora-release || { is::file /etc/redhat-release && [[ $(cat /etc/redhat-release) == *"Fedora"* ]]; }; then
         return 0
     else
         return 1
@@ -96,7 +96,7 @@ platformcheck::is_fedora() {
 # @example
 #   if platformcheck::is_altlinux; then ...
 platformcheck::is_altlinux() {
-    if [[ -f /etc/altlinux-release ]] || [[ -f /etc/os-release && $(cat /etc/os-release) == *"ALT"* ]]; then
+    if is::file /etc/altlinux-release || { is::file /etc/os-release && [[ $(cat /etc/os-release) == *"ALT"* ]]; }; then
         return 0
     else
         return 1
@@ -373,7 +373,7 @@ platformcheck::show_report() {
 
 # Инициализируем модуль при загрузке
 # Initialize module on load
-if [[ -z "${PLATFORM_CHECK_INITIALIZED:-}" ]]; then
+if is::empty "${PLATFORM_CHECK_INITIALIZED:-}"; then
     PLATFORM_CHECK_INITIALIZED="1"
     log::debug "Platform check module initialized"
 fi

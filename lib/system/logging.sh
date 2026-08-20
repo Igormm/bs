@@ -21,7 +21,7 @@ system::logging::configure() {
     # For systemd-based systems / Для систем на базе systemd
     if utils::has journalctl; then
         # Set log level for journald / Установить уровень логирования для journald
-        if [[ -f "/etc/systemd/journald.conf" ]]; then
+        if is::file "/etc/systemd/journald.conf"; then
             utils::attempt sed -i "s/^#MaxLevelStore=.*/MaxLevelStore=${log_level}/" /etc/systemd/journald.conf
             utils::attempt sed -i "s/^#MaxLevelSyslog=.*/MaxLevelSyslog=${log_level}/" /etc/systemd/journald.conf
             # Restart journald to apply changes / Перезапустить journald для применения
@@ -33,7 +33,7 @@ system::logging::configure() {
         log::info "System logging configured with level: ${log_level}"
     else
         # For sysvinit systems with rsyslog / Для систем sysvinit с rsyslog
-        if [[ -f "/etc/rsyslog.conf" ]]; then
+        if is::file "/etc/rsyslog.conf"; then
             # Set log level in rsyslog / Установить уровень логирования в rsyslog
             utils::attempt sed -i "s/^\$SystemLogRateLimitInterval.*/\$SystemLogRateLimitInterval 0/" /etc/rsyslog.conf
             # Restart rsyslog to apply changes / Перезапустить rsyslog для применения
@@ -60,7 +60,7 @@ system::logging::rotate() {
     local frequency="${2:-weekly}"
     local keep="${3:-4}"
     
-    if [[ -z "${log_file}" ]]; then
+    if is::empty "${log_file}"; then
         log::warn "Log file path not specified"
         return "${E_ERROR}"
     fi
@@ -94,7 +94,7 @@ system::logging::view() {
     
     # For systemd-based systems
     if utils::has journalctl; then
-        if [[ -n "${service}" ]]; then
+        if is::not_empty "${service}"; then
             utils::attempt journalctl -u "${service}" -n "${lines}" -f
         else
             utils::attempt journalctl -n "${lines}" -f
@@ -102,14 +102,14 @@ system::logging::view() {
     else
         # For sysvinit systems
         local log_file="/var/log/messages"
-        if [[ -n "${service}" ]]; then
+        if is::not_empty "${service}"; then
             # Try to find service-specific log
-            if [[ -f "/var/log/${service}.log" ]]; then
+            if is::file "/var/log/${service}.log"; then
                 log_file="/var/log/${service}.log"
             fi
         fi
         
-        if [[ -f "${log_file}" ]]; then
+        if is::file "${log_file}"; then
             utils::attempt tail -n "${lines}" "${log_file}"
         else
             log::warn "Log file ${log_file} not found"
@@ -127,13 +127,13 @@ system::logging::remote() {
     local server_ip="${1}"
     local server_port="${2:-514}"
     
-    if [[ -z "${server_ip}" ]]; then
+    if is::empty "${server_ip}"; then
         log::warn "Remote log server IP not specified"
         return "${E_ERROR}"
     fi
     
     # For rsyslog
-    if [[ -f "/etc/rsyslog.conf" ]]; then
+    if is::file "/etc/rsyslog.conf"; then
         # Add remote logging configuration
         io::files::append /etc/rsyslog.conf "*.* @${server_ip}:${server_port}"
         
@@ -222,13 +222,13 @@ system::logging::permissions() {
     local owner="${3:-root}"
     local group="${4}"
     
-    if [[ -z "${log_file}" ]]; then
+    if is::empty "${log_file}"; then
         log::warn "Log file path not specified"
         return "${E_ERROR}"
     fi
     
     # Set default group if not specified
-    if [[ -z "${group}" ]]; then
+    if is::empty "${group}"; then
         if utils::quiet getent group adm; then
             group="adm"
         else
@@ -237,7 +237,7 @@ system::logging::permissions() {
     fi
     
     # Set permissions
-    if [[ -f "${log_file}" ]]; then
+    if is::file "${log_file}"; then
         utils::attempt chmod "${permissions}" "${log_file}"
         utils::attempt chown "${owner}:${group}" "${log_file}"
         log::info "Permissions set for ${log_file}: ${permissions}, owner: ${owner}, group: ${group}"
@@ -256,7 +256,7 @@ system::logging::clean() {
     local directory="${1:-/var/log}"
     local age="${2:-30}"
     
-    if [[ ! -d "${directory}" ]]; then
+    if ! is::dir "${directory}"; then
         log::warn "Directory ${directory} not found"
         return "${E_ERROR}"
     fi

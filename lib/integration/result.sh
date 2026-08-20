@@ -180,7 +180,7 @@ __integration_result::build_json() {
 __integration_result::emit() {
   local json="${1:-}"
 
-  if [[ -n "${BS_RESULT_FILE:-}" ]]; then
+  if is::not_empty "${BS_RESULT_FILE:-}"; then
     printf '%s\n' "${json}" > "${BS_RESULT_FILE}"
   else
     printf '%s\n' "${json}"
@@ -386,7 +386,7 @@ result::wrap() {
   local func="${1:-}"
   shift
 
-  if [[ -z "${func}" ]]; then
+  if is::empty "${func}"; then
     result::error "${E_INVALID}" "Function name required"
     return "${E_INVALID}"
   fi
@@ -451,14 +451,14 @@ result::write() {
   local file="${1:-}"
   local json="${2:-}"
 
-  if [[ -z "${file}" ]]; then
+  if is::empty "${file}"; then
     log::warn "result::write: file path required"
     return "${E_INVALID}"
   fi
 
   local parent_dir
   parent_dir="$(dirname -- "${file}")"
-  if [[ ! -d "${parent_dir}" ]]; then
+  if ! is::dir "${parent_dir}"; then
     if ! mkdir -p -- "${parent_dir}"; then
       log::error "Failed to create directory: ${parent_dir}"
       return "${LIB_ERROR_FILE_OPERATION}"
@@ -486,7 +486,7 @@ result::get() {
   local key="${2:-}"
   local var_name="${3:-}"
 
-  if [[ -z "${var_name}" ]]; then
+  if is::empty "${var_name}"; then
     log::warn "result::get: variable name required"
     return "${E_INVALID}"
   fi

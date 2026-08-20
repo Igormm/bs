@@ -101,7 +101,7 @@ frameworks::bashit::init() {
 frameworks::bashit::load_plugin() {
     local plugin_name="${1:-}"
     
-    if [[ -z "${plugin_name}" ]]; then
+    if is::empty "${plugin_name}"; then
         error::throw "Plugin name is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -225,7 +225,7 @@ frameworks::bashit::plugins::alias::load() {
 
 # Extract function for multiple archive types
 frameworks::bashit::plugins::alias::extract() {
-    if [[ -f "$1" ]]; then
+    if is::file "$1"; then
         case "$1" in
             *.tar.bz2)   tar xjf "$1"     ;;
             *.tar.gz)    tar xzf "$1"     ;;
@@ -251,7 +251,7 @@ frameworks::bashit::plugins::battery::load() {
 }
 
 frameworks::bashit::plugins::battery::info() {
-    if [[ -f /sys/class/power_supply/BAT0/capacity ]]; then
+    if is::file /sys/class/power_supply/BAT0/capacity; then
         local capacity
         capacity=$(cat /sys/class/power_supply/BAT0/capacity)
         local status
@@ -322,7 +322,7 @@ frameworks::bashit::plugins::git::load() {
     git_prompt() {
         local branch
         branch=$(git_current_branch)
-        if [[ -n "${branch}" ]] && [[ "${branch}" != "unknown" ]]; then
+        if is::not_empty "${branch}" && [[ "${branch}" != "unknown" ]]; then
             echo " (git:${branch})"
         fi
     }
@@ -394,7 +394,7 @@ frameworks::bashit::plugins::tmux::load() {
     alias tmk='tmux kill-session -t'
     
     # Auto-attach to tmux session
-    if utils::has tmux && [[ -z "${TMUX}" ]]; then
+    if utils::has tmux && is::empty "${TMUX}"; then
         if utils::quiet_err tmux has-session; then
             tmux attach-session
         fi
@@ -430,7 +430,7 @@ frameworks::bashinator::log_message() {
     local message="${2:-}"
     local component="${3:-Bashinator}"
     
-    if [[ -z "${message}" ]]; then
+    if is::empty "${message}"; then
         error::throw "Message is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -466,7 +466,7 @@ frameworks::bashinator::function_template() {
     local param2="${2:-}"
     
     # Input validation
-    if [[ -z "${param1}" ]]; then
+    if is::empty "${param1}"; then
         error::throw "param1 is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -548,7 +548,7 @@ frameworks::bashly::parse_args() {
 frameworks::bashly::validate_args() {
     local schema_file="${1:-}"
     
-    if [[ -z "${schema_file}" ]]; then
+    if is::empty "${schema_file}"; then
         error::throw "Schema file is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -609,7 +609,7 @@ frameworks::shellspec::describe() {
     local description="${1:-}"
     local test_block="${2:-}"
     
-    if [[ -z "${description}" ]]; then
+    if is::empty "${description}"; then
         error::throw "Description is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -617,7 +617,7 @@ frameworks::shellspec::describe() {
     log::info "Test Suite: ${description}"
     
     # Execute test block
-    if [[ -n "${test_block}" ]]; then
+    if is::not_empty "${test_block}"; then
         eval "${test_block}"
     fi
 }
@@ -627,7 +627,7 @@ frameworks::shellspec::it() {
     local description="${1:-}"
     local test_command="${2:-}"
     
-    if [[ -z "${description}" ]]; then
+    if is::empty "${description}"; then
         error::throw "Description is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -635,7 +635,7 @@ frameworks::shellspec::it() {
     log::info "  Test: ${description}"
     
     # Execute test
-    if [[ -n "${test_command}" ]]; then
+    if is::not_empty "${test_command}"; then
         if eval "${test_command}"; then
             log::success "    ✓ PASSED"
             FRAMEWORKS_SHELLSPEC_RESULTS+=("PASS: ${description}")
@@ -650,7 +650,7 @@ frameworks::shellspec::it() {
 frameworks::shellspec::assert() {
     local condition="${1:-}"
     
-    if [[ -z "${condition}" ]]; then
+    if is::empty "${condition}"; then
         error::throw "Condition is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -676,13 +676,13 @@ frameworks::shellspec::matchers::contain() {
 frameworks::shellspec::matchers::be_empty() {
     local value="${1:-}"
     
-    [[ -z "${value}" ]]
+    is::empty "${value}"
 }
 
 frameworks::shellspec::matchers::exist() {
     local path="${1:-}"
     
-    [[ -e "${path}" ]]
+    is::exists "${path}"
 }
 
 # Run ShellSpec tests
@@ -729,7 +729,7 @@ frameworks::mbfl::define_function() {
     local func_name="${FRAMEWORKS_MBFL_PREFIX}${1:-}"
     local body="${2:-}"
     
-    if [[ -z "${1:-}" ]]; then
+    if is::empty "${1:-}"; then
         errorhandler::throw "frameworks::mbfl::define_function" "Function name is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -742,7 +742,7 @@ frameworks::mbfl::set_var() {
     local var_name="${FRAMEWORKS_MBFL_PREFIX}${1:-}"
     local value="${2:-}"
     
-    if [[ -z "${1:-}" ]]; then
+    if is::empty "${1:-}"; then
         errorhandler::throw "frameworks::mbfl::set_var" "Variable name is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -798,12 +798,12 @@ frameworks::mbfl::parse_args() {
 # MBFL-style string functions
 frameworks::mbfl::string::is_empty() {
     local string="${1:-}"
-    [[ -z "${string}" ]]
+    is::empty "${string}"
 }
 
 frameworks::mbfl::string::is_not_empty() {
     local string="${1:-}"
-    [[ -n "${string}" ]]
+    is::not_empty "${string}"
 }
 
 frameworks::mbfl::string::length() {
@@ -816,7 +816,7 @@ frameworks::mbfl::string::substring() {
     local start="${2:-0}"
     local length="${3:-}"
     
-    if [[ -n "${length}" ]]; then
+    if is::not_empty "${length}"; then
         echo "${string:${start}:${length}}"
     else
         echo "${string:${start}}"
@@ -846,28 +846,28 @@ frameworks::mbfl::array::contains() {
 # MBFL-style file functions
 frameworks::mbfl::file::exists() {
     local file="${1:-}"
-    [[ -f "${file}" ]]
+    is::file "${file}"
 }
 
 frameworks::mbfl::file::is_readable() {
     local file="${1:-}"
-    [[ -r "${file}" ]]
+    is::readable "${file}"
 }
 
 frameworks::mbfl::file::is_writable() {
     local file="${1:-}"
-    [[ -w "${file}" ]]
+    is::writable "${file}"
 }
 
 frameworks::mbfl::file::is_executable() {
     local file="${1:-}"
-    [[ -x "${file}" ]]
+    is::executable "${file}"
 }
 
 # MBFL-style directory functions
 frameworks::mbfl::dir::exists() {
     local dir="${1:-}"
-    [[ -d "${dir}" ]]
+    is::dir "${dir}"
 }
 
 frameworks::mbfl::dir::create() {

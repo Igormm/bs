@@ -24,16 +24,16 @@ declare -g DISTRO_PACKAGE_MANAGER=""
 system::distro::detect() {
     # Try /etc/os-release first (modern standard) / Попробовать /etc/os-release сначала
     # (современный стандарт)
-    if [[ -f /etc/os-release ]]; then
+    if is::file /etc/os-release; then
         # Parse without sourcing into current shell, single read pass /
         # Парсим без source в текущий shell, один проход чтения
         local osr_key osr_value osr_id="" osr_name="" osr_version=""
         while IFS='=' read -r osr_key osr_value; do
             osr_value="${osr_value%\"}"; osr_value="${osr_value#\"}"
             case "${osr_key}" in
-                ID)         [[ -z "${osr_id}" ]]      && osr_id="${osr_value}" ;;
-                NAME)       [[ -z "${osr_name}" ]]    && osr_name="${osr_value}" ;;
-                VERSION_ID) [[ -z "${osr_version}" ]] && osr_version="${osr_value}" ;;
+                ID)         is::empty "${osr_id}"      && osr_id="${osr_value}" ;;
+                NAME)       is::empty "${osr_name}"    && osr_name="${osr_value}" ;;
+                VERSION_ID) is::empty "${osr_version}" && osr_version="${osr_value}" ;;
             esac
         done < /etc/os-release
         DISTRO_ID="${osr_id:-unknown}"
@@ -45,15 +45,15 @@ system::distro::detect() {
         DISTRO_NAME=$(utils::quiet_err lsb_release -sd)
         DISTRO_VERSION=$(utils::quiet_err lsb_release -sr)
     # Fallback to /etc/*-release files / Резервный вариант файлы /etc/*-release
-    elif [[ -f /etc/debian_version ]]; then
+    elif is::file /etc/debian_version; then
         DISTRO_ID="debian"
         DISTRO_NAME="Debian"
         DISTRO_VERSION=$(utils::quiet_err cat /etc/debian_version)
-    elif [[ -f /etc/redhat-release ]]; then
+    elif is::file /etc/redhat-release; then
         DISTRO_ID="rhel"
         DISTRO_NAME=$(utils::quiet_err cat /etc/redhat-release | sed 's/ release.*//')
         DISTRO_VERSION=$(utils::quiet_err cat /etc/redhat-release | sed 's/.*release \([0-9]\+\).*/\1/')
-    elif [[ -f /etc/SuSE-release ]]; then
+    elif is::file /etc/SuSE-release; then
         DISTRO_ID="suse"
         DISTRO_NAME="openSUSE"
         DISTRO_VERSION=$(utils::quiet_err grep VERSION /etc/SuSE-release | cut -d'=' -f2 | tr -d ' ')
@@ -111,7 +111,7 @@ system::distro::detect() {
 #   system::distro::info
 system::distro::info() {
     # Detect if not already done / Определить если еще не сделано
-    if [[ -z "${DISTRO_ID}" ]]; then
+    if is::empty "${DISTRO_ID}"; then
         system::distro::detect
     fi
 
@@ -135,7 +135,7 @@ system::distro::is_family() {
     local family="${1}"
 
     # Detect if not already done / Определить если еще не сделано
-    if [[ -z "${DISTRO_FAMILY}" ]]; then
+    if is::empty "${DISTRO_FAMILY}"; then
         system::distro::detect
     fi
 
@@ -153,7 +153,7 @@ system::distro::package_command() {
     local action="${1}"
 
     # Detect if not already done / Определить если еще не сделано
-    if [[ -z "${DISTRO_PACKAGE_MANAGER}" ]]; then
+    if is::empty "${DISTRO_PACKAGE_MANAGER}"; then
         system::distro::detect
     fi
 
@@ -247,7 +247,7 @@ system::distro::install_package() {
     fi
 
     # Detect if not already done / Определить если еще не сделано
-    if [[ -z "${DISTRO_PACKAGE_MANAGER}" ]]; then
+    if is::empty "${DISTRO_PACKAGE_MANAGER}"; then
         system::distro::detect
     fi
 
@@ -288,12 +288,12 @@ system::distro::install_package() {
 system::distro::is_package_installed() {
     local package="${1}"
 
-    if [[ -z "${package}" ]]; then
+    if is::empty "${package}"; then
         return 1
     fi
 
     # Detect if not already done / Определить если еще не сделано
-    if [[ -z "${DISTRO_PACKAGE_MANAGER}" ]]; then
+    if is::empty "${DISTRO_PACKAGE_MANAGER}"; then
         system::distro::detect
     fi
 

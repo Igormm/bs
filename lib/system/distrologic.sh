@@ -241,7 +241,7 @@ system::distrologic::pkg_clean_all() {
 system::distrologic::service_manager_detect() {
     if utils::has systemctl; then
         echo "systemd"
-    elif [[ -d /etc/init.d ]]; then
+    elif is::dir /etc/init.d; then
         echo "sysvinit"
     elif utils::has initctl; then
         echo "upstart"
@@ -278,7 +278,7 @@ system::distrologic::service_manage_sysvinit() {
     local service="${1}"
     local action="${2}"
     
-    if [[ -f "/etc/init.d/${service}" ]]; then
+    if is::file "/etc/init.d/${service}"; then
         "/etc/init.d/${service}" "${action}"
     else
         log::warn "Service ${service} not found in /etc/init.d/"
@@ -360,7 +360,7 @@ system::distrologic::network_configure_netplan() {
     local config_file="${1}"
     
     if utils::has netplan; then
-        if [[ -f "${config_file}" ]]; then
+        if is::file "${config_file}"; then
             netplan apply
         else
             log::warn "Netplan config file not found: ${config_file}"
@@ -383,7 +383,7 @@ system::distrologic::security_configure_selinux() {
     
     if utils::has "se${cmd}"; then
         "se${cmd}" "$@"
-    elif [[ -f /usr/sbin/sestatus ]] && [[ "${cmd}" == "setenforce" ]]; then
+    elif is::file /usr/sbin/sestatus && [[ "${cmd}" == "setenforce" ]]; then
         /usr/sbin/sestatus -v | grep -q "SELinux status:.*enabled" && /usr/sbin/setenforce "$@"
     else
         log::warn "SELinux command 'se${cmd}' not available"
@@ -403,23 +403,23 @@ system::distrologic::security_configure_apparmor() {
     if utils::has apparmor_parser; then
         case "${action}" in
             "enable")
-                if [[ -n "${profile}" ]]; then
+                if is::not_empty "${profile}"; then
                     utils::quiet_err ln -s "/etc/apparmor.d/${profile}" "/etc/apparmor.d/force-enabled/${profile}" || :
                 fi
                 systemctl start apparmor
                 ;;
             "disable")
-                if [[ -n "${profile}" ]]; then
+                if is::not_empty "${profile}"; then
                     utils::quiet_err rm -f "/etc/apparmor.d/force-enabled/${profile}" || :
                 fi
                 ;;
             "complain")
-                if [[ -n "${profile}" ]]; then
+                if is::not_empty "${profile}"; then
                     aa-complain "${profile}"
                 fi
                 ;;
             "enforce")
-                if [[ -n "${profile}" ]]; then
+                if is::not_empty "${profile}"; then
                     aa-enforce "${profile}"
                 fi
                 ;;
@@ -562,7 +562,7 @@ system::distrologic::sysctl_persist() {
     # Add to sysctl.conf to persist after reboot (idempotent) / Добавить в sysctl.conf
     # для сохранения после перезагрузки (идемпотентно)
     local line="${param} = ${value}"
-    if [[ -f "${config_file}" ]] && utils::quiet_err grep -Fqx "${line}" "${config_file}"; then
+    if is::file "${config_file}" && utils::quiet_err grep -Fqx "${line}" "${config_file}"; then
         log::info "sysctl parameter already persistent: ${line}"
         return 0
     fi
@@ -612,11 +612,11 @@ system::distrologic::fs_check() {
         fs_type=$(utils::quiet_err blkid -o value -s TYPE "${device}")
     fi
     # Fallback to findmnt / Резервный вариант findmnt
-    if [[ -z "${fs_type}" ]] && utils::has findmnt; then
+    if is::empty "${fs_type}" && utils::has findmnt; then
         fs_type=$(utils::quiet_err findmnt -n -o FSTYPE "${device}")
     fi
     # Fallback to df -T / Резервный вариант df -T
-    if [[ -z "${fs_type}" ]]; then
+    if is::empty "${fs_type}"; then
         fs_type=$(utils::quiet_err df -T "${device}" | awk 'NR==2 {print $2}')
     fi
     
@@ -646,7 +646,7 @@ system::distrologic::fs_check() {
             fi
             ;;
         *)
-            if [[ -n "${fs_type}" ]]; then
+            if is::not_empty "${fs_type}"; then
                 log::warn "Unknown filesystem type '${fs_type}', using generic fsck"
             fi
             if utils::has fsck; then

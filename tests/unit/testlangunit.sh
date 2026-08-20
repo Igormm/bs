@@ -95,6 +95,59 @@ test_maps() {
     testframework::assert_false "map::has colors blue" "map::has rejects missing key"
 }
 
+# Test arr::from_lines reads stdin into an array
+test_from_lines() {
+    local -a lines=()
+    arr::from_lines lines <<'EOF'
+first
+second
+third
+EOF
+    testframework::assert_equal "3" "${#lines[@]}" "from_lines reads heredoc"
+    testframework::assert_equal "second" "${lines[1]}" "from_lines preserves order"
+
+    local -a pids=()
+    arr::from_lines pids < <(printf 'a\nb\n')
+    testframework::assert_equal "2" "${#pids[@]}" "from_lines works with process substitution"
+}
+
+# Test is:: predicate family
+test_is_predicates() {
+    testframework::assert_command "is::empty ''" "is::empty on empty string"
+    testframework::assert_false "is::empty 'x'" "is::empty on non-empty"
+    testframework::assert_command "is::not_empty 'x'" "is::not_empty on non-empty"
+    testframework::assert_false "is::not_empty ''" "is::not_empty on empty"
+
+    local tmp_file
+    tmp_file="$(mktemp)"
+    testframework::assert_command "is::exists '${tmp_file}'" "is::exists finds file"
+    testframework::assert_command "is::file '${tmp_file}'" "is::file on regular file"
+    testframework::assert_false "is::dir '${tmp_file}'" "is::dir rejects file"
+    testframework::assert_command "is::readable '${tmp_file}'" "is::readable"
+    testframework::assert_false "is::file_not_empty '${tmp_file}'" "is::file_not_empty on empty file"
+
+    printf 'data' > "${tmp_file}"
+    testframework::assert_command "is::file_not_empty '${tmp_file}'" "is::file_not_empty on filled file"
+
+    local tmp_link="${tmp_file}.link"
+    ln -s "${tmp_file}" "${tmp_link}"
+    testframework::assert_command "is::symlink '${tmp_link}'" "is::symlink finds link"
+
+    testframework::assert_command "is::dir /tmp" "is::dir on directory"
+    testframework::assert_command "is::executable /bin/sh" "is::executable on /bin/sh"
+    testframework::assert_false "is::exists '/definitely/not/here'" "is::exists rejects missing path"
+
+    testframework::assert_command "is::number 42" "is::number on digits"
+    testframework::assert_false "is::number '4x'" "is::number rejects mixed"
+
+    testframework::assert_command "is::command bash" "is::command finds bash"
+    testframework::assert_false "is::command not-a-real-cmd-xyz" "is::command rejects unknown"
+
+    testframework::assert_command "is::function bs::guard" "is::function finds bs::guard"
+
+    rm -f "${tmp_file}" "${tmp_link}"
+}
+
 main() {
     print_header "Core Lang Unit Tests / Модульные тесты core/lang"
 
@@ -111,6 +164,10 @@ main() {
     testframework::section "Collections / Коллекции"
     test_arrays
     test_maps
+    test_from_lines
+
+    testframework::section "is:: predicates / Предикаты is::"
+    test_is_predicates
 
     testframework::summary
 }

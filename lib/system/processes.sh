@@ -35,7 +35,7 @@ system::processes::list() {
 system::processes::find() {
     local pattern="${1}"
     
-    if [[ -z "${pattern}" ]]; then
+    if is::empty "${pattern}"; then
         log::warn "Process name/pattern not specified"
         return "${E_ERROR}"
     fi
@@ -43,7 +43,7 @@ system::processes::find() {
     if utils::has pgrep; then
         local pids
         pids=$(utils::quiet_err pgrep -f "${pattern}")
-        if [[ -n "${pids}" ]]; then
+        if is::not_empty "${pids}"; then
             utils::quiet_err ps -p "${pids}" -o pid,user,comm,args
         else
             log::info "No processes found matching '${pattern}'"
@@ -68,7 +68,7 @@ system::processes::find() {
 system::processes::is_running() {
     local name="${1:-}"
 
-    if [[ -z "${name}" ]]; then
+    if is::empty "${name}"; then
         log::warn "Process name not specified"
         return 1
     fi
@@ -91,7 +91,7 @@ system::processes::kill() {
     local pid="${1}"
     local signal="${2:-TERM}"
     
-    if [[ -z "${pid}" ]]; then
+    if is::empty "${pid}"; then
         log::warn "Process ID not specified"
         return "${E_ERROR}"
     fi
@@ -126,7 +126,7 @@ system::processes::kill_by_name() {
     local pattern="${1}"
     local signal="${2:-TERM}"
     
-    if [[ -z "${pattern}" ]]; then
+    if is::empty "${pattern}"; then
         log::warn "Process name/pattern not specified"
         return "${E_ERROR}"
     fi
@@ -141,7 +141,7 @@ system::processes::kill_by_name() {
         pids=$(utils::quiet_err ps aux | grep -i "${pattern}" | grep -v grep | awk '{print $2}')
     fi
     
-    if [[ -z "${pids}" ]]; then
+    if is::empty "${pids}"; then
         log::warn "No processes found matching '${pattern}'"
         return "${E_ERROR}"
     fi
@@ -221,7 +221,7 @@ system::processes::memory_top() {
 system::processes::port() {
     local port="${1}"
     
-    if [[ -z "${port}" ]]; then
+    if is::empty "${port}"; then
         log::warn "Port number not specified"
         return "${E_ERROR}"
     fi
@@ -230,7 +230,7 @@ system::processes::port() {
     if utils::has lsof; then
         local result
         result=$(utils::quiet_err lsof -i :"${port}")
-        if [[ -n "${result}" ]]; then
+        if is::not_empty "${result}"; then
             echo "${result}"
             return 0
         else
@@ -241,7 +241,7 @@ system::processes::port() {
     elif utils::has netstat; then
         local result
         result=$(utils::quiet_err netstat -tulpn | grep ":${port} ")
-        if [[ -n "${result}" ]]; then
+        if is::not_empty "${result}"; then
             echo "${result}"
             return 0
         else
@@ -253,7 +253,7 @@ system::processes::port() {
     elif utils::has ss; then
         local result
         result=$(utils::quiet_err ss -tulpn | grep ":${port} ")
-        if [[ -n "${result}" ]]; then
+        if is::not_empty "${result}"; then
             echo "${result}"
             return 0
         else
@@ -273,7 +273,7 @@ system::processes::port() {
 system::processes::info() {
     local pid="${1}"
     
-    if [[ -z "${pid}" ]]; then
+    if is::empty "${pid}"; then
         log::warn "Process ID not specified"
         return "${E_ERROR}"
     fi
@@ -291,14 +291,14 @@ system::processes::info() {
     
     # Additional info from /proc if available / Дополнительная информация из /proc если
     # доступна
-    if [[ -d "/proc/${pid}" ]]; then
-        if [[ -r "/proc/${pid}/cmdline" ]]; then
+    if is::dir "/proc/${pid}"; then
+        if is::readable "/proc/${pid}/cmdline"; then
             echo ""
             echo "Command line:"
             utils::quiet_err cat /proc/${pid}/cmdline | tr '\0' ' ' && echo
         fi
         
-        if [[ -r "/proc/${pid}/environ" ]]; then
+        if is::readable "/proc/${pid}/environ"; then
             echo ""
             echo "Environment variables (first 5):"
             utils::quiet_err cat /proc/${pid}/environ | tr '\0' '\n' | head -5

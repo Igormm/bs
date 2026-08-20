@@ -89,7 +89,7 @@ system::utils::get_disk_usage() {
 # @example
 #   cpu_info=$(system::utils::get_cpu_info)
 system::utils::get_cpu_info() {
-    if [[ -f /proc/cpuinfo ]]; then
+    if is::file /proc/cpuinfo; then
         grep -m 1 "model name" /proc/cpuinfo | cut -d ":" -f 2 | xargs
     elif utils::has lscpu; then
         lscpu | grep "Model name" | cut -d ":" -f 2 | xargs
@@ -153,7 +153,7 @@ system::utils::check_command_exists() {
 #   fi
 system::utils::check_file_exists() {
     local file_path="${1}"
-    [[ -f "${file_path}" ]]
+    is::file "${file_path}"
 }
 
 # @description Check if directory exists / Проверить директорию
@@ -165,7 +165,7 @@ system::utils::check_file_exists() {
 #   fi
 system::utils::check_directory_exists() {
     local dir_path="${1}"
-    [[ -d "${dir_path}" ]]
+    is::dir "${dir_path}"
 }
 
 # @description Get system architecture / Получить архитектуру системы
@@ -399,13 +399,13 @@ system::utils::network_download() {
     local output_path="${2:-}"
     
     if utils::has wget; then
-        if [[ -n "${output_path}" ]]; then
+        if is::not_empty "${output_path}"; then
             wget "${url}" -O "${output_path}"
         else
             wget "${url}"
         fi
     elif utils::has curl; then
-        if [[ -n "${output_path}" ]]; then
+        if is::not_empty "${output_path}"; then
             curl -L "${url}" -o "${output_path}"
         else
             curl -L "${url}" -O
@@ -509,7 +509,7 @@ system::utils::user_create() {
     local username="${1}"
     local user_id="${2:-}"
     
-    if [[ -n "${user_id}" ]]; then
+    if is::not_empty "${user_id}"; then
         useradd -m -u "${user_id}" "${username}"
     else
         useradd -m "${username}"
@@ -780,7 +780,7 @@ system::utils::api_call() {
     local data="${3:-}"
     
     if utils::has curl; then
-        if [[ -n "${data}" ]]; then
+        if is::not_empty "${data}"; then
             curl -X "${method}" -H "Content-Type: application/json" -d "${data}" "${url}"
         else
             curl -X "${method}" "${url}"

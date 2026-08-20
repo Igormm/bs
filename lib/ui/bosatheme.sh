@@ -24,7 +24,7 @@ _bosa_prompt() {
     local git_branch=""
     if utils::has git && utils::quiet git rev-parse --git-dir; then
         git_branch=" $(utils::quiet_err git branch | grep '^*' | cut -c3-)"
-        if [[ -n "$git_branch" ]]; then
+        if is::not_empty "$git_branch"; then
             git_branch="${purple}[${git_branch}]${reset_color}"
         fi
     fi

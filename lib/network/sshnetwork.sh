@@ -81,7 +81,7 @@ sshnetwork::init() {
     }
     
     # Create known devices file if it doesn't exist
-    if [[ ! -f "${SSH_NETWORK_KNOWN_HOSTS_FILE}" ]]; then
+    if ! is::file "${SSH_NETWORK_KNOWN_HOSTS_FILE}"; then
         touch "${SSH_NETWORK_KNOWN_HOSTS_FILE}" || {
             error::throw "Failed to create known devices file" \
                 "${LIB_ERROR_FILE_OPERATION}"
@@ -141,7 +141,7 @@ sshnetwork::install_dependencies() {
 # Generate SSH keys for BS
 sshnetwork::generate_ssh_keys() {
     
-    if [[ ! -f "${SSH_NETWORK_SSH_KEY_PATH}" ]]; then
+    if ! is::file "${SSH_NETWORK_SSH_KEY_PATH}"; then
         log::info "Generating SSH keys for BS..."
         
         ssh-keygen -t rsa -b 4096 -f "${SSH_NETWORK_SSH_KEY_PATH}" -N "" -C "BS@sshnetwork" || {
@@ -163,10 +163,10 @@ sshnetwork::discover_devices() {
     local network_range="${1:-}"
     local port="${2:-${SSH_NETWORK_DEFAULT_PORT}}"
     
-    if [[ -z "${network_range}" ]]; then
+    if is::empty "${network_range}"; then
         # Auto-detect local network
         network_range=$(sshnetwork::get_local_network)
-        if [[ -z "${network_range}" ]]; then
+        if is::empty "${network_range}"; then
             error::throw "Could not detect local network range" \
                 "${LIB_ERROR_NETWORK}"
         fi
@@ -181,18 +181,18 @@ sshnetwork::discover_devices() {
     local nmap_output
     nmap_output=$(utils::quiet_err nmap -p "${port}" --open -oG - "${network_range}" | grep "open/" || true)
     
-    if [[ -z "${nmap_output}" ]]; then
+    if is::empty "${nmap_output}"; then
         log::warn "No SSH devices found in network: ${network_range}"
         return "${E_ERROR}"
     fi
     
     # Parse nmap output
     while IFS= read -r line; do
-        if [[ -n "${line}" ]]; then
+        if is::not_empty "${line}"; then
             local ip
             ip=$(echo "${line}" | awk '{print $2}')
             
-            if [[ -n "${ip}" ]]; then
+            if is::not_empty "${ip}"; then
                 # Test SSH connectivity
                 if sshnetwork::test_connection "${ip}" "${port}"; then
                     SSH_NETWORK_DISCOVERED_DEVICES+=("${ip}:${port}")
@@ -220,11 +220,11 @@ sshnetwork::get_local_network() {
         
         # Маршрут без src (контейнеры, VM): берём сеть scope link
         # Route without src (containers, VMs): take the scope link network
-        if [[ -z "${subnet}" ]]; then
+        if is::empty "${subnet}"; then
             subnet=$(utils::quiet_err ip -4 route show scope link | head -1 | awk '{print $1}' || true)
         fi
         
-        if [[ -n "${subnet}" ]]; then
+        if is::not_empty "${subnet}"; then
             echo "${subnet}"
             return 0
         fi
@@ -253,7 +253,7 @@ sshnetwork::test_connection() {
     local host="${1:-}"
     local port="${2:-${SSH_NETWORK_DEFAULT_PORT}}"
     
-    if [[ -z "${host}" ]]; then
+    if is::empty "${host}"; then
         error::throw "Host is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -294,14 +294,14 @@ sshnetwork::save_discovered_devices() {
 # Load known devices from file
 sshnetwork::load_known_devices() {
     
-    if [[ ! -f "${SSH_NETWORK_KNOWN_HOSTS_FILE}" ]]; then
+    if ! is::file "${SSH_NETWORK_KNOWN_HOSTS_FILE}"; then
         return "${E_ERROR}"
     fi
     
     SSH_NETWORK_DISCOVERED_DEVICES=()
     
     while IFS= read -r line; do
-        if [[ -n "${line}" ]] && [[ "${line}" != "#"* ]]; then
+        if is::not_empty "${line}" && [[ "${line}" != "#"* ]]; then
             SSH_NETWORK_DISCOVERED_DEVICES+=("${line}")
         fi
     done < "${SSH_NETWORK_KNOWN_HOSTS_FILE}"
@@ -317,7 +317,7 @@ sshnetwork::execute_remote() {
     local user="${3:-$(whoami)}"
     local port="${4:-${SSH_NETWORK_DEFAULT_PORT}}"
     
-    if [[ -z "${host}" ]] || [[ -z "${command}" ]]; then
+    if is::empty "${host}" || is::empty "${command}"; then
         error::throw "Host and command are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -353,7 +353,7 @@ sshnetwork::transfer_file() {
     local destination="${2:-}"
     local port="${3:-${SSH_NETWORK_DEFAULT_PORT}}"
     
-    if [[ -z "${source}" ]] || [[ -z "${destination}" ]]; then
+    if is::empty "${source}" || is::empty "${destination}"; then
         error::throw "Source and destination are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -385,7 +385,7 @@ sshnetwork::transfer_file_rsync() {
     local port="${3:-${SSH_NETWORK_DEFAULT_PORT}}"
     local options="${4:-}"
     
-    if [[ -z "${source}" ]] || [[ -z "${destination}" ]]; then
+    if is::empty "${source}" || is::empty "${destination}"; then
         error::throw "Source and destination are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -398,7 +398,7 @@ sshnetwork::transfer_file_rsync() {
         --timeout="${SSH_NETWORK_CONNECT_TIMEOUT}"
     )
     
-    if [[ -n "${options}" ]]; then
+    if is::not_empty "${options}"; then
         rsync_options+=("${options}")
     fi
     
@@ -418,7 +418,7 @@ sshnetwork::sync_directories() {
     local user="${4:-$(whoami)}"
     local port="${5:-${SSH_NETWORK_DEFAULT_PORT}}"
     
-    if [[ -z "${source_dir}" ]] || [[ -z "${destination_dir}" ]] || [[ -z "${host}" ]]; then
+    if is::empty "${source_dir}" || is::empty "${destination_dir}" || is::empty "${host}"; then
         error::throw "Source, destination, and host are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -446,7 +446,7 @@ sshnetwork::setup_passwordless_auth() {
     local user="${2:-$(whoami)}"
     local port="${3:-${SSH_NETWORK_DEFAULT_PORT}}"
     
-    if [[ -z "${host}" ]]; then
+    if is::empty "${host}"; then
         error::throw "Host is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -487,7 +487,7 @@ sshnetwork::execute_batch() {
         hosts=("${hosts[@]:0:${#hosts[@]}-1}")
     fi
     
-    if [[ ${#hosts[@]} -eq 0 ]] || [[ -z "${command}" ]]; then
+    if [[ ${#hosts[@]} -eq 0 ]] || is::empty "${command}"; then
         error::throw "At least one host and command are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -535,7 +535,7 @@ sshnetwork::get_remote_info() {
     local user="${2:-$(whoami)}"
     local port="${3:-${SSH_NETWORK_DEFAULT_PORT}}"
     
-    if [[ -z "${host}" ]]; then
+    if is::empty "${host}"; then
         error::throw "Host is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -658,8 +658,8 @@ sshnetwork::create_tunnel() {
     local ssh_user="${5:-$(whoami)}"
     local ssh_port="${6:-${SSH_NETWORK_DEFAULT_PORT}}"
     
-    if [[ -z "${local_port}" ]] || [[ -z "${remote_host}" ]] || \
-       [[ -z "${remote_port}" ]] || [[ -z "${ssh_host}" ]]; then
+    if is::empty "${local_port}" || is::empty "${remote_host}" || \
+       is::empty "${remote_port}" || is::empty "${ssh_host}"; then
         error::throw "Local port, remote host, remote port, and SSH host are required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -690,7 +690,7 @@ sshnetwork::create_tunnel() {
 sshnetwork::close_tunnel() {
     local local_port="${1:-}"
     
-    if [[ -z "${local_port}" ]]; then
+    if is::empty "${local_port}"; then
         error::throw "Local port is required" \
             "${LIB_ERROR_INVALID_ARGS}"
     fi
@@ -701,7 +701,7 @@ sshnetwork::close_tunnel() {
     local ssh_pid
     ssh_pid=$(ps aux | grep "ssh.*-L.*${local_port}:" | grep -v grep | awk '{print $2}' || true)
     
-    if [[ -n "${ssh_pid}" ]]; then
+    if is::not_empty "${ssh_pid}"; then
         utils::ignore kill "${ssh_pid}"
         log::success "SSH tunnel closed on port ${local_port}"
     else
@@ -723,7 +723,7 @@ sshnetwork::get_active_tunnels() {
 sshnetwork::log_activity() {
     local message="${1:-}"
     
-    if [[ -z "${message}" ]]; then
+    if is::empty "${message}"; then
         return 0
     fi
     
@@ -737,7 +737,7 @@ sshnetwork::log_activity() {
 sshnetwork::get_network_stats() {
     local host="${1:-}"
     
-    if [[ -n "${host}" ]]; then
+    if is::not_empty "${host}"; then
         log::info "Getting network statistics for ${host}..."
         
         local commands=(

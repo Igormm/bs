@@ -250,12 +250,12 @@ system::security::fail2ban() {
 #   system::security::password_policy
 system::security::password_policy() {
     # Set password complexity requirements
-    if [[ -f "/etc/pam.d/common-password" ]]; then
+    if is::file "/etc/pam.d/common-password"; then
         # For Debian/Ubuntu systems
         if ! grep -q "pam_pwquality.so" /etc/pam.d/common-password; then
             io::files::append /etc/pam.d/common-password "password requisite pam_pwquality.so retry=3 minlen=8 difok=3 ucredit=-1 lcredit=-1 dcredit=-1 ocredit=-1"
         fi
-    elif [[ -f "/etc/pam.d/system-auth" ]]; then
+    elif is::file "/etc/pam.d/system-auth"; then
         # For RedHat/CentOS systems
         if ! grep -q "pam_pwquality.so" /etc/pam.d/system-auth; then
             sed -i 's/password.*pam_unix.so/password    requisite     pam_pwquality.so try_first_pass local_users_only retry=3 authtok_type=/' /etc/pam.d/system-auth
@@ -263,7 +263,7 @@ system::security::password_policy() {
     fi
     
     # Set password expiration
-    if [[ -f "/etc/login.defs" ]]; then
+    if is::file "/etc/login.defs"; then
         utils::ignore sed -i 's/^PASS_MAX_DAYS.*/PASS_MAX_DAYS   90/' /etc/login.defs
         utils::ignore sed -i 's/^PASS_MIN_DAYS.*/PASS_MIN_DAYS   7/' /etc/login.defs
         utils::ignore sed -i 's/^PASS_WARN_AGE.*/PASS_WARN_AGE   14/' /etc/login.defs
@@ -280,7 +280,7 @@ system::security::disable_root() {
     utils::ignore passwd -l root
     
     # Disable SSH root login
-    if [[ -f "/etc/ssh/sshd_config" ]]; then
+    if is::file "/etc/ssh/sshd_config"; then
         utils::ignore sed -i 's/^PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
         # Restart SSH service
         if utils::has systemctl; then

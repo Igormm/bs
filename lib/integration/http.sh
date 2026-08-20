@@ -206,7 +206,7 @@ http::request() {
   local url="${2:-}"
   shift 2
 
-  if [[ -z "${method}" || -z "${url}" ]]; then
+  if is::empty "${method}" || is::empty "${url}"; then
     log::warn "http::request: method and URL required"
     return "${E_INVALID}"
   fi
@@ -218,7 +218,7 @@ http::request() {
 
   local backend
   backend="$(__http::backend)"
-  if [[ -z "${backend}" ]]; then
+  if is::empty "${backend}"; then
     log::error "No HTTP backend available (curl or wget required)"
     return "${INTEGRATION_ERROR_MISSING_DEPS}"
   fi
@@ -279,14 +279,14 @@ http::download() {
   local file="${2:-}"
   shift 2
 
-  if [[ -z "${url}" || -z "${file}" ]]; then
+  if is::empty "${url}" || is::empty "${file}"; then
     log::warn "http::download: URL and destination file required"
     return "${E_INVALID}"
   fi
 
   local parent_dir
   parent_dir="$(dirname -- "${file}")"
-  if [[ ! -d "${parent_dir}" ]]; then
+  if ! is::dir "${parent_dir}"; then
     if ! mkdir -p -- "${parent_dir}"; then
       log::error "Failed to create directory: ${parent_dir}"
       return "${LIB_ERROR_FILE_OPERATION}"
@@ -300,7 +300,7 @@ http::download() {
 
   local backend
   backend="$(__http::backend)"
-  if [[ -z "${backend}" ]]; then
+  if is::empty "${backend}"; then
     log::error "No HTTP backend available (curl or wget required)"
     return "${INTEGRATION_ERROR_MISSING_DEPS}"
   fi
@@ -347,7 +347,7 @@ http::retry() {
   local delay="${2:-1}"
   shift 2
 
-  if [[ -z "${attempts}" || -z "${delay}" || $# -eq 0 ]]; then
+  if is::empty "${attempts}" || is::empty "${delay}" || [[ $# -eq 0 ]]; then
     log::warn "http::retry: attempts, delay and command required"
     return "${E_INVALID}"
   fi

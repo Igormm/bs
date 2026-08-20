@@ -99,7 +99,7 @@ automation::locale::set_locale() {
     local target_locale="${1:-en_US.UTF-8}"
     
     # For Debian/Ubuntu systems / Для систем Debian/Ubuntu
-    if [[ -f /etc/debian_version ]]; then
+    if is::file /etc/debian_version; then
         # Check if locale exists in available locales
         if grep -q "^${target_locale}" /etc/locale.gen; then
             # Uncomment the locale if it's commented
@@ -113,7 +113,7 @@ automation::locale::set_locale() {
         locale-gen
         update-locale LANG="${target_locale}"
     # For Fedora/ALT systems / Для систем Fedora/ALT
-    elif [[ -f /etc/fedora-release ]] || [[ -f /etc/altlinux-release ]]; then
+    elif is::file /etc/fedora-release || is::file /etc/altlinux-release; then
         if utils::has localectl; then
             localectl set-locale LANG="${target_locale}"
         else
@@ -143,9 +143,9 @@ automation::locale::verify_locale() {
     else
         # Check in system locale file
         local system_locale=""
-        if [[ -f /etc/default/locale ]]; then
+        if is::file /etc/default/locale; then
             system_locale=$(grep "^LANG=" /etc/default/locale | cut -d= -f2 | tr -d '"')
-        elif [[ -f /etc/locale.conf ]]; then
+        elif is::file /etc/locale.conf; then
             system_locale=$(grep "^LANG=" /etc/locale.conf | cut -d= -f2 | tr -d '"')
         fi
         
@@ -246,7 +246,7 @@ automation::hardware::set_input_device() {
     
     if utils::has xinput; then
         local device_id=$(xinput list | grep -i "${device_name}" | grep -oP 'id=\K\d+' | head -n 1)
-        if [[ -n "${device_id}" ]]; then
+        if is::not_empty "${device_id}"; then
             xinput set-prop "${device_id}" "${property}" "${value}"
             log::info "Set ${property} to ${value} for device ${device_name}"
         else
@@ -324,7 +324,7 @@ automation::hardware::check_display_mode() {
     
     if utils::has xrandr; then
         local mode_info=$(xrandr --query | grep -A 1 "${monitor}" | tail -n 1)
-        if [[ -n "${mode_info}" ]]; then
+        if is::not_empty "${mode_info}"; then
             log::info "[OK] Monitor ${monitor} is in mode: ${mode_info}"
             return 0
         else
@@ -360,7 +360,7 @@ automation::network::manage_interface() {
     case "${action}" in
         "up")
             ip link set "${interface}" up
-            if [[ -n "${ip_addr}" ]]; then
+            if is::not_empty "${ip_addr}"; then
                 ip addr add "${ip_addr}" dev "${interface}"
             fi
             log::info "Interface ${interface} brought up"
@@ -386,9 +386,9 @@ automation::network::check_interface_status() {
     local link_status=$(utils::quiet_err ip link show "${interface}" | grep -o "LOWER_UP\|DOWN" | head -n 1)
     local ip_status=$(utils::quiet_err ip addr show "${interface}" | grep "inet" | head -n 1)
     
-    if [[ -n "${link_status}" ]] && [[ "${link_status}" == "LOWER_UP" ]]; then
+    if is::not_empty "${link_status}" && [[ "${link_status}" == "LOWER_UP" ]]; then
         log::info "[OK] Interface ${interface} is UP"
-        if [[ -n "${ip_status}" ]]; then
+        if is::not_empty "${ip_status}"; then
             log::info "IP assigned: ${ip_status}"
             return 0
         else
@@ -422,7 +422,7 @@ automation::network::manage_route() {
     local gateway="${3}"
     local interface="${4:-}"
     
-    if [[ -n "${interface}" ]]; then
+    if is::not_empty "${interface}"; then
         ip route "${action}" "${dest_network}" via "${gateway}" dev "${interface}"
     else
         ip route "${action}" "${dest_network}" via "${gateway}"
@@ -453,9 +453,9 @@ automation::network::check_gateway() {
 automation::display::check_display_server() {
     local display_server=""
     
-    if [[ -n "${DISPLAY:-}" ]]; then
+    if is::not_empty "${DISPLAY:-}"; then
         display_server="X11 (DISPLAY=${DISPLAY})"
-    elif [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
+    elif is::not_empty "${WAYLAND_DISPLAY:-}"; then
         display_server="Wayland (WAYLAND_DISPLAY=${WAYLAND_DISPLAY})"
     else
         # Check for running processes
@@ -466,7 +466,7 @@ automation::display::check_display_server() {
         fi
     fi
     
-    if [[ -n "${display_server}" ]]; then
+    if is::not_empty "${display_server}"; then
         log::info "Display server: ${display_server}"
         return 0
     else
@@ -518,7 +518,7 @@ automation::display::install_display_server() {
 automation::display::check_display_socket() {
     local socket_path=""
     
-    if [[ -n "${DISPLAY:-}" ]]; then
+    if is::not_empty "${DISPLAY:-}"; then
         socket_path="/tmp/.X11-unix/X${DISPLAY#*:}"
         if [[ -S "${socket_path}" ]]; then
             log::info "[OK] X11 socket available: ${socket_path}"
@@ -527,7 +527,7 @@ automation::display::check_display_socket() {
             log::warn "[FAIL] X11 socket not available: ${socket_path}"
             return 1
         fi
-    elif [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
+    elif is::not_empty "${WAYLAND_DISPLAY:-}"; then
         socket_path="/run/user/$UID/${WAYLAND_DISPLAY}"
         if [[ -S "${socket_path}" ]]; then
             log::info "[OK] Wayland socket available: ${socket_path}"
@@ -569,7 +569,7 @@ automation::display::detect_desktop_environment() {
         de="Cinnamon"
     fi
     
-    if [[ -n "${de}" ]]; then
+    if is::not_empty "${de}"; then
         log::info "Detected Desktop Environment: ${de}"
         return 0
     else
@@ -690,7 +690,7 @@ automation::display::check_display_manager() {
         active_dm="LXDM (lxdm)"
     fi
     
-    if [[ -n "${active_dm}" ]]; then
+    if is::not_empty "${active_dm}"; then
         log::info "Active Display Manager: ${active_dm}"
         return 0
     else
@@ -744,7 +744,7 @@ automation::display::check_graphical_login() {
         dm_service="lxdm"
     fi
     
-    if [[ -n "${dm_service}" ]]; then
+    if is::not_empty "${dm_service}"; then
         if systemctl is-active --quiet "${dm_service}"; then
             log::info "[OK] Graphical login is available via ${dm_service}"
             return 0
@@ -1051,7 +1051,7 @@ automation::security::check_firewall_status() {
         fw_status="IPTables: $(iptables -L | head -n 1)"
     fi
     
-    if [[ -n "${fw_status}" ]]; then
+    if is::not_empty "${fw_status}"; then
         log::info "Firewall status: ${fw_status}"
         return 0
     else
@@ -1145,7 +1145,7 @@ automation::security::check_logging_service() {
         log_service="syslog-ng"
     fi
     
-    if [[ -n "${log_service}" ]]; then
+    if is::not_empty "${log_service}"; then
         log::info "Active logging service: ${log_service}"
         return 0
     else
