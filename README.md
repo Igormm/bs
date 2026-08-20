@@ -22,7 +22,11 @@ consistent code style and with zero external dependencies.
   pipe, буферизация stdio, `/dev` спецфайлы
 - **`core/logger`** — уровни, цвета, форматы text/json/structured
 - **`core/utils`** — идиомы тишины: `utils::has`, `utils::quiet`,
-  `utils::quiet_err`, `utils::ignore` вместо ручных `>/dev/null 2>&1`
+  `utils::quiet_err`, `utils::ignore`, `utils::attempt` вместо ручных
+  `>/dev/null 2>&1`
+- **`core/lang`** — языковое ядро: предикаты `is::file`, `is::empty`,
+  `is::command`, строки `str::*`, коллекции `arr::*`/`map::*`, интроспекция
+  `bs::func_name` и `bs::type_of`
 - **`lib/integration/*`** — HTTP-клиент, LLM (OpenAI/Ollama), Kubernetes,
   JSON-контракт результата для интеграции с Go-backend / CI
 - **`lib/system/*`** — дистрибутивы, пакеты, пользователи, сервисы, сеть,
@@ -60,7 +64,7 @@ load "core/args"
 load "lib/io/streams"
 
 args::define hello
-args::parse "$@" || exit 2
+args::require "$@"
 io::streams::print "works: $(args::get 1)"
 ```
 
