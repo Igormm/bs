@@ -109,6 +109,33 @@ namespaces public functions with a `module::` prefix, and declares
 configuration in associative arrays — all of which is required for complex
 scripts.
 
+### 2.1 Why snake_case and not CamelCase
+
+BS deliberately uses a single unix-like style (`lower_snake_case` +
+`module::` namespaces) everywhere; CamelCase is never used:
+
+- **Shell has no compiler.** A case typo (`System::Hw::Cpu` vs
+  `system::hw::cpu`) is not caught by anything at write time. In snake_case
+  a case typo is impossible by construction — everything is one register.
+- **One style means zero ambiguity.** With two styles every name raises the
+  question "which one here?". `system::hw::cpu_threads` already reads as a
+  path — CamelCase would only add a second way to write it.
+- **Ecosystem consistency.** Builtins, coreutils, and environment variables
+  are all snake/SCREAMING — a newcomer reads man pages and other people's
+  scripts in the same style.
+- **Tooling.** A single style keeps the grammar and the naming-convention
+  diagnostics of the LSP server simple.
+
+Style matrix:
+
+- `SCREAMING_SNAKE_CASE` — constants, `readonly`, environment variables.
+- `lower_snake_case` — functions, variables, module names. No mixedCase.
+- `__double_underscore` — private.
+
+If a class-like subsystem ever appears (constructors, typed values), a
+PascalCase slot can be discussed separately — until then there are no types,
+so there is no CamelCase slot.
+
 ## 3. Function documentation
 
 The Google guide recommends comments; we formalize the format for a module's

@@ -55,6 +55,7 @@ group::module::function() {
 - Add `# shellcheck shell=bash` on line 2 for `#!/usr/bin/env bs` files.
 - Public functions use `module::function` or `module::sub::function` namespaces.
 - Constants are `SCREAMING_SNAKE_CASE` and `readonly`.
+- Single unix-like style everywhere: `lower_snake_case` + `module::` namespaces; CamelCase/mixedCase are never used (see code-style-guide §2.1).
 - Use `bs::guard` for idempotency; never hand-roll `[[ -n "${__X_SOURCED:-}" ]] && return 0`.
 - Use `bs::source_relative` for relative dependency sourcing.
 - Use `utils::has`, `utils::quiet`, `utils::quiet_err`, `utils::ignore` instead of raw redirects.
