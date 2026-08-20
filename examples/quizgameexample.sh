@@ -27,8 +27,7 @@ main() {
     args::flag auto
     args::flag_describe auto "Non-interactive demo mode"
 
-    args::parse "$@" || bs::exit "${E_INVALID}"
-    [[ "${ARGS_HELP_REQUESTED}" == "1" ]] && bs::exit "${E_SUCCESS}"
+    args::parse_or_exit "$@"
 
     log::header "Timed quiz / Викторина с таймаутом"
     io::streams::print "Question: 2 + 2 = ?"

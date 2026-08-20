@@ -67,15 +67,14 @@ main "$@"
 
 ## Шаг 3: Валидация и автоматический help
 
-Добавьте `args::parse` после объявлений:
+Добавьте `args::parse_or_exit` после объявлений:
 
 ```bash
-    args::parse "$@" || bs::exit "${E_INVALID}"
-    [[ "${ARGS_HELP_REQUESTED}" == "1" ]] && bs::exit "${E_SUCCESS}"
+    args::parse_or_exit "$@"
 ```
 
-- При любом неверном вводе `args::parse` сам печатает причину и help в stderr и возвращает `E_INVALID` — мы выходим с этим кодом через `bs::exit`, который выполняет стек очистки.
-- `-h`/`--help` печатает help, выставляет `ARGS_HELP_REQUESTED=1` и возвращает 0.
+- При любом неверном вводе `args::parse` сам печатает причину и help в stderr и возвращает `E_INVALID` — `args::parse_or_exit` затем выходит с этим кодом через `bs::exit`, который выполняет стек очистки.
+- `-h`/`--help` печатает help, и `args::parse_or_exit` выходит с кодом 0 — отдельная строка не нужна.
 - `E_SUCCESS`, `E_ERROR`, `E_INVALID` (0/1/2) — константы из [core/const.sh](../../../core/const.sh), загружаемые точкой входа BS.
 
 Запуск:
@@ -214,8 +213,7 @@ main() {
     args::flag_describe dry-run "Print the plan without executing"
 
     # 2. Validate input; on error parse prints the reason and help itself
-    args::parse "$@" || bs::exit "${E_INVALID}"
-    [[ "${ARGS_HELP_REQUESTED}" == "1" ]] && bs::exit "${E_SUCCESS}"
+    args::parse_or_exit "$@"
 
     # 3. Work with validated values
     local action="${ARGS_PARAMS[0]:-status}"

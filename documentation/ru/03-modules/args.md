@@ -26,7 +26,7 @@ load "core/args"
 
 ```bash
 args::define first middle last
-args::parse "$@" || bs::exit "${E_INVALID}"
+args::parse_or_exit "$@"
 ```
 
 ## Ветвление дерева: `args::level`
@@ -83,9 +83,14 @@ if utils::quiet args::flag_get dry-run; then ...; fi
 ## Валидация: `args::parse`, `args::get`
 
 ```bash
-args::parse "$@" || bs::exit "${E_INVALID}"
+args::parse_or_exit "$@"
 action="$(args::get 1)"
 ```
+
+`args::parse_or_exit` — однострочник: при ошибке `args::parse` печатает
+причину и help, затем выход с `E_INVALID` через `bs::exit` (выполняется стек
+очистки); `--help` печатает help и выходит с кодом 0. Ручная двухшаговая
+форма ниже — для случаев, где нужна своя обработка.
 
 При успехе `args::parse` заполняет массив `ARGS_PARAMS` (позиционные
 параметры, индексация с 0) и ассоциативный массив `ARGS_FLAGS` и возвращает

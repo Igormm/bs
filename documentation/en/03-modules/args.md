@@ -26,7 +26,7 @@ The simplest case — one parameter per level. Name N occupies level N:
 
 ```bash
 args::define first middle last
-args::parse "$@" || bs::exit "${E_INVALID}"
+args::parse_or_exit "$@"
 ```
 
 ## Tree branching: `args::level`
@@ -83,9 +83,14 @@ if utils::quiet args::flag_get dry-run; then ...; fi
 ## Validation: `args::parse`, `args::get`
 
 ```bash
-args::parse "$@" || bs::exit "${E_INVALID}"
+args::parse_or_exit "$@"
 action="$(args::get 1)"
 ```
+
+`args::parse_or_exit` is the one-liner: on failure it lets `args::parse`
+print the reason and the help, then exits with `E_INVALID` via `bs::exit`
+(cleanup stack runs); `--help` prints the help and exits 0. The manual
+two-step form below is for cases that need custom handling.
 
 On success `args::parse` fills the `ARGS_PARAMS` array (positional
 parameters, 0-based) and the `ARGS_FLAGS` associative array, and returns 0.

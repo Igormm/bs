@@ -67,15 +67,14 @@ The script still prints nothing new — the tree is declared but not used yet.
 
 ## Step 3: Validation and automatic help
 
-Add `args::parse` after the declarations:
+Add `args::parse_or_exit` after the declarations:
 
 ```bash
-    args::parse "$@" || bs::exit "${E_INVALID}"
-    [[ "${ARGS_HELP_REQUESTED}" == "1" ]] && bs::exit "${E_SUCCESS}"
+    args::parse_or_exit "$@"
 ```
 
-- On any invalid input `args::parse` prints the reason and the help to stderr itself and returns `E_INVALID` — we exit with that code via `bs::exit`, which runs the cleanup stack.
-- `-h`/`--help` prints the help, sets `ARGS_HELP_REQUESTED=1` and returns 0.
+- On any invalid input `args::parse` prints the reason and the help to stderr itself and returns `E_INVALID` — `args::parse_or_exit` then exits with that code via `bs::exit`, which runs the cleanup stack.
+- `-h`/`--help` prints the help and `args::parse_or_exit` exits 0 — no extra line needed.
 - `E_SUCCESS`, `E_ERROR`, `E_INVALID` (0/1/2) are constants from [core/const.sh](../../../core/const.sh), loaded by the BS entry point.
 
 Run:
@@ -214,8 +213,7 @@ main() {
     args::flag_describe dry-run "Print the plan without executing"
 
     # 2. Validate input; on error parse prints the reason and help itself
-    args::parse "$@" || bs::exit "${E_INVALID}"
-    [[ "${ARGS_HELP_REQUESTED}" == "1" ]] && bs::exit "${E_SUCCESS}"
+    args::parse_or_exit "$@"
 
     # 3. Work with validated values
     local action="${ARGS_PARAMS[0]:-status}"
