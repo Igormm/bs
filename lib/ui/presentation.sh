@@ -275,6 +275,17 @@ presentation::__disp_width() {
     printf '%s' "$w"
 }
 
+# @description Display width of a string in terminal cells (public wrapper).
+# @description Ширина строки в экранных клетках (публичная обёртка).
+#   Emoji and other wide chars count as 2 cells / Эмодзи считаются за 2 клетки.
+# @param $1 Text / Текст
+# @stdout width in cells / ширина в клетках
+# @example
+#   w="$(presentation::text_width "🚀 Deploy")"
+presentation::text_width() {
+    presentation::__disp_width "${1-}"
+}
+
 # @description Print a box around text
 # @param $1 Text to box (multiple lines separated by \n or real newlines)
 # @param $2 [optional] "round" for rounded corners / скруглённые углы
