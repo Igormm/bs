@@ -14,6 +14,8 @@ consistent code style and with zero external dependencies.
 
 - **Интерпретатор `bs`** — shebang-режим (`#!/usr/bin/env bs`) и `bs run`:
   скрипты не требуют bootstrap-бойлерплейта
+- **Интерактивный REPL `bs repl`** — сессия с загруженным ядром: `load`,
+  eval-выражения, история команд, интроспекция (`:list`, `:doc`, `:info`)
 - **Standalone-сборка `bs build`** — превращает скрипт в один
   самодостаточный файл (фреймворк внутри, извлекается в кэш при первом
   запуске): работает в любом дистрибутиве без установки BS
@@ -47,6 +49,9 @@ consistent code style and with zero external dependencies.
 ```bash
 # Проверка целостности фреймворка / Framework integrity check
 ./bs doctor
+
+# Интерактивная консоль / Interactive shell
+./bs repl
 
 # Список модулей / List modules
 ./bs list

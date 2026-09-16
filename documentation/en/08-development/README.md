@@ -218,3 +218,26 @@ Notes:
 - CI runs the test suite in containers covering bash 5.x (ubuntu, debian,
   almalinux 9) and bash 4.4 (almalinux 8) — the framework minimum. Do not use
   features newer than bash 4.4 in modules.
+
+## REPL — interactive BS shell
+
+`bs repl` starts an interactive session with the core already loaded and the
+module loader available (`load "..."` works on the fly):
+
+```bash
+bs repl
+bs> :list                        # all modules (core/ + lib/)
+bs> :load lib/system/hw
+bs> system::hw::cpu_model        # anything is evaluated as bash
+bs> x=42                         # state persists between lines
+bs> :doc system::hw::cpu_model   # function source
+bs> :exit
+```
+
+Build-in commands: `:help` `:load <module>` `:list` `:doc <func>`
+`:info <module>` `:version` `:hist` `:!N` `:exit`. History (last 200 lines)
+is saved to `$XDG_CONFIG_HOME/bs/repl_history` (`BS_REPL_HISTORY_FILE`
+overrides it). Prompts: `BS_REPL_PROMPT1` / `BS_REPL_PROMPT2`.
+Line continuation with a trailing backslash. Implementation:
+`core/repl.sh` ([repl.sh](../../../core/repl.sh)), tests:
+`tests/integration/testrepl.sh`.

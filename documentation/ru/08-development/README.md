@@ -221,3 +221,25 @@ bash tests/runalltests.sh          # полный прогон тестов
 - CI прогоняет тесты в контейнерах с bash 5.x (ubuntu, debian, almalinux 9) и
   bash 4.4 (almalinux 8) — минимальной версией фреймворка. Не используйте в
   модулях возможности новее bash 4.4.
+
+## REPL — интерактивная консоль BS
+
+Команда `bs repl` запускает интерактивную сессию с уже загруженным ядром и
+загрузчиком модулей (`load "..."` работает на лету):
+
+```bash
+bs repl
+bs> :list                        # все модули (core/ + lib/)
+bs> :load lib/system/hw
+bs> system::hw::cpu_model        # любое выражение — обычный bash
+bs> x=42                         # состояние сохраняется между строками
+bs> :doc system::hw::cpu_model   # исходник функции
+bs> :exit
+```
+
+Встроенные команды: `:help` `:load <модуль>` `:list` `:doc <функция>`
+`:info <модуль>` `:version` `:hist` `:!N` `:exit`. История (последние 200
+строк) сохраняется в `$XDG_CONFIG_HOME/bs/repl_history` (переопределяется
+`BS_REPL_HISTORY_FILE`). Промпты: `BS_REPL_PROMPT1` / `BS_REPL_PROMPT2`.
+Продолжение строк — обратным слешем. Реализация: `core/repl.sh`
+([repl.sh](../../../core/repl.sh)), тесты: `tests/integration/testrepl.sh`.

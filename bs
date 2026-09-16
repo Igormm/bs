@@ -80,6 +80,7 @@ Commands:
   doctor                Check framework integrity
   run <script> [args]   Execute script inside BS environment
   build <script>        Assemble a standalone self-extracting script
+  repl                  Interactive REPL (BS shell / интерактивная консоль)
   init-shell            Print snippet for ~/.bashrc or ~/.zshrc
 
 Shebang mode:
@@ -98,12 +99,10 @@ env_cmd() { printf 'BS_ROOT=%s\nPATH=%s\n' "$BS_ROOT" "$PATH"; }
 
 list_cmd() {
   echo 'Available modules:'
-  for cat in core lib; do
-    is::dir "${BS_ROOT}/${cat}" || continue
-    for m in "${BS_ROOT}/${cat}"/*.sh; do
-      is::file "$m" && printf '  %s/%s\n' "$cat" "${m##*/}"
-    done
-  done
+  local file
+  while IFS= read -r file; do
+    is::file "${file}" && printf '  %s\n' "${file#"${BS_ROOT}"/}"
+  done < <(find "${BS_ROOT}/core" "${BS_ROOT}/lib" -type f -name '*.sh' 2>/dev/null | sort)
 }
 
 doctor_cmd() {
@@ -120,7 +119,7 @@ doctor_cmd() {
   fi
 
   # Required core files / Обязательные файлы ядра
-  local req=(bootstrap/init.sh bootstrap/loader.sh core/prereq.sh core/lang.sh core/const.sh core/logger.sh core/errorhandler.sh core/version.sh core/utils.sh core/config.sh core/deps.sh)
+  local req=(bootstrap/init.sh bootstrap/loader.sh core/prereq.sh core/lang.sh core/const.sh core/logger.sh core/errorhandler.sh core/version.sh core/utils.sh core/config.sh core/deps.sh core/repl.sh)
   for f in "${req[@]}"; do
     if is::file "${BS_ROOT}/${f}"; then
       echo "  [OK] ${f}"
@@ -354,7 +353,7 @@ EOF
 # первый аргумент — путь к существующему скрипту, а не команда.
 if [[ $# -ge 1 && -f "$1" ]]; then
   case "$1" in
-    help|-h|--help|version|env|list|doctor|run|build|init-shell) : ;;
+    help|-h|--help|version|env|list|doctor|run|build|repl|init-shell) : ;;
     *) BS_SHEBANG=1 ;;
   esac
 fi
@@ -373,6 +372,11 @@ case "${1:-help}" in
   doctor)         doctor_cmd ;;
   run)            shift; run_cmd "$@" ;;
   build)          shift; build_cmd "$@" ;;
+  repl)           shift
+                  if ! source -- "${BS_ROOT}/core/repl.sh"; then
+                    die "repl: core/repl.sh not found"
+                  fi
+                  repl::main "$@" ;;
   init-shell)     init_shell_cmd ;;
   *)              die "unknown command: $1" ;;
 esac
