@@ -50,6 +50,32 @@ update_path_bashrc() {
   fi
 }
 
+# Удалить строку PATH, добавленную установщиком, из rc-файла (идемпотентно).
+# Удаляется только точное совпадение строки; пользовательские правки не трогаем.
+# Remove the installer-added PATH line from an rc file (idempotent).
+# Only an exact line match is removed; user edits are left untouched.
+remove_path_entry() {
+  local rc_file="$1"
+  local line='export PATH="$HOME/.local/bin:$PATH"'
+  local tmp_file
+
+  if ! is::file "${rc_file}"; then
+    return 0
+  fi
+
+  if ! utils::quiet grep -Fqx "${line}" "${rc_file}"; then
+    return 0
+  fi
+
+  # grep -Fvx исключает только точные совпадения; при пустом результате
+  # (файл состоял лишь из этой строки) оставляем пустой файл.
+  # utils::attempt сохраняет stdout — в отличие от utils::ignore.
+  tmp_file="${rc_file}.bs.$$.tmp"
+  utils::attempt grep -Fvx "${line}" "${rc_file}" > "${tmp_file}"
+  mv "${tmp_file}" "${rc_file}"
+  printf "Удалена строка PATH из %s\nPath line removed from %s\n" "${rc_file}" "${rc_file}"
+}
+
 # Auto add PATH to bash/zsh (idempotent)
 auto_update_path() {
   local bashrc="${HOME}/.bashrc"

@@ -145,6 +145,10 @@ test_uninstall() {
         testframework::assert_true "true" "uninstall removes wrapper and libs"
     fi
 
+    local count
+    count="$(grep -c '\.local/bin' "${iso}/.bashrc" 2>/dev/null || true)"
+    testframework::assert_equal "0" "${count}" "uninstall removes installer PATH line from .bashrc"
+
     rc=0
     out="$(run_installer "${iso}" --local uninstall)" || rc=$?
     testframework::assert_equal "0" "${rc}" "second uninstall is graceful"
@@ -180,6 +184,23 @@ test_update_path_flag() {
     testframework::assert_equal "1" "${count}" "second update-path does not duplicate line"
 }
 
+test_uninstall_keeps_user_edits() {
+    local iso rc=0
+    iso="$(mk_isolated_home)"
+    run_installer "${iso}" --local >/dev/null 2>&1 || true
+
+    printf 'PATH="$HOME/.local/bin/manual:$PATH"\n' >> "${iso}/.bashrc"
+
+    run_installer "${iso}" --local uninstall >/dev/null 2>&1 || rc=$?
+    testframework::assert_equal "0" "${rc}" "uninstall exits 0 with user edits present"
+
+    if grep -q 'manual' "${iso}/.bashrc"; then
+        testframework::assert_true "true" "user PATH edits survive uninstall"
+    else
+        testframework::assert_true "false" "user PATH edits survive uninstall"
+    fi
+}
+
 test_system_mode_requires_root() {
     if [[ "$(id -u)" -eq 0 ]]; then
         printf "  ⊘ Skipping system-mode root check: running as root\n"
@@ -209,6 +230,7 @@ main() {
 
     testframework::section "Uninstall / Удаление"
     test_uninstall
+    test_uninstall_keeps_user_edits
 
     testframework::section "PATH helpers / Настройка PATH"
     test_path_flag

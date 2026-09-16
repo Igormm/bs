@@ -61,7 +61,7 @@ sudo ./install.sh uninstall        # system
 ./install.sh --local uninstall     # local
 ```
 
-`uninstall` (alias: `remove`) deletes `TARGET_BIN` and `TARGET_LIB`. In local mode it additionally removes `BIN_DIR`/`LIB_DIR` only if they are empty (`rmdir`), so other files in `~/.local` are never touched.
+`uninstall` (alias: `remove`) deletes `TARGET_BIN` and `TARGET_LIB`. In local mode it additionally removes `BIN_DIR`/`LIB_DIR` only if they are empty (`rmdir`), so other files in `~/.local` are never touched. The installer-added PATH line is also removed from `~/.bashrc` and `~/.zshrc` (exact match only; user edits are left untouched).
 
 ## PATH management (local mode)
 

@@ -96,6 +96,9 @@ do_uninstall() {
     if is::dir "${LIB_DIR}" && utils::quiet_err rmdir "${LIB_DIR}"; then
       printf "Удален пустой каталог: %s\n" "${LIB_DIR}"
     fi
+    # Remove the PATH line added by the installer (exact match only)
+    remove_path_entry "${HOME}/.bashrc"
+    remove_path_entry "${HOME}/.zshrc"
   fi
 
   printf "Готово.\n"
