@@ -29,6 +29,7 @@ core.*
 
 # Локальные артефакты / Local artifacts
 *.result.json
+*.standalone.sh
 
 # Local drafts / Локальные черновики (не публикуются)
 # Local promo/article drafts that should never be committed

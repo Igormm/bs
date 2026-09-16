@@ -85,15 +85,13 @@ main() {
         "bootstrap/loader.sh"
     )
 
-    # Все скрипты проекта: core, lib, install, tests
-    # (examples/ проверяются отдельно — см. фазу 6 плана чистки)
-    # All project scripts: core, lib, install, tests
-    # (examples/ are checked separately — see phase 6 of the cleanup plan)
+    # Все скрипты проекта: core, lib, install, tests, examples
+    # All project scripts: core, lib, install, tests, examples
     local all_files=("${required_files[@]}")
     local found_file
     while IFS= read -r found_file; do
         all_files+=("${found_file#./}")
-    done < <(find core lib install tests -type f -name "*.sh" 2>/dev/null | sort)
+    done < <(find core lib install tests examples -type f -name "*.sh" 2>/dev/null | sort)
 
     # Проверка каждого файла
     local file rc

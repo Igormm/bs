@@ -224,8 +224,8 @@ presentation::progress() {
 #   presentation::table "Name:Age:City" "John:25:NYC" "Jane:30:SFO"
 presentation::table() {
     local rows=("$@")
-    local -a parsed_rows
-    local -a col_widths
+    local -a parsed_rows=()
+    local -a col_widths=()
     local i j
     
     # Parse rows and calculate column widths
