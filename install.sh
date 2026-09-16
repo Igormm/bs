@@ -151,14 +151,15 @@ if ! declare -F -- "utils::strict" >/dev/null 2>&1; then
   exit 1
 fi
 
-# Проверить функцию utils::ensure_shell_version
-if ! declare -F -- "utils::ensure_shell_version" >/dev/null 2>&1; then
-  printf 'ERROR: required function %q not defined\n' "utils::ensure_shell_version" >&2
+# Подключить checks.sh и проверить функцию check_shell_environment
+if ! utils::ensure_source "${INSTALLER_DIR}/checks.sh" "check_shell_environment"; then
   exit 1
 fi
 
-# Проверка версии bash\zsh
-utils::ensure_shell_version
+# Проверка интерпретатора: по реальному процессу, а не по $SHELL
+# (utils::ensure_shell_version смотрит в $SHELL и ложно падает при SHELL=zsh)
+# Interpreter check: based on the real process, not on $SHELL
+check_shell_environment
 
 # Run the modular installer / Запустить модуль инсталяции 
 source "${INSTALLER_DIR}/main.sh" "$@"

@@ -10,6 +10,25 @@
 # IDE
 .kdev4/
 .qodo/
+.idea/
+*.iml
+
+# OS / Операционные системы
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Логи и временные файлы / Logs and temp files
+*.log
+*.tmp
+*.temp
+
+# Дампы ядра и бинарные артефакты / Core dumps and binary artifacts
+*.core
+core.*
+
+# Локальные артефакты / Local artifacts
+*.result.json
 
 # Local drafts / Локальные черновики (не публикуются)
 # Local promo/article drafts that should never be committed

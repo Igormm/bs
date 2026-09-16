@@ -4,7 +4,7 @@ BS is installed by the modular installer in the repository root: [install.sh](..
 
 ## Installer layout
 
-- [install.sh](../../install.sh) — entry point. Validates the repository layout (`core/`, `bootstrap/`, `install/`), loads `core/utils.sh`, enables strict mode via `utils::strict`, checks the shell version via `utils::ensure_shell_version`, then runs `install/main.sh`.
+- [install.sh](../../install.sh) — entry point. Validates the repository layout (`core/`, `bootstrap/`, `install/`), loads the core via `bootstrap/init.sh`, enables strict mode via `utils::strict`, checks the interpreter via `check_shell_environment` (based on the real process, not `$SHELL`), then runs `install/main.sh`.
 - [install/main.sh](../../install/main.sh) — argument parsing, mode/path resolution, dispatch to install/uninstall actions.
 - [install/checks.sh](../../install/checks.sh) — environment checks: `is_already_installed`, `check_shell_environment`.
 - [install/actions.sh](../../install/actions.sh) — `do_install` and `do_uninstall`.
@@ -90,6 +90,6 @@ Rules: `~/.bashrc` is updated if it exists, or if there is no `~/.zshrc`; `~/.zs
   - `system` (default): `/usr/local/lib/bs`;
   - `local` (`--local`): `~/.local/lib/bs`;
   - custom: values of `PREFIX`, `BIN_DIR`, `LIB_DIR`.
-- bash 4.0+ is required; the installer aborts on older shells via `utils::ensure_shell_version`.
+- bash 4.0+ is required; the installer aborts on older shells via `check_shell_environment` (based on the real interpreter, not `$SHELL`).
 - If BS is already installed at the target (`is_already_installed`), the installer stops and suggests uninstalling first or overriding `PREFIX`/`BIN_DIR`/`LIB_DIR`.
 - The installer runs under strict mode (`utils::strict`: `set -euo pipefail`) and validates every file it sources via `utils::ensure_source`.

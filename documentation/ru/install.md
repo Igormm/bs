@@ -4,7 +4,7 @@ BS устанавливается модульным установщиком в
 
 ## Структура установщика
 
-- [install.sh](../../install.sh) — точка входа. Проверяет структуру репозитория (`core/`, `bootstrap/`, `install/`), подключает `core/utils.sh`, включает строгий режим через `utils::strict`, проверяет версию оболочки через `utils::ensure_shell_version`, затем запускает `install/main.sh`.
+- [install.sh](../../install.sh) — точка входа. Проверяет структуру репозитория (`core/`, `bootstrap/`, `install/`), подключает ядро через `bootstrap/init.sh`, включает строгий режим через `utils::strict`, проверяет интерпретатор через `check_shell_environment` (проверка реального процесса, а не `$SHELL`), затем запускает `install/main.sh`.
 - [install/main.sh](../../install/main.sh) — разбор аргументов, выбор режима и путей, вызов действий установки/удаления.
 - [install/checks.sh](../../install/checks.sh) — проверки окружения: `is_already_installed`, `check_shell_environment`.
 - [install/actions.sh](../../install/actions.sh) — `do_install` и `do_uninstall`.
@@ -90,6 +90,6 @@ export PATH="$HOME/.local/bin:$PATH"
   - `system` (по умолчанию): `/usr/local/lib/bs`;
   - `local` (`--local`): `~/.local/lib/bs`;
   - произвольный: значения `PREFIX`, `BIN_DIR`, `LIB_DIR`.
-- Требуется bash 4.0+; на более старых оболочках установщик завершается через `utils::ensure_shell_version`.
+- Требуется bash 4.0+; иначе установщик завершается через `check_shell_environment` (по реальному интерпретатору, а не по `$SHELL`).
 - Если BS уже установлена в целевой каталог (`is_already_installed`), установщик останавливается и предлагает сначала удалить старую версию или переопределить `PREFIX`/`BIN_DIR`/`LIB_DIR`.
 - Установщик работает в строгом режиме (`utils::strict`: `set -euo pipefail`) и проверяет каждый подключаемый файл через `utils::ensure_source`.
