@@ -60,6 +60,8 @@ VK_MUSIC_ACCESS_TOKEN=""
 VK_MUSIC_LAST_SEARCH_RESULTS=()
 
 # Module initialization
+# @description Initialize the VK Music module and set up cache/download directories
+# @description Инициализировать модуль VK Music и настроить каталоги кэша и загрузок
 vkmusic::init() {
     
     log::info "Initializing VK Music module..."
@@ -87,6 +89,8 @@ vkmusic::init() {
 }
 
 # Check VK Music dependencies
+# @description Check VK Music dependencies, verify required tools like curl, jq, ffmpeg
+# @description Проверить зависимости VK Music, убедиться в наличии curl, jq, ffmpeg
 vkmusic::check_dependencies() {
     local missing_deps=()
     
@@ -105,6 +109,8 @@ vkmusic::check_dependencies() {
 }
 
 # Install missing dependencies
+# @description Install missing VK Music dependencies via apt, dnf, or brew by platform
+# @description Установить недостающие зависимости VK Music через apt, dnf или brew
 vkmusic::install_dependencies() {
     local deps=("$@")
     
@@ -130,6 +136,8 @@ vkmusic::install_dependencies() {
 }
 
 # Authenticate with VK API
+# @description Authenticate with the VK API using access token to enable VK Music access
+# @description Авторизоваться в VK API по токену доступа для работы с VK Music
 vkmusic::auth() {
     local access_token="${1:-}"
     local user_id="${2:-}"
@@ -150,6 +158,8 @@ vkmusic::auth() {
 }
 
 # Search for audio tracks
+# @description Search for audio tracks by artist or song name query, store and display results
+# @description Искать аудиозаписи/треки по запросу (исполнитель или название песни)
 vkmusic::search() {
     local query="${1:-}"
     local count="${2:-10}"
@@ -196,6 +206,8 @@ vkmusic::search() {
 }
 
 # Display search results
+# @description Display VK Music search results with artist, title, duration and audio ID
+# @description Показать результаты поиска музыки с исполнителем, названием и ID аудио
 vkmusic::display_search_results() {
     
     if [[ ${#VK_MUSIC_LAST_SEARCH_RESULTS[@]} -eq 0 ]]; then
@@ -232,6 +244,8 @@ vkmusic::display_search_results() {
 }
 
 # Get audio by ID
+# @description Get a single audio track by owner ID and audio ID from VK
+# @description Получить аудиотрек по ID владельца и ID аудио из VK
 vkmusic::get_audio() {
     local owner_id="${1:-}"
     local audio_id="${2:-}"
@@ -251,6 +265,8 @@ vkmusic::get_audio() {
 }
 
 # Get user's audio
+# @description Get a user's audio tracks from their VK page with pagination
+# @description Получить аудиозаписи пользователя из его страницы VK с пагинацией
 vkmusic::get_user_audio() {
     local user_id="${1:-}"
     local count="${2:-100}"
@@ -271,6 +287,8 @@ vkmusic::get_user_audio() {
 }
 
 # Get recommendations
+# @description Get music recommendations from VK based on user taste or trending audio
+# @description Получить рекомендации музыки от VK на основе вкуса пользователя
 vkmusic::get_recommendations() {
     local user_id="${1:-}"
     local count="${2:-20}"
@@ -289,6 +307,8 @@ vkmusic::get_recommendations() {
 }
 
 # Get popular tracks
+# @description Get popular tracks from VK, optionally filtered by genre ID
+# @description Получить популярные треки из VK, опционально по жанру
 vkmusic::get_popular() {
     local genre_id="${1:-}"
     local count="${2:-20}"
@@ -307,6 +327,8 @@ vkmusic::get_popular() {
 }
 
 # Get audio genres
+# @description Get the list of available VK audio genres and categories
+# @description Получить список доступных жанров и категорий аудио VK
 vkmusic::get_genres() {
     
     log::info "Getting audio genres..."
@@ -318,6 +340,8 @@ vkmusic::get_genres() {
 }
 
 # Add audio to user page
+# @description Add an audio track to the current user's VK page
+# @description Добавить аудиозапись на страницу пользователя VK
 vkmusic::add_audio() {
     local owner_id="${1:-}"
     local audio_id="${2:-}"
@@ -338,6 +362,8 @@ vkmusic::add_audio() {
 }
 
 # Delete audio
+# @description Delete an audio track from the user's VK music library
+# @description Удалить аудиозапись из музыкальной библиотеки пользователя VK
 vkmusic::delete_audio() {
     local owner_id="${1:-}"
     local audio_id="${2:-}"
@@ -358,6 +384,8 @@ vkmusic::delete_audio() {
 }
 
 # Create playlist
+# @description Create a new VK Music playlist with a title and optional description
+# @description Создать новый плейлист VK Music с названием и описанием
 vkmusic::create_playlist() {
     local title="${1:-}"
     local description="${2:-}"
@@ -382,6 +410,8 @@ vkmusic::create_playlist() {
 }
 
 # Get user's playlists
+# @description Get a user's playlists from VK with pagination support
+# @description Получить плейлисты пользователя из VK с поддержкой пагинации
 vkmusic::get_playlists() {
     local user_id="${1:-}"
     local count="${2:-50}"
@@ -401,6 +431,8 @@ vkmusic::get_playlists() {
 }
 
 # Download audio file
+# @description Download a VK Music audio file, add ID3 metadata and save as mp3
+# @description Скачать музыку/аудиофайл из VK Music, добавить метаданные и сохранить mp3
 vkmusic::download() {
     local audio_info="${1:-}"
     local output_dir="${2:-${VK_MUSIC_DOWNLOAD_DIR}}"
@@ -483,6 +515,8 @@ vkmusic::download() {
 }
 
 # Add metadata to audio file
+# @description Add artist and title ID3 metadata to a downloaded audio file
+# @description Добавить метаданные ID3 (исполнитель и название) в аудиофайл
 vkmusic::add_metadata() {
     local file="${1:-}"
     local artist="${2:-}"
@@ -507,6 +541,8 @@ vkmusic::add_metadata() {
 }
 
 # Batch download
+# @description Download multiple audio tracks from a list in batch mode
+# @description Скачать несколько аудиозаписей из списка пакетно
 vkmusic::batch_download() {
     local audio_list="${1:-}"
     local output_dir="${2:-${VK_MUSIC_DOWNLOAD_DIR}}"
@@ -536,6 +572,8 @@ vkmusic::batch_download() {
 }
 
 # Search and download
+# @description Search for audio tracks by query and automatically download them
+# @description Искать треки по запросу и автоматически скачать найденную музыку
 vkmusic::search_and_download() {
     local query="${1:-}"
     local count="${2:-5}"
@@ -567,6 +605,8 @@ vkmusic::search_and_download() {
 }
 
 # Get lyrics
+# @description Get the lyrics/text of a VK Music audio track by owner and audio ID
+# @description Получить текст/слова песни аудиозаписи VK Music по ID
 vkmusic::get_lyrics() {
     local owner_id="${1:-}"
     local audio_id="${2:-}"
@@ -586,6 +626,8 @@ vkmusic::get_lyrics() {
 }
 
 # Create playlist file
+# @description Create a playlist file in m3u or pls format from a list of audio IDs
+# @description Создать файл плейлиста в формате m3u или pls из списка аудио
 vkmusic::create_playlist_file() {
     local playlist_name="${1:-}"
     local audio_ids="${2:-}"
@@ -635,6 +677,8 @@ vkmusic::create_playlist_file() {
 }
 
 # Get audio count
+# @description Get the total number of audio tracks for a VK user
+# @description Получить общее количество аудиозаписей у пользователя VK
 vkmusic::get_audio_count() {
     local user_id="${1:-}"
     
@@ -651,6 +695,8 @@ vkmusic::get_audio_count() {
 }
 
 # Get audio upload server
+# @description Get the VK server URL for uploading audio files
+# @description Получить URL сервера VK для загрузки аудиофайлов
 vkmusic::get_upload_server() {
     
     log::info "Getting audio upload server..."
@@ -662,6 +708,8 @@ vkmusic::get_upload_server() {
 }
 
 # Upload audio file
+# @description Upload an audio file to VK Music with optional title and artist
+# @description Загрузить аудиофайл в VK Music с указанием названия и исполнителя
 vkmusic::upload_audio() {
     local file_path="${1:-}"
     local title="${2:-}"
@@ -714,6 +762,8 @@ vkmusic::upload_audio() {
 }
 
 # Clear cache
+# @description Clear the local VK Music cache directory of temporary files
+# @description Очистить локальный кэш VK Music от временных файлов
 vkmusic::clear_cache() {
     
     log::info "Clearing VK Music cache..."
@@ -724,6 +774,8 @@ vkmusic::clear_cache() {
 }
 
 # Get statistics
+# @description Get VK Music statistics like downloaded tracks, playlists and cache size
+# @description Получить статистику VK Music: скачанные треки, плейлисты, размер кэша
 vkmusic::get_stats() {
     
     local download_count
@@ -747,6 +799,8 @@ EOF
 }
 
 # Module info
+# @description Show module info, available functions and configuration for VK Music
+# @description Показать информацию о модуле, доступные функции и конфигурацию VK Music
 vkmusic::info() {
     cat << EOF
 VK Music Integration Module v1.0.0

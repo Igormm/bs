@@ -234,10 +234,12 @@ system::services::list() {
     fi
 }
 
-## @brief Перезапускает системный сервис
-## @param $1 service_name - Имя сервиса (например, "nginx", "sshd")
-## @return 0=успех, 2=неверные аргументы, 4=сервис не найден, 8=ОС не поддерживается
-## @example service::restart "nginx"
+# @description Restart a system service based on the detected distribution (systemd, service, init.d).
+# @description Перезапустить системный сервис с учётом дистрибутива (systemd, service, init.d).
+# @brief Перезапускает системный сервис
+# @param $1 service_name - Имя сервиса (например, "nginx", "sshd")
+# @return 0=успех, 2=неверные аргументы, 4=сервис не найден, 8=ОС не поддерживается
+# @example service::restart "nginx"
 function service::restart() {
     local -r FN="${FUNCNAME[0]}"
 

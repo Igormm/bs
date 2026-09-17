@@ -75,6 +75,7 @@ if ! utils::has function_exists; then
 fi
 
 # Helper function for error handling (since errorhandler::throw may not be available)
+# @description Log and return a VK API error / вывести в лог и вернуть ошибку VK API
 _vkapi_error() {
     local message="${1}"
     local exit_code="${2:-1}"
@@ -87,6 +88,7 @@ _vkapi_error() {
 }
 
 # Module initialization
+# @description Initialize the VK API module with app credentials / инициализировать модуль VK API и указать данные приложения
 vkapi::init() {
     local app_id="${1:-}"
     local app_secret="${2:-}"
@@ -110,6 +112,7 @@ vkapi::init() {
 }
 
 # Check VK API dependencies
+# @description Check and install required VK API tools / проверить и установить зависимости для VK API
 vkapi::check_dependencies() {
     local missing_deps=()
     
@@ -128,6 +131,7 @@ vkapi::check_dependencies() {
 }
 
 # Install missing dependencies
+# @description Install missing VK API dependencies by platform / установить недостающие зависимости VK API по платформе
 vkapi::install_dependencies() {
     local deps=("$@")
     
@@ -174,6 +178,7 @@ vkapi::install_dependencies() {
 }
 
 # Set access token
+# @description Set the VK API access token for authentication / задать токен доступа для аутентификации в VK API
 vkapi::auth() {
     local access_token="${1:-}"
     
@@ -187,6 +192,7 @@ vkapi::auth() {
 }
 
 # Rate limiting delay
+# @description Delay to respect the VK API rate limit / выдержать паузу для соблюдения лимита запросов VK API
 vkapi::rate_limit_delay() {
     local current_time
     current_time=$(utils::now_float)
@@ -204,6 +210,7 @@ vkapi::rate_limit_delay() {
 }
 
 # Generate cache key for request
+# @description Generate a cache key for a VK API request / сгенерировать ключ кэша для запроса к VK API
 vkapi::get_cache_key() {
     local method="${1:-}"
     local params="${2:-}"
@@ -212,6 +219,7 @@ vkapi::get_cache_key() {
 }
 
 # Check if cached response exists and is valid
+# @description Get a valid cached VK API response / получить корректный ответ из кэша VK API
 vkapi::get_cached_response() {
     local cache_key="${1:-}"
     
@@ -233,6 +241,7 @@ vkapi::get_cached_response() {
 }
 
 # Cache API response
+# @description Save a VK API response to cache / сохранить ответ VK API в кэш
 vkapi::cache_response() {
     local cache_key="${1:-}"
     local response="${2:-}"
@@ -242,6 +251,7 @@ vkapi::cache_response() {
 }
 
 # Make API request
+# @description Call a VK API method with retries, rate limiting and caching / вызвать метод VK API с повторами, ограничением частоты и кэшированием
 vkapi::api_request() {
     local method="${1:-}"
     local params="${2:-}"
@@ -328,6 +338,7 @@ vkapi::api_request() {
 }
 
 # Parse API response
+# @description Parse a VK API JSON response and extract data / разобрать JSON-ответ VK API и извлечь данные
 vkapi::parse_response() {
     local response="${1:-}"
     
@@ -352,6 +363,7 @@ vkapi::parse_response() {
 }
 
 # Generic API method caller
+# @description Generic caller for any VK API method / универсальный вызов любого метода VK API
 vkapi::api_call() {
     local method="${1:-}"
     local params="${2:-}"
@@ -366,12 +378,14 @@ vkapi::api_call() {
 }
 
 # User management methods
+# @description Get VK user info by users.get / получить информацию о пользователе через users.get
 vkapi::users.get() {
     local params="${1:-}"
     
     vkapi::api_call "users.get" "${params}"
 }
 
+# @description Search for VK users by users.search / поиск пользователей VK через users.search
 vkapi::users.search() {
     local params="${1:-}"
     
@@ -379,12 +393,14 @@ vkapi::users.search() {
 }
 
 # Friends methods
+# @description Get a VK user's friends list / получить список друзей пользователя VK
 vkapi::friends.get() {
     local params="${1:-}"
     
     vkapi::api_call "friends.get" "${params}"
 }
 
+# @description Get a VK user's online friends / получить друзей пользователя VK онлайн
 vkapi::friends.getOnline() {
     local params="${1:-}"
     
@@ -392,12 +408,14 @@ vkapi::friends.getOnline() {
 }
 
 # Groups methods
+# @description Get a VK user's groups / получить группы пользователя VK
 vkapi::groups.get() {
     local params="${1:-}"
     
     vkapi::api_call "groups.get" "${params}"
 }
 
+# @description Get VK group information by ID / получить информацию о группе VK по ID
 vkapi::groups.getById() {
     local params="${1:-}"
     
@@ -405,12 +423,14 @@ vkapi::groups.getById() {
 }
 
 # Wall methods
+# @description Get VK wall posts / получить записи со стены VK
 vkapi::wall.get() {
     local params="${1:-}"
     
     vkapi::api_call "wall.get" "${params}"
 }
 
+# @description Post a message to a VK wall / опубликовать запись на стене VK
 vkapi::wall.post() {
     local params="${1:-}"
     
@@ -418,18 +438,21 @@ vkapi::wall.post() {
 }
 
 # Messages methods
+# @description Get VK message conversations / получить список бесед сообщений VK
 vkapi::messages.getConversations() {
     local params="${1:-}"
     
     vkapi::api_call "messages.getConversations" "${params}"
 }
 
+# @description Get VK message history for a peer / получить историю сообщений VK для собеседника
 vkapi::messages.getHistory() {
     local params="${1:-}"
     
     vkapi::api_call "messages.getHistory" "${params}"
 }
 
+# @description Send a message via VK messages.send / отправить сообщение через messages.send
 vkapi::messages.send() {
     local params="${1:-}"
     
@@ -437,12 +460,14 @@ vkapi::messages.send() {
 }
 
 # Photos methods
+# @description Get VK user photos / получить фотографии пользователя VK
 vkapi::photos.get() {
     local params="${1:-}"
     
     vkapi::api_call "photos.get" "${params}"
 }
 
+# @description Get the VK wall photo upload server / получить сервер загрузки фото на стену VK
 vkapi::photos.getWallUploadServer() {
     local params="${1:-}"
     
@@ -450,12 +475,14 @@ vkapi::photos.getWallUploadServer() {
 }
 
 # Status methods
+# @description Get a VK user's status / получить статус пользователя VK
 vkapi::status.get() {
     local params="${1:-}"
     
     vkapi::api_call "status.get" "${params}"
 }
 
+# @description Set a VK user's status text / установить текст статуса пользователя VK
 vkapi::status.set() {
     local params="${1:-}"
     
@@ -463,6 +490,7 @@ vkapi::status.set() {
 }
 
 # Board methods (for groups)
+# @description Get VK group board topics / получить темы обсуждений группы VK
 vkapi::board.getTopics() {
     local params="${1:-}"
     
@@ -470,6 +498,7 @@ vkapi::board.getTopics() {
 }
 
 # Market methods
+# @description Get VK market items / получить товары из магазина VK
 vkapi::market.get() {
     local params="${1:-}"
     
@@ -477,6 +506,7 @@ vkapi::market.get() {
 }
 
 # Polls methods
+# @description Get a VK poll by ID / получить опрос VK по ID
 vkapi::polls.getById() {
     local params="${1:-}"
     
@@ -484,6 +514,7 @@ vkapi::polls.getById() {
 }
 
 # Secure methods for app authentication
+# @description Check a VK access token via secure.checkToken / проверить токен доступа VK через secure.checkToken
 vkapi::secure.checkToken() {
     local token="${1:-}"
     local ip="${2:-}"
@@ -497,12 +528,14 @@ vkapi::secure.checkToken() {
 }
 
 # Account methods
+# @description Get VK account info / получить информацию об аккаунте VK
 vkapi::account.getInfo() {
     local params="${1:-}"
     
     vkapi::api_call "account.getInfo" "${params}"
 }
 
+# @description Set the VK account as online / отметить аккаунт VK как находящийся в сети
 vkapi::account.setOnline() {
     local params="${1:-}"
     
@@ -510,12 +543,14 @@ vkapi::account.setOnline() {
 }
 
 # Database methods
+# @description Get a list of countries from VK database / получить список стран из базы данных VK
 vkapi::database.getCountries() {
     local params="${1:-}"
     
     vkapi::api_call "database.getCountries" "${params}" "true"  # Cache this
 }
 
+# @description Get a list of cities from VK database / получить список городов из базы данных VK
 vkapi::database.getCities() {
     local params="${1:-}"
     
@@ -523,6 +558,7 @@ vkapi::database.getCities() {
 }
 
 # Execute method (for generic API calls)
+# @description Execute VKScript code via VK API execute / выполнить VKScript код через execute
 vkapi::execute() {
     local code="${1:-}"
     
@@ -536,12 +572,14 @@ vkapi::execute() {
 
 # Utility functions for common operations
 # Get current user's profile
+# @description Get the current user's VK profile / получить профиль текущего пользователя VK
 vkapi::get_my_profile() {
     
     vkapi::users.get "fields=photo_200,status,last_seen,online"
 }
 
 # Get user profile by ID
+# @description Get a VK user profile by ID / получить профиль пользователя VK по ID
 vkapi::get_user_profile() {
     local user_id="${1:-}"
     
@@ -554,6 +592,7 @@ vkapi::get_user_profile() {
 }
 
 # Search for users
+# @description Search for VK users by query / найти пользователей VK по запросу
 vkapi::search_users() {
     local query="${1:-}"
     local count="${2:-10}"
@@ -567,6 +606,7 @@ vkapi::search_users() {
 }
 
 # Get user's groups
+# @description Get the groups of a VK user / получить группы пользователя VK
 vkapi::get_user_groups() {
     local user_id="${1:-}"
     local extended="${2:-1}"
@@ -580,6 +620,7 @@ vkapi::get_user_groups() {
 }
 
 # Get group information
+# @description Get information about a VK group by ID / получить информацию о группе VK по ID
 vkapi::get_group_info() {
     local group_id="${1:-}"
     
@@ -592,6 +633,7 @@ vkapi::get_group_info() {
 }
 
 # Get wall posts
+# @description Get VK wall posts with count and offset / получить записи со стены VK с количеством и смещением
 vkapi::get_wall_posts() {
     local owner_id="${1:-}"
     local count="${2:-10}"
@@ -606,6 +648,7 @@ vkapi::get_wall_posts() {
 }
 
 # Post to wall
+# @description Post a message to a VK wall / опубликовать сообщение на стене VK
 vkapi::post_to_wall() {
     local message="${1:-}"
     local owner_id="${2:-}"
@@ -624,6 +667,7 @@ vkapi::post_to_wall() {
 }
 
 # Send message
+# @description Send a message to a VK user / отправить сообщение пользователю VK
 vkapi::send_message() {
     local user_id="${1:-}"
     local message="${2:-}"
@@ -638,6 +682,7 @@ vkapi::send_message() {
 }
 
 # Get conversations
+# @description Get VK message conversations / получить список бесед сообщений VK
 vkapi::get_conversations() {
     local count="${1:-20}"
     local offset="${2:-0}"
@@ -646,6 +691,7 @@ vkapi::get_conversations() {
 }
 
 # Get message history
+# @description Get VK message history for a peer / получить историю сообщений VK для собеседника
 vkapi::get_message_history() {
     local peer_id="${1:-}"
     local count="${2:-20}"
@@ -660,6 +706,7 @@ vkapi::get_message_history() {
 }
 
 # Get online friends
+# @description Get a VK user's online friends / получить друзей пользователя VK онлайн
 vkapi::get_online_friends() {
     local online_mobile="${1:-1}"
     local order="${2:-random}"
@@ -668,6 +715,7 @@ vkapi::get_online_friends() {
 }
 
 # Set status
+# @description Set a VK user's status text / установить текст статуса пользователя VK
 vkapi::set_status() {
     local text="${1:-}"
     
@@ -680,6 +728,7 @@ vkapi::set_status() {
 }
 
 # Get current status
+# @description Get a VK user's current status / получить текущий статус пользователя VK
 vkapi::get_status() {
     local user_id="${1:-}"
     
@@ -692,6 +741,7 @@ vkapi::get_status() {
 }
 
 # Get countries list (cached)
+# @description Get a cached list of countries from VK / получить кэшированный список стран из VK
 vkapi::get_countries() {
     local need_all="${1:-1}"
     local count="${2:-1000}"
@@ -700,6 +750,7 @@ vkapi::get_countries() {
 }
 
 # Clear cache
+# @description Clear the VK API response cache / очистить кэш ответов VK API
 vkapi::clear_cache() {
     
     log::info "Clearing VK API cache..."
@@ -710,6 +761,7 @@ vkapi::clear_cache() {
 }
 
 # Get API usage statistics
+# @description Get VK API usage statistics / получить статистику использования VK API
 vkapi::get_stats() {
     
     local cache_count
@@ -727,6 +779,7 @@ EOF
 }
 
 # Module info
+# @description Print VK API module info and available methods / показать информацию о модуле VK API и доступные методы
 vkapi::info() {
     cat << EOF
 VK API Integration Module v1.0.0

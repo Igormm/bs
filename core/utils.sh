@@ -11,6 +11,8 @@ bs::guard "UTILS" || return 0
 
 
 # Устанавливает строгий режим.
+# @description Enable strict bash mode (set -euo pipefail).
+# @description Включить строгий режим bash (set -euo pipefail).
 # @function utils::strict
 utils::strict() {
   set -euo pipefail
@@ -25,6 +27,8 @@ utils::strict() {
 #   readonly __FOO_SOURCED=1
 # @function utils::guard
 # @deprecated Используйте bs::guard из core/prereq.sh — она и проверяет, и ставит метку
+# @description Check if module already loaded / guard against double sourcing.
+# @description Проверить, загружен ли уже модуль, идиома защиты от повторного включения.
 # @param $1 {string} Уникальное имя модуля (без __ и _SOURCED)
 # @returns 0  модуль уже загружался
 # @returns 1  модуль ещё не загружался
@@ -35,6 +39,8 @@ utils::guard() {
 
 # Проверяет наличие команды в PATH.
 # Заменяет идиому: command -v foo >/dev/null 2>&1
+# @description Check if command exists in PATH.
+# @description Проверить наличие команды в PATH.
 # @function utils::has
 # @param $1 {string} Имя команды
 # @returns 0  команда доступна
@@ -48,6 +54,8 @@ utils::has() {
 
 # Выполняет команду, полностью подавляя вывод. Код возврата сохраняется.
 # Заменяет идиому: cmd >/dev/null 2>&1
+# @description Run command suppressing all output (stdout and stderr).
+# @description Выполнить команду, подавляя весь вывод (stdout и stderr).
 # @function utils::quiet
 # @param $@ {string} Команда и её аргументы
 # @returns код возврата команды
@@ -59,6 +67,8 @@ utils::quiet() {
 
 # Выполняет команду, подавляя только stderr. Код возврата сохраняется.
 # Заменяет идиому: cmd 2>/dev/null
+# @description Run command suppressing stderr only.
+# @description Выполнить команду, подавляя только stderr.
 # @function utils::quiet_err
 # @param $@ {string} Команда и её аргументы
 # @returns код возврата команды
@@ -70,6 +80,8 @@ utils::quiet_err() {
 # Явная замена идиомы: cmd >/dev/null 2>&1 || true
 # Использовать только там, где неудача команды действительно не важна.
 # @function utils::ignore
+# @description Run command ignoring result (always succeeds).
+# @description Выполнить команду, игнорируя результат (всегда успех).
 # @param $@ {string} Команда и её аргументы
 # @returns всегда 0
 utils::ignore() {
@@ -80,6 +92,8 @@ utils::ignore() {
 # Явная замена идиомы: cmd 2>/dev/null || true (и utils::quiet_err cmd || true)
 # Использовать для best-effort операций, где неудача допустима.
 # @function utils::attempt
+# @description Best-effort command, ignore failure (always succeeds).
+# @description Выполнить команду best-effort, игнорируя сбой (всегда успех).
 # @param $@ {string} Команда и её аргументы
 # @returns всегда 0
 utils::attempt() {
@@ -89,6 +103,8 @@ utils::attempt() {
 # Текущее время в секундах (epoch).
 # Заменяет идиому: date +%s
 # @function utils::now_s
+# @description Current unix time in seconds (epoch).
+# @description Текущее время в секундах (epoch).
 # @stdout секунды с начала эпохи
 utils::now_s() {
   date +%s
@@ -97,6 +113,8 @@ utils::now_s() {
 # Текущее время в миллисекундах (epoch).
 # Заменяет идиому: date +%s%3N
 # @function utils::now_ms
+# @description Current unix time in milliseconds (epoch).
+# @description Текущее время в миллисекундах (epoch).
 # @stdout миллисекунды с начала эпохи
 utils::now_ms() {
   date +%s%3N
@@ -105,6 +123,8 @@ utils::now_ms() {
 # Текущее время в секундах с дробной частью (для интервалов через bc/awk).
 # Заменяет идиому: date +%s.%N
 # @function utils::now_float
+# @description Current unix time in seconds with fractional part (epoch).
+# @description Текущее время в секундах с дробной частью (epoch).
 # @stdout секунды с наносекундной дробной частью
 utils::now_float() {
   date +%s.%N
@@ -113,6 +133,8 @@ utils::now_float() {
 # Метка времени для имён файлов: YYYYMMDD_HHMMSS.
 # Заменяет идиому: date +%Y%m%d_%H%M%S
 # @function utils::stamp
+# @description Timestamp for filenames: YYYYMMDD_HHMMSS.
+# @description Метка времени для имён файлов: YYYYMMDD_HHMMSS.
 # @stdout timestamp, безопасный для имён файлов
 utils::stamp() {
   date +%Y%m%d_%H%M%S
@@ -121,6 +143,8 @@ utils::stamp() {
 # Человекочитаемая метка времени для логов: "YYYY-MM-DD HH:MM:SS".
 # Заменяет идиому: date '+%Y-%m-%d %H:%M:%S'
 # @function utils::log_stamp
+# @description Human-readable timestamp for logs: "YYYY-MM-DD HH:MM:SS".
+# @description Человекочитаемая метка времени для логов: "YYYY-MM-DD HH:MM:SS".
 # @stdout timestamp для логов
 utils::log_stamp() {
   date '+%Y-%m-%d %H:%M:%S'
@@ -129,6 +153,8 @@ utils::log_stamp() {
 # Разбивает строку на массив по заданному разделителю.
 # Безопасна при любом IFS вызывающего: устанавливает локальный IFS внутри функции.
 # @function utils::split
+# @description Split string into array by delimiter.
+# @description Разбить строку на массив по разделителю.
 # @param $1 {string} Имя выходного массива
 # @param $2 {string} Исходная строка
 # @param $3 {string} Разделитель (по умолчанию пробел)
@@ -163,6 +189,8 @@ utils::split() {
 # Load target file and confirm required function exists.
 #
 # @function utils::ensure_source
+# @description Load file and verify required function exists.
+# @description Загрузить файл и проверить, что требуемая функция существует.
 # @param $1 {string} Absolute or relative path to file (must exist)
 # @param $2 {string} Function name to check after sourcing
 # @returns 0  If file loaded and function present
@@ -197,6 +225,8 @@ utils::ensure_source() {
 }
 
 # Function to check if current shell is at least the required version
+# @description Verify shell meets version requirement.
+# @description Проверить, что версия оболочки соответствует требованиям.
 utils::ensure_shell_version() {
     local -r required_version="${1:-4}"  # Default to version 4 if not specified
 
@@ -230,6 +260,8 @@ utils::ensure_shell_version() {
 }
 
 ## @brief Получение корневой директории фреймворка
+# @description Detect framework root directory regardless of invocation.
+# @description Определить корневую директорию фреймворка независимо от способа вызова.
 ## @description Определяет путь независимо от способа вызова
 ## @global Устанавливает FRAMEWORK_ROOT
 utils::detect_root() {

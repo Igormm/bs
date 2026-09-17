@@ -50,6 +50,7 @@ readonly WIREGUARD_DEFAULT_PORT=51820
 readonly WIREGUARD_DEFAULT_KEEPALIVE=25
 
 # Module initialization
+# @description Initialize WireGuard module, check dependencies and create directories. Инициализировать модуль WireGuard, проверить зависимости и создать каталоги.
 wireguard::init() {
     log::info "Initializing WireGuard module..."
     
@@ -69,6 +70,7 @@ wireguard::init() {
 }
 
 # Check WireGuard dependencies
+# @description Check WireGuard dependencies and install missing tools. Проверить зависимости WireGuard и установить недостающие инструменты.
 wireguard::check_dependencies() {
     local missing_deps=()
     
@@ -87,6 +89,7 @@ wireguard::check_dependencies() {
 }
 
 # Install missing dependencies
+# @description Install missing WireGuard dependencies (wireguard-tools, openssl, iproute2) per platform. Установить недостающие зависимости WireGuard (wireguard-tools, openssl, iproute2) в зависимости от платформы.
 wireguard::install_dependencies() {
     local deps=("$@")
     
@@ -120,6 +123,7 @@ wireguard::install_dependencies() {
 }
 
 # Create necessary directories
+# @description Create WireGuard config, key and backup directories with proper permissions. Создать каталоги конфигурации, ключей и резервных копий WireGuard с правильными правами.
 wireguard::create_directories() {
     
     log::debug "Creating WireGuard directories..."
@@ -148,6 +152,7 @@ wireguard::create_directories() {
 }
 
 # Generate WireGuard key pair
+# @description Generate WireGuard private and public key pair for an interface. Сгенерировать пару ключей WireGuard (приватный и публичный) для интерфейса.
 wireguard::generate_keypair() {
     local interface="${1:-}"
     
@@ -183,6 +188,7 @@ wireguard::generate_keypair() {
 }
 
 # Create WireGuard interface configuration
+# @description Create WireGuard interface config file with address, port, DNS and NAT/firewall rules. Создать конфигурацию интерфейса WireGuard с адресом, портом, DNS и правилами NAT/фаервола.
 wireguard::create_interface() {
     local interface="${1:-}"
     local address="${2:-}"
@@ -246,6 +252,7 @@ EOF
 }
 
 # Add peer to interface
+# @description Add a peer to a WireGuard interface with public key, allowed IPs, endpoint and keepalive. Добавить пир к интерфейсу WireGuard с публичным ключом, разрешёнными IP, endpoint и keepalive.
 wireguard::add_peer() {
     local interface="${1:-}"
     local peer_pubkey="${2:-}"
@@ -293,6 +300,7 @@ EOF
 }
 
 # Remove peer from interface
+# @description Remove a peer by public key from a WireGuard interface config. Удалить пир по публичному ключу из конфигурации интерфейса WireGuard.
 wireguard::remove_peer() {
     local interface="${1:-}"
     local peer_pubkey="${2:-}"
@@ -333,6 +341,7 @@ wireguard::remove_peer() {
 }
 
 # Start WireGuard interface
+# @description Start a WireGuard interface / bring up VPN using wg-quick. Запустить интерфейс WireGuard / поднять VPN с помощью wg-quick.
 wireguard::start_interface() {
     local interface="${1:-}"
     
@@ -359,6 +368,7 @@ wireguard::start_interface() {
 }
 
 # Stop WireGuard interface
+# @description Stop a running WireGuard interface / take down VPN using wg-quick. Остановить работающий интерфейс WireGuard / опустить VPN с помощью wg-quick.
 wireguard::stop_interface() {
     local interface="${1:-}"
     
@@ -385,6 +395,7 @@ wireguard::stop_interface() {
 }
 
 # Get interface status
+# @description Get WireGuard interface status / check if VPN interface is running. Получить статус интерфейса WireGuard / проверить, работает ли VPN-интерфейс.
 wireguard::get_interface_status() {
     local interface="${1:-}"
     
@@ -406,6 +417,7 @@ wireguard::get_interface_status() {
 }
 
 # List all WireGuard interfaces
+# @description List all WireGuard interfaces. Список всех интерфейсов WireGuard.
 wireguard::list_interfaces() {
     
     log::debug "Listing all WireGuard interfaces..."
@@ -420,6 +432,7 @@ wireguard::list_interfaces() {
 }
 
 # Backup WireGuard configuration
+# @description Backup WireGuard interface config and keys. Создать резервную копию конфигурации и ключей интерфейса WireGuard.
 wireguard::backup_config() {
     local interface="${1:-}"
     local backup_name="${2:-backup_$(utils::stamp)}"
@@ -462,6 +475,7 @@ wireguard::backup_config() {
 }
 
 # Restore WireGuard configuration
+# @description Restore WireGuard interface configuration from a backup file. Восстановить конфигурацию интерфейса WireGuard из резервной копии.
 wireguard::restore_config() {
     local interface="${1:-}"
     local backup_file="${2:-}"
@@ -493,6 +507,7 @@ wireguard::restore_config() {
 }
 
 # Generate QR code for mobile clients (requires qrencode)
+# @description Generate a QR code for mobile WireGuard clients from config. Сгенерировать QR-код для мобильных клиентов WireGuard из конфигурации.
 wireguard::generate_qr() {
     local interface="${1:-}"
     
@@ -533,6 +548,7 @@ wireguard::generate_qr() {
 }
 
 # Enable automatic startup
+# @description Enable WireGuard interface autostart on boot via systemctl. Включить автозапуск интерфейса WireGuard при загрузке через systemctl.
 wireguard::enable_autostart() {
     local interface="${1:-}"
     
@@ -561,6 +577,7 @@ wireguard::enable_autostart() {
 }
 
 # Disable automatic startup
+# @description Disable WireGuard interface autostart on boot via systemctl. Отключить автозапуск интерфейса WireGuard при загрузке через systemctl.
 wireguard::disable_autostart() {
     local interface="${1:-}"
     
@@ -589,6 +606,7 @@ wireguard::disable_autostart() {
 }
 
 # Get public IP address for endpoint
+# @description Get the public IP address of the server for the WireGuard endpoint. Получить публичный IP-адрес сервера для endpoint WireGuard.
 wireguard::get_public_ip() {
     
     log::debug "Getting public IP address..."
@@ -615,6 +633,7 @@ wireguard::get_public_ip() {
 }
 
 # Create client configuration for road warrior setup
+# @description Create a WireGuard client config for road warrior / mobile setup with its own key pair. Создать клиентскую конфигурацию WireGuard для road warrior / мобильного подключения с собственными ключами.
 wireguard::create_client_config() {
     local client_name="${1:-}"
     local server_pubkey="${2:-}"
@@ -673,6 +692,7 @@ EOF
 }
 
 # Module info
+# @description Show module info and list available WireGuard functions. Показать информацию о модуле и список доступных функций WireGuard.
 wireguard::info() {
     cat << EOF
 WireGuard Integration Module v1.0.0

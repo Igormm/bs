@@ -62,6 +62,8 @@ SSH_NETWORK_SSH_KEY_PATH="${HOME}/.ssh/id_rsa_bosa"
 SSH_NETWORK_SSH_PUBLIC_KEY_PATH="${SSH_NETWORK_SSH_KEY_PATH}.pub"
 
 # Module initialization
+# @description Initialize the SSH Network module (init SSH network, setup config, keys, подключиться по SSH)
+# @description Инициализировать модуль SSH-сети (init, настройка конфигурации, ключей)
 sshnetwork::init() {
     
     log::info "Initializing SSH Network module..."
@@ -96,6 +98,8 @@ sshnetwork::init() {
 }
 
 # Check SSH Network dependencies
+# @description Check and install SSH Network dependencies (ssh, scp, rsync, nmap, ping)
+# @description Проверить и установить зависимости SSH-сети (ssh, scp, rsync, nmap, ping)
 sshnetwork::check_dependencies() {
     local missing_deps=()
     
@@ -114,6 +118,8 @@ sshnetwork::check_dependencies() {
 }
 
 # Install missing dependencies
+# @description Install missing SSH Network dependencies per platform (apt, dnf, brew)
+# @description Установить недостающие зависимости SSH-сети по платформе (apt, dnf, brew)
 sshnetwork::install_dependencies() {
     local deps=("$@")
     
@@ -139,6 +145,8 @@ sshnetwork::install_dependencies() {
 }
 
 # Generate SSH keys for BS
+# @description Generate SSH keys for BS (ssh-keygen, SSH-ключ, generate SSH key pair)
+# @description Сгенерировать SSH-ключи для BS (ssh-keygen, SSH-ключ, пара ключей)
 sshnetwork::generate_ssh_keys() {
     
     if ! is::file "${SSH_NETWORK_SSH_KEY_PATH}"; then
@@ -159,6 +167,8 @@ sshnetwork::generate_ssh_keys() {
 }
 
 # Discover SSH-enabled devices in network
+# @description Discover SSH devices in network (scan network, nmap, сканировать сеть, find hosts)
+# @description Обнаружить SSH-устройства в сети (сканировать сеть, nmap, найти хосты)
 sshnetwork::discover_devices() {
     local network_range="${1:-}"
     local port="${2:-${SSH_NETWORK_DEFAULT_PORT}}"
@@ -211,6 +221,8 @@ sshnetwork::discover_devices() {
 }
 
 # Get local network range
+# @description Get local network subnet range (local network, detect subnet, локальная сеть)
+# @description Получить диапазон локальной сети (локальная сеть, подсеть)
 sshnetwork::get_local_network() {
     
     # Try to get network information using ip command
@@ -249,6 +261,8 @@ sshnetwork::get_local_network() {
 }
 
 # Test SSH connection
+# @description Test SSH connection to host (connect SSH, check connectivity, проверить подключение)
+# @description Проверить SSH-подключение к хосту (подключиться по SSH, проверить связь)
 sshnetwork::test_connection() {
     local host="${1:-}"
     local port="${2:-${SSH_NETWORK_DEFAULT_PORT}}"
@@ -273,6 +287,8 @@ sshnetwork::test_connection() {
 }
 
 # Save discovered devices to file
+# @description Save discovered SSH devices to known hosts file (known hosts, сохранить устройства)
+# @description Сохранить обнаруженные SSH-устройства в файл known hosts
 sshnetwork::save_discovered_devices() {
     
     if [[ ${#SSH_NETWORK_DISCOVERED_DEVICES[@]} -eq 0 ]]; then
@@ -292,6 +308,8 @@ sshnetwork::save_discovered_devices() {
 }
 
 # Load known devices from file
+# @description Load known SSH devices from file (known hosts, load devices, загрузить устройства)
+# @description Загрузить известные SSH-устройства из файла (known hosts)
 sshnetwork::load_known_devices() {
     
     if ! is::file "${SSH_NETWORK_KNOWN_HOSTS_FILE}"; then
@@ -311,6 +329,8 @@ sshnetwork::load_known_devices() {
 }
 
 # Execute remote command
+# @description Execute command on remote host over SSH (run command remotely, выполнить команду на удалённом хосте)
+# @description Выполнить команду на удалённом хосте по SSH (удалённая команда)
 sshnetwork::execute_remote() {
     local host="${1:-}"
     local command="${2:-}"
@@ -348,6 +368,8 @@ sshnetwork::execute_remote() {
 }
 
 # Transfer file using scp
+# @description Copy file over SSH using scp (transfer file, copy file, SCP, скопировать файл по SSH)
+# @description Скопировать файл по SSH с помощью scp (передать файл, SCP)
 sshnetwork::transfer_file() {
     local source="${1:-}"
     local destination="${2:-}"
@@ -379,6 +401,8 @@ sshnetwork::transfer_file() {
 }
 
 # Transfer file using rsync (more efficient)
+# @description Copy file over SSH using rsync (transfer file, efficient copy, rsync, скопировать файл)
+# @description Скопировать файл по SSH с помощью rsync (эффективная передача)
 sshnetwork::transfer_file_rsync() {
     local source="${1:-}"
     local destination="${2:-}"
@@ -411,6 +435,8 @@ sshnetwork::transfer_file_rsync() {
 }
 
 # Synchronize directories
+# @description Synchronize directories over SSH with rsync (sync dirs, sync, синхронизировать каталоги)
+# @description Синхронизировать каталоги по SSH с помощью rsync (синхронизация папок)
 sshnetwork::sync_directories() {
     local source_dir="${1:-}"
     local destination_dir="${2:-}"
@@ -441,6 +467,8 @@ sshnetwork::sync_directories() {
 }
 
 # Copy SSH public key to remote host
+# @description Setup passwordless SSH auth by copying public key (SSH key, passwordless, ssh-copy-id)
+# @description Настроить вход по SSH без пароля (скопировать SSH-ключ, ssh-copy-id)
 sshnetwork::setup_passwordless_auth() {
     local host="${1:-}"
     local user="${2:-$(whoami)}"
@@ -477,6 +505,8 @@ sshnetwork::setup_passwordless_auth() {
 }
 
 # Execute command on multiple hosts
+# @description Execute command on multiple remote hosts (batch command, many hosts, выполнить на нескольких хостах)
+# @description Выполнить команду на нескольких удалённых хостах (пакетное выполнение)
 sshnetwork::execute_batch() {
     local hosts=("$@")
     local command=""
@@ -530,6 +560,8 @@ sshnetwork::execute_batch() {
 }
 
 # Get system information from remote host
+# @description Get system info from remote host (hostname, uptime, OS, CPU, disk, remote info)
+# @description Получить информацию о системе удалённого хоста (имя, аптайм, ОС, CPU, диск)
 sshnetwork::get_remote_info() {
     local host="${1:-}"
     local user="${2:-$(whoami)}"
@@ -572,6 +604,8 @@ sshnetwork::get_remote_info() {
 }
 
 # Monitor network connectivity
+# @description Monitor network connectivity of hosts (monitor, ping, uptime, мониторинг сети)
+# @description Мониторить связь с хостами (мониторинг сети, ping, проверка доступности)
 sshnetwork::monitor_network() {
     local hosts=("$@")
     local interval="${1:-60}"
@@ -619,6 +653,8 @@ sshnetwork::monitor_network() {
 }
 
 # Get network topology
+# @description Get network topology (interfaces, routes, ARP, топология сети)
+# @description Получить топологию сети (интерфейсы, маршруты, ARP)
 sshnetwork::get_topology() {
     
     log::info "Analyzing network topology..."
@@ -650,6 +686,8 @@ sshnetwork::get_topology() {
 }
 
 # Create SSH tunnel
+# @description Create SSH tunnel port forward (tunnel, port forward, SSH-туннель, проброс порта)
+# @description Создать SSH-туннель (проброс порта, туннель)
 sshnetwork::create_tunnel() {
     local local_port="${1:-}"
     local remote_host="${2:-}"
@@ -687,6 +725,8 @@ sshnetwork::create_tunnel() {
 }
 
 # Close SSH tunnel
+# @description Close an SSH tunnel on port (kill tunnel, stop tunnel, закрыть SSH-туннель)
+# @description Закрыть SSH-туннель по порту (остановить туннель)
 sshnetwork::close_tunnel() {
     local local_port="${1:-}"
     
@@ -710,6 +750,8 @@ sshnetwork::close_tunnel() {
 }
 
 # Get active tunnels
+# @description List active SSH tunnels (active tunnels, show tunnels, активные туннели)
+# @description Показать активные SSH-туннели (список туннелей)
 sshnetwork::get_active_tunnels() {
     
     log::info "Active SSH tunnels:"
@@ -720,6 +762,8 @@ sshnetwork::get_active_tunnels() {
 }
 
 # Log network activity
+# @description Log network activity to log file (log activity, журнал сети)
+# @description Записать активность сети в журнал (логирование)
 sshnetwork::log_activity() {
     local message="${1:-}"
     
@@ -734,6 +778,8 @@ sshnetwork::log_activity() {
 }
 
 # Get network statistics
+# @description Get network statistics (local or remote, stats, статистика сети)
+# @description Получить статистику сети (локальная или удалённая, метрики)
 sshnetwork::get_network_stats() {
     local host="${1:-}"
     
@@ -778,6 +824,8 @@ EOF
 }
 
 # Module info
+# @description Show SSH Network module info (module info, help, функции модуля, справка)
+# @description Показать информацию о модуле SSH-сети (справка, функции)
 sshnetwork::info() {
     cat << EOF
 SSH Network Module v1.0.0

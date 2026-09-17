@@ -48,6 +48,8 @@ AUDIT_SCORE=100
 AUDIT_SUMMARY=""
 
 # Module initialization
+# @description Initialize the system audit module: create config/report/cache dirs and check dependencies.
+# @description Инициализировать модуль аудита системы: создать каталоги конфигурации/отчётов/кэша и проверить зависимости.
 systemaudit::init() {
     
     log::info "Initializing System Audit module..."
@@ -78,6 +80,8 @@ systemaudit::init() {
 }
 
 # Check dependencies
+# @description Verify required audit tools and dependencies are installed; list missing ones.
+# @description Проверить, установлены ли требуемые инструменты и зависимости аудита; перечислить недостающие.
 systemaudit::check_dependencies() {
     local missing_deps=()
     
@@ -96,6 +100,8 @@ systemaudit::check_dependencies() {
 }
 
 # Install dependencies
+# @description Install missing audit tools via the platform package manager (apt, dnf, brew).
+# @description Установить недостающие инструменты аудита через пакетный менеджер платформы (apt, dnf, brew).
 systemaudit::install_dependencies() {
     local deps=("$@")
     
@@ -121,6 +127,8 @@ systemaudit::install_dependencies() {
 }
 
 # Initialize audit components
+# @description Initialize all audit components and checks (security, users, network, filesystem, services, compliance).
+# @description Инициализировать все компоненты и проверки аудита (безопасность, пользователи, сеть, файловая система, службы, соответствие).
 systemaudit::init_components() {
     
     log::debug "Initializing audit components..."
@@ -142,6 +150,8 @@ systemaudit::init_components() {
 # ============================================================================
 
 # Run comprehensive system audit
+# @description Run a system audit by type (full, quick, security, users, network, filesystem, services, compliance) and generate a report.
+# @description Запустить аудит системы по типу (full, quick, security, users, network, filesystem, services, compliance) и сформировать отчёт.
 systemaudit::run() {
     local audit_type="${1:-full}"
     local output_format="${2:-text}"
@@ -191,6 +201,8 @@ systemaudit::run() {
 }
 
 # Run quick audit
+# @description Run a quick security audit covering key root, password, sudo, ports and world-writable checks.
+# @description Запустить быструю проверку безопасности по ключевым проверкам root, паролей, sudo, портов и прав.
 systemaudit::run_quick() {
     log::info "Running quick security audit..."
     
@@ -204,6 +216,8 @@ systemaudit::run_quick() {
 }
 
 # Run full comprehensive audit
+# @description Run a full comprehensive system audit across all categories and calculate the score.
+# @description Запустить полную всестороннюю проверку системы по всем категориям и рассчитать балл.
 systemaudit::run_full() {
     log::info "Running full comprehensive audit..."
     
@@ -223,11 +237,15 @@ systemaudit::run_full() {
 # Аудит безопасности
 # ============================================================================
 
+# @description Initialize the security audit component and its checks.
+# @description Инициализировать компонент аудита безопасности и его проверки.
 systemaudit::security::init() {
     # Security audit specific initialization
     return 0
 }
 
+# @description Run the security audit: root login, passwords, ssh, firewall, selinux, kernel, suid, permissions, processes.
+# @description Запустить аудит безопасности: вход root, пароли, ssh, межсетевой экран, selinux, ядро, suid, права, процессы.
 systemaudit::security::run() {
     log::info "Running security audit..."
     
@@ -243,6 +261,8 @@ systemaudit::security::run() {
 }
 
 # Check root login configuration
+# @description Check if root login is enabled over SSH and report it as a security risk.
+# @description Проверить, разрешён ли вход root через SSH, и зафиксировать это как риск безопасности.
 systemaudit::security::check_root_login() {
     local finding=""
     
@@ -260,6 +280,8 @@ systemaudit::security::check_root_login() {
 }
 
 # Check password policy
+# @description Check the password policy, e.g. password expiration (PASS_MAX_DAYS) is not too long.
+# @description Проверить политику паролей, например срок действия пароля (PASS_MAX_DAYS) не слишком длинный.
 systemaudit::security::check_password_policy() {
     local finding=""
     
@@ -281,6 +303,8 @@ systemaudit::security::check_password_policy() {
 }
 
 # Check SSH configuration
+# @description Check the SSH configuration for insecure settings like Protocol 1 and empty passwords.
+# @description Проверить конфигурацию SSH на небезопасные настройки, такие как Protocol 1 и пустые пароли.
 systemaudit::security::check_ssh_config() {
     local finding=""
     
@@ -310,6 +334,8 @@ systemaudit::security::check_ssh_config() {
 }
 
 # Check firewall status
+# @description Check the firewall status (ufw, firewalld, iptables) and warn if no firewall is active.
+# @description Проверить статус межсетевого экрана (ufw, firewalld, iptables) и предупредить, если он неактивен.
 systemaudit::security::check_firewall_status() {
     local finding=""
     local firewall_active=false
@@ -347,6 +373,8 @@ systemaudit::security::check_firewall_status() {
 }
 
 # Check SELinux/AppArmor status
+# @description Check SELinux and AppArmor mandatory access control status for security hardening.
+# @description Проверить статус SELinux и AppArmor (принудительный контроль доступа) для усиления безопасности.
 systemaudit::security::check_selinux_apparmor() {
     local finding=""
     
@@ -381,6 +409,8 @@ systemaudit::security::check_selinux_apparmor() {
 }
 
 # Check kernel parameters
+# @description Check kernel parameters for security, e.g. IPv4 IP forwarding should be disabled.
+# @description Проверить параметры ядра для безопасности, например IP-пересылка IPv4 должна быть отключена.
 systemaudit::security::check_kernel_parameters() {
     local finding=""
     
@@ -402,6 +432,8 @@ systemaudit::security::check_kernel_parameters() {
 }
 
 # Check SUID files
+# @description Check for a high number of SUID files on the system as a potential security risk.
+# @description Проверить большое количество SUID-файлов в системе как потенциальный риск безопасности.
 systemaudit::security::check_suid_files() {
     local finding=""
     
@@ -424,6 +456,8 @@ systemaudit::security::check_suid_files() {
 }
 
 # Check world-writable directories
+# @description Check for world-writable directories that pose a security risk.
+# @description Проверить каталоги с правами на запись для всех (world-writable) как риск безопасности.
 systemaudit::security::check_world_writable_dirs() {
     local finding=""
     
@@ -443,6 +477,8 @@ systemaudit::security::check_world_writable_dirs() {
 }
 
 # Check running processes
+# @description Check running processes for suspicious or potentially compromised activity.
+# @description Проверить запущенные процессы на подозрительную или потенциально скомпрометированную активность.
 systemaudit::security::check_processes() {
     local finding=""
     
@@ -466,11 +502,15 @@ systemaudit::security::check_processes() {
 # Аудит пользователей
 # ============================================================================
 
+# @description Initialize the users audit component and its permission checks.
+# @description Инициализировать компонент аудита пользователей и его проверки прав.
 systemaudit::users::init() {
     # Users audit specific initialization
     return 0
 }
 
+# @description Run the users audit: sudo users, passwordless sudo, locked accounts, uid zero, home permissions.
+# @description Запустить аудит пользователей: sudo-пользователи, sudo без пароля, заблокированные учётки, uid 0, права home.
 systemaudit::users::run() {
     log::info "Running users audit..."
     
@@ -482,6 +522,8 @@ systemaudit::users::run() {
 }
 
 # Check sudo users
+# @description Check the number of sudo users and flag too many accounts with sudo privileges.
+# @description Проверить количество sudo-пользователей и зафиксировать слишком много учётных записей с правами sudo.
 systemaudit::users::check_sudo_users() {
     local finding=""
     
@@ -506,6 +548,8 @@ systemaudit::users::check_sudo_users() {
 }
 
 # Check passwordless sudo
+# @description Check for passwordless sudo (NOPASSWD) configuration as a security risk.
+# @description Проверить конфигурацию sudo без пароля (NOPASSWD) как риск безопасности.
 systemaudit::users::check_passwordless_sudo() {
     local finding=""
     
@@ -523,6 +567,8 @@ systemaudit::users::check_passwordless_sudo() {
 }
 
 # Check locked accounts
+# @description Check for locked accounts with empty passwords that pose a security risk.
+# @description Проверить заблокированные учётные записи с пустыми паролями как риск безопасности.
 systemaudit::users::check_locked_accounts() {
     local finding=""
     
@@ -542,6 +588,8 @@ systemaudit::users::check_locked_accounts() {
 }
 
 # Check UID 0 accounts
+# @description Check for additional accounts with UID 0; only root should have UID 0.
+# @description Проверить дополнительные учётные записи с UID 0; только root должен иметь UID 0.
 systemaudit::users::check_uid_zero() {
     local finding=""
     
@@ -560,6 +608,8 @@ systemaudit::users::check_uid_zero() {
 }
 
 # Check home directory permissions
+# @description Check home directory permissions for world-readable directories.
+# @description Проверить права домашних каталогов на чтение для всех (world-readable).
 systemaudit::users::check_home_permissions() {
     local finding=""
     
@@ -583,11 +633,15 @@ systemaudit::users::check_home_permissions() {
 # Аудит сети
 # ============================================================================
 
+# @description Initialize the network audit component and its security checks.
+# @description Инициализировать компонент аудита сети и его проверки безопасности.
 systemaudit::network::init() {
     # Network audit specific initialization
     return 0
 }
 
+# @description Run the network audit: open ports, listening services, ip forwarding, icmp redirects.
+# @description Запустить аудит сети: открытые порты, прослушиваемые сервисы, IP-пересылку, ICMP-редиректы.
 systemaudit::network::run() {
     log::info "Running network audit..."
     
@@ -598,6 +652,8 @@ systemaudit::network::run() {
 }
 
 # Check open ports
+# @description Scan open listening ports and detect insecure services (telnet, ftp, smb) on them.
+# @description Сканировать открытые прослушиваемые порты и выявлять небезопасные сервисы (telnet, ftp, smb).
 systemaudit::network::check_open_ports() {
     local finding=""
     
@@ -643,6 +699,8 @@ systemaudit::network::check_open_ports() {
 }
 
 # Check listening services
+# @description Check listening services exposed to all interfaces as a network security risk.
+# @description Проверить прослушиваемые сервисы, доступные на всех интерфейсах, как риск сетевой безопасности.
 systemaudit::network::check_listening_services() {
     local finding=""
     
@@ -668,6 +726,8 @@ systemaudit::network::check_listening_services() {
 }
 
 # Check IP forwarding
+# @description Check if IPv4 IP forwarding is enabled, which may indicate a router or security issue.
+# @description Проверить, включена ли IP-пересылка IPv4, что может указывать на маршрутизацию или проблему безопасности.
 systemaudit::network::check_ip_forwarding() {
     local finding=""
     
@@ -689,6 +749,8 @@ systemaudit::network::check_ip_forwarding() {
 }
 
 # Check ICMP redirects
+# @description Check if ICMP redirect acceptance is enabled, which can be used for MITM attacks.
+# @description Проверить, включён ли приём ICMP-редиректов, который может использоваться для MITM-атак.
 systemaudit::network::check_icmp_redirects() {
     local finding=""
     
@@ -714,11 +776,15 @@ systemaudit::network::check_icmp_redirects() {
 # Аудит файловой системы
 # ============================================================================
 
+# @description Initialize the filesystem audit component and its permission checks.
+# @description Инициализировать компонент аудита файловой системы и его проверки прав.
 systemaudit::filesystem::init() {
     # Filesystem audit specific initialization
     return 0
 }
 
+# @description Run the filesystem audit: world-writable, suid, sticky bits, and dot files.
+# @description Запустить аудит файловой системы: world-writable, suid, sticky bit и dot-файлы.
 systemaudit::filesystem::run() {
     log::info "Running filesystem audit..."
     
@@ -729,6 +795,8 @@ systemaudit::filesystem::run() {
 }
 
 # Check world-writable files
+# @description Check for world-writable files that any user could modify.
+# @description Проверить файлы с правами на запись для всех (world-writable), которые может изменить любой пользователь.
 systemaudit::filesystem::check_world_writable() {
     local finding=""
     
@@ -749,6 +817,8 @@ systemaudit::filesystem::check_world_writable() {
 }
 
 # Check SUID files (already done in security, but more detailed here)
+# @description Audit SUID files in detail; they allow elevated privilege execution and should be monitored.
+# @description Аудит SUID-файлов в деталях; они позволяют выполнение с повышенными привилегиями и требуют контроля.
 systemaudit::filesystem::check_suid_files() {
     local finding=""
     
@@ -769,6 +839,8 @@ systemaudit::filesystem::check_suid_files() {
 }
 
 # Check sticky bits
+# @description Check that public directories like /tmp and /var/tmp have the sticky bit set.
+# @description Проверить, что публичные каталоги, такие как /tmp и /var/tmp, имеют установленный sticky bit.
 systemaudit::filesystem::check_sticky_bits() {
     local finding=""
     
@@ -794,6 +866,8 @@ systemaudit::filesystem::check_sticky_bits() {
 }
 
 # Check dot files in home directories
+# @description Check for insecure legacy dot files like .rhosts and .netrc in home directories.
+# @description Проверить небезопасные устаревшие dot-файлы, такие как .rhosts и .netrc, в домашних каталогах.
 systemaudit::filesystem::check_dot_files() {
     local finding=""
     
@@ -817,11 +891,15 @@ systemaudit::filesystem::check_dot_files() {
 # Аудит служб
 # ============================================================================
 
+# @description Initialize the services audit component and its process/service checks.
+# @description Инициализировать компонент аудита служб и его проверки процессов/сервисов.
 systemaudit::services::init() {
     # Services audit specific initialization
     return 0
 }
 
+# @description Run the services audit: running services, inetd services, and service file permissions.
+# @description Запустить аудит служб: запущенные службы, службы inetd и права файлов служб.
 systemaudit::services::run() {
     log::info "Running services audit..."
     
@@ -831,6 +909,8 @@ systemaudit::services::run() {
 }
 
 # Check running services
+# @description Check for unnecessary or legacy running services like telnet, ftp, rsh, rlogin, rexec.
+# @description Проверить ненужные или устаревшие запущенные службы, такие как telnet, ftp, rsh, rlogin, rexec.
 systemaudit::services::check_running_services() {
     local finding=""
     
@@ -851,6 +931,8 @@ systemaudit::services::check_running_services() {
 }
 
 # Check inetd services
+# @description Check for configured inetd services, which are legacy and insecure.
+# @description Проверить настроенные службы inetd, которые являются устаревшими и небезопасными.
 systemaudit::services::check_inetd_services() {
     local finding=""
     
@@ -872,6 +954,8 @@ systemaudit::services::check_inetd_services() {
 }
 
 # Check service permissions
+# @description Check systemd service file permissions for world-writable files.
+# @description Проверить права файлов служб systemd на наличие файлов с правами записи для всех (world-writable).
 systemaudit::services::check_service_permissions() {
     local finding=""
     
@@ -897,11 +981,15 @@ systemaudit::services::check_service_permissions() {
 # Аудит соответствия
 # ============================================================================
 
+# @description Initialize the compliance audit component and its best-practice checks.
+# @description Инициализировать компонент аудита соответствия и его проверки лучших практик.
 systemaudit::compliance::init() {
     # Compliance audit specific initialization
     return 0
 }
 
+# @description Run the compliance audit: password complexity, audit logging, updates, cis benchmarks.
+# @description Запустить аудит соответствия: сложность паролей, журнал аудита, обновления, базовые проверки CIS.
 systemaudit::compliance::run() {
     log::info "Running compliance audit..."
     
@@ -912,6 +1000,8 @@ systemaudit::compliance::run() {
 }
 
 # Check password complexity
+# @description Check password complexity / minimum length compliance (pwquality minlen).
+# @description Проверить соответствие сложности/минимальной длины пароля (minlen в pwquality).
 systemaudit::compliance::check_password_complexity() {
     local finding=""
     
@@ -932,6 +1022,8 @@ systemaudit::compliance::check_password_complexity() {
 }
 
 # Check audit logging
+# @description Check that the audit logging daemon (auditd) is running for security compliance.
+# @description Проверить, что демон журнала аудита (auditd) запущен для соответствия требованиям безопасности.
 systemaudit::compliance::check_audit_logging() {
     local finding=""
     
@@ -948,6 +1040,8 @@ systemaudit::compliance::check_audit_logging() {
 }
 
 # Check system updates
+# @description Check that system packages were updated recently (within the update window).
+# @description Проверить, что системные пакеты обновлялись недавно (в пределах окна обновления).
 systemaudit::compliance::check_updates() {
     local finding=""
     
@@ -971,6 +1065,8 @@ systemaudit::compliance::check_updates() {
 }
 
 # Check CIS benchmarks (simplified)
+# @description Check CIS benchmark compliance basics like prelink and unnecessary compilers.
+# @description Проверить базовые требования соответствия CIS, например prelink и лишние компиляторы.
 systemaudit::compliance::check_cis_benchmarks() {
     local finding=""
     
@@ -1003,6 +1099,8 @@ systemaudit::compliance::check_cis_benchmarks() {
 # ============================================================================
 
 # Create audit finding
+# @description Create an audit finding record with timestamp, title, description, severity, category and recommendation.
+# @description Создать запись результата аудита с временной меткой, заголовком, описанием, серьёзностью, категорией и рекомендацией.
 systemaudit::create_finding() {
     local title="${1:-}"
     local description="${2:-}"
@@ -1024,6 +1122,8 @@ systemaudit::create_finding() {
 }
 
 # Calculate audit score
+# @description Calculate the audit score from findings by severity and generate a summary assessment.
+# @description Рассчитать балл аудита на основе найденных проблем по серьёзности и сформировать итоговую оценку.
 systemaudit::calculate_score() {
     
     local initial_score=100
@@ -1073,6 +1173,8 @@ systemaudit::calculate_score() {
 }
 
 # Generate audit report
+# @description Generate the audit report in the requested format (text, json, csv, xml) to the reports directory.
+# @description Сформировать отчёт аудита в запрошенном формате (text, json, csv, xml) в каталог отчётов.
 systemaudit::generate_report() {
     local format="${1:-text}"
     local timestamp="$(date '+%Y%m%d_%H%M%S')"
@@ -1097,6 +1199,8 @@ systemaudit::generate_report() {
 }
 
 # Generate text report
+# @description Generate a human-readable text audit report file with findings by severity.
+# @description Сформировать текстовый отчёт аудита в удобочитаемом виде с результатами по серьёзности.
 systemaudit::generate_text_report() {
     local report_file="${1:-}"
     
@@ -1172,6 +1276,8 @@ systemaudit::generate_text_report() {
 }
 
 # Generate JSON report
+# @description Generate a JSON audit report file for automation and machine processing.
+# @description Сформировать отчёт аудита в формате JSON для автоматизации и машинной обработки.
 systemaudit::generate_json_report() {
     local report_file="${1:-}"
     
@@ -1202,6 +1308,8 @@ systemaudit::generate_json_report() {
 }
 
 # Generate CSV report
+# @description Generate a CSV audit report file for spreadsheets and tabular analysis.
+# @description Сформировать отчёт аудита в формате CSV для таблиц и табличного анализа.
 systemaudit::generate_csv_report() {
     local report_file="${1:-}"
     
@@ -1228,6 +1336,8 @@ systemaudit::generate_csv_report() {
 }
 
 # Generate XML report
+# @description Generate an XML audit report file for system integration and data exchange.
+# @description Сформировать отчёт аудита в формате XML для интеграции систем и обмена данными.
 systemaudit::generate_xml_report() {
     local report_file="${1:-}"
     
@@ -1264,6 +1374,8 @@ systemaudit::generate_xml_report() {
 # ============================================================================
 
 # Create baseline
+# @description Create a security baseline snapshot of the current system state and save it to the baseline file.
+# @description Создать базовый снимок (baseline) текущего состояния системы для аудита и сохранить его в файл.
 systemaudit::create_baseline() {
     
     log::info "Creating security baseline..."
@@ -1284,6 +1396,8 @@ systemaudit::create_baseline() {
 }
 
 # Compare with baseline
+# @description Compare the current system state against a previously created security baseline.
+# @description Сравнить текущее состояние системы с ранее созданным базовым показателем (baseline) безопасности.
 systemaudit::compare_baseline() {
     
     if ! is::file "${AUDIT_BASELINE_FILE}"; then
@@ -1303,6 +1417,8 @@ systemaudit::compare_baseline() {
 # Информация о модуле
 # ============================================================================
 
+# @description Print module info: available functions, audit types, output formats, severity levels, and usage.
+# @description Вывести информацию о модуле: доступные функции, типы аудита, форматы вывода, уровни серьёзности и использование.
 systemaudit::info() {
     cat << EOF
 System Audit Module v1.0.0

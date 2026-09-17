@@ -9,6 +9,8 @@ bs::guard "UI_BOSATHEME" || return 0
 # Зависимости / Dependencies
 bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh"
 
+# @description Build the bash prompt with colors and git branch / Собрать приглашение
+# bash с цветами и веткой git
 # BS theme - A clean, informative prompt
 _bosa_prompt() {
     local reset_color='\[\033[0m\]'
@@ -39,6 +41,8 @@ _bosa_prompt() {
     PS1="$user_host:$current_dir$git_branch \$ $reset_color"
 }
 
+# @description Apply the BS theme to the current shell / Применить тему BS в текущей
+# оболочке, установить цвета и промпт
 # Apply the prompt to the current shell
 bosatheme::apply() {
     _bosa_prompt
