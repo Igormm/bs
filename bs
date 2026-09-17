@@ -57,6 +57,9 @@ if [[ ! -f "${BS_ROOT}/bootstrap/init.sh" ]]; then
   printf 'ERROR: bootstrap/init.sh not found in BS_ROOT=%s\n' "$BS_ROOT" >&2
   exit 2
 fi
+# CLI всегда загружает ядро заново, даже если окружение уже
+# инициализировано (BS_INITIALIZED из sourced-сессии иначе пропустит загрузку)
+unset BS_INITIALIZED
 source "${BS_ROOT}/bootstrap/init.sh"
 
 # EXIT-trap для стека cleanup (ядро при source trap больше не ставит)
@@ -77,11 +80,15 @@ Commands:
   version               Print framework version
   env                   Show environment (BS_ROOT, PATH)
   list                  List available modules (core/, lib/)
+  lang-doc              Emit a JSON index of function docs (LSP metadata)
+  lsp                   Run the language server (stdin/stdout, JSON-RPC)
+  chat                  Interactive LLM chat (openai/ollama, --url for custom)
   doctor                Check framework integrity
   run <script> [args]   Execute script inside BS environment
   build <script>        Assemble a standalone self-extracting script
-  repl                  Interactive REPL (BS shell / интерактивная консоль)
-  init-shell            Print snippet for ~/.bashrc or ~/.zshrc
+  repl                   Interactive REPL (BS shell / интерактивная консоль)
+  sync                   Apply repo changes to installed copies (no reinstall)
+  init-shell             Print snippet for ~/.bashrc or ~/.zshrc
 
 Shebang mode:
   #!/usr/bin/env bs
@@ -103,6 +110,161 @@ list_cmd() {
   while IFS= read -r file; do
     is::file "${file}" && printf '  %s\n' "${file#"${BS_ROOT}"/}"
   done < <(find "${BS_ROOT}/core" "${BS_ROOT}/lib" -type f -name '*.sh' 2>/dev/null | sort)
+}
+
+lang_doc_cmd() {
+  local file=""
+  while [[ $# -gt 0 ]]; do
+    case "${1:-}" in
+      --file)
+        shift
+        [[ $# -ge 1 ]] || die "lang-doc: --file requires a path"
+        file="$1"
+        shift ;;
+      -h|--help)
+        printf 'Usage: bs lang-doc [--file path]\n\n'
+        printf 'Emits a JSON array of {name, file, description, params, returns,\n'
+        printf 'stdout, example, deprecated} for every documented function in\n'
+        printf 'core/ and lib/. With --file, only that file is parsed.\n'
+        printf 'Requires jq (optional dev dependency).\n'
+        return 0 ;;
+      *)
+        die "lang-doc: unknown argument: $1" ;;
+    esac
+  done
+
+  load "lib/data/langdoc"
+  is::command jq || die "lang-doc: jq is required (optional dev tool)"
+
+  if is::not_empty "${file}"; then
+    is::file "${file}" || die "lang-doc: file not found: ${file}"
+    langdoc::parse_file "${file}" | jq -s -c .
+  else
+    langdoc::index "${BS_ROOT}"
+  fi
+}
+
+lsp_cmd() {
+  while [[ $# -gt 0 ]]; do
+    case "${1:-}" in
+      -h|--help)
+        printf 'Usage: bs lsp\n\n'
+        printf 'Runs a minimal Language Server (JSON-RPC 2.0 over stdin/stdout,\n'
+        printf 'Content-Length framing): initialize, hover, completion,\n'
+        printf 'full text sync. The function index over BS_ROOT is built lazily.\n'
+        printf 'Requires jq. Wire it up in VS Code / Neovim as a custom server.\n'
+        return 0 ;;
+      *)
+        die "lsp: unknown argument: $1" ;;
+    esac
+  done
+
+  load "lib/data/langdoc"
+  load "lib/data/lsp"
+  is::command jq || die "lsp: jq is required (optional dev tool)"
+  lsp::server
+}
+
+chat_cmd() {
+  local provider="${BS_CHAT_PROVIDER:-}"
+  local model="${BS_CHAT_MODEL:-}"
+  local system_prompt="${BS_CHAT_SYSTEM:-You are a helpful assistant for the BS framework.}"
+  local one_shot="" limit=20 show_raw=0 url="" api_key=""
+  while [[ $# -gt 0 ]]; do
+    case "${1:-}" in
+      --provider)
+        shift
+        [[ $# -ge 1 ]] || die "chat: --provider requires a name"
+        provider="$1"
+        shift ;;
+      --model|-m)
+        shift
+        [[ $# -ge 1 ]] || die "chat: --model requires a name"
+        model="$1"
+        shift ;;
+      --system|-s)
+        shift
+        [[ $# -ge 1 ]] || die "chat: --system requires a prompt"
+        system_prompt="$1"
+        shift ;;
+      --one-shot)
+        shift
+        [[ $# -ge 1 ]] || die "chat: --one-shot requires a message"
+        one_shot="$1"
+        shift ;;
+      --history)
+        shift
+        [[ $# -ge 1 ]] || die "chat: --history requires a number"
+        limit="$1"
+        shift ;;
+      --url)
+        shift
+        [[ $# -ge 1 ]] || die "chat: --url requires an endpoint (e.g. http://pi.local:8080/v1/chat/completions)"
+        url="$1"
+        shift ;;
+      --api-key)
+        shift
+        [[ $# -ge 1 ]] || die "chat: --api-key requires a key"
+        api_key="$1"
+        shift ;;
+      --show-raw)
+        show_raw=1
+        shift ;;
+      -h|--help)
+        printf 'Usage: bs chat [--provider p] [--model m] [--system text]\n'
+        printf '          [--one-shot msg] [--history N] [--url URL] [--api-key KEY]\n\n'
+        printf 'Interactive multi-turn chat with an LLM.\n'
+        printf 'Providers: openai (API key required) or ollama (local).\n'
+        printf 'A custom local model (e.g. Phi Pi) plugs in as an OpenAI-compatible\n'
+        printf 'endpoint: bs chat --url http://host:port/v1/chat/completions --model phi-pi\n'
+        printf 'Env defaults: BS_CHAT_PROVIDER, BS_CHAT_MODEL, BS_CHAT_SYSTEM.\n'
+        printf 'Requires curl and jq.\n'
+        return 0 ;;
+      *)
+        if is::empty "${one_shot}"; then
+          one_shot="$1"
+        else
+          die "chat: unexpected argument: $1"
+        fi
+        shift ;;
+    esac
+  done
+
+  load "lib/integration/llm"
+  load "lib/integration/chat"
+  is::command curl || die "chat: curl is required"
+  is::command jq || die "chat: jq is required"
+
+  # Дефолтный провайдер: ollama, если доступен, иначе openai
+  # Default provider: ollama when reachable, otherwise openai
+  if is::empty "${provider}"; then
+    if llm::is_available ollama; then
+      provider="ollama"
+    else
+      provider="openai"
+    fi
+  fi
+  if is::empty "${model}"; then
+    if [[ "${provider}" == "ollama" ]]; then
+      model="${LLM_OLLAMA_MODEL:-llama3}"
+    else
+      model="${LLM_OPENAI_MODEL:-gpt-3.5-turbo}"
+    fi
+  fi
+
+  # Переопределение эндпоинта / Endpoint override
+  if is::not_empty "${url}"; then
+    if [[ "${provider}" == "ollama" ]]; then
+      export LLM_OLLAMA_HOST="${url}"
+    else
+      export LLM_OPENAI_URL="${url}"
+    fi
+  fi
+  if is::not_empty "${api_key}"; then
+    export OPENAI_API_KEY="${api_key}"
+  fi
+
+  chat::repl "${provider}" "${model}" "${system_prompt}" "${one_shot}" "${limit}" "${show_raw}"
 }
 
 doctor_cmd() {
@@ -348,12 +510,100 @@ source "\${BS_ROOT}/bootstrap/init.sh"
 EOF
 }
 
+# ==========================================
+# bs sync: apply repo changes to installed copies without reinstalling
+# bs sync: применить изменения репозитория к установленным копиям
+# ==========================================
+
+sync_cmd() {
+  local from="${BS_ROOT}"
+  local -a targets=()
+  local explicit=0
+  local verbose=0
+
+  while [[ $# -gt 0 ]]; do
+    case "${1:-}" in
+      --local)
+        explicit=1
+        targets+=("${HOME}/.local/lib/bs")
+        shift ;;
+      --system)
+        explicit=1
+        targets+=("/usr/local/lib/bs")
+        shift ;;
+      --lib)
+        shift
+        [[ $# -ge 1 ]] || die "sync: --lib requires a target directory"
+        explicit=1
+        targets+=("$1")
+        shift ;;
+      --from)
+        shift
+        [[ $# -ge 1 ]] || die "sync: --from requires a source directory"
+        from="$1"
+        shift ;;
+      -v|--verbose)
+        verbose=1
+        shift ;;
+      -h|--help)
+        printf 'Usage: bs sync [--local] [--system] [--lib DIR] [--from DIR] [-v]\n\n'
+        printf 'Copies framework changes from the source repository to installed\n'
+        printf 'copies without reinstalling. Run from the repo: ./bs sync\n'
+        printf '  --local   sync to ~/.local/lib/bs      (local install)\n'
+        printf '  --system  sync to /usr/local/lib/bs    (system install, needs root)\n'
+        printf '  --lib DIR sync to a custom install directory\n'
+        printf '  --from    source repo (default: running BS_ROOT)\n'
+        printf 'Without flags: sync to every detected install (local + system).\n'
+        printf 'Copies bootstrap/, core/, lib/, bs. Use sudo bs sync --system.\n'
+        return 0 ;;
+      *)
+        die "sync: unknown argument: $1" ;;
+    esac
+  done
+
+  # Детект установок / Detect installs
+  if (( explicit == 0 )); then
+    if is::dir "${HOME}/.local/lib/bs"; then
+      targets+=("${HOME}/.local/lib/bs")
+    fi
+    if is::dir "/usr/local/lib/bs"; then
+      targets+=("/usr/local/lib/bs")
+    fi
+  fi
+
+  if (( ${#targets[@]} == 0 )); then
+    die "sync: no BS installs found (use --local, --system or --lib DIR)"
+  fi
+  is::dir "${from}/core" || die "sync: source is not a BS repo: ${from}"
+
+  local target item ok=0
+  for target in "${targets[@]}"; do
+    if ! is::dir "${target}"; then
+      log::warn "sync: target not found, skipping: ${target}"
+      continue
+    fi
+    if ! [[ -w "${target}" ]]; then
+      log::warn "sync: target not writable: ${target} (try: sudo bs sync --system)"
+      continue
+    fi
+    log::info "syncing ${from} -> ${target}"
+    cp -a "${from}/bootstrap" "${from}/core" "${from}/lib" "${from}/bs" "${target}/"
+    ok=1
+    if (( verbose == 1 )); then
+      log::info "  files: $(find "${from}/core" "${from}/lib" -name '*.sh' | wc -l) modules copied"
+    fi
+  done
+
+  (( ok == 1 )) || die "sync: nothing to sync"
+  log::success "sync done — changes are live without reinstalling"
+}
+
 # 6. Shebang-режим 
 # Если bs вызван как интерпретатор shebang'а (#!/usr/bin/env bs),
 # первый аргумент — путь к существующему скрипту, а не команда.
 if [[ $# -ge 1 && -f "$1" ]]; then
   case "$1" in
-    help|-h|--help|version|env|list|doctor|run|build|repl|init-shell) : ;;
+    help|-h|--help|version|env|list|lang-doc|lsp|chat|sync|doctor|run|build|repl|init-shell) : ;;
     *) BS_SHEBANG=1 ;;
   esac
 fi
@@ -369,6 +619,10 @@ case "${1:-help}" in
   version)        version ;;
   env)            env_cmd ;;
   list)           list_cmd ;;
+  lang-doc)       shift; lang_doc_cmd "$@" ;;
+  lsp)            shift; lsp_cmd "$@" ;;
+  chat)           shift; chat_cmd "$@" ;;
+  sync)           shift; sync_cmd "$@" ;;
   doctor)         doctor_cmd ;;
   run)            shift; run_cmd "$@" ;;
   build)          shift; build_cmd "$@" ;;
