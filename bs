@@ -87,7 +87,7 @@ Commands:
   run <script> [args]   Execute script inside BS environment
   build <script>        Assemble a standalone self-extracting script
   repl                   Interactive REPL (BS shell / интерактивная консоль)
-  sync                   Apply repo changes to installed copies (no reinstall)
+  update                   Apply repo changes to installed copies (no reinstall)
   init-shell             Print snippet for ~/.bashrc or ~/.zshrc
 
 Shebang mode:
@@ -511,11 +511,11 @@ EOF
 }
 
 # ==========================================
-# bs sync: apply repo changes to installed copies without reinstalling
-# bs sync: применить изменения репозитория к установленным копиям
+# bs update: apply repo changes to installed copies without reinstalling
+# bs update: применить изменения репозитория к установленным копиям
 # ==========================================
 
-sync_cmd() {
+update_cmd() {
   local from="${BS_ROOT}"
   local -a targets=()
   local explicit=0
@@ -533,31 +533,31 @@ sync_cmd() {
         shift ;;
       --lib)
         shift
-        [[ $# -ge 1 ]] || die "sync: --lib requires a target directory"
+        [[ $# -ge 1 ]] || die "update: --lib requires a target directory"
         explicit=1
         targets+=("$1")
         shift ;;
       --from)
         shift
-        [[ $# -ge 1 ]] || die "sync: --from requires a source directory"
+        [[ $# -ge 1 ]] || die "update: --from requires a source directory"
         from="$1"
         shift ;;
       -v|--verbose)
         verbose=1
         shift ;;
       -h|--help)
-        printf 'Usage: bs sync [--local] [--system] [--lib DIR] [--from DIR] [-v]\n\n'
+        printf 'Usage: bs update [--local] [--system] [--lib DIR] [--from DIR] [-v]\n\n'
         printf 'Copies framework changes from the source repository to installed\n'
-        printf 'copies without reinstalling. Run from the repo: ./bs sync\n'
-        printf '  --local   sync to ~/.local/lib/bs      (local install)\n'
-        printf '  --system  sync to /usr/local/lib/bs    (system install, needs root)\n'
-        printf '  --lib DIR sync to a custom install directory\n'
+        printf 'copies without reinstalling. Run from the repo: ./bs update\n'
+        printf '  --local   update to ~/.local/lib/bs      (local install)\n'
+        printf '  --system  update to /usr/local/lib/bs    (system install, needs root)\n'
+        printf '  --lib DIR update to a custom install directory\n'
         printf '  --from    source repo (default: running BS_ROOT)\n'
-        printf 'Without flags: sync to every detected install (local + system).\n'
-        printf 'Copies bootstrap/, core/, lib/, bs. Use sudo bs sync --system.\n'
+        printf 'Without flags: update to every detected install (local + system).\n'
+        printf 'Copies bootstrap/, core/, lib/, bs. Use sudo bs update --system.\n'
         return 0 ;;
       *)
-        die "sync: unknown argument: $1" ;;
+        die "update: unknown argument: $1" ;;
     esac
   done
 
@@ -572,18 +572,18 @@ sync_cmd() {
   fi
 
   if (( ${#targets[@]} == 0 )); then
-    die "sync: no BS installs found (use --local, --system or --lib DIR)"
+    die "update: no BS installs found (use --local, --system or --lib DIR)"
   fi
-  is::dir "${from}/core" || die "sync: source is not a BS repo: ${from}"
+  is::dir "${from}/core" || die "update: source is not a BS repo: ${from}"
 
   local target item ok=0
   for target in "${targets[@]}"; do
     if ! is::dir "${target}"; then
-      log::warn "sync: target not found, skipping: ${target}"
+      log::warn "update: target not found, skipping: ${target}"
       continue
     fi
     if ! [[ -w "${target}" ]]; then
-      log::warn "sync: target not writable: ${target} (try: sudo bs sync --system)"
+      log::warn "update: target not writable: ${target} (try: sudo bs update --system)"
       continue
     fi
     log::info "syncing ${from} -> ${target}"
@@ -594,7 +594,7 @@ sync_cmd() {
     fi
   done
 
-  (( ok == 1 )) || die "sync: nothing to sync"
+  (( ok == 1 )) || die "update: nothing to update"
   log::success "sync done — changes are live without reinstalling"
 }
 
@@ -622,7 +622,7 @@ case "${1:-help}" in
   lang-doc)       shift; lang_doc_cmd "$@" ;;
   lsp)            shift; lsp_cmd "$@" ;;
   chat)           shift; chat_cmd "$@" ;;
-  sync)           shift; sync_cmd "$@" ;;
+  update)           shift; update_cmd "$@" ;;
   doctor)         doctor_cmd ;;
   run)            shift; run_cmd "$@" ;;
   build)          shift; build_cmd "$@" ;;
