@@ -201,6 +201,13 @@ __llm::request() {
     return 0
   fi
 
+  # Test hook: fake the HTTP response without a network.
+  # Тестовый хук: подменить HTTP-ответ без сети.
+  if [[ -n "${LLM_MOCK_RESPONSE:-}" ]]; then
+    printf '%s' "${LLM_MOCK_RESPONSE}"
+    return 0
+  fi
+
   local response
   local rc=0
 
@@ -301,7 +308,7 @@ llm::chat() {
   local api_key=""
   if [[ "${provider}" == "openai" ]]; then
     api_key="${OPENAI_API_KEY:-${LLM_OPENAI_API_KEY:-}}"
-    if is::empty "${api_key}" && [[ "${FRAMEWORK_DRY_RUN:-false}" != "true" ]]; then
+    if is::empty "${api_key}" && [[ "${FRAMEWORK_DRY_RUN:-false}" != "true" ]] && [[ -z "${LLM_MOCK_RESPONSE:-}" ]]; then
       log::error "OpenAI API key not set (OPENAI_API_KEY or LLM_OPENAI_API_KEY)"
       return "${INTEGRATION_ERROR_LLM}"
     fi
@@ -384,6 +391,87 @@ llm::chat_file() {
   content="$(cat -- "${file}")"
 
   llm::chat "${provider}" "${model}" "${content}"
+}
+
+# @description Send a full messages array (multi-turn chat).
+# @description Отправить полный массив сообщений (многоходовой чат).
+#   The messages_json must be a JSON array of {role, content} objects —
+#   build it with jq (--arg escapes properly). Supports any OpenAI-compatible
+#   endpoint via LLM_OPENAI_URL (e.g. a local Phi Pi server).
+#   messages_json — JSON-массив объектов {role, content} — собирайте через
+#   jq (--arg корректно экранирует). Работает с любым OpenAI-совместимым
+#   эндпоинтом через LLM_OPENAI_URL (например, локальный Phi Pi).
+# @param $1 provider (openai|ollama)
+# @param $2 model name
+# @param $3 messages JSON array / JSON-массив сообщений
+# @return 0 on success, error code otherwise
+# @stdout response content
+# @example
+#   msgs="$(jq -nc --arg c 'hi' '[{role: "user", content: $c}]')"
+#   llm::chat_turn ollama llama3 "${msgs}"
+llm::chat_turn() {
+  local provider="${1:-}"
+  local model="${2:-}"
+  local messages_json="${3:-}"
+
+  if is::empty "${provider}" || is::empty "${model}" || is::empty "${messages_json}"; then
+    log::warn "llm::chat_turn: provider, model and messages_json required"
+    return "${E_INVALID}"
+  fi
+
+  if ! __llm::validate_provider "${provider}"; then
+    return "${E_INVALID}"
+  fi
+
+  local api_key=""
+  if [[ "${provider}" == "openai" ]]; then
+    api_key="${OPENAI_API_KEY:-${LLM_OPENAI_API_KEY:-}}"
+    if is::empty "${api_key}" && [[ "${FRAMEWORK_DRY_RUN:-false}" != "true" ]] && [[ -z "${LLM_MOCK_RESPONSE:-}" ]]; then
+      log::error "OpenAI API key not set (OPENAI_API_KEY or LLM_OPENAI_API_KEY)"
+      return "${INTEGRATION_ERROR_LLM}"
+    fi
+  fi
+
+  if ! utils::has jq; then
+    log::error "llm::chat_turn: jq is required to build the request body"
+    return "${INTEGRATION_ERROR_MISSING_DEPS}"
+  fi
+
+  local body
+  body="$(jq -nc --arg m "${model}" --argjson msgs "${messages_json}" \
+    '{model: $m, messages: $msgs, stream: false}')"
+
+  local response
+  local rc=0
+  response="$(__llm::request "${provider}" "${body}" "${api_key}")" || rc=$?
+
+  if [[ "${rc}" -ne 0 ]]; then
+    return "${rc}"
+  fi
+
+  if is::empty "${response}"; then
+    log::error "LLM returned empty response"
+    return "${INTEGRATION_ERROR_LLM}"
+  fi
+
+  local content
+  case "${provider}" in
+    openai)
+      content="$(__llm::json_query "${response}" ".choices[0].message.content")"
+      ;;
+    ollama)
+      content="$(__llm::json_query "${response}" ".message.content")"
+      ;;
+  esac
+
+  if is::empty "${content}"; then
+    log::warn "LLM response did not contain expected content"
+    printf '%s' "${response}"
+    return "${INTEGRATION_ERROR_LLM}"
+  fi
+
+  printf '%s' "${content}"
+  return 0
 }
 
 # @description Return a structured JSON result for an LLM chat.
