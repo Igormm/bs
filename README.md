@@ -22,7 +22,9 @@ consistent code style and with zero external dependencies.
 - **Загрузчик модулей** — `load "lib/io/streams"`, зависимости через
   `# @depends`, защита от циклов и повторной загрузки
 - **`core/args`** — декларативное дерево параметров: валидация, авто-help,
-  флаги `--key value` и генерация bash-completion из одного источника
+  флаги `--key value`, дефолты, типы значений (`number`, `enum:a,b`,
+  валидатор-колбэк), повторяемые уровни, `--` для сырых аргументов и
+  генерация bash-completion из одного источника
 - **`lib/io/streams`** — безопасный вывод, перенаправления, save/restore FD,
   pipe, буферизация stdio, `/dev` спецфайлы
 - **`core/logger`** — уровни, цвета, форматы text/json/structured
@@ -160,6 +162,31 @@ ubuntu, debian:stable, almalinux:9, almalinux:8 — см. `.github/workflows/ci.
 - HTTP, LLM, Kubernetes / HTTP, LLM, Kubernetes — [ru](documentation/ru/03-modules/integration-http.md) · [en](documentation/en/03-modules/integration-http.md)
 - Стиль кода / Code style — [ru](documentation/ru/code-style-guide.md) · [en](documentation/en/code-style-guide.md)
 - `examples/` — рабочие примеры с комментариями / working examples with comments
+
+## Ценности / Values
+
+- **Вездесущность** — Bash 4+ есть везде: ноль установки, ноль внешних
+  зависимостей в рантайме. / **Ubiquity** — Bash 4+ ships everywhere:
+  zero install, zero external runtime dependencies.
+- **Совместимость важнее новизны** — BS это bash + конвенции, а не новый
+  язык: вся экосистема bash открыта. / **Compatibility over novelty** —
+  BS is bash plus conventions, not a new language: the whole bash
+  ecosystem stays open.
+- **Прозрачность** — каждая строка читаемый bash: `bash -x`, `declare -p`,
+  никакой магии. / **Transparency** — every line is readable bash, no magic.
+- **Ноль форков в ядре** — языковые примитивы — чистый bash, без внешних
+  команд. / **Zero forks in the core** — language primitives are pure bash.
+- **Операционность** — cron, CI, Docker, матрица дистрибутивов (bash 4.4–5.x),
+  `bs build` в один самодостаточный файл. / **Ops-first** — cron, CI,
+  Docker, distro matrix, standalone builds.
+- **Честные границы** — BS не язык с типами и замыканиями; данные
+  делегируются бинарникам (jq, Go) по JSON-контракту. / **Honest
+  boundaries** — data-heavy work goes to binaries (jq, Go) via a JSON
+  contract.
+
+Чем платим / What we pay: префиксы `__arr_*` вместо namespace, колбэки
+по имени вместо замыканий, дисциплина вместо компилятора, рантайм-
+проверки вместо статических гарантий.
 
 ## Лицензия / License
 
