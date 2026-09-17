@@ -8,12 +8,6 @@
 # Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points
 
-# Ensure running under Bash 4+ (associative arrays required)
-if [[ -z "${BASH_VERSION:-}" || ${BASH_VERSINFO[0]} -lt 4 ]]; then
-  echo "BS: ERROR: Bash 4.0+ required for loader" >&2
-  return 1 2>/dev/null || exit 1
-fi
-
 # ============================================================================
 # ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ / GLOBAL VARIABLES
 # ============================================================================
