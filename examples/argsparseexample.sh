@@ -41,10 +41,21 @@ main() {
 
     # Флаги не занимают позиционные уровни
     # Flags do not occupy positional levels
-    args::flag env value           # --env production / --env=production
-    args::flag dry-run             # --dry-run (без значения / no value)
+    args::flag env value staging "enum:staging,prod"  # дефолт + тип / default + type
+    args::flag dry-run                                # --dry-run (без значения / no value)
+    args::flag retries value 3 number                 # дефолт 3, тип number
     args::flag_describe env "Target environment (staging, production)"
     args::flag_describe dry-run "Print the plan without executing"
+
+    # Минимум один позиционный параметр / At least one positional
+    args::required 1
+
+    # Повторяемый уровень: имена уровня 3 повторяются без ограничений
+    # Variadic level: level-3 names may repeat unboundedly
+    args::level 3 server...   # server server server ...
+
+    # Всё после "--" — сырые аргументы / Everything after "--" is raw
+    #   deploy now --server s1 --server s2 -- --any --flags --forwarded
 
     # ==========================================
     # 2. Валидируем входные параметры
@@ -80,11 +91,17 @@ main() {
     local action="${ARGS_PARAMS[0]:-status}"   # действие по умолчанию / default action
     local timing="${ARGS_PARAMS[1]:-now}"      # время по умолчанию / default timing
     local env
-    env="$(args::flag_get env || printf 'staging')"   # окружение по умолчанию / default env
+    env="$(args::flag_get env)"                # дефолт приходит из args::flag / default from args::flag
+    local retries
+    retries="$(args::flag_get retries)"
+    local servers="${#ARGS_PARAMS[@]}"         # 1 + N повторов уровня 3 / 1 + N repeats of level 3
 
-    log::info "Action: ${action}, timing: ${timing}, env: ${env}"
-    if args::flag_get dry-run >/dev/null; then
+    log::info "Action: ${action}, timing: ${timing}, env: ${env}, retries: ${retries}, servers: ${servers}"
+    if args::flag_is_set dry-run; then
         log::warn "DRY RUN: no changes will be made"
+    fi
+    if (( ${#ARGS_REST[@]} > 0 )); then
+        log::info "Raw args after --: $(args::rest | tr '\n' ' ')"
     fi
     case "${action}" in
         deploy)   log::success "Deploying to ${env} (${timing})..." ;;

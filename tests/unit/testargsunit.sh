@@ -279,6 +279,91 @@ main() {
 
     args::reset
 
+    # Новые фичи: дефолты, типы, валидаторы
+    testframework::section "Defaults / Дефолты"
+
+    args::reset
+    args::define deploy
+    args::flag env value staging "enum:staging,prod"
+    args::flag port value "" number
+    args::flag retries value 3 number
+    args::flag dry-run
+
+    args::parse deploy
+    testframework::assert_equal "staging" "$(args::flag_get env)" "flag default returned"
+    testframework::assert_equal "3" "$(args::flag_get retries)" "number flag default"
+    testframework::assert_false "args::flag_get port" "flag without default and not set fails"
+    testframework::assert_false "args::flag_is_set dry-run" "flag_is_set false when only default"
+
+    args::parse deploy --env prod --port 8080 --dry-run
+    testframework::assert_equal "prod" "$(args::flag_get env)" "flag set on CLI wins"
+    testframework::assert_equal "8080" "$(args::flag_get port)" "flag value parsed"
+    testframework::assert_command "args::flag_is_set dry-run" "flag_is_set true when set on CLI"
+
+    testframework::section "Validation / Валидация значений"
+
+    args::reset
+    args::define deploy
+    args::flag env value staging "enum:staging,prod"
+    args::flag port value "" number
+    my_validator() { [[ "${1}" == allowed-* ]]; }
+    args::flag token value "" my_validator
+
+    testframework::assert_command "args::parse deploy --env staging" "enum accepts declared value"
+    testframework::assert_false "args::parse deploy --env test" "enum rejects unknown value"
+    testframework::assert_command "args::parse deploy --port 8080" "number accepts digit"
+    testframework::assert_false "args::parse deploy --port abc" "number rejects letters"
+    testframework::assert_command "args::parse deploy --port=22" "number accepts inline form"
+    testframework::assert_false "args::parse deploy --port abc" "number rejects after --port"
+    testframework::assert_command "args::parse deploy --token allowed-x" "custom validator passes"
+    testframework::assert_false "args::parse deploy --token denied" "custom validator rejects"
+
+    testframework::section "Required / Обязательные параметры"
+
+    args::reset
+    args::define deploy target
+    args::required 2
+    testframework::assert_command "args::parse deploy target" "required satisfied"
+    testframework::assert_false "args::parse deploy" "required not satisfied fails"
+    testframework::assert_false "args::required x" "args::required rejects non-numeric"
+
+    testframework::section "Predicates / Предикаты"
+
+    args::reset
+    args::define first second
+    args::parse first
+    testframework::assert_command "args::has 1" "args::has first present"
+    testframework::assert_false "args::has 2" "args::has second absent"
+    testframework::assert_equal "fallback" "$(args::get 2 fallback)" "args::get with default"
+    testframework::assert_equal "first" "$(args::get 1 none)" "args::get default ignored when set"
+
+    testframework::section "Dash-dash / Разделитель --"
+
+    args::reset
+    args::define deploy
+    args::parse deploy -- --env prod --raw arg
+    testframework::assert_equal "4" "${#ARGS_REST[@]}" "rest captured after --"
+    testframework::assert_equal "--env" "${ARGS_REST[0]}" "flags after -- stay raw"
+    testframework::assert_equal "arg" "${ARGS_REST[3]}" "last rest word kept"
+    testframework::assert_equal "--env
+prod
+--raw
+arg" "$(args::rest)" "args::rest prints all"
+
+    testframework::section "Variadic / Повторяемые уровни"
+
+    args::reset
+    args::define deploy
+    args::level 2 file...
+    args::parse deploy file file file
+    testframework::assert_equal "4" "${#ARGS_PARAMS[@]}" "variadic level accepts repeats"
+    testframework::assert_equal "file" "$(args::get 4)" "variadic position reachable"
+    testframework::assert_false "args::parse deploy file a bogus" "variadic still validates names"
+    testframework::assert_command "args::parse deploy file" "variadic single element ok"
+    testframework::assert_false "args::parse deploy bogus" "variadic level requires its names"
+
+    args::reset
+
     # Вывод сводки
     testframework::summary
 }

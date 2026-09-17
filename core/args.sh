@@ -77,6 +77,25 @@ declare -g -A __ARGS_FLAG_DESCRIPTIONS=()
 # Validated flags after args::parse: name → value ("1" for bool)
 declare -g -A ARGS_FLAGS=()
 
+# Дефолтные значения флагов: имя → значение
+# Default flag values: name → value
+declare -g -A __ARGS_FLAG_DEFAULTS=()
+
+# Валидаторы значений флагов: имя → "number" | "enum:a,b,c" | имя функции
+# Flag value validators: name → "number" | "enum:a,b,c" | function name
+declare -g -A __ARGS_FLAG_VALIDATORS=()
+
+# Минимальное количество позиционных параметров (args::required)
+# Minimum positional parameter count (args::required)
+declare -g -i __ARGS_REQUIRED=0
+
+# Повторяемый уровень: допустимые имена уровня повторяются без ограничений
+# Variadic level: the level's allowed names may repeat unboundedly
+declare -g -i __ARGS_VARIADIC_LEVEL=0
+
+# Сырые аргументы после "--" / Raw arguments after "--"
+declare -g -a ARGS_REST=()
+
 # ==========================================
 # Приватные вспомогательные функции / Private helper functions
 # ==========================================
@@ -125,6 +144,55 @@ args::__is_allowed_at() {
     return "${E_ERROR:-1}"
 }
 
+# @description Проверить значение value-флага по объявленному валидатору.
+# @description Validate a value-flag value against the declared validator.
+#   Validators: "number", "enum:a,b,c", or a callback function name.
+#   Валидаторы: "number", "enum:a,b,c" или имя функции-колбэка.
+# @param $1 Flag name (without --) / Имя флага (без --)
+# @param $2 Value to check / Проверяемое значение
+# @return 0 valid, 1 invalid or unknown validator
+args::__validate_flag_value() {
+    local -r flag="${1:-}" value="${2-}"
+    local -r validator="${__ARGS_FLAG_VALIDATORS["${flag}"]:-}"
+    is::empty "${validator}" && return "${E_SUCCESS:-0}"
+    case "${validator}" in
+        number)
+            is::number "${value}" || return "${E_ERROR:-1}"
+            ;;
+        enum:*)
+            local list="${validator#enum:}"
+            local item ok=0
+            local IFS=','
+            for item in ${list}; do
+                [[ "${item}" == "${value}" ]] && ok=1
+            done
+            (( ok == 1 )) || return "${E_ERROR:-1}"
+            ;;
+        *)
+            if is::function "${validator}"; then
+                "${validator}" "${value}" || return "${E_ERROR:-1}"
+            else
+                return "${E_ERROR:-1}"
+            fi
+            ;;
+    esac
+    return "${E_SUCCESS:-0}"
+}
+
+# @description Человекочитаемая подсказка валидатора для сообщений и help.
+# @description Human-readable validator hint for messages and help.
+# @param $1 Flag name (without --) / Имя флага (без --)
+# @stdout hint / подсказка
+args::__flag_value_hint() {
+    local -r flag="${1:-}"
+    local -r validator="${__ARGS_FLAG_VALIDATORS["${flag}"]:-}"
+    case "${validator}" in
+        number) printf 'a number\n' ;;
+        enum:*) printf 'one of: %s\n' "${validator#enum:}" ;;
+        *)      printf '%s\n' "${validator}" ;;
+    esac
+}
+
 # ==========================================
 # Объявление дерева / Tree declaration
 # ==========================================
@@ -138,8 +206,13 @@ args::reset() {
     __ARGS_DESCRIPTIONS=()
     __ARGS_FLAGS=()
     __ARGS_FLAG_DESCRIPTIONS=()
+    __ARGS_FLAG_DEFAULTS=()
+    __ARGS_FLAG_VALIDATORS=()
     ARGS_PARAMS=()
     ARGS_FLAGS=()
+    ARGS_REST=()
+    __ARGS_REQUIRED=0
+    __ARGS_VARIADIC_LEVEL=0
     ARGS_HELP_REQUESTED=0
 }
 
@@ -167,13 +240,18 @@ args::define() {
 }
 
 # @description Объявить допустимые значения уровня (ветвление дерева):
-#   на одном уровне может быть несколько альтернатив
+#   на одном уровне может быть несколько альтернатив. Имя с суффиксом
+#   "..." делает уровень повторяемым: допустимые имена повторяются
+#   без ограничений (аналог nargs='*' в argparse).
 # @description Declare allowed values for a level (tree branching):
-#   one level may hold several alternatives
+#   one level may hold several alternatives. A name with a "..." suffix
+#   makes the level variadic: its allowed names may repeat unboundedly
+#   (the argparse nargs='*' analog).
 # @param $1 Level number (1-based) / Номер уровня (с 1)
 # @param $@ Parameter names allowed at this level / Имена, допустимые на уровне
 # @example
 #   args::level 1 start stop status
+#   args::level 3 file...            # повторяемый уровень / variadic level
 args::level() {
     local level="${1:-}"
     shift $(( $# > 0 ? 1 : 0 ))
@@ -189,6 +267,11 @@ args::level() {
 
     local name
     for name in "$@"; do
+        if [[ "${name}" == *"..." ]]; then
+            # Повторяемый уровень / Variadic level
+            __ARGS_VARIADIC_LEVEL="${level}"
+            name="${name%...}"
+        fi
         if is::empty "${name}"; then
             log::warn "args::level: empty parameter name at level ${level}"
             return "${E_ERROR:-1}"
@@ -202,6 +285,23 @@ args::level() {
             __ARGS_TREE["${level}"]="${name}"
         fi
     done
+}
+
+# @description Объявить минимальное количество позиционных параметров.
+# @description Declare the minimum number of positional parameters.
+#   args::parse fails with E_INVALID if fewer are given.
+# @param $1 Minimum count, non-negative integer / Минимум, целое число >= 0
+# @return 0 ok, 1 invalid count
+# @example
+#   args::required 2
+args::required() {
+    local -r count="${1:-}"
+    if is::empty "${count}" || ! [[ "${count}" =~ ^[0-9]+$ ]]; then
+        log::warn "args::required: count must be a non-negative integer, got: ${count}"
+        return "${E_ERROR:-1}"
+    fi
+    __ARGS_REQUIRED="${count}"
+    return "${E_SUCCESS:-0}"
 }
 
 # @description Задать описание параметра для help-сообщения
@@ -235,12 +335,23 @@ args::describe() {
 #   Flags do not occupy positional tree levels
 # @param $1 Flag name (with or without --) / Имя флага (с -- или без)
 # @param $2 [optional] Type: "bool" (default) or "value" / [опционально] Тип: "bool" (по умолчанию) или "value"
+# @param $3 [optional] Default value (value flags; also for --help display)
+#        [опционально] Значение по умолчанию (для value-флагов; попадает в help)
+# @param $4 [optional] Value validator: "number", "enum:a,b,c", or a callback
+#        function name returning 0 for valid values
+#        [опционально] Валидатор значения: "number", "enum:a,b,c" или имя
+#        функции-колбэка, возвращающей 0 для допустимых значений
 # @example
 #   args::flag verbose
 #   args::flag output value
+#   args::flag env value staging "enum:staging,prod"
+#   args::flag port value "" number
+#   args::flag token value "" "is::not_empty"
 args::flag() {
     local name="${1:-}"
     local type="${2:-bool}"
+    local default="${3-}"
+    local validator="${4-}"
 
     # Убираем префикс --, если передан / Strip the -- prefix if given
     name="${name#--}"
@@ -255,6 +366,13 @@ args::flag() {
     fi
 
     __ARGS_FLAGS["${name}"]="${type}"
+    # Пустая строка дефолта означает "дефолта нет" / Empty default = no default
+    if (( $# >= 3 )) && is::not_empty "${default}"; then
+        __ARGS_FLAG_DEFAULTS["${name}"]="${default}"
+    fi
+    if (( $# >= 4 )); then
+        __ARGS_FLAG_VALIDATORS["${name}"]="${validator}"
+    fi
 }
 
 # @description Задать описание флага для help-сообщения
@@ -277,9 +395,14 @@ args::flag_describe() {
 }
 
 # @description Получить значение флага после args::parse
+#   Если флаг не задан на командной строке, возвращается объявленный
+#   дефолт (args::flag NAME value DEFAULT); без дефолта — ошибка.
 # @description Get a flag value after args::parse
+#   If the flag was not set on the command line, the declared default is
+#   returned (args::flag NAME value DEFAULT); without a default — error.
 # @param $1 Flag name (with or without --) / Имя флага (с -- или без)
-# @return Prints the value; 1 if flag not set / Выводит значение; 1 если флаг не задан
+# @return Prints the value; 1 if flag not set and no default declared
+#   Выводит значение; 1 если флаг не задан и дефолт не объявлен
 # @example
 #   report_file="$(args::flag_get output)"
 args::flag_get() {
@@ -289,9 +412,54 @@ args::flag_get() {
 
     local value="${ARGS_FLAGS["${name}"]:-}"
     if is::empty "${value}"; then
+        # Объявленный дефолт / Declared default
+        if [[ -v __ARGS_FLAG_DEFAULTS["${name}"] ]]; then
+            printf '%s\n' "${__ARGS_FLAG_DEFAULTS["${name}"]}"
+            return "${E_SUCCESS:-0}"
+        fi
         return "${E_ERROR:-1}"
     fi
     printf '%s\n' "${value}"
+}
+
+# @description Предикат: флаг был задан на командной строке.
+# @description Predicate: the flag was set on the command line.
+#   False when only the default was declared — use args::flag_get for that.
+#   Ложь, если задан только дефолт — для дефолта используйте args::flag_get.
+# @param $1 Flag name (with or without --) / Имя флага (с -- или без)
+# @return 0 set on the command line, 1 not set
+# @example
+#   if args::flag_is_set dry-run; then ...
+args::flag_is_set() {
+    local name="${1:-}"
+    name="${name#--}"
+    [[ -v ARGS_FLAGS["${name}"] ]]
+}
+
+# @description Предикат: позиционный параметр задан (Python: len check).
+# @description Predicate: the positional parameter is set.
+# @param $1 Position (1-based) / Позиция (с 1)
+# @return 0 set, 1 not set or invalid position
+# @example
+#   if args::has 2; then ...
+args::has() {
+    local -r position="${1:-}"
+    if is::empty "${position}" || ! [[ "${position}" =~ ^[0-9]+$ ]] || [[ "${position}" -eq 0 ]]; then
+        return "${E_ERROR:-1}"
+    fi
+    [[ -n "${ARGS_PARAMS[$((position - 1))]:-}" ]]
+}
+
+# @description Сырые аргументы после "--", построчно.
+# @description Raw arguments after "--", one per line.
+#   The full array is also exposed as ARGS_REST.
+# @stdout rest arguments / сырые аргументы
+# @example
+#   while IFS= read -r raw; do printf '%s\n' "${raw}"; done < <(args::rest)
+args::rest() {
+    if (( ${#ARGS_REST[@]} > 0 )); then
+        printf '%s\n' "${ARGS_REST[@]}"
+    fi
 }
 
 # ==========================================
@@ -340,6 +508,10 @@ args::help() {
                     choices="${item}"
                 fi
             done
+            # Повторяемый уровень: суффикс ... / Variadic level: ... suffix
+            if (( __ARGS_VARIADIC_LEVEL == level )); then
+                choices+="..."
+            fi
             usage+=" [${choices}]"
         fi
     done
@@ -371,15 +543,28 @@ args::help() {
         while IFS= read -r flag_name; do
             local flag_label="--${flag_name}"
             if [[ "${__ARGS_FLAGS["${flag_name}"]:-}" == "value" ]]; then
-                flag_label="--${flag_name} <value>"
+                # Хинт типа значения: number / enum:a,b / другое
+                # Value type hint: number / enum:a,b / other
+                local value_hint="value"
+                case "${__ARGS_FLAG_VALIDATORS["${flag_name}"]:-}" in
+                    number) value_hint="number" ;;
+                    enum:*) value_hint="${__ARGS_FLAG_VALIDATORS["${flag_name}"]#enum:}" ;;
+                esac
+                flag_label="--${flag_name} <${value_hint}>"
             fi
             if is::not_empty "${__ARGS_FLAG_DESCRIPTIONS["${flag_name}"]:-}"; then
-                printf '    %-22s — %s\n' "${flag_label}" "${__ARGS_FLAG_DESCRIPTIONS["${flag_name}"]}"
+                printf '    %-28s — %s' "${flag_label}" "${__ARGS_FLAG_DESCRIPTIONS["${flag_name}"]}"
             else
-                printf '    %s\n' "${flag_label}"
+                printf '    %-28s' "${flag_label}"
+            fi
+            # Дефолт в help / Default in help
+            if [[ -v __ARGS_FLAG_DEFAULTS["${flag_name}"] ]]; then
+                printf ' (default: %s)\n' "${__ARGS_FLAG_DEFAULTS["${flag_name}"]}"
+            else
+                printf '\n'
             fi
         done < <(printf '%s\n' "${!__ARGS_FLAGS[@]}" | sort)
-        printf '    %-22s — %s\n' "--help" "Show this help and exit"
+        printf '    %-28s — %s\n' "--help" "Show this help and exit"
     fi
 }
 
@@ -400,6 +585,7 @@ args::help() {
 args::parse() {
     ARGS_PARAMS=()
     ARGS_FLAGS=()
+    ARGS_REST=()
     ARGS_HELP_REQUESTED=0
 
     # Запрос help / Help request
@@ -427,6 +613,13 @@ args::parse() {
 
     while [[ ${i} -lt ${argc} ]]; do
         local param="${argv[i]}"
+
+        # Разделитель "--": всё после — сырые аргументы (ARGS_REST)
+        # The "--" separator: everything after — raw arguments (ARGS_REST)
+        if [[ "${param}" == "--" ]]; then
+            ARGS_REST=("${argv[@]:i+1}")
+            break
+        fi
 
         # Флаги: --name, --name value, --name=value
         # Flags: --name, --name value, --name=value
@@ -461,6 +654,12 @@ args::parse() {
                     fi
                     ARGS_FLAGS["${flag_name}"]="${argv[i]}"
                 fi
+                # Валидация значения / Value validation
+                if ! args::__validate_flag_value "${flag_name}" "${ARGS_FLAGS["${flag_name}"]}"; then
+                    log::error "flag \"--${flag_name}\" has an invalid value: \"${ARGS_FLAGS["${flag_name}"]}\" (expected $(args::__flag_value_hint "${flag_name}"))"
+                    args::help >&2
+                    return "${E_INVALID:-2}"
+                fi
             else
                 # bool-флаг не принимает значение / bool flag takes no value
                 if [[ "${has_inline}" == "true" ]]; then
@@ -481,6 +680,12 @@ args::parse() {
         # Параметров больше, чем уровней в дереве
         # More parameters than tree levels
         if [[ "${position}" -gt "${max_level}" ]]; then
+            # Повторяемый уровень / Variadic level
+            if (( __ARGS_VARIADIC_LEVEL > 0 )) && args::__is_allowed_at "${__ARGS_VARIADIC_LEVEL}" "${param}"; then
+                ARGS_PARAMS+=("${param}")
+                ((++i))
+                continue
+            fi
             log::error "too many parameters: \"${param}\" is beyond level ${max_level}"
             args::help >&2
             return "${E_INVALID:-2}"
@@ -506,6 +711,13 @@ args::parse() {
         return "${E_INVALID:-2}"
     done
 
+    # Минимальное количество позиционных параметров / Minimum positional count
+    if (( __ARGS_REQUIRED > 0 )) && (( position < __ARGS_REQUIRED )); then
+        log::error "at least ${__ARGS_REQUIRED} parameter(s) are required, got ${position}"
+        args::help >&2
+        return "${E_INVALID:-2}"
+    fi
+
     return "${E_SUCCESS:-0}"
 }
 
@@ -526,11 +738,16 @@ args::require() {
 }
 
 # @description Получить провалидированный параметр по позиции (1-based)
+#   С дефолтом (третий аргумент): возвращает его вместо ошибки.
 # @description Get a validated parameter by position (1-based)
+#   With a default (third argument): returns it instead of failing.
 # @param $1 Position / Позиция
-# @return Prints the value; 1 if position not set / Выводит значение; 1 если позиция пуста
+# @param $2 [optional] Default value / [опционально] Значение по умолчанию
+# @return Prints the value; 1 if position not set and no default given
+#   Выводит значение; 1 если позиция пуста и дефолт не задан
 # @example
 #   stage="$(args::get 1)"
+#   env="$(args::get 2 staging)"
 args::get() {
     local -r position="${1:-}"
 
@@ -541,6 +758,10 @@ args::get() {
 
     local value="${ARGS_PARAMS[$((position - 1))]:-}"
     if is::empty "${value}"; then
+        if (( $# >= 2 )); then
+            printf '%s\n' "${2}"
+            return "${E_SUCCESS:-0}"
+        fi
         return "${E_ERROR:-1}"
     fi
     printf '%s\n' "${value}"
@@ -579,11 +800,14 @@ args::completion() {
         flag_words+=" --${flag_name}"
     done < <(printf '%s\n' "${!__ARGS_FLAGS[@]}" | sort)
 
-    # Список value-флагов (после них значение не дополняется)
-    # Value flags list (their values are not completed)
+    # Список value-флагов (после них значение не дополняется);
+    # enum-флаги исключаются — для них дополняются значения
+    # Value flags list (their values are not completed);
+    # enum flags are excluded — their values ARE completed
     local value_flags=""
     while IFS= read -r flag_name; do
-        if [[ "${__ARGS_FLAGS["${flag_name}"]:-}" == "value" ]]; then
+        if [[ "${__ARGS_FLAGS["${flag_name}"]:-}" == "value" ]] && \
+           [[ "${__ARGS_FLAG_VALIDATORS["${flag_name}"]:-}" != enum:* ]]; then
             value_flags+=" --${flag_name}"
         fi
     done < <(printf '%s\n' "${!__ARGS_FLAGS[@]}" | sort)
@@ -625,6 +849,23 @@ EOF
     esac
 EOF
     fi
+
+    # enum-значения для value-флагов / enum values for value flags
+    local enum_flag_name enum_values
+    while IFS= read -r enum_flag_name; do
+        if [[ "${__ARGS_FLAGS["${enum_flag_name}"]:-}" == "value" ]] && \
+           [[ "${__ARGS_FLAG_VALIDATORS["${enum_flag_name}"]:-}" == enum:* ]]; then
+            enum_values="${__ARGS_FLAG_VALIDATORS["${enum_flag_name}"]#enum:}"
+            enum_values="${enum_values//,/ }"
+            cat <<EOF
+
+    # enum-значения: --${enum_flag_name} <${enum_values// /|}>
+    case "\${prev}" in
+        --${enum_flag_name}) COMPREPLY=( \$(compgen -W "${enum_values}" -- "\${cur}") ); return 0 ;;
+    esac
+EOF
+        fi
+    done < <(printf '%s\n' "${!__ARGS_FLAGS[@]}" | sort)
 
     cat <<EOF
 
