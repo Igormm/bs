@@ -1,38 +1,15 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
-# shellcheck disable=SC2155
+# lib/frameworks/frameworksintegration.sh — integrate patterns from popular Bash frameworks
+# lib/frameworks/frameworksintegration.sh — интеграция паттернов популярных Bash-фреймворков
+#
+# Integrates features and patterns from popular Bash frameworks: Bash-it,
+# Bashinator, Bashly, ShellSpec, and mbfl.
+# Интегрирует функции и паттерны из популярных Bash-фреймворков:
+# Bash-it, Bashinator, Bashly, ShellSpec и mbfl.
 
-# frameworksintegration.sh — Frameworks Integration Module for BS
-# Модуль интеграции фреймворков для BS
-#
-# Description:
-#   Integrates features and patterns from popular Bash frameworks:
-#   Bash-it, Bashinator, Bashly, ShellSpec, and mbfl.
-#   Интегрирует функции и паттерны из популярных Bash фреймворков:
-#   Bash-it, Bashinator, Bashly, ShellSpec и mbfl.
-#
-# Features:
-#   - Bash-it: Community-driven aliases, plugins, and themes
-#   - Bashinator: Message handling, logging, and modular structure
-#   - Bashly: CLI generation from YAML with argument validation
-#   - ShellSpec: BDD testing framework for Bash scripts
-#   - mbfl: Marco's Bash Functions Library with naming conventions
-#
-# Dependencies:
-#   - bash 4.0+ (for associative arrays)
-#   - Various framework-specific dependencies
-#
-# Usage:
-#   source "${BS_HOME}/boot.sh"
-#   bs::init
-#   frameworks::init
-#   frameworks::bashit::load_plugin "git"
-#   frameworks::bashinator::log_message "INFO" "Test message"
-#
-# @author BS Framework
-# @since 2026-01-06
-# @version 1.0.0
 # @depends core/const, core/logger, core/utils, core/errorhandler
+# @tier core
 
 # Source Guard / Защита от повторной загрузки
 bs::guard "FRAMEWORKS_INTEGRATION" || return 0
@@ -52,35 +29,36 @@ FRAMEWORKS_BASHINATOR_LEVEL="INFO"
 
 # Initialize frameworks integration
 # @description Initialize the whole frameworks integration module (config dirs + submodules).
+# @description Инициализировать модуль интеграции фреймворков целиком (каталоги конфигурации + подмодули).
 # @description Инициализировать модуль интеграции фреймворков (директории и подмодули).
 frameworks::init() {
-    
-    log::info "Initializing Frameworks Integration module..."
-    
-    # Create necessary directories
-    mkdir -p "${FRAMEWORKS_CONFIG_DIR}" || {
-        error::throw "Failed to create config directory" \
-            "${LIB_ERROR_FILE_OPERATION}"
-    }
-    
-    mkdir -p "${FRAMEWORKS_PLUGIN_DIR}" || {
-        error::throw "Failed to create plugin directory" \
-            "${LIB_ERROR_FILE_OPERATION}"
-    }
-    
-    mkdir -p "${FRAMEWORKS_CACHE_DIR}" || {
-        error::throw "Failed to create cache directory" \
-            "${LIB_ERROR_FILE_OPERATION}"
-    }
-    
-    # Initialize sub-modules
-    frameworks::bashit::init
-    frameworks::bashinator::init
-    frameworks::bashly::init
-    frameworks::shellspec::init
-    frameworks::mbfl::init
-    
-    log::success "Frameworks Integration module initialized successfully"
+  
+  log::info "Initializing Frameworks Integration module..."
+  
+  # Create necessary directories
+  mkdir -p "${FRAMEWORKS_CONFIG_DIR}" || {
+  error::throw "Failed to create config directory" \
+  "${LIB_ERROR_FILE_OPERATION}"
+  }
+  
+  mkdir -p "${FRAMEWORKS_PLUGIN_DIR}" || {
+  error::throw "Failed to create plugin directory" \
+  "${LIB_ERROR_FILE_OPERATION}"
+  }
+  
+  mkdir -p "${FRAMEWORKS_CACHE_DIR}" || {
+  error::throw "Failed to create cache directory" \
+  "${LIB_ERROR_FILE_OPERATION}"
+  }
+  
+  # Initialize sub-modules
+  frameworks::bashit::init
+  frameworks::bashinator::init
+  frameworks::bashly::init
+  frameworks::shellspec::init
+  frameworks::mbfl::init
+  
+  log::success "Frameworks Integration module initialized successfully"
 }
 
 # ============================================================================
@@ -89,348 +67,363 @@ frameworks::init() {
 
 # @description Initialize the Bash-it integration state.
 # @description Инициализировать состояние интеграции Bash-it.
+# @description Инициализировать состояние интеграции Bash-it.
 frameworks::bashit::init() {
-    
-    log::debug "Initializing Bash-it integration..."
-    
-    # Initialize Bash-it components
-    FRAMEWORKS_BASHIT_PLUGINS=()
-    FRAMEWORKS_BASHIT_ALIASES=()
-    FRAMEWORKS_BASHIT_COMPLETIONS=()
-    
-    log::debug "Bash-it integration initialized"
+  
+  log::debug "Initializing Bash-it integration..."
+  
+  # Initialize Bash-it components
+  FRAMEWORKS_BASHIT_PLUGINS=()
+  FRAMEWORKS_BASHIT_ALIASES=()
+  FRAMEWORKS_BASHIT_COMPLETIONS=()
+  
+  log::debug "Bash-it integration initialized"
 }
 
 # Load Bash-it style plugin
 # @description Load a Bash-it style plugin (base, alias, git, docker, ...).
 # @description Загрузить плагин в стиле Bash-it (base, alias, git, docker, ...).
+# @description Загрузить плагин в стиле Bash-it (base, alias, git, docker, ...).
 frameworks::bashit::load_plugin() {
-    local plugin_name="${1:-}"
-    
-    if is::empty "${plugin_name}"; then
-        error::throw "Plugin name is required" \
-            "${LIB_ERROR_INVALID_ARGS}"
-    fi
-    
-    log::info "Loading Bash-it plugin: ${plugin_name}"
-    
-    # Check if plugin is already loaded
-    if [[ " ${FRAMEWORKS_BASHIT_PLUGINS[*]} " =~ " ${plugin_name} " ]]; then
-        log::warn "Plugin ${plugin_name} is already loaded"
-        return 0
-    fi
-    
-    # Plugin implementations
-    case "${plugin_name}" in
-        base)
-            frameworks::bashit::plugins::base::load
-            ;;
-        alias)
-            frameworks::bashit::plugins::alias::load
-            ;;
-        battery)
-            frameworks::bashit::plugins::battery::load
-            ;;
-        docker)
-            frameworks::bashit::plugins::docker::load
-            ;;
-        editor)
-            frameworks::bashit::plugins::editor::load
-            ;;
-        git)
-            frameworks::bashit::plugins::git::load
-            ;;
-        history)
-            frameworks::bashit::plugins::history::load
-            ;;
-        osx)
-            frameworks::bashit::plugins::osx::load
-            ;;
-        projects)
-            frameworks::bashit::plugins::projects::load
-            ;;
-        ssh)
-            frameworks::bashit::plugins::ssh::load
-            ;;
-        tmux)
-            frameworks::bashit::plugins::tmux::load
-            ;;
-        *)
-            log::warn "Unknown Bash-it plugin: ${plugin_name}"
-            return "${E_ERROR}"
-            ;;
-    esac
-    
-    FRAMEWORKS_BASHIT_PLUGINS+=("${plugin_name}")
-    log::success "Plugin ${plugin_name} loaded successfully"
+  local plugin_name="${1:-}"
+  
+  if is::empty "${plugin_name}"; then
+  error::throw "Plugin name is required" \
+  "${LIB_ERROR_INVALID_ARGS}"
+  fi
+  
+  log::info "Loading Bash-it plugin: ${plugin_name}"
+  
+  # Check if plugin is already loaded
+  if [[ " ${FRAMEWORKS_BASHIT_PLUGINS[*]} " =~ " ${plugin_name} " ]]; then
+  log::warn "Plugin ${plugin_name} is already loaded"
+  return 0
+  fi
+  
+  # Plugin implementations
+  case "${plugin_name}" in
+  base)
+  frameworks::bashit::plugins::base::load
+  ;;
+  alias)
+  frameworks::bashit::plugins::alias::load
+  ;;
+  battery)
+  frameworks::bashit::plugins::battery::load
+  ;;
+  docker)
+  frameworks::bashit::plugins::docker::load
+  ;;
+  editor)
+  frameworks::bashit::plugins::editor::load
+  ;;
+  git)
+  frameworks::bashit::plugins::git::load
+  ;;
+  history)
+  frameworks::bashit::plugins::history::load
+  ;;
+  osx)
+  frameworks::bashit::plugins::osx::load
+  ;;
+  projects)
+  frameworks::bashit::plugins::projects::load
+  ;;
+  ssh)
+  frameworks::bashit::plugins::ssh::load
+  ;;
+  tmux)
+  frameworks::bashit::plugins::tmux::load
+  ;;
+  *)
+  log::warn "Unknown Bash-it plugin: ${plugin_name}"
+  return "${E_ERROR}"
+  ;;
+  esac
+  
+  FRAMEWORKS_BASHIT_PLUGINS+=("${plugin_name}")
+  log::success "Plugin ${plugin_name} loaded successfully"
 }
 
 # Base plugin (core functionality)
 # @description Load the base plugin aliases (navigation, list, history, process).
+# @description Загрузить базовые алиасы плагина (навигация, список, история, процессы).
 # @description Загрузить базовые алиасы (навигация, листинг, история, процессы).
 frameworks::bashit::plugins::base::load() {
-    # Directory navigation shortcuts
-    alias ..='cd ..'
-    alias ...='cd ../..'
-    alias ....='cd ../../..'
-    alias .....='cd ../../../..'
-    
-    # List shortcuts
-    alias ll='ls -al'
-    alias la='ls -A'
-    alias l='ls -CF'
-    
-    # Safe operations
-    alias rm='rm -i'
-    alias cp='cp -i'
-    alias mv='mv -i'
-    
-    # History shortcuts
-    alias h='history'
-    alias j='jobs -l'
-    
-    # Process management
-    alias psg='ps aux | grep -v grep | grep'
-    alias killall='killall'
-    
-    # System information
-    alias myip='curl -s https://ipinfo.io/ip'
-    alias ports='netstat -tulanp'
-    
-    # Quick edit
-    alias qedit='${EDITOR:-nano} ~/.bashrc && source ~/.bashrc'
-    
-    # BOSA-specific
-    alias bosa-init='source "${BOSA_HOME}/boot.sh" && bs::init'
-    alias bosa-info='bs::info'
+  # Directory navigation shortcuts
+  alias ..='cd ..'
+  alias ...='cd ../..'
+  alias ....='cd ../../..'
+  alias .....='cd ../../../..'
+  
+  # List shortcuts
+  alias ll='ls -al'
+  alias la='ls -A'
+  alias l='ls -CF'
+  
+  # Safe operations
+  alias rm='rm -i'
+  alias cp='cp -i'
+  alias mv='mv -i'
+  
+  # History shortcuts
+  alias h='history'
+  alias j='jobs -l'
+  
+  # Process management
+  alias psg='ps aux | grep -v grep | grep'
+  alias killall='killall'
+  
+  # System information
+  alias myip='curl -s https://ipinfo.io/ip'
+  alias ports='netstat -tulanp'
+  
+  # Quick edit
+  alias qedit='${EDITOR:-nano} ~/.bashrc && source ~/.bashrc'
+  
+  # BOSA-specific
+  alias bosa-init='source "${BOSA_HOME}/boot.sh" && bs::init'
+  alias bosa-info='bs::info'
 }
 
 # Alias plugin
 # @description Load common shell aliases (grep, df, du, tree, extract).
+# @description Загрузить общие алиасы shell (grep, df, du, tree, extract).
 # @description Загрузить общие алиасы оболочки (grep, df, du, tree, extract).
 frameworks::bashit::plugins::alias::load() {
-    # Common aliases
-    alias grep='grep --color=auto'
-    alias fgrep='fgrep --color=auto'
-    alias egrep='egrep --color=auto'
-    
-    # File size shortcuts
-    alias df='df -h'
-    alias du='du -h'
-    
-    # Tree command
-    if utils::has tree; then
-        alias tree='tree -C'
-    else
-        alias tree='find . -print | sed -e "s;[^/]*/;|____;g;s;____|; |;g"'
-    fi
-    
-    # Date/time
-    alias now='date +"%T"'
-    alias nowdate='date +"%d-%m-%Y"'
-    
-    # Extract archives
-    alias extract='frameworks::bashit::plugins::alias::extract'
+  # Common aliases
+  alias grep='grep --color=auto'
+  alias fgrep='fgrep --color=auto'
+  alias egrep='egrep --color=auto'
+  
+  # File size shortcuts
+  alias df='df -h'
+  alias du='du -h'
+  
+  # Tree command
+  if utils::has tree; then
+  alias tree='tree -C'
+  else
+  alias tree='find . -print | sed -e "s;[^/]*/;|____;g;s;____|; |;g"'
+  fi
+  
+  # Date/time
+  alias now='date +"%T"'
+  alias nowdate='date +"%d-%m-%Y"'
+  
+  # Extract archives
+  alias extract='frameworks::bashit::plugins::alias::extract'
 }
 
 # Extract function for multiple archive types
 # @description Extract a file based on its archive type (tar, gz, zip, 7z, ...).
+# @description Извлечь файл по типу архива (tar, gz, zip, 7z, ...).
 # @description Распаковать архив по типу файла (tar, gz, zip, 7z, ...).
 frameworks::bashit::plugins::alias::extract() {
-    if is::file "$1"; then
-        case "$1" in
-            *.tar.bz2)   tar xjf "$1"     ;;
-            *.tar.gz)    tar xzf "$1"     ;;
-            *.bz2)       bunzip2 "$1"     ;;
-            *.rar)       unrar e "$1"     ;;
-            *.gz)        gunzip "$1"      ;;
-            *.tar)       tar xf "$1"      ;;
-            *.tbz2)      tar xjf "$1"     ;;
-            *.tgz)       tar xzf "$1"     ;;
-            *.zip)       unzip "$1"       ;;
-            *.Z)         uncompress "$1"  ;;
-            *.7z)        7z x "$1"        ;;
-            *)           echo "'$1' cannot be extracted via extract()" ;;
-        esac
-    else
-        echo "'$1' is not a valid file"
-    fi
+  if is::file "$1"; then
+  case "$1" in
+  *.tar.bz2)   tar xjf "$1"     ;;
+  *.tar.gz)    tar xzf "$1"     ;;
+  *.bz2)       bunzip2 "$1"     ;;
+  *.rar)       unrar e "$1"     ;;
+  *.gz)        gunzip "$1"      ;;
+  *.tar)       tar xf "$1"      ;;
+  *.tbz2)      tar xjf "$1"     ;;
+  *.tgz)       tar xzf "$1"     ;;
+  *.zip)       unzip "$1"       ;;
+  *.Z)         uncompress "$1"  ;;
+  *.7z)        7z x "$1"        ;;
+  *)           echo "'$1' cannot be extracted via extract()" ;;
+  esac
+  else
+  echo "'$1' is not a valid file"
+  fi
 }
 
 # Battery plugin
 # @description Load the battery alias that shows battery info.
+# @description Загрузить алиас battery, показывающий информацию о батарее.
 # @description Загрузить алиас battery для показа состояния батареи.
 frameworks::bashit::plugins::battery::load() {
-    alias battery='frameworks::bashit::plugins::battery::info'
+  alias battery='frameworks::bashit::plugins::battery::info'
 }
 
 # @description Show battery capacity and status.
+# @description Показать ёмкость и статус батареи.
 # @description Показать ёмкость и состояние батареи.
 frameworks::bashit::plugins::battery::info() {
-    if is::file /sys/class/power_supply/BAT0/capacity; then
-        local capacity
-        capacity=$(cat /sys/class/power_supply/BAT0/capacity)
-        local status
-        status=$(cat /sys/class/power_supply/BAT0/status)
-        echo "Battery: ${capacity}% (${status})"
-    elif utils::has pmset; then
-        pmset -g batt
-    else
-        echo "Battery information not available"
-    fi
+  if is::file /sys/class/power_supply/BAT0/capacity; then
+  local capacity
+  capacity=$(cat /sys/class/power_supply/BAT0/capacity)
+  local status
+  status=$(cat /sys/class/power_supply/BAT0/status)
+  echo "Battery: ${capacity}% (${status})"
+  elif utils::has pmset; then
+  pmset -g batt
+  else
+  echo "Battery information not available"
+  fi
 }
 
 # Docker plugin
 # @description Load Docker aliases and completion.
+# @description Загрузить алиасы и дополнение для Docker.
 # @description Загрузить алиасы и дополнения Docker.
 frameworks::bashit::plugins::docker::load() {
-    alias d='docker'
-    alias dc='docker-compose'
-    alias dps='docker ps'
-    alias dpsa='docker ps -a'
-    alias dim='docker images'
-    alias drm='docker rm'
-    alias drmi='docker rmi'
-    alias dcl='docker system prune -f'
-    
-    # Docker bash completion
-    if utils::has docker && utils::has docker-compose; then
-        utils::ignore source <(docker completion bash)
-        utils::ignore source <(docker-compose completion bash)
-    fi
+  alias d='docker'
+  alias dc='docker-compose'
+  alias dps='docker ps'
+  alias dpsa='docker ps -a'
+  alias dim='docker images'
+  alias drm='docker rm'
+  alias drmi='docker rmi'
+  alias dcl='docker system prune -f'
+  
+  # Docker bash completion
+  if utils::has docker && utils::has docker-compose; then
+  utils::ignore source <(docker completion bash)
+  utils::ignore source <(docker-compose completion bash)
+  fi
 }
 
 # Editor plugin
 # @description Set EDITOR and load editor aliases.
+# @description Задать EDITOR и загрузить алиасы редактора.
 # @description Установить EDITOR и загрузить алиасы редактора.
 frameworks::bashit::plugins::editor::load() {
-    export EDITOR="${EDITOR:-nano}"
-    alias edit="${EDITOR}"
-    alias e="${EDITOR}"
+  export EDITOR="${EDITOR:-nano}"
+  alias edit="${EDITOR}"
+  alias e="${EDITOR}"
 }
 
 # Git plugin
 # @description Load Git aliases and helper functions (g, gs, ga, gc, gp, ...).
+# @description Загрузить алиасы и помощники Git (g, gs, ga, gc, gp, ...).
 # @description Загрузить алиасы и вспомогательные функции Git (g, gs, ga, gc, gp, ...).
 frameworks::bashit::plugins::git::load() {
-    alias g='git'
-    alias gs='git status'
-    alias ga='git add'
-    alias gc='git commit'
-    alias gp='git push'
-    alias gl='git log'
-    alias gd='git diff'
-    alias gb='git branch'
-    alias gco='git checkout'
-    alias gm='git merge'
-    alias gr='git rebase'
-    alias grv='git revert'
-    alias grm='git rm'
-    alias gmv='git mv'
-    alias gcl='git clone'
-    alias gpl='git pull'
-    alias gpp='git pull && git push'
-    
-    # Git functions
-    git_current_branch() {
-        utils::quiet_err git rev-parse --abbrev-ref HEAD || echo "unknown"
-    }
-    
-    git_current_sha() {
-        utils::quiet_err git rev-parse HEAD | cut -c1-7 || echo "unknown"
-    }
-    
-    # Git prompt
-    git_prompt() {
-        local branch
-        branch=$(git_current_branch)
-        if is::not_empty "${branch}" && [[ "${branch}" != "unknown" ]]; then
-            echo " (git:${branch})"
-        fi
-    }
+  alias g='git'
+  alias gs='git status'
+  alias ga='git add'
+  alias gc='git commit'
+  alias gp='git push'
+  alias gl='git log'
+  alias gd='git diff'
+  alias gb='git branch'
+  alias gco='git checkout'
+  alias gm='git merge'
+  alias gr='git rebase'
+  alias grv='git revert'
+  alias grm='git rm'
+  alias gmv='git mv'
+  alias gcl='git clone'
+  alias gpl='git pull'
+  alias gpp='git pull && git push'
+  
+  # Git functions
+  git_current_branch() {
+  utils::quiet_err git rev-parse --abbrev-ref HEAD || echo "unknown"
+  }
+  
+  git_current_sha() {
+  utils::quiet_err git rev-parse HEAD | cut -c1-7 || echo "unknown"
+  }
+  
+  # Git prompt
+  git_prompt() {
+  local branch
+  branch=$(git_current_branch)
+  if is::not_empty "${branch}" && [[ "${branch}" != "unknown" ]]; then
+  echo " (git:${branch})"
+  fi
+  }
 }
 
 # History plugin
 # @description Load shell history settings and aliases.
+# @description Загрузить настройки и алиасы истории shell.
 # @description Загрузить настройки и алиасы истории оболочки.
 frameworks::bashit::plugins::history::load() {
-    # History settings
-    shopt -s histappend
-    export HISTCONTROL=ignoredups
-    export HISTSIZE=10000
-    export HISTFILESIZE=10000
-    
-    # History aliases
-    alias h='history'
-    alias hg='history | grep'
-    alias hclear='history -c'
-    
-    # Search history with grep
-    alias histg='history | grep'
+  # History settings
+  shopt -s histappend
+  export HISTCONTROL=ignoredups
+  export HISTSIZE=10000
+  export HISTFILESIZE=10000
+  
+  # History aliases
+  alias h='history'
+  alias hg='history | grep'
+  alias hclear='history -c'
+  
+  # Search history with grep
+  alias histg='history | grep'
 }
 
 # macOS plugin
 # @description Load macOS-specific aliases (Finder, flushdns, ...).
 # @description Загрузить алиасы для macOS (Finder, flushdns, ...).
+# @description Загрузить алиасы для macOS (Finder, flushdns, ...).
 frameworks::bashit::plugins::osx::load() {
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        alias finder='open -a Finder .'
-        alias show='defaults write com.apple.finder AppleShowAllFiles TRUE; killall Finder'
-        alias hide='defaults write com.apple.finder AppleShowAllFiles FALSE; killall Finder'
-        alias flushdns='sudo dscacheutil -flushcache'
-        alias lsusb='system_profiler SPUSBDataType'
-        alias lsbt='system_profiler SPBluetoothDataType'
-    fi
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+  alias finder='open -a Finder .'
+  alias show='defaults write com.apple.finder AppleShowAllFiles TRUE; killall Finder'
+  alias hide='defaults write com.apple.finder AppleShowAllFiles FALSE; killall Finder'
+  alias flushdns='sudo dscacheutil -flushcache'
+  alias lsusb='system_profiler SPUSBDataType'
+  alias lsbt='system_profiler SPBluetoothDataType'
+  fi
 }
 
 # Projects plugin
 # @description Load project navigation helpers (proj, proj_list).
 # @description Загрузить помощники навигации по проектам (proj, proj_list).
+# @description Загрузить помощники навигации по проектам (proj, proj_list).
 frameworks::bashit::plugins::projects::load() {
-    export PROJECTS_HOME="${PROJECTS_HOME:-${HOME}/Projects}"
-    
-    proj() {
-        utils::quiet_err cd "${PROJECTS_HOME}/${1}" || echo "Project not found: ${1}"
-    }
-    
-    proj_list() {
-        ls -1 "${PROJECTS_HOME}"
-    }
+  export PROJECTS_HOME="${PROJECTS_HOME:-${HOME}/Projects}"
+  
+  proj() {
+  utils::quiet_err cd "${PROJECTS_HOME}/${1}" || echo "Project not found: ${1}"
+  }
+  
+  proj_list() {
+  ls -1 "${PROJECTS_HOME}"
+  }
 }
 
 # SSH plugin
 # @description Load SSH aliases and the ssh_copy_id helper.
 # @description Загрузить алиасы SSH и помощник ssh_copy_id.
+# @description Загрузить алиасы SSH и помощник ssh_copy_id.
 frameworks::bashit::plugins::ssh::load() {
-    alias ss='ssh'
-    alias ssconfig='${EDITOR:-nano} ~/.ssh/config'
-    
-    # SSH with common options
-    ssh_copy_id() {
-        if utils::has ssh-copy-id; then
-            command ssh-copy-id "$@"
-        else
-            echo "ssh-copy-id not available"
-        fi
-    }
+  alias ss='ssh'
+  alias ssconfig='${EDITOR:-nano} ~/.ssh/config'
+  
+  # SSH with common options
+  ssh_copy_id() {
+  if utils::has ssh-copy-id; then
+  command ssh-copy-id "$@"
+  else
+  echo "ssh-copy-id not available"
+  fi
+  }
 }
 
 # Tmux plugin
 # @description Load tmux aliases and auto-attach to a session.
 # @description Загрузить алиасы tmux и авто-подключение к сессии.
+# @description Загрузить алиасы tmux и авто-подключение к сессии.
 frameworks::bashit::plugins::tmux::load() {
-    alias tm='tmux'
-    alias tml='tmux list-sessions'
-    alias tma='tmux attach-session -t'
-    alias tmn='tmux new-session -s'
-    alias tmk='tmux kill-session -t'
-    
-    # Auto-attach to tmux session
-    if utils::has tmux && is::empty "${TMUX}"; then
-        if utils::quiet_err tmux has-session; then
-            tmux attach-session
-        fi
-    fi
+  alias tm='tmux'
+  alias tml='tmux list-sessions'
+  alias tma='tmux attach-session -t'
+  alias tmn='tmux new-session -s'
+  alias tmk='tmux kill-session -t'
+  
+  # Auto-attach to tmux session
+  if utils::has tmux && is::empty "${TMUX}"; then
+  if utils::quiet_err tmux has-session; then
+  tmux attach-session
+  fi
+  fi
 }
 
 # ============================================================================
@@ -439,84 +432,86 @@ frameworks::bashit::plugins::tmux::load() {
 
 # @description Initialize the Bashinator message levels.
 # @description Инициализировать уровни сообщений Bashinator.
+# @description Инициализировать уровни сообщений Bashinator.
 frameworks::bashinator::init() {
-    
-    log::debug "Initializing Bashinator integration..."
-    
-    # Initialize Bashinator message levels
-    FRAMEWORKS_BASHINATOR_LEVELS=(
-        "DEBUG"
-        "INFO"
-        "NOTICE"
-        "WARNING"
-        "ERROR"
-        "CRITICAL"
-        "ALERT"
-        "EMERGENCY"
-    )
-    
-    log::debug "Bashinator integration initialized"
+  
+  log::debug "Initializing Bashinator integration..."
+  
+  # Initialize Bashinator message levels
+  FRAMEWORKS_BASHINATOR_LEVELS=(
+  "DEBUG"
+  "INFO"
+  "NOTICE"
+  "WARNING"
+  "ERROR"
+  "CRITICAL"
+  "ALERT"
+  "EMERGENCY"
+  )
+  
+  log::debug "Bashinator integration initialized"
 }
 
 # Bashinator-style message handling
 # @description Log a message at a Bashinator level (DEBUG, INFO, ERROR, ...).
+# @description Записать сообщение на уровне Bashinator (DEBUG, INFO, ERROR, ...).
 # @description Записать сообщение с уровнем Bashinator (DEBUG, INFO, ERROR, ...).
 frameworks::bashinator::log_message() {
-    local level="${1:-INFO}"
-    local message="${2:-}"
-    local component="${3:-Bashinator}"
-    
-    if is::empty "${message}"; then
-        error::throw "Message is required" \
-            "${LIB_ERROR_INVALID_ARGS}"
-    fi
-    
-    # Map Bashinator levels to BS logger levels
-    case "${level}" in
-        DEBUG)
-            log::debug "[${component}] ${message}"
-            ;;
-        INFO|NOTICE)
-            log::info "[${component}] ${message}"
-            ;;
-        WARNING)
-            log::warn "[${component}] ${message}"
-            ;;
-        ERROR|CRITICAL)
-            log::error "[${component}] ${message}"
-            ;;
-        ALERT|EMERGENCY)
-            log::fatal "[${component}] ${message}"
-            return "${?}"
-            ;;
-        *)
-            log::info "[${component}] ${message}"
-            ;;
-    esac
+  local level="${1:-INFO}"
+  local message="${2:-}"
+  local component="${3:-Bashinator}"
+  
+  if is::empty "${message}"; then
+  error::throw "Message is required" \
+  "${LIB_ERROR_INVALID_ARGS}"
+  fi
+  
+  # Map Bashinator levels to BS logger levels
+  case "${level}" in
+  DEBUG)
+  log::debug "[${component}] ${message}"
+  ;;
+  INFO|NOTICE)
+  log::info "[${component}] ${message}"
+  ;;
+  WARNING)
+  log::warn "[${component}] ${message}"
+  ;;
+  ERROR|CRITICAL)
+  log::error "[${component}] ${message}"
+  ;;
+  ALERT|EMERGENCY)
+  log::fatal "[${component}] ${message}"
+  return "${?}"
+  ;;
+  *)
+  log::info "[${component}] ${message}"
+  ;;
+  esac
 }
 
 # Bashinator-style function structure
 # @description Template for a Bashinator-style structured function.
 # @description Шаблон структурированной функции в стиле Bashinator.
+# @description Шаблон структурированной функции в стиле Bashinator.
 frameworks::bashinator::function_template() {
-    local func_name="frameworks::bashinator::function_template"
-    local param1="${1:-}"
-    local param2="${2:-}"
-    
-    # Input validation
-    if is::empty "${param1}"; then
-        error::throw "param1 is required" \
-            "${LIB_ERROR_INVALID_ARGS}"
-    fi
-    
-    # Function body
-    frameworks::bashinator::log_message "DEBUG" "Entering function: ${func_name}"
-    
-    # Your code here
-    local result="${param1}_${param2}"
-    
-    frameworks::bashinator::log_message "DEBUG" "Exiting function: ${func_name}"
-    echo "${result}"
+  local func_name="frameworks::bashinator::function_template"
+  local param1="${1:-}"
+  local param2="${2:-}"
+
+  # Input validation
+  if is::empty "${param1}"; then
+    error::throw "param1 is required" \
+      "${LIB_ERROR_INVALID_ARGS}"
+  fi
+
+  # Function body / Тело функции
+  frameworks::bashinator::log_message "DEBUG" "Entering function: ${func_name}"
+
+  local result="${param1}_${param2}"
+
+  frameworks::bashinator::log_message "DEBUG" "Exiting function: ${func_name}"
+  echo "${result}"
 }
 
 # ============================================================================
@@ -525,97 +520,101 @@ frameworks::bashinator::function_template() {
 
 # @description Initialize the Bashly CLI command state.
 # @description Инициализировать состояние CLI-команд Bashly.
+# @description Инициализировать состояние CLI-команд Bashly.
 frameworks::bashly::init() {
-    
-    log::debug "Initializing Bashly integration..."
-    
-    # Initialize Bashly components
-    FRAMEWORKS_BASHLY_COMMANDS=()
-    FRAMEWORKS_BASHLY_OPTIONS=()
-    FRAMEWORKS_BASHLY_ARGS=()
-    
-    log::debug "Bashly integration initialized"
+  
+  log::debug "Initializing Bashly integration..."
+  
+  # Initialize Bashly components
+  FRAMEWORKS_BASHLY_COMMANDS=()
+  FRAMEWORKS_BASHLY_OPTIONS=()
+  FRAMEWORKS_BASHLY_ARGS=()
+  
+  log::debug "Bashly integration initialized"
 }
 
 # Parse command line arguments Bashly-style
 # @description Parse command-line arguments into args/flags/options.
 # @description Разобрать аргументы CLI на args/flags/options.
+# @description Разобрать аргументы CLI на args/flags/options.
 frameworks::bashly::parse_args() {
-    
-    # Initialize variables
-    local args=()
-    local flags=()
-    local options=()
-    
-    # Parse arguments
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            --*=*)
-                # Long option with value
-                local option="${1%%=*}"
-                local value="${1#*=}"
-                options+=("${option}=${value}")
-                shift
-                ;;
-            --*)
-                # Long option without value (flag)
-                flags+=("$1")
-                shift
-                ;;
-            -*)
-                # Short options
-                flags+=("$1")
-                shift
-                ;;
-            *)
-                # Positional arguments
-                args+=("$1")
-                shift
-                ;;
-        esac
-    done
-    
-    # Store parsed arguments in global arrays
-    FRAMEWORKS_BASHLY_ARGS=("${args[@]}")
-    FRAMEWORKS_BASHLY_FLAGS=("${flags[@]}")
-    FRAMEWORKS_BASHLY_OPTIONS=("${options[@]}")
-    
-    # Return parsed data
-    echo "args: ${args[*]}"
-    echo "flags: ${flags[*]}"
-    echo "options: ${options[*]}"
+  
+  # Initialize variables
+  local args=()
+  local flags=()
+  local options=()
+  
+  # Parse arguments
+  while [[ $# -gt 0 ]]; do
+  case "$1" in
+  --*=*)
+  # Long option with value
+  local option="${1%%=*}"
+  local value="${1#*=}"
+  options+=("${option}=${value}")
+  shift
+  ;;
+  --*)
+  # Long option without value (flag)
+  flags+=("$1")
+  shift
+  ;;
+  -*)
+  # Short options
+  flags+=("$1")
+  shift
+  ;;
+  *)
+  # Positional arguments
+  args+=("$1")
+  shift
+  ;;
+  esac
+  done
+  
+  # Store parsed arguments in global arrays
+  FRAMEWORKS_BASHLY_ARGS=("${args[@]}")
+  FRAMEWORKS_BASHLY_FLAGS=("${flags[@]}")
+  FRAMEWORKS_BASHLY_OPTIONS=("${options[@]}")
+  
+  # Return parsed data
+  echo "args: ${args[*]}"
+  echo "flags: ${flags[*]}"
+  echo "options: ${options[*]}"
 }
 
 # Validate arguments against schema
 # @description Validate parsed arguments against a schema file.
 # @description Проверить разобранные аргументы по файлу схемы.
+# @description Проверить разобранные аргументы по файлу схемы.
 frameworks::bashly::validate_args() {
-    local schema_file="${1:-}"
-    
-    if is::empty "${schema_file}"; then
-        error::throw "Schema file is required" \
-            "${LIB_ERROR_INVALID_ARGS}"
-    fi
-    
-    # Simple validation (in real Bashly, this would be more complex)
-    log::info "Validating arguments against schema: ${schema_file}"
-    
-    # For now, just check if required arguments are present
-    if [[ ${#FRAMEWORKS_BASHLY_ARGS[@]} -eq 0 ]]; then
-        log::warn "No positional arguments provided"
-    fi
-    
-    return 0
+  local schema_file="${1:-}"
+  
+  if is::empty "${schema_file}"; then
+  error::throw "Schema file is required" \
+  "${LIB_ERROR_INVALID_ARGS}"
+  fi
+  
+  # Simple validation (in real Bashly, this would be more complex)
+  log::info "Validating arguments against schema: ${schema_file}"
+  
+  # For now, just check if required arguments are present
+  if [[ ${#FRAMEWORKS_BASHLY_ARGS[@]} -eq 0 ]]; then
+  log::warn "No positional arguments provided"
+  fi
+  
+  return 0
 }
 
 # Generate help text
 # @description Generate help text for a Bashly command.
 # @description Сформировать текст справки для команды Bashly.
+# @description Сформировать текст справки для команды Bashly.
 frameworks::bashly::generate_help() {
-    local command_name="${1:-command}"
-    local description="${2:-Description not provided}"
-    
-    cat << EOF
+  local command_name="${1:-command}"
+  local description="${2:-Description not provided}"
+  
+  cat << EOF
 Usage: ${command_name} [OPTIONS] [ARGS]
 
 ${description}
@@ -641,137 +640,146 @@ EOF
 
 # @description Initialize the ShellSpec test state.
 # @description Инициализировать состояние тестов ShellSpec.
+# @description Инициализировать состояние тестов ShellSpec.
 frameworks::shellspec::init() {
-    
-    log::debug "Initializing ShellSpec integration..."
-    
-    # Initialize ShellSpec components
-    FRAMEWORKS_SHELLSPEC_TESTS=()
-    FRAMEWORKS_SHELLSPEC_RESULTS=()
-    
-    log::debug "ShellSpec integration initialized"
+  
+  log::debug "Initializing ShellSpec integration..."
+  
+  # Initialize ShellSpec components
+  FRAMEWORKS_SHELLSPEC_TESTS=()
+  FRAMEWORKS_SHELLSPEC_RESULTS=()
+  
+  log::debug "ShellSpec integration initialized"
 }
 
 # ShellSpec-style test definition
 # @description Define a ShellSpec-style test suite/block.
 # @description Определить тестовый набор/блок в стиле ShellSpec.
+# @description Определить тестовый набор/блок в стиле ShellSpec.
 frameworks::shellspec::describe() {
-    local description="${1:-}"
-    local test_block="${2:-}"
-    
-    if is::empty "${description}"; then
-        error::throw "Description is required" \
-            "${LIB_ERROR_INVALID_ARGS}"
-    fi
-    
-    log::info "Test Suite: ${description}"
-    
-    # Execute test block
-    if is::not_empty "${test_block}"; then
-        eval "${test_block}"
-    fi
+  local description="${1:-}"
+  local test_block="${2:-}"
+  
+  if is::empty "${description}"; then
+  error::throw "Description is required" \
+  "${LIB_ERROR_INVALID_ARGS}"
+  fi
+  
+  log::info "Test Suite: ${description}"
+  
+  # Execute test block
+  if is::not_empty "${test_block}"; then
+  eval "${test_block}"
+  fi
 }
 
 # ShellSpec-style test case
 # @description Define and run a ShellSpec-style test case.
+# @description Определить и запустить тестовый случай в стиле ShellSpec.
 # @description Определить и выполнить тест-кейс в стиле ShellSpec.
 frameworks::shellspec::it() {
-    local description="${1:-}"
-    local test_command="${2:-}"
-    
-    if is::empty "${description}"; then
-        error::throw "Description is required" \
-            "${LIB_ERROR_INVALID_ARGS}"
-    fi
-    
-    log::info "  Test: ${description}"
-    
-    # Execute test
-    if is::not_empty "${test_command}"; then
-        if eval "${test_command}"; then
-            log::success "    ✓ PASSED"
-            FRAMEWORKS_SHELLSPEC_RESULTS+=("PASS: ${description}")
-        else
-            log::error "    ✗ FAILED"
-            FRAMEWORKS_SHELLSPEC_RESULTS+=("FAIL: ${description}")
-        fi
-    fi
+  local description="${1:-}"
+  local test_command="${2:-}"
+  
+  if is::empty "${description}"; then
+  error::throw "Description is required" \
+  "${LIB_ERROR_INVALID_ARGS}"
+  fi
+  
+  log::info "  Test: ${description}"
+  
+  # Execute test
+  if is::not_empty "${test_command}"; then
+  if eval "${test_command}"; then
+  log::success "    ✓ PASSED"
+  FRAMEWORKS_SHELLSPEC_RESULTS+=("PASS: ${description}")
+  else
+  log::error "    ✗ FAILED"
+  FRAMEWORKS_SHELLSPEC_RESULTS+=("FAIL: ${description}")
+  fi
+  fi
 }
 
 # ShellSpec-style assertions
 # @description Assert that a condition holds (eval).
 # @description Проверить, что условие истинно (eval).
+# @description Проверить, что условие истинно (eval).
 frameworks::shellspec::assert() {
-    local condition="${1:-}"
-    
-    if is::empty "${condition}"; then
-        error::throw "Condition is required" \
-            "${LIB_ERROR_INVALID_ARGS}"
-    fi
-    
-    eval "${condition}"
+  local condition="${1:-}"
+  
+  if is::empty "${condition}"; then
+  error::throw "Condition is required" \
+  "${LIB_ERROR_INVALID_ARGS}"
+  fi
+  
+  eval "${condition}"
 }
 
 # ShellSpec-style matchers
 # @description Matcher: actual value equals the expected value.
+# @description Матвер: фактическое значение равно ожидаемому.
 # @description Матчер: фактическое значение равно ожидаемому.
 frameworks::shellspec::matchers::equal() {
-    local actual="${1:-}"
-    local expected="${2:-}"
-    
-    [[ "${actual}" == "${expected}" ]]
+  local actual="${1:-}"
+  local expected="${2:-}"
+  
+  [[ "${actual}" == "${expected}" ]]
 }
 
 # @description Matcher: string contains a substring.
+# @description Матвер: строка содержит подстроку.
 # @description Матчер: строка содержит подстроку.
 frameworks::shellspec::matchers::contain() {
-    local string="${1:-}"
-    local substring="${2:-}"
-    
-    [[ "${string}" == *"${substring}"* ]]
+  local string="${1:-}"
+  local substring="${2:-}"
+  
+  [[ "${string}" == *"${substring}"* ]]
 }
 
 # @description Matcher: value is empty.
+# @description Матвер: значение пусто.
 # @description Матчер: значение пустое.
 frameworks::shellspec::matchers::be_empty() {
-    local value="${1:-}"
-    
-    is::empty "${value}"
+  local value="${1:-}"
+  
+  is::empty "${value}"
 }
 
 # @description Matcher: path exists.
+# @description Матвер: путь существует.
 # @description Матчер: путь существует.
 frameworks::shellspec::matchers::exist() {
-    local path="${1:-}"
-    
-    is::exists "${path}"
+  local path="${1:-}"
+  
+  is::exists "${path}"
 }
 
 # Run ShellSpec tests
 # @description Run collected ShellSpec tests and report pass/fail counts.
+# @description Запустить собранные тесты ShellSpec и сообщить счётчики успехов/неудач.
 # @description Выполнить собранные тесты ShellSpec и вывести счётчики прошедших/проваленных.
 frameworks::shellspec::run() {
-    
-    log::info "Running ShellSpec tests..."
-    
-    local passed=0
-    local failed=0
-    
-    for result in "${FRAMEWORKS_SHELLSPEC_RESULTS[@]}"; do
-        if [[ "${result}" =~ ^PASS: ]]; then
-            ((passed++))
-        elif [[ "${result}" =~ ^FAIL: ]]; then
-            ((failed++))
-        fi
-    done
-    
-    log::info "Test Results: ${passed} passed, ${failed} failed"
-    
-    if [[ "${failed}" -gt 0 ]]; then
-        return "${E_ERROR}"
-    else
-        return 0
-    fi
+  
+  log::info "Running ShellSpec tests..."
+  
+  local passed=0
+  local failed=0
+  
+  for result in "${FRAMEWORKS_SHELLSPEC_RESULTS[@]}"; do
+  if [[ "${result}" =~ ^PASS: ]]; then
+  ((passed++))
+  elif [[ "${result}" =~ ^FAIL: ]]; then
+  ((failed++))
+  fi
+  done
+  
+  log::info "Test Results: ${passed} passed, ${failed} failed"
+  
+  if [[ "${failed}" -gt 0 ]]; then
+  return "${E_ERROR}"
+  else
+  return 0
+  fi
 }
 
 # ============================================================================
@@ -779,205 +787,223 @@ frameworks::shellspec::run() {
 # ============================================================================
 
 # @description Initialize the mbfl naming convention prefix.
+# @description Инициализировать префикс соглашения об именовании mbfl.
 # @description Инициализировать префикс соглашения об именах mbfl.
 frameworks::mbfl::init() {
-    
-    log::debug "Initializing mbfl integration..."
-    
-    # Initialize mbfl naming conventions
-    FRAMEWORKS_MBFL_PREFIX="mbfl_"
-    
-    log::debug "mbfl integration initialized"
+  
+  log::debug "Initializing mbfl integration..."
+  
+  # Initialize mbfl naming conventions
+  FRAMEWORKS_MBFL_PREFIX="mbfl_"
+  
+  log::debug "mbfl integration initialized"
 }
 
 # MBFL-style function naming
 # @description Define a function with the mbfl_ name prefix.
 # @description Определить функцию с префиксом имени mbfl_.
+# @description Определить функцию с префиксом имени mbfl_.
 frameworks::mbfl::define_function() {
-    local func_name="${FRAMEWORKS_MBFL_PREFIX}${1:-}"
-    local body="${2:-}"
-    
-    if is::empty "${1:-}"; then
-        errorhandler::throw "frameworks::mbfl::define_function" "Function name is required" \
-            "${LIB_ERROR_INVALID_ARGS}"
-    fi
-    
-    eval "${func_name}() { ${body}; }"
+  local func_name="${FRAMEWORKS_MBFL_PREFIX}${1:-}"
+  local body="${2:-}"
+  
+  if is::empty "${1:-}"; then
+  errorhandler::throw "frameworks::mbfl::define_function" "Function name is required" \
+  "${LIB_ERROR_INVALID_ARGS}"
+  fi
+  
+  eval "${func_name}() { ${body}; }"
 }
 
 # MBFL-style variable naming
 # @description Set a variable with the mbfl_ name prefix.
 # @description Установить переменную с префиксом имени mbfl_.
+# @description Установить переменную с префиксом имени mbfl_.
 frameworks::mbfl::set_var() {
-    local var_name="${FRAMEWORKS_MBFL_PREFIX}${1:-}"
-    local value="${2:-}"
-    
-    if is::empty "${1:-}"; then
-        errorhandler::throw "frameworks::mbfl::set_var" "Variable name is required" \
-            "${LIB_ERROR_INVALID_ARGS}"
-    fi
-    
-    printf -v "${var_name}" '%s' "${value}"
+  local var_name="${FRAMEWORKS_MBFL_PREFIX}${1:-}"
+  local value="${2:-}"
+  
+  if is::empty "${1:-}"; then
+  errorhandler::throw "frameworks::mbfl::set_var" "Variable name is required" \
+  "${LIB_ERROR_INVALID_ARGS}"
+  fi
+  
+  printf -v "${var_name}" '%s' "${value}"
 }
 
 # MBFL-style error handling
 # @description Print a fatal error message and return an exit code.
+# @description Вывести сообщение фатальной ошибки и вернуть код выхода.
 # @description Вывести фатальную ошибку и вернуть код выхода.
 frameworks::mbfl::die() {
-    local message="${1:-Unknown error}"
-    local exit_code="${2:-1}"
-    
-    log::fatal "${message}"
-    return "${exit_code}"
+  local message="${1:-Unknown error}"
+  local exit_code="${2:-1}"
+  
+  log::fatal "${message}"
+  return "${exit_code}"
 }
 
 # MBFL-style argument parsing
 # @description Parse MBFL-style arguments/flags/options.
+# @description Разобрать аргументы/флаги/опции в стиле MBFL.
 # @description Разобрать аргументы/флаги/опции в стиле mbfl.
 frameworks::mbfl::parse_args() {
-    
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            --help|-h)
-                echo "Usage: $0 [OPTIONS]"
-                echo "Options:"
-                echo "  -h, --help     Show this help"
-                echo "  -v, --version  Show version"
-                exit 0
-                ;;
-            --version|-v)
-                echo "Version: 1.0.0"
-                exit 0
-                ;;
-            --*)
-                local option="${1#--}"
-                local value="${2:-}"
-                printf -v "mbfl_option_${option}" '%s' "${value}"
-                shift 2
-                ;;
-            -*)
-                local option="${1#-}"
-                local value="${2:-}"
-                printf -v "mbfl_flag_${option}" '%s' "${value}"
-                shift 2
-                ;;
-            *)
-                mbfl_args+=("$1")
-                shift
-                ;;
-        esac
-    done
+  
+  while [[ $# -gt 0 ]]; do
+  case "$1" in
+  --help|-h)
+  echo "Usage: $0 [OPTIONS]"
+  echo "Options:"
+  echo "  -h, --help     Show this help"
+  echo "  -v, --version  Show version"
+  exit 0
+  ;;
+  --version|-v)
+  echo "Version: 1.0.0"
+  exit 0
+  ;;
+  --*)
+  local option="${1#--}"
+  local value="${2:-}"
+  printf -v "mbfl_option_${option}" '%s' "${value}"
+  shift 2
+  ;;
+  -*)
+  local option="${1#-}"
+  local value="${2:-}"
+  printf -v "mbfl_flag_${option}" '%s' "${value}"
+  shift 2
+  ;;
+  *)
+  mbfl_args+=("$1")
+  shift
+  ;;
+  esac
+  done
 }
 
 # MBFL-style string functions
 # @description Check whether a string is empty.
 # @description Проверить, пуста ли строка.
+# @description Проверить, пуста ли строка.
 frameworks::mbfl::string::is_empty() {
-    local string="${1:-}"
-    is::empty "${string}"
+  local string="${1:-}"
+  is::empty "${string}"
 }
 
 # @description Check whether a string is not empty.
+# @description Проверить, что строка не пуста.
 # @description Проверить, не пуста ли строка.
 frameworks::mbfl::string::is_not_empty() {
-    local string="${1:-}"
-    is::not_empty "${string}"
+  local string="${1:-}"
+  is::not_empty "${string}"
 }
 
 # @description Get the length of a string.
 # @description Получить длину строки.
+# @description Получить длину строки.
 frameworks::mbfl::string::length() {
-    local string="${1:-}"
-    echo "${#string}"
+  local string="${1:-}"
+  echo "${#string}"
 }
 
 # @description Get a substring of a string.
 # @description Получить подстроку строки.
+# @description Получить подстроку строки.
 frameworks::mbfl::string::substring() {
-    local string="${1:-}"
-    local start="${2:-0}"
-    local length="${3:-}"
-    
-    if is::not_empty "${length}"; then
-        echo "${string:${start}:${length}}"
-    else
-        echo "${string:${start}}"
-    fi
+  local string="${1:-}"
+  local start="${2:-0}"
+  local length="${3:-}"
+  
+  if is::not_empty "${length}"; then
+  echo "${string:${start}:${length}}"
+  else
+  echo "${string:${start}}"
+  fi
 }
 
 # MBFL-style array functions
 # @description Get the number of elements in an array.
+# @description Получить число элементов массива.
 # @description Получить количество элементов массива.
 frameworks::mbfl::array::length() {
-    local array=("$@")
-    echo "${#array[@]}"
+  local array=("$@")
+  echo "${#array[@]}"
 }
 
 # @description Check whether an array contains an element.
 # @description Проверить, содержит ли массив элемент.
+# @description Проверить, содержит ли массив элемент.
 frameworks::mbfl::array::contains() {
-    local element="${1:-}"
-    shift
-    local array=("$@")
-    
-    for item in "${array[@]}"; do
-        if [[ "${item}" == "${element}" ]]; then
-            return 0
-        fi
-    done
-    
-    return 1
+  local element="${1:-}"
+  shift
+  local array=("$@")
+  
+  for item in "${array[@]}"; do
+  if [[ "${item}" == "${element}" ]]; then
+  return 0
+  fi
+  done
+  
+  return 1
 }
 
 # MBFL-style file functions
 # @description Check whether a file exists.
 # @description Проверить, существует ли файл.
+# @description Проверить, существует ли файл.
 frameworks::mbfl::file::exists() {
-    local file="${1:-}"
-    is::file "${file}"
+  local file="${1:-}"
+  is::file "${file}"
 }
 
 # @description Check whether a file is readable.
 # @description Проверить, читается ли файл.
+# @description Проверить, читается ли файл.
 frameworks::mbfl::file::is_readable() {
-    local file="${1:-}"
-    is::readable "${file}"
+  local file="${1:-}"
+  is::readable "${file}"
 }
 
 # @description Check whether a file is writable.
+# @description Проверить, записывается ли файл.
 # @description Проверить, записываем ли файл.
 frameworks::mbfl::file::is_writable() {
-    local file="${1:-}"
-    is::writable "${file}"
+  local file="${1:-}"
+  is::writable "${file}"
 }
 
 # @description Check whether a file is executable.
+# @description Проверить, исполняемый ли файл.
 # @description Проверить, исполняем ли файл.
 frameworks::mbfl::file::is_executable() {
-    local file="${1:-}"
-    is::executable "${file}"
+  local file="${1:-}"
+  is::executable "${file}"
 }
 
 # MBFL-style directory functions
 # @description Check whether a directory exists.
 # @description Проверить, существует ли каталог.
+# @description Проверить, существует ли каталог.
 frameworks::mbfl::dir::exists() {
-    local dir="${1:-}"
-    is::dir "${dir}"
+  local dir="${1:-}"
+  is::dir "${dir}"
 }
 
 # @description Create a directory (mkdir -p).
 # @description Создать каталог (mkdir -p).
+# @description Создать каталог (mkdir -p).
 frameworks::mbfl::dir::create() {
-    local dir="${1:-}"
-    mkdir -p "${dir}"
+  local dir="${1:-}"
+  mkdir -p "${dir}"
 }
 
 # @description Remove a directory (rm -rf).
 # @description Удалить каталог (rm -rf).
+# @description Удалить каталог (rm -rf).
 frameworks::mbfl::dir::remove() {
-    local dir="${1:-}"
-    rm -rf "${dir}"
+  local dir="${1:-}"
+  rm -rf "${dir}"
 }
 
 # ============================================================================
@@ -987,9 +1013,10 @@ frameworks::mbfl::dir::remove() {
 # Get loaded frameworks status
 # @description Show the status of loaded framework integrations.
 # @description Показать статус загруженных интеграций фреймворков.
+# @description Показать статус загруженных интеграций фреймворков.
 frameworks::status() {
-    
-    cat << EOF
+  
+  cat << EOF
 Frameworks Integration Status:
 
 Bash-it Plugins Loaded: ${#FRAMEWORKS_BASHIT_PLUGINS[@]}
@@ -1009,36 +1036,38 @@ EOF
 
 # Clear all framework integrations
 # @description Clear the state of all framework integrations.
+# @description Сбросить состояние всех интеграций фреймворков.
 # @description Очистить состояние всех интеграций фреймворков.
 frameworks::clear() {
-    
-    log::info "Clearing all framework integrations..."
-    
-    # Clear Bash-it
-    FRAMEWORKS_BASHIT_PLUGINS=()
-    FRAMEWORKS_BASHIT_ALIASES=()
-    FRAMEWORKS_BASHIT_COMPLETIONS=()
-    
-    # Clear Bashinator
-    FRAMEWORKS_BASHINATOR_LEVEL="INFO"
-    
-    # Clear Bashly
-    FRAMEWORKS_BASHLY_COMMANDS=()
-    FRAMEWORKS_BASHLY_OPTIONS=()
-    FRAMEWORKS_BASHLY_ARGS=()
-    
-    # Clear ShellSpec
-    FRAMEWORKS_SHELLSPEC_TESTS=()
-    FRAMEWORKS_SHELLSPEC_RESULTS=()
-    
-    log::success "All framework integrations cleared"
+  
+  log::info "Clearing all framework integrations..."
+  
+  # Clear Bash-it
+  FRAMEWORKS_BASHIT_PLUGINS=()
+  FRAMEWORKS_BASHIT_ALIASES=()
+  FRAMEWORKS_BASHIT_COMPLETIONS=()
+  
+  # Clear Bashinator
+  FRAMEWORKS_BASHINATOR_LEVEL="INFO"
+  
+  # Clear Bashly
+  FRAMEWORKS_BASHLY_COMMANDS=()
+  FRAMEWORKS_BASHLY_OPTIONS=()
+  FRAMEWORKS_BASHLY_ARGS=()
+  
+  # Clear ShellSpec
+  FRAMEWORKS_SHELLSPEC_TESTS=()
+  FRAMEWORKS_SHELLSPEC_RESULTS=()
+  
+  log::success "All framework integrations cleared"
 }
 
 # Module info
 # @description Show framework module info and available functions.
+# @description Показать информацию о модуле и доступные функции.
 # @description Показать информацию о модуле и доступных функциях.
 frameworks::info() {
-    cat << EOF
+  cat << EOF
 Frameworks Integration Module v1.0.0
 
 Integrated Frameworks:
@@ -1050,32 +1079,32 @@ Integrated Frameworks:
 
 Available Functions:
   Bash-it Integration:
-    frameworks::bashit::load_plugin <plugin>    - Load Bash-it style plugin
-    frameworks::bashit::plugins::<name>::load   - Load specific plugin
+  frameworks::bashit::load_plugin <plugin>    - Load Bash-it style plugin
+  frameworks::bashit::plugins::<name>::load   - Load specific plugin
 
   Bashinator Integration:
-    frameworks::bashinator::log_message <level> <message> [component]
-    frameworks::bashinator::function_template   - Template for functions
+  frameworks::bashinator::log_message <level> <message> [component]
+  frameworks::bashinator::function_template   - Template for functions
 
   Bashly Integration:
-    frameworks::bashly::parse_args [args...]    - Parse command line arguments
-    frameworks::bashly::validate_args <schema>  - Validate against schema
-    frameworks::bashly::generate_help           - Generate help text
+  frameworks::bashly::parse_args [args...]    - Parse command line arguments
+  frameworks::bashly::validate_args <schema>  - Validate against schema
+  frameworks::bashly::generate_help           - Generate help text
 
   ShellSpec Integration:
-    frameworks::shellspec::describe <desc> <block> - Define test suite
-    frameworks::shellspec::it <desc> <command>     - Define test case
-    frameworks::shellspec::assert <condition>      - Assert condition
-    frameworks::shellspec::run                     - Run tests
+  frameworks::shellspec::describe <desc> <block> - Define test suite
+  frameworks::shellspec::it <desc> <command>     - Define test case
+  frameworks::shellspec::assert <condition>      - Assert condition
+  frameworks::shellspec::run                     - Run tests
 
   mbfl Integration:
-    frameworks::mbfl::define_function <name> <body> - Define function
-    frameworks::mbfl::set_var <name> <value>        - Set variable
-    frameworks::mbfl::die <message> [exit_code]     - Die with message
-    frameworks::mbfl::string::*                     - String functions
-    frameworks::mbfl::array::*                      - Array functions
-    frameworks::mbfl::file::*                       - File functions
-    frameworks::mbfl::dir::*                        - Directory functions
+  frameworks::mbfl::define_function <name> <body> - Define function
+  frameworks::mbfl::set_var <name> <value>        - Set variable
+  frameworks::mbfl::die <message> [exit_code]     - Die with message
+  frameworks::mbfl::string::*                     - String functions
+  frameworks::mbfl::array::*                      - Array functions
+  frameworks::mbfl::file::*                       - File functions
+  frameworks::mbfl::dir::*                        - Directory functions
 
 Utilities:
   frameworks::status                            - Show integration status
