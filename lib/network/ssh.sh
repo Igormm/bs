@@ -4,6 +4,7 @@
 # lib/network/ssh.sh — удалённый Linux: run / push / pull / multiplex / check
 
 # @depends core/lang, core/const, core/utils, core/logger
+# @tier core
 
 # Source Guard
 bs::guard "LIB_NETWORK_SSH" || return 0

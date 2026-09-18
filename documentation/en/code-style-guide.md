@@ -542,5 +542,6 @@ busybox (Alpine), glibc and musl. Rules:
    `kernel / arch / distro / family (ID_LIKE) / repo / userland / libc /
    bash / tools[]`. The package repository is derived from `ID_LIKE`, not
    from the distro name.
-6. **Extended analysis** — see `.art/versioning-analysis.md` (author's
-   local document); the rules above are the canon.
+6. **Full description** — see "Portability and capability vector —
+   recommendations": [documentation/en/02-core-concepts/portability.md](02-core-concepts/portability.md);
+   the rules above are the canon.

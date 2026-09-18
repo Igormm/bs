@@ -547,5 +547,6 @@ busybox (Alpine), glibc и musl. Правила:
    `kernel / arch / distro / family (ID_LIKE) / repo / userland / libc /
    bash / tools[]`. Репозиторий пакетов — производное от `ID_LIKE`,
    не от названия дистрибутива.
-6. **Развёрнутый анализ** — см. `.art/versioning-analysis.md` (локальный
-   документ автора); канон правил — этот раздел.
+6. **Полное описание** — см. «Портируемость и вектор возможностей —
+   рекомендации»: [documentation/ru/02-core-concepts/portability.md](02-core-concepts/portability.md);
+   канон правил — этот раздел.

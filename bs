@@ -269,6 +269,17 @@ chat_cmd() {
 
 doctor_cmd() {
   local fail=0
+  # Вектор возможностей / Capability vector
+  if [[ "${1:-}" == "--capabilities" ]]; then
+    load "lib/platform/facts"
+    platform::dump
+    return 0
+  fi
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    printf 'Usage: bs doctor [--capabilities]\n'
+    printf '  --capabilities  print the platform capability vector\n'
+    return 0
+  fi
   echo "BS doctor report"
   echo "BS_ROOT: $BS_ROOT"
 
@@ -542,6 +553,33 @@ rfc_cmd() {
   esac
 }
 
+# ==========================================
+# bs audit: GNU-only tool usage in core/ and lib/
+# bs audit: использование GNU-only инструментов в core/ и lib/
+# ==========================================
+
+audit_cmd() {
+  local -r audit_gnu_tools='grep[[:space:]]+-P|sed[[:space:]]+-z|sha256sum|stat[[:space:]]+-c|date[[:space:]]+\+%N|readlink[[:space:]]+-f|head[[:space:]]+-c'
+  local audit_roots_str="${1:-core lib}"
+  # IFS в CLI = $'\n\t' (без пробела) — префикс IFS=' ' только для read
+  local -a audit_roots=()
+  IFS=' ' read -ra audit_roots <<< "${audit_roots_str}"
+  local file n bad=0
+  for file in $(find "${audit_roots[@]}" -name '*.sh' 2>/dev/null | sort); do
+    n="$(grep -cE "${audit_gnu_tools}" "${file}" 2>/dev/null || true)"
+    if (( n > 0 )); then
+      local tier
+      tier="$(grep -m1 '^# @tier' "${file}" | awk '{print $3}' || true)"
+      printf '  %-40s GNU-only: %-3d tier: %s\n' "${file}" "${n}" "${tier:-unspecified}"
+      bad=1
+    fi
+  done
+  if (( bad == 0 )); then
+    printf 'No GNU-only tool usage found in %s\n' "${audit_roots_str}"
+  fi
+  return 0
+}
+
 init_shell_cmd() {
   cat <<EOF
 # Add to ~/.bashrc or ~/.zshrc
@@ -643,7 +681,7 @@ update_cmd() {
 # первый аргумент — путь к существующему скрипту, а не команда.
 if [[ $# -ge 1 && -f "$1" ]]; then
   case "$1" in
-    help|-h|--help|version|env|list|lang-doc|lsp|chat|sync|rfc|doctor|run|build|repl|init-shell) : ;;
+    help|-h|--help|version|env|list|lang-doc|lsp|chat|sync|rfc|audit|doctor|run|build|repl|init-shell) : ;;
     *) BS_SHEBANG=1 ;;
   esac
 fi
@@ -664,7 +702,8 @@ case "${1:-help}" in
   chat)           shift; chat_cmd "$@" ;;
   update)           shift; update_cmd "$@" ;;
   rfc)              shift; rfc_cmd "$@" ;;
-  doctor)         doctor_cmd ;;
+  audit)            shift; audit_cmd "$@" ;;
+  doctor)         shift || true; doctor_cmd "$@" ;;
   run)            shift; run_cmd "$@" ;;
   build)          shift; build_cmd "$@" ;;
   repl)           shift

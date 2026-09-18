@@ -4,6 +4,7 @@
 # lib/math/math.sh — вычисление выражений через C (настоящая математика для BS)
 
 # @depends core/lang, core/const, core/utils
+# @tier gnu-linux
 
 # Source Guard
 bs::guard "LIB_MATH" || return 0

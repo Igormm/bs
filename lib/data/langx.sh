@@ -4,6 +4,7 @@
 # lib/data/langx.sh — языковые расширения (по мотивам C23 / C++23 / C++26)
 
 # @depends core/lang, core/const, core/logger, core/utils
+# @tier core
 
 # Source Guard
 bs::guard "LIB_DATA_LANGX" || return 0

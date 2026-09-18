@@ -4,6 +4,7 @@
 # lib/rfc/rfc1925.sh — RFC 1925: Двенадцать истин сетей
 
 # @depends core/lang
+# @tier core
 
 # Source Guard
 bs::guard "LIB_RFC_1925" || return 0

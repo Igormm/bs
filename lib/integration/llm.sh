@@ -17,6 +17,7 @@
 #   llm::chat ollama llama3 "Explain bash arrays"
 #
 # @depends core/const, core/logger, core/utils, lib/integration/result
+# @tier core
 # @optdeps jq
 
 # Source Guard / Защита от повторной загрузки

@@ -4,6 +4,7 @@
 # lib/data/regex.sh — регулярные выражения (ERE без зависимостей + PCRE)
 
 # @depends core/lang, core/utils, core/errorhandler
+# @tier core
 
 # Source Guard
 bs::guard "LIB_DATA_REGEX" || return 0

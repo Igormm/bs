@@ -4,6 +4,7 @@
 # lib/rfc/uri.sh — RFC 3986: разбор URI
 
 # @depends core/lang
+# @tier core
 
 # Source Guard
 bs::guard "LIB_RFC_URI" || return 0

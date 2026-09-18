@@ -11,7 +11,7 @@ def fnname:
 # Convert a doc-comment block (array of "# ..." lines) into metadata.
 def docmeta:
   reduce .[] as $line (
-    {description: "", returns: "", stdout: "", example: "", deprecated: false, params: [], cur: ""};
+    {description: "", returns: "", stdout: "", example: "", deprecated: false, tier: "", params: [], cur: ""};
     if ($line | test("^#\\s*@[A-Za-z]+")) then
       ($line | capture("^#\\s*@(?<t>[A-Za-z]+)\\s*(?<v>.*)")) as $m
       | .cur = $m.t
@@ -19,6 +19,7 @@ def docmeta:
         elif $m.t == "return" then .returns = $m.v
         elif $m.t == "stdout" then .stdout = $m.v
         elif $m.t == "example" then .example = $m.v
+        elif $m.t == "tier" then .tier = $m.v
         elif $m.t == "param" then .params += [$m.v]
         elif $m.t == "deprecated" then .deprecated = true
         else . end
@@ -33,11 +34,13 @@ def docmeta:
   | .example |= sub("^\\n"; "")
   | .params = [.params[] | (split(" ") as $p | {name: $p[0], desc: ($p[1:] | join(" "))})]
   | {description: .description, params: .params, returns: .returns,
-     stdout: .stdout, example: .example, deprecated: .deprecated};
+     stdout: .stdout, example: .example, deprecated: .deprecated, tier: .tier};
 
 # Walk the file: accumulate column-0 comment lines; when a function
 # definition follows a comment block, emit a record for it.
-split("\n")
+split("\n") as $lines
+| (first($lines[] | select(test("^#\\s*@tier")) | capture("^#\\s*@tier\\s+(?<t>.*)").t) // "") as $modtier
+| ($lines
 | reduce .[] as $line (
     {doc: [], out: []};
     if ($line | startswith("#")) then
@@ -49,5 +52,6 @@ split("\n")
     else
       .doc = []
     end)
-| .out[]
+| .out[])
 | {name: .name, file: $file} + (.doc | docmeta)
+| .tier = (if .tier == "" then $modtier else .tier end)

@@ -4,6 +4,7 @@
 # lib/data/langdoc.sh — индекс документации функций (метаданные для LSP)
 
 # @depends core/lang, core/const, core/errorhandler
+# @tier core
 
 # Source Guard
 bs::guard "LIB_DATA_LANGDOC" || return 0

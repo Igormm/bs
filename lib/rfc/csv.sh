@@ -4,6 +4,7 @@
 # lib/rfc/csv.sh — RFC 4180: записи и поля CSV
 
 # @depends core/lang
+# @tier core
 
 # Source Guard
 bs::guard "LIB_RFC_CSV" || return 0

@@ -4,6 +4,7 @@
 # lib/rfc/uuid.sh — RFC 4122 / RFC 9562: генерация UUID
 
 # @depends core/lang
+# @tier core
 
 # Source Guard
 bs::guard "LIB_RFC_UUID" || return 0

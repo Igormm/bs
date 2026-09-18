@@ -4,6 +4,7 @@
 # lib/integration/chat.sh — интерактивный чат-REPL с LLM для BS
 
 # @depends core/lang, core/utils, core/const, core/logger, core/errorhandler, lib/integration/llm
+# @tier gnu-linux
 
 # Source Guard
 bs::guard "LIB_INTEGRATION_CHAT" || return 0

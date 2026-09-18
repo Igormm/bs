@@ -4,6 +4,7 @@
 # lib/data/lsp.sh — LSP-сервер для BS
 
 # @depends core/lang, core/const, core/logger, core/errorhandler, lib/data/langdoc
+# @tier gnu-linux
 
 # Source Guard
 bs::guard "LIB_DATA_LSP" || return 0
@@ -78,7 +79,9 @@ lsp::__find_by_name() {
 # @stdout Hover result JSON / JSON-результат hover
 lsp::__hover_result() {
   jq -c '{contents: {kind: "markdown", value: (
-      "**" + .name + "**  `" + .file + "`\n\n" + .description + "\n\n" +
+      "**" + .name + "**  `" + .file + "`" +
+      (if .tier == "" then "" else "  `tier: " + .tier + "`" end) + "\n\n" +
+      .description + "\n\n" +
       ([.params[] | "- `" + .name + "` — " + .desc] | join("\n")) +
       "\n\n**Returns:** " + .returns +
       "\n\n**Example:**\n```bash\n" + .example + "\n```"
@@ -238,7 +241,8 @@ lsp::__fuzzy_items() {
       [.name, .description, ([.params[].desc] | join(" ")), .example] | join(" ");
     def item_doc:
       {kind: "markdown", value: (
-        "**" + .name + "**\n\n" + .description + "\n\n" +
+        "**" + .name + "**" + (if .tier == "" then "" else "  `tier: " + .tier + "`" end) +
+        "\n\n" + .description + "\n\n" +
         ([.params[] | "- `" + .name + "` — " + .desc] | join("\n"))
       )};
     ($q | ru_downcase | split(" ") | map(select(length >= 3))) as $terms
