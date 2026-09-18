@@ -79,6 +79,89 @@ test_replace() {
     testframework::assert_equal "line1 line2" "$(regex::replace $'line1\nline2' $'\n' ' ')" "regex::replace newline (sed -z)"
 }
 
+test_pcre_probe_cache() {
+    # проба выполняется один раз и кэшируется в RX_PCRE / probe runs once, cached
+    RX_PCRE=""
+    regex::matches 'x' 'x' --pcre >/dev/null || true
+    testframework::assert_true '${RX_PCRE} == "1" || ${RX_PCRE} == "0"' "RX_PCRE probed and cached"
+
+    if is::command perl; then
+        # эмуляция BSD: grep -P недоступен → фолбэк на perl / BSD emulation: perl fallback
+        RX_PCRE=0
+        testframework::assert_command "regex::matches 'date 2026-09-17' '\d{4}-\d{2}-\d{2}' --pcre" "PCRE fallback to perl matches"
+        RX_PCRE=0
+        testframework::assert_false "regex::matches 'no date' '\d{4}-\d{2}-\d{2}' --pcre" "PCRE fallback to perl rejects"
+        RX_PCRE=0
+        testframework::assert_false "regex::matches 'fooXbar' 'foo(?=\d)' --pcre" "PCRE fallback to perl lookahead"
+
+        local -a out=()
+        RX_PCRE=0
+        regex::find "ids: 12-345 67-890" '\d{2}-\d{3}' out --pcre
+        testframework::assert_equal "12-345 67-890" "$(arr::join out ' ')" "PCRE fallback to perl find"
+        RX_PCRE=0
+        testframework::assert_equal "2" "$(regex::count "a1b2" '\d' --pcre)" "PCRE fallback to perl count"
+    fi
+
+    # движок отсутствует полностью → явный код ошибки (не 2, не 1) /
+    # engine missing entirely → distinct error code (not 2, not 1)
+    local mock_dir
+    mock_dir="$(mktemp -d)"
+    ln -s "$(command -v grep)" "${mock_dir}/grep"
+    local old_path="${PATH}"
+    PATH="${mock_dir}"
+    RX_PCRE=0
+    local rc=0
+    if regex::matches 'x' 'x' --pcre 2>/dev/null; then
+        rc=0
+    else
+        rc=$?
+    fi
+    PATH="${old_path}"
+    rm -rf "${mock_dir}"
+    testframework::assert_equal "${LIB_ERROR_DEPENDENCY_MISSING:-101}" "${rc}" "PCRE unavailable returns distinct error code"
+    # shellcheck disable=SC2034
+    RX_PCRE=""
+}
+
+test_replace_fallback() {
+    # фолбэк возвращает данные (не пусто) / fallback returns data (not empty)
+    RX_SED_Z=0
+    testframework::assert_equal "aXbXcX" "$(regex::replace "a1b2c3" '[0-9]+' 'X')" "sed -z fallback returns data (perl/bash)"
+
+    # кэш пробы устанавливается первым вызовом / probe cache set on first call
+    RX_SED_Z=""
+    regex::replace "a1b2c3" '[0-9]+' 'X' >/dev/null
+    testframework::assert_true '${RX_SED_Z} == "1" || ${RX_SED_Z} == "0"' "RX_SED_Z probed and cached"
+
+    # обратные ссылки работают в фолбэке / backrefs work in fallback
+    RX_SED_Z=0
+    testframework::assert_equal "a_Bc" "$(regex::replace "aBc" '([a-z])([A-Z])' '\1_\2')" "fallback backrefs"
+    RX_SED_Z=0
+    testframework::assert_equal "Doe John" "$(regex::replace "John Doe" '^(\w+) (\w+)$' '\2 \1')" "fallback swaps groups"
+
+    # сбой движка не маскируется пустым результатом / engine failure is not masked
+    local rc=0
+    RX_SED_Z=1
+    if regex::replace "abc" '[' 'x' >/dev/null 2>&1; then
+        rc=0
+    else
+        rc=$?
+    fi
+    testframework::assert_true "${rc} -ne 0" "sed failure propagates non-zero status"
+
+    if is::command perl; then
+        RX_SED_Z=0
+        if regex::replace "abc" '[' 'x' >/dev/null 2>&1; then
+            rc=0
+        else
+            rc=$?
+        fi
+        testframework::assert_true "${rc} -ne 0" "perl fallback failure propagates non-zero status"
+    fi
+    # shellcheck disable=SC2034
+    RX_SED_Z=""
+}
+
 test_split() {
     local -a s=()
     regex::split "a,1;b,2" '[,;]' s
@@ -109,6 +192,12 @@ main() {
 
     testframework::section "replace / замена"
     test_replace
+
+    testframework::section "replace fallback / фолбэк replace"
+    test_replace_fallback
+
+    testframework::section "pcre probe and fallback / проба и фолбэк PCRE"
+    test_pcre_probe_cache
 
     testframework::section "split / разбиение"
     test_split
