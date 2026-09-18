@@ -817,7 +817,7 @@ hw::ls() {
     fi
   done
   if (( ${#out[@]} == 0 )); then
-    printf 'hw: no such node: %s\n' "${prefix}" >&2
+    log::warn "hw: no such node: ${prefix}"
     return 1
   fi
   printf '%s\n' "${out[@]}" | sort
@@ -834,11 +834,11 @@ hw::cd() {
   hw::__ensure
   local target
   target="$(hw::__resolve "${1:-}")"
-  if [[ "${target}" == "mb" ]] || [[ -v HW_DB["${target}"] ]] || hw::ls "${target}" >/dev/null 2>&1; then
+  if [[ "${target}" == "mb" ]] || [[ -v HW_DB["${target}"] ]] || utils::quiet hw::ls "${target}"; then
     HW_CWD="${target}"
     return 0
   fi
-  printf 'hw: cd: no such node: %s\n' "${target}" >&2
+  log::warn "hw: cd: no such node: ${target}"
   return 1
 }
 

@@ -70,7 +70,7 @@ __ssh::parse_flags() {
           __SSH_FLAG_REST+=("${1}")
           shift
         else
-          printf 'ssh: unknown option: %s\n' "${1}" >&2
+          log::error "ssh: unknown option: ${1}"
           return 1
         fi ;;
       *)
@@ -122,7 +122,7 @@ ssh::run() {
     __SSH_FLAG_REST=("${__SSH_FLAG_REST[@]:1}")
   fi
   is::not_empty "${__SSH_FLAG_HOST}" || {
-    printf 'ssh::run: host required\n' >&2
+    log::error "ssh::run: host required"
     return 1
   }
 
@@ -174,7 +174,7 @@ ssh::push() {
       --delete) __sp_delete=1; shift ;;
       --port)   __sp_port="${2:?--port requires a value}"; shift 2 ;;
       --key)    __sp_key="${2:?--key requires a value}"; shift 2 ;;
-      *) printf 'ssh::push: unknown option: %s\n' "${1}" >&2; return 1 ;;
+      *) log::error "ssh::push: unknown option: ${1}"; return 1 ;;
     esac
   done
 
@@ -207,7 +207,7 @@ ssh::pull() {
       --delete) __sp_delete=1; shift ;;
       --port)   __sp_port="${2:?--port requires a value}"; shift 2 ;;
       --key)    __sp_key="${2:?--key requires a value}"; shift 2 ;;
-      *) printf 'ssh::pull: unknown option: %s\n' "${1}" >&2; return 1 ;;
+      *) log::error "ssh::pull: unknown option: ${1}"; return 1 ;;
     esac
   done
 
@@ -239,7 +239,7 @@ ssh::multiplex() {
     __SSH_FLAG_REST=("${__SSH_FLAG_REST[@]:1}")
   fi
   is::not_empty "${__SSH_FLAG_HOST}" || {
-    printf 'ssh::multiplex: host required\n' >&2
+    log::error "ssh::multiplex: host required"
     return 1
   }
 
@@ -308,7 +308,7 @@ ssh::check() {
     __SSH_FLAG_REST=("${__SSH_FLAG_REST[@]:1}")
   fi
   is::not_empty "${__SSH_FLAG_HOST}" || {
-    printf 'ssh::check: host required\n' >&2
+    log::error "ssh::check: host required"
     return 1
   }
 

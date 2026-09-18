@@ -3,13 +3,13 @@
 # lib/data/langx.sh — language extensions (C23 / C++23 / C++26 inspired)
 # lib/data/langx.sh — языковые расширения (по мотивам C23 / C++23 / C++26)
 
-# @depends core/lang
+# @depends core/lang, core/const, core/logger, core/utils
 
 # Source Guard
 bs::guard "LIB_DATA_LANGX" || return 0
 
 # Dependencies
-bs::source_relative "../../core/lang.sh"
+bs::source_relative "../../core/lang.sh" "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh"
 
 # ==========================================
 # Language extensions / Языковые расширения
@@ -46,7 +46,7 @@ bs::pre() {
   local -r __px_msg="${2:-precondition failed}"
   # shellcheck disable=SC2294
   if ! eval "${__px_cond}"; then
-    printf 'PRECONDITION FAILED: %s\n  %s\n' "${__px_msg}" "${__px_cond}" >&2
+    log::error "PRECONDITION FAILED: ${__px_msg} — ${__px_cond}"
     return 1
   fi
   return 0
@@ -69,7 +69,7 @@ bs::post() {
   local -r __px_msg="${2:-postcondition failed}"
   # shellcheck disable=SC2294
   if ! eval "${__px_cond}"; then
-    printf 'POSTCONDITION FAILED: %s\n  %s\n' "${__px_msg}" "${__px_cond}" >&2
+    log::error "POSTCONDITION FAILED: ${__px_msg} — ${__px_cond}"
     return 1
   fi
   return 0
@@ -230,7 +230,7 @@ bs::num() {
 # @example
 #   is::int "0b1010" && ...
 is::int() {
-  bs::num "${1-}" >/dev/null 2>&1
+  utils::quiet bs::num "${1-}"
 }
 
 # @description Predicate: floating-point literal (Go strconv.ParseFloat).
@@ -263,7 +263,7 @@ bs::enum() {
   local __en_name
   for __en_name in "$@"; do
     if ! [[ "${__en_name}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
-      printf 'bs::enum: invalid constant name: %s\n' "${__en_name}" >&2
+      log::error "bs::enum: invalid constant name: ${__en_name}"
       return 1
     fi
     readonly "${__en_name}=${__en_i}"

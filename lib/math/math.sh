@@ -129,7 +129,10 @@ ${expr}${MATH_TEMPLATE_TAIL//FMT/\"${fmt_escaped}\"}"
   err="$(printf '%s' "${csrc}" | "${compiler}" -O2 -lm -x c - -o "${out}" 2>&1)"
   if [[ ! -x "${out}" ]]; then
     log::error "math: compilation failed"
-    printf '%s\n' "${err}" | sed 's/^/  /' >&2
+    local err_line
+    while IFS= read -r err_line; do
+      log::error "  ${err_line}"
+    done <<< "${err}"
     return 2
   fi
   printf '%s\n' "${out}"
