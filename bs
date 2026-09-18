@@ -502,6 +502,46 @@ build_cmd() {
   printf 'Framework bundle: %s bytes (payload hash %s)\n' "$(( ${#payload} ))" "${hash}"
 }
 
+rfc_cmd() {
+  local -r rfc_dir="${BS_ROOT}/lib/rfc"
+  case "${1:-}" in
+    -h|--help)
+      printf 'Usage: bs rfc [number]\n\n'
+      printf 'Lists implemented RFC modules; with a number, shows or runs\n'
+      printf 'that RFC (e.g. bs rfc 1925 — the twelve networking truths).\n'
+      return 0 ;;
+    ""|list)
+      local file name
+      for file in "${rfc_dir}"/*.sh; do
+        name="$(basename "${file}" .sh)"
+        printf '  %-12s %s\n' "${name}" "$(grep -m1 -o 'RFC [0-9]*:.*' "${file}" | sed 's/^RFC [0-9]*: //')"
+      done
+      return 0 ;;
+    1925)
+      load "lib/rfc/rfc1925"
+      rfc1925::truths
+      ;;
+    3986)
+      load "lib/rfc/uri"
+      printf 'RFC 3986 — URI. Functions: uri::parse, uri::dump, uri::decode, uri::encode.\n'
+      printf 'Example:\n  uri::parse "https://user:pw@host:8080/p?a=1#f"\n  echo "${URI_HOST}:${URI_PORT}"\n'
+      ;;
+    4122)
+      load "lib/rfc/uuid"
+      printf 'RFC 4122/9562 — UUID. Functions: uuid::gen, uuid::gen_v7, uuid::validate.\n'
+      printf 'Example:\n  uuid::gen\n'
+      ;;
+    4180)
+      load "lib/rfc/csv"
+      printf 'RFC 4180 — CSV. Functions: csv::rows, csv::fields.\n'
+      printf 'Example:\n  csv::fields "a,\"b,c\"" f && printf "%%s\\n" "${f[1]}"\n'
+      ;;
+    *)
+      die "rfc: unknown RFC: $1 (implemented: 1925, 3986, 4122, 4180)"
+      ;;
+  esac
+}
+
 init_shell_cmd() {
   cat <<EOF
 # Add to ~/.bashrc or ~/.zshrc
@@ -603,7 +643,7 @@ update_cmd() {
 # первый аргумент — путь к существующему скрипту, а не команда.
 if [[ $# -ge 1 && -f "$1" ]]; then
   case "$1" in
-    help|-h|--help|version|env|list|lang-doc|lsp|chat|sync|doctor|run|build|repl|init-shell) : ;;
+    help|-h|--help|version|env|list|lang-doc|lsp|chat|sync|rfc|doctor|run|build|repl|init-shell) : ;;
     *) BS_SHEBANG=1 ;;
   esac
 fi
@@ -623,6 +663,7 @@ case "${1:-help}" in
   lsp)            shift; lsp_cmd "$@" ;;
   chat)           shift; chat_cmd "$@" ;;
   update)           shift; update_cmd "$@" ;;
+  rfc)              shift; rfc_cmd "$@" ;;
   doctor)         doctor_cmd ;;
   run)            shift; run_cmd "$@" ;;
   build)          shift; build_cmd "$@" ;;
