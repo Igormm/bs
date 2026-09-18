@@ -88,6 +88,43 @@ test_modal_stack() {
     testframework::assert_equal "0" "$?" "empty top returns 0"
 }
 
+test_borders() {
+    tui::border::set double
+    testframework::assert_equal "╔" "${TUI_BORDER_TL}" "border double TL"
+    testframework::assert_equal "╝" "${TUI_BORDER_BR}" "border double BR"
+
+    tui::border::set rounded
+    testframework::assert_equal "╭" "${TUI_BORDER_TL}" "border rounded TL"
+    testframework::assert_equal "╯" "${TUI_BORDER_BR}" "border rounded BR"
+
+    tui::border::set dashed
+    testframework::assert_equal "┄" "${TUI_BORDER_H}" "border dashed horizontal"
+    testframework::assert_equal "┆" "${TUI_BORDER_V}" "border dashed vertical"
+
+    tui::border::set none
+    # Без углов: угловые глифы = горизонтальная линия / no corners
+    testframework::assert_equal "─" "${TUI_BORDER_TL}" "border none has no corner glyph"
+
+    tui::border::set thick
+    testframework::assert_equal "┏" "${TUI_BORDER_TL}" "border thick TL"
+
+    testframework::assert_false "tui::border::set bogus" "border rejects unknown style"
+
+    # Рамка с заголовком рисует непрерывную линию / box with title keeps line
+    TUI_COLS=20
+    TUI_LINES=4
+    tui::buf::clear
+    tui::border::set double
+    tui::box 1 1 18 3 "T"
+    testframework::assert_equal "╔" "${TUI_BUF[0,0]}" "box TL drawn"
+    testframework::assert_equal "╗" "${TUI_BUF[0,17]}" "box TR drawn"
+    testframework::assert_equal "═" "${TUI_BUF[0,1]}" "box top line continuous"
+    testframework::assert_equal "T" "${TUI_BUF[0,3]}" "box title in line"
+    testframework::assert_equal "╚" "${TUI_BUF[2,0]}" "box BL drawn"
+    testframework::assert_equal "╝" "${TUI_BUF[2,17]}" "box BR drawn"
+    testframework::assert_equal "║" "${TUI_BUF[1,0]}" "box side drawn"
+}
+
 main() {
     print_header "TUI Unit Tests / Модульные тесты TUI"
 
@@ -104,6 +141,9 @@ main() {
 
     testframework::section "Modals / Модальные окна"
     test_modal_stack
+
+    testframework::section "Borders / Рамки"
+    test_borders
 
     testframework::summary
 }

@@ -441,25 +441,54 @@ tui::__mouse_sgr() {
 # Primitives / Примитивы
 # ==========================================
 
+# ==========================================
+# Borders / Рамки
+# ==========================================
+
+# Текущий набор рамки / Current border set
+declare -g TUI_BORDER_TL="╔" TUI_BORDER_TR="╗" TUI_BORDER_BL="╚" TUI_BORDER_BR="╝"
+declare -g TUI_BORDER_H="═" TUI_BORDER_V="║"
+
+# @description Select a border style / Выбрать стиль рамки.
+#   double (default) — ╔═╗║╚╝   single — ┌─┐│└┘
+#   rounded — ╭─╮│╰╯   dashed — ┌┄┐┆└┄┘
+#   thick — ┏━┓┃┗━┛     none — без углов, только линии
+# @param $1 style name / имя стиля
+# @return 0 ok, 1 unknown
+tui::border::set() {
+  case "${1:-double}" in
+    double)  TUI_BORDER_TL="╔" TUI_BORDER_TR="╗" TUI_BORDER_BL="╚" TUI_BORDER_BR="╝" TUI_BORDER_H="═" TUI_BORDER_V="║" ;;
+    single)  TUI_BORDER_TL="┌" TUI_BORDER_TR="┐" TUI_BORDER_BL="└" TUI_BORDER_BR="┘" TUI_BORDER_H="─" TUI_BORDER_V="│" ;;
+    rounded) TUI_BORDER_TL="╭" TUI_BORDER_TR="╮" TUI_BORDER_BL="╰" TUI_BORDER_BR="╯" TUI_BORDER_H="─" TUI_BORDER_V="│" ;;
+    dashed)  TUI_BORDER_TL="┌" TUI_BORDER_TR="┐" TUI_BORDER_BL="└" TUI_BORDER_BR="┘" TUI_BORDER_H="┄" TUI_BORDER_V="┆" ;;
+    thick)   TUI_BORDER_TL="┏" TUI_BORDER_TR="┓" TUI_BORDER_BL="┗" TUI_BORDER_BR="┛" TUI_BORDER_H="━" TUI_BORDER_V="┃" ;;
+    none)    TUI_BORDER_TL="─" TUI_BORDER_TR="─" TUI_BORDER_BL="─" TUI_BORDER_BR="─" TUI_BORDER_H="─" TUI_BORDER_V="│" ;;
+    *) return 1 ;;
+  esac
+  return 0
+}
+
 # @description Bordered box with optional title.
 # @description Рамка с опциональным заголовком.
+#   Стили: double/single/rounded/dashed/thick/none (tui::border::set).
+#   Заголовок — «встроенный»: линия не прерывается, текст в середине.
+#   Title is inline: the line is unbroken, text sits in the middle.
 # @param $1 row, $2 col, $3 width, $4 height, $5 [title], $6 [style]
 tui::box() {
   local -r r="$1" c="$2" w="$3" h="$4" title="${5-}" style="${6-}"
   local -i i
-  local tl tr bl br hz vt
-  tl="╔"; tr="╗"; bl="╚"; br="╝"; hz="═"; vt="║"
-  local top="${tl}${hz}"
+  local top
+  top="${TUI_BORDER_TL}${TUI_BORDER_H}"
   if is::not_empty "${title}"; then
     top+=" ${title} "
   fi
-  top+="$(str::repeat "${hz}" $(( w - 2 - ${#title} - 2 )))${tr}"
+  top+="$(str::repeat "${TUI_BORDER_H}" $(( w - ${#title} - 5 )))${TUI_BORDER_TR}"
   tui::put "${r}" "${c}" "${top}" "${style}"
   for (( i = 1; i < h - 1; i++ )); do
-    tui::put "$(( r + i ))" "${c}" "${vt}" "${style}"
-    tui::put "$(( r + i ))" "$(( c + w - 1 ))" "${vt}" "${style}"
+    tui::put "$(( r + i ))" "${c}" "${TUI_BORDER_V}" "${style}"
+    tui::put "$(( r + i ))" "$(( c + w - 1 ))" "${TUI_BORDER_V}" "${style}"
   done
-  tui::put "$(( r + h - 1 ))" "${c}" "${bl}$(str::repeat "${hz}" $(( w - 2 )))${br}" "${style}"
+  tui::put "$(( r + h - 1 ))" "${c}" "${TUI_BORDER_BL}$(str::repeat "${TUI_BORDER_H}" $(( w - 2 )))${TUI_BORDER_BR}" "${style}"
 }
 
 # @description Text with clipping / Текст с обрезкой.
