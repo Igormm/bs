@@ -105,7 +105,7 @@ declare -g FRAMEWORK_DRY_RUN=false
 # Владелец переменной — скрипт bs (readonly); здесь задаём только если пусто
 # Owner of the variable is the bs script (readonly); set here only if empty
 if is::empty "${BS_VERSION:-}"; then
-  declare -g BS_VERSION="0.3.0"
+  declare -g BS_VERSION="0.5.0"
 fi
 
 # 

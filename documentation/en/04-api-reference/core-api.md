@@ -393,7 +393,7 @@ Note: internally this checks `command -v timeout >/dev/null 2>&1`; in your own c
 
 ## Version — `core/version.sh`
 
-- `BS_VERSION` — current version (e.g. `0.3.0`); exported only if empty, the `bs` script owns the readonly variable.
+- `BS_VERSION` — current version (e.g. `0.5.0`); exported only if empty, the `bs` script owns the readonly variable.
 - `BS_NAME="BS (Bash Open Source Architecture) BOSA Framework"`.
 
 #### `bs::version::print`

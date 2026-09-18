@@ -79,7 +79,7 @@ test_local_install() {
 
     local version_out
     version_out="$(env HOME="${iso}" "${bin}" version)"
-    testframework::assert_equal "BS Framework version: 0.4.0" "${version_out}" "installed bs version works"
+    testframework::assert_equal "BS Framework version: 0.5.0" "${version_out}" "installed bs version works"
 
     local list_out
     list_out="$(env HOME="${iso}" "${bin}" list)"
