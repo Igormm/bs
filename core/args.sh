@@ -588,8 +588,21 @@ args::parse() {
     ARGS_REST=()
     ARGS_HELP_REQUESTED=0
 
-    # Запрос help / Help request
-    if [[ "${1:-}" == "-h" ]] || [[ "${1:-}" == "--help" ]]; then
+    # Запрос help: -h/--help в любой позиции, не только argv[0].
+    # Объявленные флаги help/h имеют приоритет — их обработает цикл ниже.
+    # Help request: -h/--help at any position, not only argv[0].
+    # Declared flags named help/h take precedence — the loop below handles them.
+    local arg key help_requested="false"
+    for arg in "$@"; do
+        if [[ "${arg}" == "-h" ]] || [[ "${arg}" == "--help" ]]; then
+            key="${arg#--}"
+            [[ "${arg}" == "-h" ]] && key="h"
+            if is::empty "${__ARGS_FLAGS["${key}"]:-}"; then
+                help_requested="true"
+            fi
+        fi
+    done
+    if [[ "${help_requested}" == "true" ]]; then
         ARGS_HELP_REQUESTED=1
         args::help
         return "${E_SUCCESS:-0}"
@@ -652,7 +665,16 @@ args::parse() {
                         args::help >&2
                         return "${E_INVALID:-2}"
                     fi
-                    ARGS_FLAGS["${flag_name}"]="${argv[i]}"
+                    if [[ "${argv[i]}" == "--" ]]; then
+                        # Разделитель "--" не съедаем: значение отсутствует (пустое);
+                        # откатываем i назад, чтобы "--" обработала ветка разделителя
+                        # Do not eat the "--" separator: the value is missing (empty);
+                        # rewind i so the "--" branch handles the separator
+                        ARGS_FLAGS["${flag_name}"]=""
+                        ((--i))
+                    else
+                        ARGS_FLAGS["${flag_name}"]="${argv[i]}"
+                    fi
                 fi
                 # Валидация значения / Value validation
                 if ! args::__validate_flag_value "${flag_name}" "${ARGS_FLAGS["${flag_name}"]}"; then
@@ -794,23 +816,31 @@ args::completion() {
     # Список всех флагов для дополнения / All flags for completion
     # Итерация через read: $() word splitting зависит от IFS вызывающего
     # Iterating via read: $() word splitting depends on the caller's IFS
+    # При пустом множестве флагов printf '%s\n' "${!arr[@]}" выдал бы пустую
+    # строку (ключ ""), read получил бы flag_name="" и индекс "" сломал бы
+    # ассоциативный массив — циклы пропускаются целиком
+    # With an empty flag set, printf '%s\n' "${!arr[@]}" emits an empty line
+    # (key ""), read would set flag_name="" and the "" subscript would break
+    # the associative array — the loops are skipped entirely
     local flag_words="--help"
-    local flag_name
-    while IFS= read -r flag_name; do
-        flag_words+=" --${flag_name}"
-    done < <(printf '%s\n' "${!__ARGS_FLAGS[@]}" | sort)
-
-    # Список value-флагов (после них значение не дополняется);
-    # enum-флаги исключаются — для них дополняются значения
-    # Value flags list (their values are not completed);
-    # enum flags are excluded — their values ARE completed
     local value_flags=""
-    while IFS= read -r flag_name; do
-        if [[ "${__ARGS_FLAGS["${flag_name}"]:-}" == "value" ]] && \
-           [[ "${__ARGS_FLAG_VALIDATORS["${flag_name}"]:-}" != enum:* ]]; then
-            value_flags+=" --${flag_name}"
-        fi
-    done < <(printf '%s\n' "${!__ARGS_FLAGS[@]}" | sort)
+    if [[ ${#__ARGS_FLAGS[@]} -gt 0 ]]; then
+        local flag_name
+        while IFS= read -r flag_name; do
+            flag_words+=" --${flag_name}"
+        done < <(printf '%s\n' "${!__ARGS_FLAGS[@]}" | sort)
+
+        # Список value-флагов (после них значение не дополняется);
+        # enum-флаги исключаются — для них дополняются значения
+        # Value flags list (their values are not completed);
+        # enum flags are excluded — their values ARE completed
+        while IFS= read -r flag_name; do
+            if [[ "${__ARGS_FLAGS["${flag_name}"]:-}" == "value" ]] && \
+               [[ "${__ARGS_FLAG_VALIDATORS["${flag_name}"]:-}" != enum:* ]]; then
+                value_flags+=" --${flag_name}"
+            fi
+        done < <(printf '%s\n' "${!__ARGS_FLAGS[@]}" | sort)
+    fi
 
     # Уровни дерева / Tree levels
     local max_level=0
@@ -852,20 +882,22 @@ EOF
 
     # enum-значения для value-флагов / enum values for value flags
     local enum_flag_name enum_values
-    while IFS= read -r enum_flag_name; do
-        if [[ "${__ARGS_FLAGS["${enum_flag_name}"]:-}" == "value" ]] && \
-           [[ "${__ARGS_FLAG_VALIDATORS["${enum_flag_name}"]:-}" == enum:* ]]; then
-            enum_values="${__ARGS_FLAG_VALIDATORS["${enum_flag_name}"]#enum:}"
-            enum_values="${enum_values//,/ }"
-            cat <<EOF
+    if [[ ${#__ARGS_FLAGS[@]} -gt 0 ]]; then
+        while IFS= read -r enum_flag_name; do
+            if [[ "${__ARGS_FLAGS["${enum_flag_name}"]:-}" == "value" ]] && \
+               [[ "${__ARGS_FLAG_VALIDATORS["${enum_flag_name}"]:-}" == enum:* ]]; then
+                enum_values="${__ARGS_FLAG_VALIDATORS["${enum_flag_name}"]#enum:}"
+                enum_values="${enum_values//,/ }"
+                cat <<EOF
 
     # enum-значения: --${enum_flag_name} <${enum_values// /|}>
     case "\${prev}" in
         --${enum_flag_name}) COMPREPLY=( \$(compgen -W "${enum_values}" -- "\${cur}") ); return 0 ;;
     esac
 EOF
-        fi
-    done < <(printf '%s\n' "${!__ARGS_FLAGS[@]}" | sort)
+            fi
+        done < <(printf '%s\n' "${!__ARGS_FLAGS[@]}" | sort)
+    fi
 
     cat <<EOF
 

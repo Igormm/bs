@@ -118,6 +118,12 @@ main() {
     testframework::assert_equal "1" "${ARGS_HELP_REQUESTED}" "Help flag set on --help"
     testframework::assert_equal "0" "${#ARGS_PARAMS[@]}" "No params on help request"
 
+    # -h/--help в любой позиции, не только argv[0] / at any position, not only argv[0]
+    args::parse deploy --help >/dev/null
+    testframework::assert_equal "1" "${ARGS_HELP_REQUESTED}" "Trailing --help requests help"
+    args::parse -h rollback >/dev/null
+    testframework::assert_equal "1" "${ARGS_HELP_REQUESTED}" "-h before params requests help"
+
     # Тест 8: args::get за пределами
     testframework::section "args::get Out of Range / args::get за пределами"
 
@@ -203,6 +209,14 @@ main() {
     args::parse --force
     testframework::assert_equal "1" "$(args::flag_get --force)" "Flag works with -- prefix"
 
+    # Объявленный флаг help имеет приоритет над -h/--help
+    # A declared flag named help takes precedence over -h/--help
+    args::reset
+    args::flag help
+    args::parse --help
+    testframework::assert_equal "1" "${ARGS_FLAGS[help]}" "Declared help flag wins over --help"
+    testframework::assert_equal "0" "${ARGS_HELP_REQUESTED}" "No help requested when help flag declared"
+
     # Только флаги, без дерева / Flags only, no tree
     args::reset
     args::flag verbose
@@ -258,6 +272,27 @@ main() {
     # completion без объявлений / completion without declarations
     args::reset
     testframework::assert_false "args::completion x" "Completion fails with empty tree"
+
+    # completion с деревом, но без флагов: без краха и без призрачного "--"
+    # completion with a tree but no flags: no crash, no ghost "--"
+    args::reset
+    args::define deploy
+    comp_out="$(args::completion "deploy.sh")"
+    testframework::assert_true "\$comp_out == *'complete -F _deploy_sh_completion deploy.sh'*" "Completion works with zero flags"
+    testframework::assert_true "\$comp_out != *'--help --'*" "No ghost -- candidate with zero flags"
+    comp_err="$(args::completion "deploy.sh" 2>&1 >/dev/null)"
+    testframework::assert_equal "" "${comp_err}" "No invalid-subscript errors on zero flags"
+    comp_file="$(mktemp)"
+    args::completion "deploy.sh" > "${comp_file}"
+    (
+        source "${comp_file}"
+        COMP_WORDS=(deploy.sh "")
+        COMP_CWORD=1
+        _deploy_sh_completion
+        printf '%s\n' "${COMPREPLY[*]}"
+    ) > /tmp/args_comp_result.$$
+    testframework::assert_true "\"$(cat /tmp/args_comp_result.$$)\" == *'deploy'*" "Zero-flag completion offers level 1"
+    rm -f "${comp_file}" /tmp/args_comp_result.$$
 
     # args::require: выход с кодом при ошибке / exits with code on failure
     testframework::section "args::require"
@@ -349,6 +384,14 @@ main() {
 prod
 --raw
 arg" "$(args::rest)" "args::rest prints all"
+
+    # value-флаг не съедает разделитель "--" / value flag does not eat the "--" separator
+    args::reset
+    args::define deploy
+    args::flag output value
+    args::parse deploy --output -- -x
+    testframework::assert_equal "-x" "${ARGS_REST[0]}" "-- stays raw separator after a value flag"
+    testframework::assert_false "args::flag_get output" "value flag left empty when followed by --"
 
     testframework::section "Variadic / Повторяемые уровни"
 
