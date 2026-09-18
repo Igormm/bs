@@ -518,3 +518,34 @@ main "$@"
 в репозитории есть конфиг [.shellcheckrc](../../.shellcheckrc) и скрипт
 [tests/validateshellcheck.sh](../../tests/validateshellcheck.sh). Настройте оба
 в CI.
+
+## 11. Вектор возможностей / Capability vector
+
+Новые функции ядра (`core/`) и библиотеки (`lib/`) должны работать на
+любом целевом окружении BS: GNU/Linux, macOS и FreeBSD (BSD userland),
+busybox (Alpine), glibc и musl. Правила:
+
+1. **Фича-детекция вместо ОС-детекции.** Проверяйте возможность, а не имя
+   ОС. Не пишите `if [[ "$(uname)" == "Darwin" ]]` для выбора реализации —
+   пробуйте инструмент/поведение:
+   ```bash
+   if printf 'a\nb' | sed -z 's/a/X/' >/dev/null 2>&1; then SED_Z=1; fi
+   if printf 'x' | grep -Pq 'x' 2>/dev/null; then GREP_P=1; fi
+   ```
+2. **Probe chain с fallback.** Любой не-POSIX инструмент берётся через
+   цепочку проб (эталон — `bs_build::sha256`): `sha256sum → shasum -a 256
+   → cksum`. Свойства GNU-инструментов, которые требуют fallback:
+   `grep -P`, `sed -z`, `stat -c`, `date +%N`, `readlink -f`, `head -c`.
+   BSD-замены: `shasum`, `stat -f`, `perl -0` для многострочного sed.
+3. **Никаких GNU-only вызовов в ядре без обёртки.** `core/` не должен
+   вызывать `grep -P`/`sed -z` напрямую — только через модуль с fallback
+   (например, `regex::matches --pcre` уже умеет ERE-фолбэк).
+4. **`/proc` и `/sys` — Linux-only.** Проверяйте `[[ -d /proc ]]` перед
+   чтением; на macOS/FreeBSD их нет. Аппаратные данные — через слой
+   вроде `lib/system/hw` с хуками для тестов.
+5. **Версионируйте по вектору возможностей.** Вектор:
+   `kernel / arch / distro / family (ID_LIKE) / repo / userland / libc /
+   bash / tools[]`. Репозиторий пакетов — производное от `ID_LIKE`,
+   не от названия дистрибутива.
+6. **Развёрнутый анализ** — см. `.art/versioning-analysis.md` (локальный
+   документ автора); канон правил — этот раздел.

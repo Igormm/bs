@@ -47,3 +47,16 @@ declare -g MYMODULE_VERSION="1.0.0"
 ## Extra caution
 
 Core changes affect every script using the framework. Keep changes minimal, do not alter existing public function signatures, and verify `bs doctor` still passes after the change.
+
+## Portability / Вектор возможностей
+
+Core kernel must stay portable (per `documentation/ru/code-style-guide.md`
+§11, EN synced):
+
+1. No GNU-only tools in core without a pure-bash fallback
+   (`grep -P`, `sed -z`, `stat -c`, `date +%N`, `readlink -f`).
+2. Probe chains for optional tools (reference: `bs_build::sha256`:
+   `sha256sum → shasum -a 256 → cksum`).
+3. Feature-detect, then gate: primitives portable by default;
+   platform-specific behavior behind probes (`[[ -d /proc ]]` and the like).
+4. Never select behavior by `uname` — probe the capability.

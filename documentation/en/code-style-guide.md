@@ -513,3 +513,34 @@ Linting: always run [shellcheck](https://www.shellcheck.net/) — the repository
 has a [.shellcheckrc](../../.shellcheckrc) config and a
 [tests/validateshellcheck.sh](../../tests/validateshellcheck.sh) script. Wire
 both into CI.
+
+## 11. Capability vector / Вектор возможностей
+
+New functions in the kernel (`core/`) and library (`lib/`) must work on any
+target environment of BS: GNU/Linux, macOS and FreeBSD (BSD userland),
+busybox (Alpine), glibc and musl. Rules:
+
+1. **Feature detection over OS detection.** Probe a capability, not an OS
+   name. Do not write `if [[ "$(uname)" == "Darwin" ]]` to pick an
+   implementation — probe the tool/behavior:
+   ```bash
+   if printf 'a\nb' | sed -z 's/a/X/' >/dev/null 2>&1; then SED_Z=1; fi
+   if printf 'x' | grep -Pq 'x' 2>/dev/null; then GREP_P=1; fi
+   ```
+2. **Probe chain with fallbacks.** Any non-POSIX tool is picked through a
+   probe chain (the reference is `bs_build::sha256`): `sha256sum →
+   shasum -a 256 → cksum`. GNU-only tools that need fallbacks:
+   `grep -P`, `sed -z`, `stat -c`, `date +%N`, `readlink -f`, `head -c`.
+   BSD replacements: `shasum`, `stat -f`, `perl -0` for multiline sed.
+3. **No bare GNU-only calls in the kernel.** `core/` must not call
+   `grep -P`/`sed -z` directly — only through a module with a fallback
+   (e.g. `regex::matches --pcre` already falls back to ERE).
+4. **`/proc` and `/sys` are Linux-only.** Check `[[ -d /proc ]]` before
+   reading; macOS/FreeBSD do not have them. Hardware data goes through a
+   layer like `lib/system/hw` with test hooks.
+5. **Version by the capability vector.** The vector:
+   `kernel / arch / distro / family (ID_LIKE) / repo / userland / libc /
+   bash / tools[]`. The package repository is derived from `ID_LIKE`, not
+   from the distro name.
+6. **Extended analysis** — see `.art/versioning-analysis.md` (author's
+   local document); the rules above are the canon.

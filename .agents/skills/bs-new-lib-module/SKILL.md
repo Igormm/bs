@@ -66,3 +66,19 @@ group::module::function() {
    bash tests/validateshellcheck.sh
    bash tests/runalltests.sh
    ```
+
+## Portability / Вектор возможностей
+
+Follow the capability vector rules from `documentation/ru/code-style-guide.md`
+§11 (EN: `documentation/en/code-style-guide.md`):
+
+1. Feature detection over OS detection: probe capabilities (`sed -z` probe,
+   `[[ -d /proc ]]`), never branch on `uname`.
+2. Non-POSIX tools only via probe chains (reference: `bs_build::sha256`:
+   `sha256sum → shasum -a 256 → cksum`).
+3. No bare `grep -P`, `sed -z`, `stat -c`, `date +%N`, `readlink -f` —
+   provide or use a fallback; degrade gracefully and document the tier.
+4. `/proc`/`/sys` reads guarded with `[[ -d /proc ]]`; platform paths via
+   test hooks (like `HW_DMI_PATH` in `lib/system/hw`).
+5. Library must work on GNU/Linux, macOS/FreeBSD (BSD userland) and busybox
+   (Alpine) unless the module documents a Linux-only tier.

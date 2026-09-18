@@ -110,3 +110,22 @@ main "$@"
 - Confirm all three validators pass.
 - Confirm unit tests cover the new behavior.
 - Provide a concise summary of what changed.
+
+## Portability / Вектор возможностей
+
+Follow the capability vector rules from `documentation/ru/code-style-guide.md`
+§11 (synced EN: `documentation/en/code-style-guide.md`). Concretely:
+
+1. New lib functions must work on GNU/Linux, macOS/FreeBSD (BSD userland),
+   and busybox (Alpine). No GNU-only tools without a fallback:
+   `grep -P`, `sed -z`, `stat -c`, `date +%N`, `readlink -f`.
+2. Pick non-POSIX tools via probe chains (reference: `bs_build::sha256`:
+   `sha256sum → shasum -a 256 → cksum`).
+3. `/proc` and `/sys` reads must be guarded (`[[ -d /proc ]]`) — they do
+   not exist on macOS/FreeBSD. Provide test hooks for platform-specific
+   paths (like `HW_DMI_PATH` in `lib/system/hw`).
+4. Version by capability, not by OS name: never branch on `uname` for
+   behavior selection — probe the feature.
+5. If the module inherently targets GNU/Linux (e.g. PCRE), degrade
+   gracefully to the portable fallback (like `regex::matches --pcre`
+   falls back to ERE) and document the tier.

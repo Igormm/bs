@@ -77,3 +77,18 @@ core::module::do_thing() {
 - Confirm all validators pass.
 - Confirm no core module sources `core/prereq.sh`.
 - Provide a concise summary of changes and any breaking implications.
+
+## Portability / Вектор возможностей
+
+Follow the capability vector rules from `documentation/ru/code-style-guide.md`
+§11 (and the synced EN version). Concretely:
+
+1. New core primitives must work on bash 4+ WITHOUT GNU-only tools.
+   If a feature needs `grep -P`, `sed -z`, `stat -c` or `date +%N`,
+   either implement a pure-bash fallback or gate it behind a feature probe.
+2. Use probe chains (reference: `bs_build::sha256`:
+   `sha256sum → shasum -a 256 → cksum`) instead of hardcoded OS names.
+3. Never write `if [[ "$(uname)" == "Darwin" ]]` to choose behavior —
+   probe the capability instead (`[[ -d /proc ]]`, `sed -z` probe, ...).
+4. Feature-detect, then gate: new primitives stay portable by default;
+   platform-specific extensions live behind probes.
