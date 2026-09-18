@@ -630,7 +630,7 @@ update_cmd() {
         printf '  --local   update to ~/.local/lib/bs      (local install)\n'
         printf '  --system  update to /usr/local/lib/bs    (system install, needs root)\n'
         printf '  --lib DIR update to a custom install directory\n'
-        printf '  --from    source repo (default: running BS_ROOT)\n'
+        printf '  --from    source repo (default: repo detected from CWD, else running BS_ROOT)\n'
         printf 'Without flags: update to every detected install (local + system).\n'
         printf 'Copies bootstrap/, core/, lib/, bs. Use sudo bs update --system.\n'
         return 0 ;;
@@ -638,6 +638,12 @@ update_cmd() {
         die "update: unknown argument: $1" ;;
     esac
   done
+
+  # Источник: если CWD — каталог репозитория, используем его.
+  # Source: if CWD is the repo directory, use it as the source.
+  if [[ "${from}" == "${BS_ROOT}" && -f "${PWD}/bs" && -d "${PWD}/core" && -d "${PWD}/tests" ]]; then
+    from="${PWD}"
+  fi
 
   # Детект установок / Detect installs
   if (( explicit == 0 )); then
@@ -660,6 +666,10 @@ update_cmd() {
       log::warn "update: target not found, skipping: ${target}"
       continue
     fi
+    if [[ "${from}" == "${target}" ]]; then
+      log::warn "update: source is the same as target: ${target} (running from an installed copy). Run from the repo: ./bs update, or pass --from <repo-path>"
+      continue
+    fi
     if ! [[ -w "${target}" ]]; then
       log::warn "update: target not writable: ${target} (try: sudo bs update --system)"
       continue
@@ -672,7 +682,7 @@ update_cmd() {
     fi
   done
 
-  (( ok == 1 )) || die "update: nothing to update"
+  (( ok == 1 )) || die "update: nothing to update — source is not a repo or equals target (see messages above)"
   log::success "sync done — changes are live without reinstalling"
 }
 
@@ -701,6 +711,7 @@ case "${1:-help}" in
   lsp)            shift; lsp_cmd "$@" ;;
   chat)           shift; chat_cmd "$@" ;;
   update)           shift; update_cmd "$@" ;;
+  sync)             shift; log::warn "sync is deprecated — use: bs update" && update_cmd "$@" ;;
   rfc)              shift; rfc_cmd "$@" ;;
   audit)            shift; audit_cmd "$@" ;;
   doctor)         shift || true; doctor_cmd "$@" ;;
