@@ -76,6 +76,66 @@ EOF
     testframework::assert_equal "3.1429" "$(math::calc "22.0 / 7.0" --format "%.4f")" "custom format"
     testframework::assert_equal "3" "$(math::calc "22.0 / 7.0" --format "%.0f")" "integer format"
 
+    testframework::section "Locale / Локаль"
+    # Вывод не зависит от LC_NUMERIC: всегда точка, никогда запятая
+    # Output is locale-independent: always ".", never ","
+    local test_locale=""
+    local candidate
+    for candidate in "ru_RU.utf8" "ru_RU.UTF-8" "ru_RU" "de_DE.utf8" "de_DE.UTF-8" "de_DE"; do
+        if locale -a 2>/dev/null | grep -Fqx "${candidate}"; then
+            test_locale="${candidate}"
+            break
+        fi
+    done
+
+    local loc_out=""
+    if [[ -n "${test_locale}" ]]; then
+        loc_out="$(LC_ALL='' LC_NUMERIC="${test_locale}" math::calc "1.0 / 2")"
+        testframework::assert_equal "0.5" "${loc_out}" "decimal separator '.' under ${test_locale}"
+    else
+        # Нет локали с запятой — проверяем printf сгенерированного C напрямую
+        # No comma locale available — check the generated C printf directly
+        local bin_check
+        bin_check="$(__math::build "" "1.0 / 2" "%.15g")"
+        loc_out="$("${bin_check}")"
+        testframework::assert_equal "0.5" "${loc_out}" "manual printf check uses '.'"
+    fi
+
+    testframework::section "Security / Безопасность"
+    # Значение переменной встраивается в C-исходник — только числовой
+    # литерал; инъекция C-кода через значение должна отклоняться
+    # Variable values are embedded into the C source — numeric literals
+    # only; C-code injection via a value must be rejected
+    local inj_out=""
+    local inj_rc=0
+    local inj_err
+    inj_err="$(mktemp)"
+    if inj_out="$(math::calc "x" "x=1; system(\"echo pwned\"); //" 2>"${inj_err}")"; then
+        inj_rc=0
+    else
+        inj_rc=$?
+    fi
+    rm -f "${inj_err}"
+    local was_rejected="no"
+    [[ ${inj_rc} -ne 0 ]] && was_rejected="yes"
+    testframework::assert_equal "yes" "${was_rejected}" "injection attempt rejected (rc=${inj_rc})"
+    # "pwned" не должен появиться в stdout: system() не выполняется
+    # "pwned" must not appear on stdout: system() never runs
+    local has_pwned="no"
+    [[ "${inj_out}" == *pwned* ]] && has_pwned="yes"
+    testframework::assert_equal "no" "${has_pwned}" "no pwned output"
+
+    local val_rc=0
+    if math::calc "x" "x=abc" >/dev/null 2>&1; then
+        val_rc=0
+    else
+        val_rc=$?
+    fi
+    local val_rejected="no"
+    [[ ${val_rc} -ne 0 ]] && val_rejected="yes"
+    testframework::assert_equal "yes" "${val_rejected}" "non-numeric value rejected"
+    testframework::assert_equal "-700" "$(math::calc "x * 2" "x=-3.5e2")" "numeric literal forms accepted"
+
     testframework::section "Errors / Ошибки"
     testframework::assert_false "math::calc '2 +'" "invalid expression fails"
     testframework::assert_false "math::calc ''" "empty expression fails"

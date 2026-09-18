@@ -19,22 +19,29 @@ bs::source_relative "../../core/lang.sh" "../../core/const.sh" "../../core/utils
 # compiles the expression into a tiny C program (double precision,
 # math.h: sin/cos/pow/sqrt/log/...) and runs it. The first evaluation
 # compiles (~100 ms), the binary is cached by content hash, subsequent
-# calls run in ~1 ms. Input via heredoc (triple quotes):
+# calls run in ~1 ms. Output is locale-independent: the C program forces
+# LC_ALL=C, so the decimal separator is always "." (never ","). Input via
+# heredoc (triple quotes):
 #   math::eval <<'EOF'
 #   pow(2, 10) + sqrt(144) * sin(PI / 6)
 #   EOF
 # SECURITY: the expression is compiled and executed as C — only feed
-# expressions you trust. Requires cc (gcc/clang).
+# expressions you trust. Variable values are validated as numeric
+# literals (no C injection via values). Requires cc (gcc/clang).
 # Арифметика bash — только целые числа, для настоящей математики она
 # бесполезна. Модуль компилирует выражение в крошечную C-программу
 # (double, math.h: sin/cos/pow/sqrt/log/...) и запускает её. Первое
 # вычисление компилирует (~100 мс), бинарник кэшируется по хешу,
-# последующие вызовы — ~1 мс. Ввод — через heredoc (тройные кавычки):
+# последующие вызовы — ~1 мс. Вывод не зависит от локали: C-программа
+# принудительно ставит LC_ALL=C, поэтому десятичный разделитель всегда
+# "." (никогда ","). Ввод — через heredoc (тройные кавычки):
 #   math::eval <<'EOF'
 #   pow(2, 10) + sqrt(144) * sin(PI / 6)
 #   EOF
 # БЕЗОПАСНОСТЬ: выражение компилируется и выполняется как C — подавайте
-# только доверенные выражения. Требуется cc (gcc/clang).
+# только доверенные выражения. Значения переменных проверяются как
+# числовые литералы (инъекция C через значения исключена). Требуется cc
+# (gcc/clang).
 # ==========================================
 
 # Cache dir / Каталог кэша
@@ -44,6 +51,7 @@ bs::source_relative "../../core/lang.sh" "../../core/const.sh" "../../core/utils
 # Хелперы, доступные в каждом выражении (math.h + небольшие дополнения).
 readonly MATH_TEMPLATE_HEAD='#include <math.h>
 #include <stdio.h>
+#include <locale.h>
 #define PI 3.14159265358979323846
 #define TAU 6.28318530717958647692
 #define E 2.71828182845904523536
@@ -53,7 +61,8 @@ readonly MATH_TEMPLATE_HEAD='#include <math.h>
 #define clamp(x, a, b) fmin(fmax((x), (a)), (b))
 #define lerp(a, b, t) ((a) + (t) * ((b) - (a)))
 #define roundn(x, n) (round((x) * pow(10, (n))) / pow(10, (n)))
-int main(void) {'
+int main(void) {
+  setlocale(LC_ALL, "C");'
 
 readonly MATH_TEMPLATE_EXPR_OPEN='  double __result = ('
 
@@ -145,7 +154,8 @@ ${expr}${MATH_TEMPLATE_TAIL//FMT/\"${fmt_escaped}\"}"
 # @description Вычислить выражение (общий код math::eval / math::calc).
 # @param $1 Expression / Выражение
 # @param $2 Output format, default "%.15g" / Формат вывода
-# @param $@ Variable definitions "name=value" / Определения переменных
+# @param $@ Variable definitions "name=value" (value: numeric literal)
+#        Определения переменных "name=value" (значение: числовой литерал)
 # @stdout the result / результат
 # @return 0 ok, nonzero on failure
 __math::run() {
@@ -154,12 +164,22 @@ __math::run() {
   shift 2
 
   # Переменные → объявления double / Variables → double declarations
+  # Значение встраивается в C-исходник, поэтому допускается только
+  # числовой литерал (плюс пробелы по краям) — инъекция C исключена
+  # Value is embedded into the C source, so only a numeric literal
+  # (plus surrounding whitespace) is allowed — no C injection
   local var_decls="" pair name value
   for pair in "$@"; do
     name="${pair%%=*}"
     value="${pair#*=}"
     [[ "${name}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || {
       log::error "math: invalid variable name: ${name}"
+      return 1
+    }
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    [[ "${value}" =~ ^-?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$ ]] || {
+      log::error "math: invalid variable value (numeric literal required): ${pair}"
       return 1
     }
     var_decls+="double ${name} = ${value};
@@ -175,8 +195,9 @@ __math::run() {
 # @description Evaluate an expression from stdin (heredoc = triple quotes).
 # @description Вычислить выражение из stdin (heredoc = тройные кавычки).
 # @param $1 [optional] --format FMT, default "%.15g" / формат вывода
-# @param $@ [optional] Variable definitions "name=value"
-#        Определения переменных "name=value"
+# @param $@ [optional] Variable definitions "name=value" (value: numeric
+#        literal) / Определения переменных "name=value" (значение:
+#        числовой литерал)
 # @stdin the expression / выражение
 # @stdout the result / результат
 # @return 0 ok, nonzero on failure
@@ -217,7 +238,9 @@ math::eval() {
 # @description Вычислить разовое выражение из аргумента.
 # @param $1 Expression / Выражение
 # @param $2 [optional] --format FMT / формат вывода
-# @param $@ [optional] Variable definitions / Определения переменных
+# @param $@ [optional] Variable definitions "name=value" (value: numeric
+#        literal) / Определения переменных "name=value" (значение:
+#        числовой литерал)
 # @stdout the result / результат
 # @return 0 ok, nonzero on failure
 # @example
