@@ -46,7 +46,8 @@ EOF
 
     # Флаги / Flags
     export SSH_MOCK_RC=0
-    ssh::run --user root --port 2222 --key /tmp/k -- host "id" >/dev/null 2>&1 || true
+    touch "${tmp_dir}/id_rsa"
+    ssh::run --user root --port 2222 --key "${tmp_dir}/id_rsa" -- host "id" >/dev/null 2>&1 || true
     testframework::assert_command "grep -q -- '-p 2222' '${log}'" "ssh::run passes port"
     testframework::assert_command "grep -q 'root@host' '${log}'" "ssh::run builds user@host"
 
@@ -91,6 +92,52 @@ EOF
     rm -rf "${tmp_dir}"
 }
 
+test_ssh_security() {
+    local tmp_dir rc err
+    tmp_dir="$(mktemp -d)"
+
+    # Инъекция через --port в rsync -e: значение с пробелом отклоняется
+    # Injection via --port into rsync -e: a value with a space is rejected
+    rc=0
+    err="$(ssh::push ./app.sh root@server:/opt/ --port '2222 -oProxyCommand=touch /tmp/pwned' 2>&1 >/dev/null)" || rc=$?
+    testframework::assert_equal "1" "${rc}" "ssh::push rejects malicious --port (rc 1)"
+    testframework::assert_command "printf '%s' '${err}' | grep -q 'invalid --port'" "ssh::push reports invalid --port error"
+
+    # --key с пробелами отклоняется / --key with spaces is rejected
+    rc=0
+    err="$(ssh::push ./app.sh root@server:/opt/ --key '/tmp/my key' 2>&1 >/dev/null)" || rc=$?
+    testframework::assert_equal "1" "${rc}" "ssh::push rejects --key with spaces (rc 1)"
+    testframework::assert_command "printf '%s' '${err}' | grep -q 'invalid --key'" "ssh::push reports invalid --key error"
+
+    # Несуществующий --key отклоняется / Nonexistent --key is rejected
+    rc=0
+    err="$(ssh::pull root@server:/x ./y --key "${tmp_dir}/no-such-key" 2>&1 >/dev/null)" || rc=$?
+    testframework::assert_equal "1" "${rc}" "ssh::pull rejects missing --key (rc 1)"
+    testframework::assert_command "printf '%s' '${err}' | grep -q 'file not found'" "ssh::pull reports missing --key error"
+
+    # Инъекция опций: --user с ведущим '-' отклоняется
+    # Option injection: --user with a leading '-' is rejected
+    rc=0
+    err="$(ssh::run --user '-oProxyCommand=touch /tmp/pwned' -- host id 2>&1 >/dev/null)" || rc=$?
+    testframework::assert_equal "1" "${rc}" "ssh::run rejects --user with leading dash (rc 1)"
+    testframework::assert_command "printf '%s' '${err}' | grep -q 'must not start with'" "ssh::run reports option-injection guard error"
+
+    # Хост с ведущим '-' после '--' не становится опцией: ssh получает '--'
+    # A host with a leading '-' after '--' is not an option: ssh gets its own '--'
+    local mock log
+    log="${tmp_dir}/ssh.log"
+    mock="${tmp_dir}/mock-ssh"
+    printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >> "%s"\nexit 0\n' "${log}" > "${mock}"
+    chmod +x "${mock}"
+    export SSH_MOCK="${mock}"
+    export SSH_MOCK_LOG="${log}"
+    ssh::run -- '-oProxyCommand=evil' host id >/dev/null 2>&1 || true
+    testframework::assert_command "grep -q -- '-- -oProxyCommand=evil host id' '${log}'" "ssh::run passes -- to ssh for dash host after --"
+    unset SSH_MOCK SSH_MOCK_LOG
+
+    rm -rf "${tmp_dir}"
+}
+
 test_ssh_multiplex() {
     local tmp_dir mock log sockdir
     tmp_dir="$(mktemp -d)"
@@ -111,10 +158,27 @@ EOF
     testframework::assert_command "grep -q -- '-M' '${log}'" "ssh::multiplex opens master (-M)"
     testframework::assert_command "grep -q 'ControlMaster=yes' '${log}'" "ssh::multiplex sets ControlMaster"
     testframework::assert_command "test -d '${sockdir}'" "ssh::multiplex creates socket dir"
-    touch "${sockdir}/root@build01.sock"
+
+    # Настоящий сокет на пути: -O exit отправляется / Real socket: -O exit is sent
+    python3 - "${sockdir}/root@build01.sock" <<'PYEOF'
+import socket, sys
+s = socket.socket(socket.AF_UNIX)
+s.bind(sys.argv[1])
+PYEOF
 
     ssh::multiplex_close root@build01
     testframework::assert_command "grep -q -- '-O exit' '${log}'" "ssh::multiplex_close sends exit"
+
+    # Регрессия: обычный файл на пути сокета — rc 0, ssh не вызывается.
+    # Прямой вызов без '||' доказывает: set -e вызывающего не срабатывает.
+    # Regression: a regular file at the socket path — rc 0, ssh not invoked.
+    # A bare call (no '||') proves a set -e caller is not killed.
+    printf 'leftover\n' > "${sockdir}/leftover.sock"
+    local before after
+    before="$(grep -c -- '-O exit' "${log}" || true)"
+    ssh::multiplex_close leftover
+    after="$(grep -c -- '-O exit' "${log}" || true)"
+    testframework::assert_equal "${before}" "${after}" "multiplex_close does not invoke ssh for a regular file"
 
     unset SSH_MOCK SSH_MOCK_LOG BS_SSH_SOCKET_DIR
     rm -rf "${tmp_dir}"
@@ -173,6 +237,9 @@ main() {
 
     testframework::section "push/pull / Передача"
     test_ssh_transfer
+
+    testframework::section "Security / Безопасность"
+    test_ssh_security
 
     testframework::section "multiplex / Соединения"
     test_ssh_multiplex
