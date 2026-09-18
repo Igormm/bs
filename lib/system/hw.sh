@@ -357,3 +357,554 @@ EOF
 # Метка загрузки / Load marker
 # shellcheck disable=SC2034
 declare -g SYSTEM_HW_LOADED="1"
+
+# ==========================================
+# hw:: — hardware DB layer / слой-база данных
+#
+# The hardware is exposed as a dictionary navigated by semantic paths
+# instead of the Linux /sys layout:
+#   hw::get mb.bios.vendor      mb.memory.speed
+#   hw::cd mb.memory; hw::get speed
+#   hw::ls mb.storage           hw::find "temp"
+# Аппаратура доступна как словарь с навигацией по смысловым путям
+# вместо раскладки Linux /sys:
+#   hw::get mb.bios.vendor      mb.memory.speed
+#   hw::cd mb.memory; hw::get speed
+#   hw::ls mb.storage           hw::find "temp"
+#
+# Path scheme / Схема путей:
+#   mb.bios.{vendor,version,date,uefi}
+#   mb.system.{vendor,product,serial,uuid}
+#   mb.board.{vendor,name,serial,version}
+#   mb.chassis.{vendor,type}
+#   mb.cpu.{vendor,name,cores,threads,max_mhz,virtualization,flags.<flag>}
+#   mb.cache.{l1d,l1i,l2,l3}
+#   mb.memory.{total_bytes,total_mb,type,speed,modules}
+#   mb.storage.<dev>.{model,size,type}
+#   mb.net.<if>.{mac,speed,state}
+#   mb.sensors.<name>.<sensor>_c / _rpm / _mv
+#   mb.battery.{present,capacity_pct,energy_full_wh,status}
+#   mb.power.ac_online
+#   mb.usb.count  mb.pci.count  mb.tpm.present  mb.efi.{mode,secure_boot}
+#   mb.os.{name,kernel,arch,hostname}
+#
+# Test hooks (override paths) / Тестовые хуки (переопределение путей):
+#   HW_DMI_PATH, HW_HWMON_PATH, HW_POWER_PATH, HW_NET_PATH, HW_BLOCK_PATH
+# ==========================================
+
+# Path overrides (test hooks) / Переопределение путей (тестовые хуки)
+: "${HW_DMI_PATH:=/sys/class/dmi/id}"
+: "${HW_HWMON_PATH:=/sys/class/hwmon}"
+: "${HW_POWER_PATH:=/sys/class/power_supply}"
+: "${HW_NET_PATH:=/sys/class/net}"
+: "${HW_BLOCK_PATH:=/sys/block}"
+
+# State / Состояние
+declare -gA HW_DB=()
+declare -g HW_CWD=""
+declare -g HW_BUILT=0
+
+# @private
+# @description Read a DMI file if readable, store under a key.
+# @description Прочитать DMI-файл, если он доступен, и сохранить по ключу.
+# @param $1 DB key / Ключ БД
+# @param $2 File name under HW_DMI_PATH / Имя файла в HW_DMI_PATH
+# @private
+# @description Read a file if readable (never empty $(hw::__read_file f) trap:
+# an extra redirection disables the $(<file) special case and discards
+# the content). / Прочитать файл, если он доступен (ловушка
+# $(hw::__read_file f): лишний редирект отключает спец-режим $(<file)).
+# @param $1 Path / Путь
+# @stdout content or nothing / содержимое или ничего
+hw::__read_file() {
+  if [[ -r "${1}" ]]; then
+    printf '%s' "$(<"${1}")"
+  fi
+}
+
+hw::__read_dmi() {
+  local f="${HW_DMI_PATH}/${2}"
+  if [[ -r "${f}" ]]; then
+    hw::__set "${1}" "$(<"${f}")"
+  fi
+}
+
+# @private
+# @description Set one DB entry / Записать одну запись БД.
+# @param $1 key / ключ
+# @param $2 value / значение
+hw::__set() {
+  HW_DB["${1}"]="${2}"
+}
+
+# @private
+# @description Populate HW_DB from /proc and /sys.
+# @description Заполнить HW_DB из /proc и /sys.
+hw::__build() {
+  local val=""
+
+  # --- DMI / паспорт платы
+  hw::__read_dmi mb.bios.vendor bios_vendor
+  hw::__read_dmi mb.bios.version bios_version
+  hw::__read_dmi mb.bios.date bios_date
+  hw::__read_dmi mb.system.vendor sys_vendor
+  hw::__read_dmi mb.system.vendor product_vendor
+  hw::__read_dmi mb.system.product product_name
+  hw::__read_dmi mb.system.serial product_serial
+  hw::__read_dmi mb.system.uuid product_uuid
+  hw::__read_dmi mb.board.vendor board_vendor
+  hw::__read_dmi mb.board.name board_name
+  hw::__read_dmi mb.board.serial board_serial
+  hw::__read_dmi mb.board.version board_version
+  hw::__read_dmi mb.chassis.vendor chassis_vendor
+  hw::__read_dmi mb.chassis.type chassis_type
+
+  # --- EFI / UEFI
+  if [[ -d /sys/firmware/efi ]]; then
+    hw::__set mb.efi.mode "uefi"
+    hw::__set mb.efi.secure_boot "$(hw::__secure_boot)"
+  else
+    hw::__set mb.efi.mode "bios"
+  fi
+
+  # --- OS / ОС
+  hw::__set mb.os.kernel "$(hw::__read_file /proc/sys/kernel/osrelease)"
+  hw::__set mb.os.arch "$(hw::__read_file /proc/sys/kernel/arch)"
+  hw::__set mb.os.hostname "$(hw::__read_file /proc/sys/kernel/hostname)"
+  val="$(awk -F= '/^NAME=/{gsub(/"/,"",$2); print $2}' /etc/os-release 2>/dev/null)"
+  is::not_empty "${val}" && hw::__set mb.os.name "${val}"
+
+  # --- CPU / процессор
+  hw::__build_cpu
+
+  # --- Memory / память
+  local mem_total_kb=""
+  mem_total_kb="$(awk '/^MemTotal:/{print $2}' /proc/meminfo 2>/dev/null)"
+  if is::number "${mem_total_kb}"; then
+    hw::__set mb.memory.total_bytes "$(( mem_total_kb * 1024 ))"
+    hw::__set mb.memory.total_mb "$(( mem_total_kb / 1024 ))"
+  fi
+  hw::__build_memory_spd
+
+  # --- Sensors / датчики
+  hw::__build_sensors
+
+  # --- Power / питание
+  hw::__build_power
+
+  # --- Network / сеть
+  hw::__build_net
+
+  # --- Storage / накопители
+  hw::__build_storage
+
+  # --- Counters / счётчики
+  hw::__set mb.usb.count "$(ls -1 /sys/bus/usb/devices 2>/dev/null | wc -l)"
+  hw::__set mb.pci.count "$(ls -1 /sys/bus/pci/devices 2>/dev/null | wc -l)"
+  if [[ -d /sys/class/tpm/tpm0 ]]; then
+    hw::__set mb.tpm.present "yes"
+  else
+    hw::__set mb.tpm.present "no"
+  fi
+
+  HW_BUILT=1
+}
+
+# @private
+# @description Secure Boot state / Состояние Secure Boot.
+# @stdout yes / no / unknown
+hw::__secure_boot() {
+  if is::command bootctl; then
+    bootctl is-secure-boot 2>/dev/null || printf 'unknown\n'
+    return 0
+  fi
+  local sb_file
+  sb_file="$(ls /sys/firmware/efi/efivars/SecureBoot-* 2>/dev/null | head -n1)"
+  if is::not_empty "${sb_file}"; then
+    local size
+    size="$(stat -c %s "${sb_file}" 2>/dev/null)"
+    if is::number "${size}" && (( size > 4 )); then
+      if [[ "$(od -An -tu1 -j $(( size - 1 )) -N1 "${sb_file}" 2>/dev/null | tr -d ' ')" == "1" ]]; then
+        printf 'yes\n'
+      else
+        printf 'no\n'
+      fi
+      return 0
+    fi
+  fi
+  printf 'unknown\n'
+}
+
+# @private
+# @description CPU section of the DB / CPU-раздел БД.
+hw::__build_cpu() {
+  local name="" vendor="" flags="" cache_l3=""
+  local physical="" core=""
+  local -i threads=0
+  declare -A seen_cores=() seen_sockets=()
+
+  local line
+  while IFS= read -r line; do
+    case "${line}" in
+      processor[[:space:]]*) threads=$(( threads + 1 )) ;;
+      vendor_id[[:space:]]*) vendor="${line#*: }" ;;
+      "model name"*) name="${line#*: }" ;;
+      physical[[:space:]]id*) physical="${line#*: }"; seen_sockets["${physical}"]=1 ;;
+      core[[:space:]]id*) core="${line#*: }"; seen_cores["${physical}.${core}"]=1 ;;
+      flags[[:space:]]*) flags="${line#*: }" ;;
+      cache[[:space:]]size*) cache_l3="${line#*: }" ;;
+    esac
+  done < /proc/cpuinfo
+
+  is::not_empty "${name}" && hw::__set mb.cpu.name "${name}"
+  is::not_empty "${vendor}" && hw::__set mb.cpu.vendor "${vendor}"
+  hw::__set mb.cpu.threads "${threads}"
+  hw::__set mb.cpu.cores "${#seen_cores[@]}"
+  hw::__set mb.cpu.sockets "${#seen_sockets[@]}"
+  is::not_empty "${cache_l3}" && hw::__set mb.cache.l3 "${cache_l3}"
+
+  local freq
+  freq="$(hw::__read_file /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq)"
+  if is::number "${freq}"; then
+    hw::__set mb.cpu.max_mhz "$(( freq / 1000 ))"
+  fi
+
+  # Флаги → под-ключи / Flags → sub-keys
+  local flag
+  for flag in ${flags}; do
+    hw::__set "mb.cpu.flags.${flag}" "1"
+  done
+  case " ${flags} " in
+    *" vmx "*) hw::__set mb.cpu.virtualization "vmx" ;;
+    *" svm "*) hw::__set mb.cpu.virtualization "svm" ;;
+    *) hw::__set mb.cpu.virtualization "no" ;;
+  esac
+
+  # Кэши L1/L2 из sysfs / Caches from sysfs
+  local cache_dir idx type level size
+  for cache_dir in /sys/devices/system/cpu/cpu0/cache/index*; do
+    type="$(hw::__read_file "${cache_dir}/type")"
+    level="$(hw::__read_file "${cache_dir}/level")"
+    size="$(hw::__read_file "${cache_dir}/size")"
+    case "${level}:${type}" in
+      1:Data)      hw::__set mb.cache.l1d "${size}" ;;
+      1:Instruction) hw::__set mb.cache.l1i "${size}" ;;
+      2:*)         hw::__set mb.cache.l2 "${size}" ;;
+      3:*)         hw::__set mb.cache.l3 "${size}" ;;
+    esac
+  done
+}
+
+# @private
+# @description SPD details from dmidecode (root only) / SPD из dmidecode.
+hw::__build_memory_spd() {
+  if (( EUID != 0 )) || ! is::command dmidecode; then
+    return 0
+  fi
+  local out
+  out="$(dmidecode -t memory 2>/dev/null)"
+  local type speed
+  type="$(printf '%s\n' "${out}" | awk '/^[[:space:]]*Type:/{print $2; exit}')"
+  speed="$(printf '%s\n' "${out}" | awk '/^[[:space:]]*Speed:/{print $2; exit}')"
+  local modules
+  modules="$(printf '%s\n' "${out}" | grep -c 'Memory Device$' || true)"
+  is::not_empty "${type}" && hw::__set mb.memory.type "${type}"
+  is::not_empty "${speed}" && hw::__set mb.memory.speed "${speed}"
+  (( modules > 0 )) && hw::__set mb.memory.modules "${modules}"
+}
+
+# @private
+# @description Sensors from hwmon / Датчики из hwmon.
+hw::__build_sensors() {
+  local h name s basename val
+  for h in "${HW_HWMON_PATH}"/hwmon*; do
+    name="$(hw::__read_file "${h}/name")"
+    is::empty "${name}" && continue
+    for s in "${h}"/temp*_input; do
+      [[ -e "${s}" ]] || continue
+      basename="${s##*/}"; basename="${basename%_input}"
+      val="$(< "${s}")"
+      is::number "${val}" && hw::__set "mb.sensors.${name}.${basename}_c" "$(( val / 1000 ))"
+    done
+    for s in "${h}"/fan*_input; do
+      [[ -e "${s}" ]] || continue
+      basename="${s##*/}"; basename="${basename%_input}"
+      val="$(< "${s}")"
+      is::number "${val}" && hw::__set "mb.sensors.${name}.${basename}_rpm" "${val}"
+    done
+    for s in "${h}"/in*_input; do
+      [[ -e "${s}" ]] || continue
+      basename="${s##*/}"; basename="${basename%_input}"
+      val="$(< "${s}")"
+      is::number "${val}" && hw::__set "mb.sensors.${name}.${basename}_mv" "$(( val / 1000 ))"
+    done
+  done
+}
+
+# @private
+# @description Battery and AC from power_supply / Батарея и питание.
+hw::__build_power() {
+  local p type
+  for p in "${HW_POWER_PATH}"/*; do
+    [[ -d "${p}" ]] || continue
+    type="$(hw::__read_file "${p}/type")"
+    case "${type}" in
+      Battery)
+        hw::__set mb.battery.present "yes"
+        local cap energy_full status
+        cap="$(hw::__read_file "${p}/capacity")"
+        is::number "${cap}" && hw::__set mb.battery.capacity_pct "${cap}"
+        energy_full="$(hw::__read_file "${p}/energy_full")"
+        is::number "${energy_full}" && hw::__set mb.battery.energy_full_wh "$(( energy_full / 1000000 ))"
+        status="$(hw::__read_file "${p}/status")"
+        is::not_empty "${status}" && hw::__set mb.battery.status "${status}"
+        ;;
+      Mains)
+        local online
+        online="$(hw::__read_file "${p}/online")"
+        is::not_empty "${online}" && hw::__set mb.power.ac_online "${online}"
+        ;;
+    esac
+  done
+}
+
+# @private
+# @description Network interfaces / Сетевые интерфейсы.
+hw::__build_net() {
+  local n addr speed state count=0
+  for n in "${HW_NET_PATH}"/*; do
+    [[ -d "${n}" ]] || continue
+    local ifname
+    ifname="${n##*/}"
+    addr="$(hw::__read_file "${n}/address")"
+    speed="$(hw::__read_file "${n}/speed")"
+    state="$(hw::__read_file "${n}/operstate")"
+    is::not_empty "${addr}" && hw::__set "mb.net.${ifname}.mac" "${addr}"
+    is::number "${speed}" && (( speed > 0 )) && hw::__set "mb.net.${ifname}.speed_mbps" "${speed}"
+    is::not_empty "${state}" && hw::__set "mb.net.${ifname}.state" "${state}"
+    count=$(( count + 1 ))
+  done
+  hw::__set mb.net.count "${count}"
+}
+
+# @private
+# @description Block devices / Блочные устройства.
+hw::__build_storage() {
+  local b model size rotational type count=0
+  for b in "${HW_BLOCK_PATH}"/*; do
+    [[ -d "${b}" ]] || continue
+    local dev
+    dev="${b##*/}"
+    case "${dev}" in
+      loop*|ram*|dm-*|zram*) continue ;;
+    esac
+    model="$(hw::__read_file "${b}/device/model")"
+    size="$(hw::__read_file "${b}/size")"
+    rotational="$(hw::__read_file "${b}/queue/rotational")"
+    case "${dev}" in
+      nvme*) type="nvme" ;;
+      sd*)   type="sata/scsi" ;;
+      mmcblk*) type="mmc" ;;
+      *)     type="block" ;;
+    esac
+    is::not_empty "${model}" && hw::__set "mb.storage.${dev}.model" "${model}"
+    is::number "${size}" && hw::__set "mb.storage.${dev}.size" "${size}"
+    hw::__set "mb.storage.${dev}.type" "${type}"
+    if is::number "${rotational}"; then
+      if (( rotational == 0 )); then
+        hw::__set "mb.storage.${dev}.media" "ssd"
+      else
+        hw::__set "mb.storage.${dev}.media" "hdd"
+      fi
+    fi
+    count=$(( count + 1 ))
+  done
+  hw::__set mb.storage.count "${count}"
+}
+
+# @private
+# @description Ensure the DB is built / Убедиться, что БД собрана.
+hw::__ensure() {
+  (( HW_BUILT == 1 )) && return 0
+  hw::__build
+}
+
+# @private
+# @description Resolve a path against HW_CWD.
+# @description Разрешить путь относительно HW_CWD.
+# @param $1 path / путь
+# @stdout absolute key / абсолютный ключ
+hw::__resolve() {
+  local p="${1:-}"
+  if is::empty "${p}"; then
+    # Пустой путь = текущий каталог (как ls без аргументов)
+    # Empty path = current directory (like ls without arguments)
+    if is::not_empty "${HW_CWD}"; then
+      printf '%s\n' "${HW_CWD}"
+    else
+      printf 'mb\n'
+    fi
+  elif [[ "${p}" == "/" ]]; then
+    printf 'mb\n'
+  elif [[ "${p}" == mb.* ]] || [[ "${p}" == mb ]]; then
+    printf '%s\n' "${p}"
+  elif is::not_empty "${HW_CWD}"; then
+    printf '%s.%s\n' "${HW_CWD}" "${p}"
+  else
+    printf 'mb.%s\n' "${p}"
+  fi
+}
+
+# @description Get a value by path (dictionary / DB get).
+# @description Получить значение по пути (словарь / БД get).
+# @param $1 Path, e.g. mb.memory.speed / Путь, напр. mb.memory.speed
+# @param $2 [optional] Default value / Значение по умолчанию
+# @stdout the value / значение
+# @return 0 found, 1 not found
+# @example
+#   hw::get mb.bios.vendor
+#   hw::get mb.memory.speed "unknown"
+hw::get() {
+  hw::__ensure
+  local key
+  key="$(hw::__resolve "${1:?path required}")"
+  if [[ -v HW_DB["${key}"] ]]; then
+    printf '%s\n' "${HW_DB[${key}]}"
+    return 0
+  fi
+  if (( $# >= 2 )); then
+    printf '%s\n' "${2}"
+    return 0
+  fi
+  return 1
+}
+
+# @description List child keys one level under a path (DB ls).
+# @description Перечислить ключи следующего уровня (БД ls).
+#   A leaf path prints its value / Ключ-значение печатает своё значение.
+# @param $1 [optional] Path, default current dir / Путь, по умолчанию тек. каталог
+# @stdout one child per line / по ключу на строку
+# @return 0 ok, 1 not a node
+# @example
+#   hw::ls mb.memory
+hw::ls() {
+  hw::__ensure
+  local prefix
+  prefix="$(hw::__resolve "${1:-}")"
+
+  # Лист: печатаем значение / Leaf: print the value
+  if [[ -v HW_DB["${prefix}"] ]]; then
+    printf '%s\n' "${HW_DB[${prefix}]}"
+    return 0
+  fi
+
+  local k rest child
+  local -a out=()
+  for k in "${!HW_DB[@]}"; do
+    if [[ "${k}" == "${prefix}."* ]]; then
+      rest="${k#"${prefix}."}"
+      if [[ "${rest}" == *.* ]]; then
+        child="${rest%%.*}"
+      else
+        child="${rest}"
+      fi
+      local seen=0
+      local e
+      for e in "${out[@]}"; do
+        [[ "${e}" == "${child}" ]] && seen=1
+      done
+      (( seen == 0 )) && out+=("${child}")
+    fi
+  done
+  if (( ${#out[@]} == 0 )); then
+    printf 'hw: no such node: %s\n' "${prefix}" >&2
+    return 1
+  fi
+  printf '%s\n' "${out[@]}" | sort
+}
+
+# @description Change the current navigation path (DB cd).
+# @description Сменить текущий путь навигации (БД cd).
+# @param $1 Path or / for root / Путь или / для корня
+# @return 0 ok, 1 no such node
+# @example
+#   hw::cd mb.memory
+#   hw::get speed
+hw::cd() {
+  hw::__ensure
+  local target
+  target="$(hw::__resolve "${1:-}")"
+  if [[ "${target}" == "mb" ]] || [[ -v HW_DB["${target}"] ]] || hw::ls "${target}" >/dev/null 2>&1; then
+    HW_CWD="${target}"
+    return 0
+  fi
+  printf 'hw: cd: no such node: %s\n' "${target}" >&2
+  return 1
+}
+
+# @description Print the current navigation path (DB pwd).
+# @description Вывести текущий путь навигации (БД pwd).
+# @stdout the path / путь
+hw::pwd() {
+  if is::empty "${HW_CWD}"; then
+    printf 'mb\n'
+  else
+    printf '%s\n' "${HW_CWD}"
+  fi
+}
+
+# @description Search keys by substring (DB query).
+# @description Поиск ключей по подстроке (запрос к БД).
+# @param $1 Substring / Подстрока
+# @stdout matching "key = value" lines / строки «ключ = значение»
+# @example
+#   hw::find temp
+hw::find() {
+  hw::__ensure
+  local sub="${1:?substring required}"
+  local k
+  for k in "${!HW_DB[@]}"; do
+    [[ "${k}" == *"${sub}"* ]] && printf '%s = %s\n' "${k}" "${HW_DB[${k}]}"
+  done | sort
+  return 0
+}
+
+# @description Dump the whole DB or a subtree (DB select *).
+# @description Вывести всю БД или поддерево (БД select *).
+# @param $1 [optional] Path prefix / Префикс пути
+# @stdout "key = value" lines / строки «ключ = значение»
+# @example
+#   hw::dump mb.memory
+hw::dump() {
+  hw::__ensure
+  local prefix
+  prefix="$(hw::__resolve "${1:-}")"
+  local k
+  for k in "${!HW_DB[@]}"; do
+    [[ "${k}" == "${prefix}"* ]] && printf '%s = %s\n' "${k}" "${HW_DB[${k}]}"
+  done | sort
+  return 0
+}
+
+# @description Count keys under a path (DB count).
+# @description Количество ключей под путём (БД count).
+# @param $1 [optional] Path prefix / Префикс пути
+# @stdout the count / количество
+hw::count() {
+  hw::__ensure
+  local prefix
+  prefix="$(hw::__resolve "${1:-}")"
+  local k n=0
+  for k in "${!HW_DB[@]}"; do
+    [[ "${k}" == "${prefix}"* ]] && n=$(( n + 1 ))
+  done
+  printf '%d\n' "${n}"
+}
+
+# @description Rebuild the DB (e.g. after tests changed hooks).
+# @description Пересобрать БД (напр. после смены хуков тестами).
+hw::reset() {
+  HW_DB=()
+  HW_CWD=""
+  HW_BUILT=0
+}
