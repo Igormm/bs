@@ -72,6 +72,36 @@ test_dmi_mock() {
     rm -rf "${tmp_dir}"
 }
 
+test_flags_loop_ifs() {
+    # Регрессия: цикл флагов не зависит от IFS вызывающего (без пробела)
+    # Regression: the flags loop does not depend on the caller's IFS (no space)
+    local saved_ifs="${IFS}"
+    local flags first_flag count
+    flags="$(awk -F': ' '/^flags/ {print $2; exit}' /proc/cpuinfo)"
+    first_flag="${flags%% *}"
+
+    IFS=$'\n\t'
+    hw::reset
+    hw::__build
+    IFS="${saved_ifs}"
+
+    testframework::assert_equal "1" "$(hw::get "mb.cpu.flags.${first_flag}")" \
+        "flags yield separate mb.cpu.flags.<flag> keys under IFS newline+tab"
+    testframework::assert_false "hw::get 'mb.cpu.flags.${flags}'" \
+        "no space-joined garbage key under IFS newline+tab"
+    count="$(hw::count mb.cpu.flags)"
+    testframework::assert_true "${count} -gt 10" "separate flag keys count > 10 (got ${count})"
+}
+
+test_os_release_missing() {
+    # Регрессия: отсутствие /etc/os-release не убивает сборку под set -e
+    # Regression: a missing /etc/os-release must not kill the build under set -e
+    local val rc=0
+    val="$(utils::attempt awk -F= '/^NAME=/{gsub(/"/,"",$2); print $2}' /etc/os-release-does-not-exist)" || rc=$?
+    testframework::assert_equal "0" "${rc}" "os-release read returns 0 when file is missing"
+    testframework::assert_equal "" "${val}" "os-release read yields empty value when file is missing"
+}
+
 main() {
     print_header "HW DB Unit Tests / Модульные тесты БД hw"
 
@@ -91,6 +121,10 @@ main() {
 
     testframework::section "DMI hook / Хук DMI"
     test_dmi_mock
+
+    testframework::section "Regression: IFS / os-release / Регрессия: IFS и os-release"
+    test_flags_loop_ifs
+    test_os_release_missing
 
     testframework::summary
 }

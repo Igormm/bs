@@ -105,6 +105,24 @@ test_info() {
     testframework::assert_true "'${out}' == *'system::hw::cpu'*" "system::hw::info lists commands"
 }
 
+# Test /proc getters: always rc=0, no stderr noise ([[ -d /proc ]] guard)
+# Тест /proc-геттеров: всегда rc=0, без шума в stderr (гвард [[ -d /proc ]])
+test_proc_getters_clean() {
+    local out err rc=0
+
+    out="$(system::hw::cpu_mhz)" || rc=$?
+    testframework::assert_equal "0" "${rc}" "cpu_mhz exits 0"
+
+    out="$(system::hw::cpu_flags_count)" || rc=$?
+    testframework::assert_equal "0" "${rc}" "cpu_flags_count exits 0"
+
+    err="$(system::hw::cpu_mhz 2>&1 >/dev/null)"
+    testframework::assert_equal "" "${err}" "cpu_mhz emits no stderr"
+
+    err="$(system::hw::mem_available 2>&1 >/dev/null)"
+    testframework::assert_equal "" "${err}" "mem_available emits no stderr"
+}
+
 main() {
     print_header "HW Unit Tests / Модульные тесты hw"
 
@@ -115,6 +133,7 @@ main() {
 
     testframework::section "CPU and memory / CPU и память"
     test_cpu_functions
+    test_proc_getters_clean
 
     testframework::section "DMI getters / DMI-геттеры"
     test_dmi_getters

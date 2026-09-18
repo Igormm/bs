@@ -80,12 +80,15 @@ system::hw::__dmi_value() {
 # @description CPU model name (data) / Модель CPU (данные).
 # @stdout e.g. "Intel(R) Core(TM) i7-8650U CPU @ 1.90GHz"
 system::hw::cpu_model() {
+  # /proc доступен только на Linux / /proc exists on Linux only
+  [[ -d /proc ]] || return 0
   awk -F': ' '/^model name/ {print $2; exit}' /proc/cpuinfo
 }
 
 # @description Number of physical CPU cores (data) / Физические ядра (данные).
 # @stdout core count
 system::hw::cpu_cores() {
+  [[ -d /proc ]] || return 0
   awk -F': ' '/^cpu cores/ {print $2; exit}' /proc/cpuinfo
 }
 
@@ -94,7 +97,7 @@ system::hw::cpu_cores() {
 system::hw::cpu_threads() {
   if utils::has nproc; then
     nproc
-  else
+  elif [[ -d /proc ]] && is::readable /proc/cpuinfo; then
     grep -c '^processor' /proc/cpuinfo
   fi
 }
@@ -102,24 +105,28 @@ system::hw::cpu_threads() {
 # @description Current CPU frequency in MHz (data) / Текущая частота CPU (данные).
 # @stdout integer MHz
 system::hw::cpu_mhz() {
+  [[ -d /proc ]] || return 0
   awk -F': ' '/^cpu MHz/ {printf "%.0f", $2; exit}' /proc/cpuinfo
 }
 
 # @description Number of CPU feature flags (data) / Число CPU-флагов (данные).
 # @stdout flag count
 system::hw::cpu_flags_count() {
+  [[ -d /proc ]] || return 0
   awk -F': ' '/^flags/ {print split($2, f, " "); exit}' /proc/cpuinfo
 }
 
 # @description Total RAM in MiB (data) / Всего RAM в MiB (данные).
 # @stdout total memory in MiB
 system::hw::mem_total() {
+  [[ -d /proc ]] || return 0
   awk '/^MemTotal/ {printf "%d", $2 / 1024; exit}' /proc/meminfo
 }
 
 # @description Available RAM in MiB (data) / Доступно RAM в MiB (данные).
 # @stdout available memory in MiB
 system::hw::mem_available() {
+  [[ -d /proc ]] || return 0
   awk '/^MemAvailable/ {printf "%d", $2 / 1024; exit}' /proc/meminfo
 }
 
@@ -471,7 +478,9 @@ hw::__build() {
   hw::__set mb.os.kernel "$(hw::__read_file /proc/sys/kernel/osrelease)"
   hw::__set mb.os.arch "$(hw::__read_file /proc/sys/kernel/arch)"
   hw::__set mb.os.hostname "$(hw::__read_file /proc/sys/kernel/hostname)"
-  val="$(awk -F= '/^NAME=/{gsub(/"/,"",$2); print $2}' /etc/os-release 2>/dev/null)"
+  # os-release может отсутствовать (контейнеры): не умираем, val остаётся пустым
+  # os-release may be absent (containers): do not die, val stays empty
+  val="$(utils::attempt awk -F= '/^NAME=/{gsub(/"/,"",$2); print $2}' /etc/os-release)"
   is::not_empty "${val}" && hw::__set mb.os.name "${val}"
 
   # --- CPU / процессор
@@ -479,7 +488,7 @@ hw::__build() {
 
   # --- Memory / память
   local mem_total_kb=""
-  mem_total_kb="$(awk '/^MemTotal:/{print $2}' /proc/meminfo 2>/dev/null)"
+  mem_total_kb="$(utils::attempt awk '/^MemTotal:/{print $2}' /proc/meminfo)"
   if is::number "${mem_total_kb}"; then
     hw::__set mb.memory.total_bytes "$(( mem_total_kb * 1024 ))"
     hw::__set mb.memory.total_mb "$(( mem_total_kb / 1024 ))"
@@ -544,17 +553,20 @@ hw::__build_cpu() {
   declare -A seen_cores=() seen_sockets=()
 
   local line
-  while IFS= read -r line; do
-    case "${line}" in
-      processor[[:space:]]*) threads=$(( threads + 1 )) ;;
-      vendor_id[[:space:]]*) vendor="${line#*: }" ;;
-      "model name"*) name="${line#*: }" ;;
-      physical[[:space:]]id*) physical="${line#*: }"; seen_sockets["${physical}"]=1 ;;
-      core[[:space:]]id*) core="${line#*: }"; seen_cores["${physical}.${core}"]=1 ;;
-      flags[[:space:]]*) flags="${line#*: }" ;;
-      cache[[:space:]]size*) cache_l3="${line#*: }" ;;
-    esac
-  done < /proc/cpuinfo
+  # /proc доступен только на Linux / /proc exists on Linux only
+  if [[ -d /proc ]] && is::readable /proc/cpuinfo; then
+    while IFS= read -r line; do
+      case "${line}" in
+        processor[[:space:]]*) threads=$(( threads + 1 )) ;;
+        vendor_id[[:space:]]*) vendor="${line#*: }" ;;
+        "model name"*) name="${line#*: }" ;;
+        physical[[:space:]]id*) physical="${line#*: }"; seen_sockets["${physical}"]=1 ;;
+        core[[:space:]]id*) core="${line#*: }"; seen_cores["${physical}.${core}"]=1 ;;
+        flags[[:space:]]*) flags="${line#*: }" ;;
+        cache[[:space:]]size*) cache_l3="${line#*: }" ;;
+      esac
+    done < /proc/cpuinfo
+  fi
 
   is::not_empty "${name}" && hw::__set mb.cpu.name "${name}"
   is::not_empty "${vendor}" && hw::__set mb.cpu.vendor "${vendor}"
@@ -570,8 +582,12 @@ hw::__build_cpu() {
   fi
 
   # Флаги → под-ключи / Flags → sub-keys
+  # Разбиение по пробелам не зависит от IFS вызывающего
+  # Split on spaces regardless of the caller's IFS
   local flag
-  for flag in ${flags}; do
+  local -a flag_arr=()
+  IFS=' ' read -ra flag_arr <<< "${flags}"
+  for flag in "${flag_arr[@]}"; do
     hw::__set "mb.cpu.flags.${flag}" "1"
   done
   case " ${flags} " in
