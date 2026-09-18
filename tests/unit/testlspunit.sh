@@ -171,14 +171,16 @@ test_lsp_description_search() {
     out="$(
         {
             lsp_test::frame '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
-            lsp_test::frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/q.sh","languageId":"shell","version":1,"text":"?обрезать строку\n# обрезать пробелы по краям\n?slc\n"}}}'
+            lsp_test::frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/q.sh","languageId":"shell","version":1,"text":"?обрезать строку\n# обрезать пробелы по краям\n?slc\n?обрезать пробелы\n"}}}'
             # ?query в коде: "обрезать строку" / ?query in code
             lsp_test::frame '{"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/q.sh"},"position":{"line":0,"character":16}}}'
             # внутри комментария: "обрезать пробелы" / inside a comment
             lsp_test::frame '{"jsonrpc":"2.0","id":3,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/q.sh"},"position":{"line":1,"character":27}}}'
             # fuzzy по имени: подпоследовательность "slc" / name subsequence
             lsp_test::frame '{"jsonrpc":"2.0","id":4,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/q.sh"},"position":{"line":2,"character":4}}}'
-            lsp_test::frame '{"jsonrpc":"2.0","id":5,"method":"shutdown","params":null}'
+            # точная фраза из описания: "обрезать пробелы" / exact description phrase
+            lsp_test::frame '{"jsonrpc":"2.0","id":5,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/q.sh"},"position":{"line":3,"character":17}}}'
+            lsp_test::frame '{"jsonrpc":"2.0","id":6,"method":"shutdown","params":null}'
             lsp_test::frame '{"jsonrpc":"2.0","method":"exit","params":null}'
         } | lsp::server 2>/dev/null
     )" || true
@@ -196,10 +198,12 @@ test_lsp_description_search() {
 
     # "?обрезать строку" — ищем по описанию
     testframework::assert_command "jq -e '[.result.items[].label] | any(contains(\"slice\"))' '${tmp_dir}/s1.json'" "lsp ?query finds str::slice by description"
-    testframework::assert_command "jq -e '[.result.items[].label] | any(contains(\"trim\"))' '${tmp_dir}/s1.json'" "lsp ?query finds str::trim by description"
 
     # внутри комментария "обрезать пробелы" — комментарий как запрос
     testframework::assert_command "jq -e '[.result.items[].label] | any(contains(\"trim\"))' '${tmp_dir}/s2.json'" "lsp comment query finds str::trim"
+
+    # "?обрезать пробелы" — точная фраза из описания / exact description phrase
+    testframework::assert_command "jq -e '[.result.items[].label] | any(contains(\"trim\"))' '${tmp_dir}/s4.json'" "lsp exact description query finds str::trim"
 
     # "?slc" — подпоследовательность имени / subsequence of the name
     testframework::assert_command "jq -e '[.result.items[].label] | any(contains(\"slice\"))' '${tmp_dir}/s3.json'" "lsp fuzzy name subsequence finds slice"
