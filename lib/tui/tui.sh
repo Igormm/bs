@@ -274,6 +274,9 @@ tui::render() {
   local key new old newst oldst
   for (( r = 0; r < TUI_LINES; r++ )); do
     local row_out="" cur_style="" has_change=0
+    # последняя выведенная колонка: несмежные изменения требуют перепозиции
+    # last emitted column: non-contiguous changes need a new cursor jump
+    local -i out_col=-2
     for (( c = 0; c < TUI_COLS; c++ )); do
       key="${r},${c}"
       new="${TUI_BUF[${key}]:- }"
@@ -281,7 +284,7 @@ tui::render() {
       newst="${TUI_BUF_STYLE[${key}]:-}"
       oldst="${TUI_LAST_STYLE[${key}]:-}"
       if [[ "${new}" != "${old}" || "${newst}" != "${oldst}" ]]; then
-        if (( has_change == 0 )); then
+        if (( out_col != c - 1 )); then
           row_out+=$'\e['"$(( r + 1 ))"';'$(( c + 1 ))'H'
           has_change=1
         fi
@@ -290,6 +293,7 @@ tui::render() {
           cur_style="${newst}"
         fi
         row_out+="${new}"
+        out_col="${c}"
       fi
     done
     (( has_change == 1 )) && printf '%s' "${row_out}"
@@ -337,6 +341,7 @@ tui::key_read() {
             'F') TUI_KEY="END" ;;
             'Z') TUI_KEY="BTAB" ;;
             'M') tui::__mouse_sgr; return 0 ;;
+            '<') tui::__mouse_sgr; return 0 ;;
             '1'|'2'|'3'|'4'|'5'|'6'|'7'|'8')
               # модификатор: [1;5A = Ctrl+Up, [3~ = Delete, [5~ = PgUp
               IFS= read -r -s -n1 -t 0.05 k4 || k4=""
@@ -421,6 +426,8 @@ tui::key_read() {
 # @description Parse SGR mouse sequence: ESC[<b;x;yM / m.
 # @description Разобрать SGR-последовательность мыши: ESC[<b;x;yM / m.
 tui::__mouse_sgr() {
+  # SGR: ESC[<b;x;yM / ESC[<b;x;ym. '<' уже прочитан как k3 / '<' already read as k3.
+  # Хвостовой разделитель M/m поглощается самим read (-d) / trailing M/m consumed by read.
   local rest=""
   IFS= read -r -s -d 'M' -n 50 -t 0.1 rest || IFS= read -r -s -d 'm' -n 50 -t 0.1 rest || rest=""
   rest="${rest#<}"
@@ -477,12 +484,21 @@ tui::border::set() {
 tui::box() {
   local -r r="$1" c="$2" w="$3" h="$4" title="${5-}" style="${6-}"
   local -i i
-  local top
+  local top shown_title="${title}"
   top="${TUI_BORDER_TL}${TUI_BORDER_H}"
   if is::not_empty "${title}"; then
-    top+=" ${title} "
+    # длинный заголовок обрезаем, чтобы не уйти в отрицательный repeat
+    # clamp long titles so the repeat count never goes negative
+    local -i avail=$(( w - 5 ))
+    (( avail < 0 )) && avail=0
+    (( ${#title} > avail )) && shown_title="${title:0:${avail}}"
+    top+=" ${shown_title} "
+  else
+    shown_title=""
   fi
-  top+="$(str::repeat "${TUI_BORDER_H}" $(( w - ${#title} - 5 )))${TUI_BORDER_TR}"
+  local -i fill=$(( w - ${#shown_title} - 5 ))
+  (( fill < 0 )) && fill=0
+  top+="$(str::repeat "${TUI_BORDER_H}" "${fill}")${TUI_BORDER_TR}"
   tui::put "${r}" "${c}" "${top}" "${style}"
   for (( i = 1; i < h - 1; i++ )); do
     tui::put "$(( r + i ))" "${c}" "${TUI_BORDER_V}" "${style}"

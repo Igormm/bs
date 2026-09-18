@@ -75,6 +75,41 @@ test_buffer() {
     testframework::assert_command "printf '%s' '${out}' | grep -q $'\e\[2;2H'" "render positions cursor"
 }
 
+test_render_diff_noncontiguous() {
+    TUI_COLS=10
+    TUI_LINES=2
+    tui::buf::clear
+    tui::render >/dev/null
+    # изменения в (0,0) и (0,5): несмежные, нужны два перепозиционирования
+    # changes at (0,0) and (0,5): non-contiguous, both need a cursor jump
+    tui::put 1 1 "X"
+    tui::put 1 6 "Y"
+    local out
+    out="$(tui::render)"
+    testframework::assert_command "printf '%s' '${out}' | grep -q $'\e\[1;1HX'" "render jumps to X at (0,0)"
+    testframework::assert_command "printf '%s' '${out}' | grep -q $'\e\[1;6HY'" "render jumps to Y at (0,5)"
+}
+
+test_mouse_sgr() {
+    tui::key_read < <(printf '\e[<0;23;5M')
+    testframework::assert_equal "MOUSE" "${TUI_KEY}" "SGR mouse key"
+    testframework::assert_equal "0" "${TUI_MOUSE_BUTTON}" "SGR mouse button"
+    testframework::assert_equal "23" "${TUI_MOUSE_X}" "SGR mouse x"
+    testframework::assert_equal "5" "${TUI_MOUSE_Y}" "SGR mouse y"
+}
+
+test_box_long_title() {
+    TUI_COLS=20
+    TUI_LINES=4
+    tui::buf::clear
+    # заголовок длиннее w-5: раньше str::repeat получал -10 и убивал shell
+    # title longer than w-5: str::repeat used to get -10 and kill the shell
+    tui::box 1 1 10 3 "long title here"
+    testframework::assert_equal "╔" "${TUI_BUF[0,0]}" "box TL drawn with long title"
+    testframework::assert_equal "╗" "${TUI_BUF[0,9]}" "box TR drawn with long title"
+    testframework::assert_equal "═" "${TUI_BUF[0,1]}" "box top line continuous"
+}
+
 test_modal_stack() {
     draw_a() { :; }
     draw_b() { :; }
@@ -138,6 +173,15 @@ main() {
 
     testframework::section "Buffer / Буфер"
     test_buffer
+
+    testframework::section "Diff render / Diff-рендер"
+    test_render_diff_noncontiguous
+
+    testframework::section "Mouse / Мышь"
+    test_mouse_sgr
+
+    testframework::section "Box / Рамка"
+    test_box_long_title
 
     testframework::section "Modals / Модальные окна"
     test_modal_stack
