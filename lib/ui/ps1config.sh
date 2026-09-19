@@ -123,9 +123,15 @@ ps1config::list_themes() {
     log::info "Available PS1 themes:"
     for theme in "${themes[@]}"; do
         if [[ "$theme" == "$PS1_CONFIG_CURRENT_THEME" ]]; then
-            echo -e "  ${COLOR_GREEN}● $theme (current)${COLOR_RESET}"
+            # Цвет — только при активном гейте цвета; символ ● сохраняем всегда
+            # Color only when the color gate is on; keep the ● symbol always
+            if log::__is_color_enabled; then
+                echo -e "  ${COLOR_GREEN}● $theme (current)${COLOR_RESET}"
+            else
+                echo "  ● $theme (current)"
+            fi
         else
-            echo -e "  ○ $theme"
+            echo "  ○ $theme"
         fi
     done
 }

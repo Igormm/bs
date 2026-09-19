@@ -51,8 +51,18 @@ log::__timestamp() {
 # @private
 # @description Проверить, разрешены ли цвета в терминале / Check if colors are enabled in
 # terminal
+# @param $1 [optional] Целевой fd для проверки tty (по умолчанию 1) / Target fd for the tty
+# test (default: 1)
 # @return 0 if colors enabled, 1 otherwise / 0 если цвета разрешены, иначе 1
 log::__is_color_enabled() {
+    local -r fd="${1:-1}"
+
+    # NO_COLOR (no-color.org): задан и непуст — цвета запрещены всегда
+    # NO_COLOR (no-color.org): set and non-empty — colors are always disabled
+    if is::not_empty "${NO_COLOR:-}"; then
+        return 1
+    fi
+
     case "${BS_LOG_COLOR}" in
         always)
             return 0
@@ -61,9 +71,9 @@ log::__is_color_enabled() {
             return 1
             ;;
         auto|*)
-            # Цвета разрешены только в интерактивном терминале
-            # Colors only enabled in interactive terminal
-            [[ -t 1 ]] && return 0 || return 1
+            # Цвета разрешены только если целевой fd — интерактивный терминал
+            # Colors only enabled if the target fd is an interactive terminal
+            [[ -t "${fd}" ]] && return 0 || return 1
             ;;
     esac
 }
@@ -143,11 +153,14 @@ log::__json_escape() {
 # @description Форматировать сообщение для вывода
 # @description Format message for output
 # @param $1 Log level / Уровень логирования
+# @param $2 [optional] Целевой fd для вывода (по умолчанию 1) / Target fd for output
+# (default: 1)
 # @param $@ Message text / Текст сообщения
 # @return Formatted message / Отформатированное сообщение
 log::__format_message() {
     local -r level="${1^^}"
-    shift
+    local -r fd="${2:-1}"
+    shift 2
     local text="$*"
     
     local timestamp
@@ -175,7 +188,7 @@ log::__format_message() {
             ;;
         text|*)
             # Текстовый формат с цветами / Text format with colors
-            if log::__is_color_enabled; then
+            if log::__is_color_enabled "${fd}"; then
                 local -r color_reset='\033[0m'
                 local color="$(log::__get_level_color "$level")"
                 local -r bold='\033[1m'
@@ -218,7 +231,7 @@ log::__format_message() {
 #   log::trace "Entering function with args: $@"
 log::trace() {
     log::__is_level_allowed "TRACE" || return 0
-    log::__format_message "TRACE" "$@"
+    log::__format_message "TRACE" 1 "$@"
 }
 
 # @description Вывести сообщение уровня DEBUG / Output DEBUG level message
@@ -227,7 +240,7 @@ log::trace() {
 #   log::debug "Processing item: $item"
 log::debug() {
     log::__is_level_allowed "DEBUG" || return 0
-    log::__format_message "DEBUG" "$@"
+    log::__format_message "DEBUG" 1 "$@"
 }
 
 # @description Вывести информационное сообщение / Output INFO level message
@@ -236,7 +249,7 @@ log::debug() {
 #   log::info "Starting process with PID: $$"
 log::info() {
     log::__is_level_allowed "INFO" || return 0
-    log::__format_message "INFO" "$@"
+    log::__format_message "INFO" 1 "$@"
 }
 
 # @description Вывести сообщение об успехе / Output SUCCESS level message
@@ -245,7 +258,7 @@ log::info() {
 #   log::success "Operation completed successfully"
 log::success() {
     log::__is_level_allowed "SUCCESS" || return 0
-    log::__format_message "SUCCESS" "$@"
+    log::__format_message "SUCCESS" 1 "$@"
 }
 
 # @description Вывести предупреждение / Output WARN level message
@@ -254,7 +267,7 @@ log::success() {
 #   log::warn "Configuration file not found, using defaults"
 log::warn() {
     log::__is_level_allowed "WARN" || return 0
-    log::__format_message "WARN" "$@" >&2
+    log::__format_message "WARN" 2 "$@" >&2
 }
 
 # @description Вывести сообщение об ошибке / Output ERROR level message
@@ -263,7 +276,7 @@ log::warn() {
 #   log::error "Failed to connect to database: $error"
 log::error() {
     log::__is_level_allowed "ERROR" || return 0
-    log::__format_message "ERROR" "$@" >&2
+    log::__format_message "ERROR" 2 "$@" >&2
 }
 
 # @description Вывести фатальное сообщение и вернуть код ошибки
@@ -275,7 +288,7 @@ log::error() {
 #   log::fatal "Critical error, cannot continue" || exit 1
 log::fatal() {
     if log::__is_level_allowed "FATAL"; then
-        log::__format_message "FATAL" "$@" >&2
+        log::__format_message "FATAL" 2 "$@" >&2
     fi
     
     # Библиотечная функция не завершает чужой скрипт: возвращаем код,

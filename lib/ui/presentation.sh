@@ -10,52 +10,131 @@ bs::guard "UI_PRESENTATION" || return 0
 # Зависимости / Dependencies
 bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh"
 
+# @private
+# @description Проверить, разрешены ли цвета (NO_COLOR + BS_LOG_COLOR=always|never|auto).
+# @description Check whether colors are enabled (NO_COLOR + BS_LOG_COLOR=always|never|auto).
+# Модуль пишет в stdout, поэтому проверяем fd 1 / Module writes to stdout, so check fd 1.
+# @return 0 if colors enabled, 1 otherwise / 0 если цвета разрешены, иначе 1
+presentation::__is_color_enabled() {
+    # NO_COLOR (no-color.org): задан и непуст — цвета запрещены всегда
+    # NO_COLOR (no-color.org): set and non-empty — colors are always disabled
+    if is::not_empty "${NO_COLOR:-}"; then
+        return 1
+    fi
+
+    case "${BS_LOG_COLOR:-auto}" in
+        always)
+            return 0
+            ;;
+        never)
+            return 1
+            ;;
+        auto|*)
+            # Цвета разрешены только в интерактивном терминале
+            # Colors only enabled in interactive terminal
+            [[ -t 1 ]] && return 0 || return 1
+            ;;
+    esac
+}
+
 # Define common color codes
-export PRESENTATION_COLOR_RESET=$'\033[0m'
-export PRESENTATION_COLOR_BLACK=$'\033[30m'
-export PRESENTATION_COLOR_RED=$'\033[31m'
-export PRESENTATION_COLOR_GREEN=$'\033[32m'
-export PRESENTATION_COLOR_YELLOW=$'\033[33m'
-export PRESENTATION_COLOR_BLUE=$'\033[34m'
-export PRESENTATION_COLOR_MAGENTA=$'\033[35m'
-export PRESENTATION_COLOR_CYAN=$'\033[36m'
-export PRESENTATION_COLOR_WHITE=$'\033[37m'
-export PRESENTATION_COLOR_BRIGHT_BLACK=$'\033[90m'
-export PRESENTATION_COLOR_BRIGHT_RED=$'\033[91m'
-export PRESENTATION_COLOR_BRIGHT_GREEN=$'\033[92m'
-export PRESENTATION_COLOR_BRIGHT_YELLOW=$'\033[93m'
-export PRESENTATION_COLOR_BRIGHT_BLUE=$'\033[94m'
-export PRESENTATION_COLOR_BRIGHT_MAGENTA=$'\033[95m'
-export PRESENTATION_COLOR_BRIGHT_CYAN=$'\033[96m'
-export PRESENTATION_COLOR_BRIGHT_WHITE=$'\033[97m'
+# ANSI-коды проходят через единый гейт цвета: при выключенном гейте они
+# обнуляются, чтобы вывод оставался читаемым в pipe/логах
+# ANSI codes go through the single color gate: when the gate is off they are
+# reset to empty so output stays readable in pipes/logs
+if presentation::__is_color_enabled; then
+    export PRESENTATION_COLOR_RESET=$'\033[0m'
+    export PRESENTATION_COLOR_BLACK=$'\033[30m'
+    export PRESENTATION_COLOR_RED=$'\033[31m'
+    export PRESENTATION_COLOR_GREEN=$'\033[32m'
+    export PRESENTATION_COLOR_YELLOW=$'\033[33m'
+    export PRESENTATION_COLOR_BLUE=$'\033[34m'
+    export PRESENTATION_COLOR_MAGENTA=$'\033[35m'
+    export PRESENTATION_COLOR_CYAN=$'\033[36m'
+    export PRESENTATION_COLOR_WHITE=$'\033[37m'
+    export PRESENTATION_COLOR_BRIGHT_BLACK=$'\033[90m'
+    export PRESENTATION_COLOR_BRIGHT_RED=$'\033[91m'
+    export PRESENTATION_COLOR_BRIGHT_GREEN=$'\033[92m'
+    export PRESENTATION_COLOR_BRIGHT_YELLOW=$'\033[93m'
+    export PRESENTATION_COLOR_BRIGHT_BLUE=$'\033[94m'
+    export PRESENTATION_COLOR_BRIGHT_MAGENTA=$'\033[95m'
+    export PRESENTATION_COLOR_BRIGHT_CYAN=$'\033[96m'
+    export PRESENTATION_COLOR_BRIGHT_WHITE=$'\033[97m'
 
-# Define styles
-export PRESENTATION_STYLE_BOLD=$'\033[1m'
-export PRESENTATION_STYLE_DIM=$'\033[2m'
-export PRESENTATION_STYLE_ITALIC=$'\033[3m'
-export PRESENTATION_STYLE_UNDERLINE=$'\033[4m'
-export PRESENTATION_STYLE_BLINK=$'\033[5m'
-export PRESENTATION_STYLE_REVERSE=$'\033[7m'
-export PRESENTATION_STYLE_HIDDEN=$'\033[8m'
-export PRESENTATION_STYLE_STRIKETHROUGH=$'\033[9m'
+    # Define styles
+    export PRESENTATION_STYLE_BOLD=$'\033[1m'
+    export PRESENTATION_STYLE_DIM=$'\033[2m'
+    export PRESENTATION_STYLE_ITALIC=$'\033[3m'
+    export PRESENTATION_STYLE_UNDERLINE=$'\033[4m'
+    export PRESENTATION_STYLE_BLINK=$'\033[5m'
+    export PRESENTATION_STYLE_REVERSE=$'\033[7m'
+    export PRESENTATION_STYLE_HIDDEN=$'\033[8m'
+    export PRESENTATION_STYLE_STRIKETHROUGH=$'\033[9m'
 
-# Define background colors
-export PRESENTATION_BG_BLACK=$'\033[40m'
-export PRESENTATION_BG_RED=$'\033[41m'
-export PRESENTATION_BG_GREEN=$'\033[42m'
-export PRESENTATION_BG_YELLOW=$'\033[43m'
-export PRESENTATION_BG_BLUE=$'\033[44m'
-export PRESENTATION_BG_MAGENTA=$'\033[45m'
-export PRESENTATION_BG_CYAN=$'\033[46m'
-export PRESENTATION_BG_WHITE=$'\033[47m'
-export PRESENTATION_BG_BRIGHT_BLACK=$'\033[100m'
-export PRESENTATION_BG_BRIGHT_RED=$'\033[101m'
-export PRESENTATION_BG_BRIGHT_GREEN=$'\033[102m'
-export PRESENTATION_BG_BRIGHT_YELLOW=$'\033[103m'
-export PRESENTATION_BG_BRIGHT_BLUE=$'\033[104m'
-export PRESENTATION_BG_BRIGHT_MAGENTA=$'\033[105m'
-export PRESENTATION_BG_BRIGHT_CYAN=$'\033[106m'
-export PRESENTATION_BG_BRIGHT_WHITE=$'\033[107m'
+    # Define background colors
+    export PRESENTATION_BG_BLACK=$'\033[40m'
+    export PRESENTATION_BG_RED=$'\033[41m'
+    export PRESENTATION_BG_GREEN=$'\033[42m'
+    export PRESENTATION_BG_YELLOW=$'\033[43m'
+    export PRESENTATION_BG_BLUE=$'\033[44m'
+    export PRESENTATION_BG_MAGENTA=$'\033[45m'
+    export PRESENTATION_BG_CYAN=$'\033[46m'
+    export PRESENTATION_BG_WHITE=$'\033[47m'
+    export PRESENTATION_BG_BRIGHT_BLACK=$'\033[100m'
+    export PRESENTATION_BG_BRIGHT_RED=$'\033[101m'
+    export PRESENTATION_BG_BRIGHT_GREEN=$'\033[102m'
+    export PRESENTATION_BG_BRIGHT_YELLOW=$'\033[103m'
+    export PRESENTATION_BG_BRIGHT_BLUE=$'\033[104m'
+    export PRESENTATION_BG_BRIGHT_MAGENTA=$'\033[105m'
+    export PRESENTATION_BG_BRIGHT_CYAN=$'\033[106m'
+    export PRESENTATION_BG_BRIGHT_WHITE=$'\033[107m'
+else
+    export PRESENTATION_COLOR_RESET=""
+    export PRESENTATION_COLOR_BLACK=""
+    export PRESENTATION_COLOR_RED=""
+    export PRESENTATION_COLOR_GREEN=""
+    export PRESENTATION_COLOR_YELLOW=""
+    export PRESENTATION_COLOR_BLUE=""
+    export PRESENTATION_COLOR_MAGENTA=""
+    export PRESENTATION_COLOR_CYAN=""
+    export PRESENTATION_COLOR_WHITE=""
+    export PRESENTATION_COLOR_BRIGHT_BLACK=""
+    export PRESENTATION_COLOR_BRIGHT_RED=""
+    export PRESENTATION_COLOR_BRIGHT_GREEN=""
+    export PRESENTATION_COLOR_BRIGHT_YELLOW=""
+    export PRESENTATION_COLOR_BRIGHT_BLUE=""
+    export PRESENTATION_COLOR_BRIGHT_MAGENTA=""
+    export PRESENTATION_COLOR_BRIGHT_CYAN=""
+    export PRESENTATION_COLOR_BRIGHT_WHITE=""
+
+    # Define styles
+    export PRESENTATION_STYLE_BOLD=""
+    export PRESENTATION_STYLE_DIM=""
+    export PRESENTATION_STYLE_ITALIC=""
+    export PRESENTATION_STYLE_UNDERLINE=""
+    export PRESENTATION_STYLE_BLINK=""
+    export PRESENTATION_STYLE_REVERSE=""
+    export PRESENTATION_STYLE_HIDDEN=""
+    export PRESENTATION_STYLE_STRIKETHROUGH=""
+
+    # Define background colors
+    export PRESENTATION_BG_BLACK=""
+    export PRESENTATION_BG_RED=""
+    export PRESENTATION_BG_GREEN=""
+    export PRESENTATION_BG_YELLOW=""
+    export PRESENTATION_BG_BLUE=""
+    export PRESENTATION_BG_MAGENTA=""
+    export PRESENTATION_BG_CYAN=""
+    export PRESENTATION_BG_WHITE=""
+    export PRESENTATION_BG_BRIGHT_BLACK=""
+    export PRESENTATION_BG_BRIGHT_RED=""
+    export PRESENTATION_BG_BRIGHT_GREEN=""
+    export PRESENTATION_BG_BRIGHT_YELLOW=""
+    export PRESENTATION_BG_BRIGHT_BLUE=""
+    export PRESENTATION_BG_BRIGHT_MAGENTA=""
+    export PRESENTATION_BG_BRIGHT_CYAN=""
+    export PRESENTATION_BG_BRIGHT_WHITE=""
+fi
 
 # Define common symbols
 export PRESENTATION_SYMBOL_CHECK="✓"
@@ -81,7 +160,13 @@ export PRESENTATION_EMOJI_HEART="❤️"
 presentation::colorize() {
     local color="$1"
     local text="$2"
-    echo "${color}${text}${PRESENTATION_COLOR_RESET}"
+    # Проверяем гейт в момент вызова: константы могли быть захвачены раньше
+    # Check the gate at call time: constants may have been captured earlier
+    if presentation::__is_color_enabled; then
+        echo "${color}${text}${PRESENTATION_COLOR_RESET}"
+    else
+        echo "${text}"
+    fi
 }
 
 # @description Style text with specified style
@@ -92,7 +177,11 @@ presentation::colorize() {
 presentation::style() {
     local style="$1"
     local text="$2"
-    echo "${style}${text}${PRESENTATION_COLOR_RESET}"
+    if presentation::__is_color_enabled; then
+        echo "${style}${text}${PRESENTATION_COLOR_RESET}"
+    else
+        echo "${text}"
+    fi
 }
 
 # @description Create a colored and styled text
@@ -106,7 +195,11 @@ presentation::format() {
     local color="$1"
     local style="$2"
     local text="$3"
-    echo "${color}${style}${text}${PRESENTATION_COLOR_RESET}"
+    if presentation::__is_color_enabled; then
+        echo "${color}${style}${text}${PRESENTATION_COLOR_RESET}"
+    else
+        echo "${text}"
+    fi
 }
 
 # @description Print a header with separator lines
