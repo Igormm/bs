@@ -72,6 +72,21 @@ system::hw::__dmi_value() {
   printf '%s\n' "${value}"
 }
 
+# @private
+# @description Print "Label: value" with a fixed-width label column.
+# @description Вывести «Label: value» с колонкой меток фиксированной ширины.
+# @param $1 Label / Метка (пустая — строка без двоеточия / empty — no colon)
+# @param $2 Value / Значение
+# @stdout aligned line / выровненная строка
+hw::__print_label_value() {
+  local -r label="${1:-}"
+  if is::empty "${label}"; then
+    printf '%-14s %s\n' "" "${2:-}"
+  else
+    printf '%-14s %s\n' "${label}:" "${2:-}"
+  fi
+}
+
 # ==========================================
 # Getters: single machine-readable values
 # Геттеры: одно машиночитаемое значение
@@ -163,11 +178,10 @@ system::hw::cpu() {
     return "${E_ERROR}"
   fi
 
-  printf 'Model:   %s\n' "$(system::hw::cpu_model)"
-  printf 'Cores:   %s physical, %s logical\n' \
-    "$(system::hw::cpu_cores)" "$(system::hw::cpu_threads)"
-  printf 'MHz:     %s\n' "$(system::hw::cpu_mhz)"
-  printf 'Flags:   %s features\n' "$(system::hw::cpu_flags_count)"
+  hw::__print_label_value "Model" "$(system::hw::cpu_model)"
+  hw::__print_label_value "Cores" "$(system::hw::cpu_cores) physical, $(system::hw::cpu_threads) logical"
+  hw::__print_label_value "MHz" "$(system::hw::cpu_mhz)"
+  hw::__print_label_value "Flags" "$(system::hw::cpu_flags_count) features"
 }
 
 # @description Show memory usage (free -h, with /proc/meminfo fallback).
@@ -181,8 +195,40 @@ system::hw::memory() {
   fi
 
   if is::readable /proc/meminfo; then
-    awk '/^MemTotal|^MemAvailable|^MemFree|^SwapTotal|^SwapFree/ \
-      {printf "%-14s %8.1f GiB\n", $1, $2 / 1048576}' /proc/meminfo
+    # Та же форма, что у free -h: колонки total/used/free/shared/buff-cache/
+    # available; недоступные значения — "unknown"
+    # Same shape as free -h: total/used/free/shared/buff-cache/available
+    # columns; unavailable values fill with "unknown"
+    local line
+    local -a table=()
+    while IFS= read -r line; do
+      table+=("${line}")
+    done < <(awk '
+      function h(kb) {
+        if (kb == "") return "unknown"
+        if (kb >= 1048576) return sprintf("%.1fGi", kb / 1048576)
+        if (kb >= 1024)    return sprintf("%.1fMi", kb / 1024)
+        return sprintf("%.1fKi", kb)
+      }
+      /^MemTotal:/     { mt = $2 }
+      /^MemAvailable:/ { ma = $2 }
+      /^MemFree:/      { mf = $2 }
+      /^Shmem:/        { ms = $2 }
+      /^Buffers:/      { mb = $2 }
+      /^Cached:/       { mc = $2 }
+      /^SwapTotal:/    { st = $2 }
+      /^SwapFree:/     { sf = $2 }
+      END {
+        used = (mt == "" || ma == "") ? "" : mt - ma
+        bc   = (mb == "" && mc == "") ? "" : mb + mc
+        su   = (st == "" || sf == "") ? "" : st - sf
+        printf "%8s %8s %8s %8s %10s %10s\n", "total", "used", "free", "shared", "buff/cache", "available"
+        printf "%8s %8s %8s %8s %10s %10s\n", h(mt), h(used), h(mf), h(ms), h(bc), h(ma)
+        printf "%8s %8s %8s %8s %10s %10s\n", h(st), h(su), h(sf), "unknown", "unknown", "unknown"
+      }' /proc/meminfo)
+    hw::__print_label_value "" "${table[0]}"
+    hw::__print_label_value "Mem" "${table[1]}"
+    hw::__print_label_value "Swap" "${table[2]}"
     return "${E_SUCCESS}"
   fi
 
@@ -269,9 +315,9 @@ system::hw::dmi() {
   if is::not_empty "${dtype}"; then
     dmidecode -t "${dtype}"
   else
-    printf 'Vendor:  %s\n' "$(system::hw::vendor)"
-    printf 'Product: %s\n' "$(system::hw::product_name)"
-    printf 'BIOS:    %s\n' "$(system::hw::bios_version)"
+    hw::__print_label_value "Vendor" "$(system::hw::vendor)"
+    hw::__print_label_value "Product" "$(system::hw::product_name)"
+    hw::__print_label_value "BIOS" "$(system::hw::bios_version)"
   fi
 }
 
@@ -298,34 +344,42 @@ system::hw::lshw() {
   }
 }
 
+# @private
+# @description Run one summary section: header + command, count the result.
+# @description Выполнить одну секцию сводки: заголовок + команда, подсчёт.
+# @param $1 Section title / Название секции
+# @param $@ Command and args / Команда и аргументы
+system::hw::__section() {
+  local -r title="${1:?section title required}"
+  shift
+  log::header "${title}"
+  local rc=0
+  "$@" 2>/dev/null || rc=$?
+  if (( rc == 0 )); then
+    HW_SUMMARY_SHOWN=$(( HW_SUMMARY_SHOWN + 1 ))
+  else
+    HW_SUMMARY_SKIPPED=$(( HW_SUMMARY_SKIPPED + 1 ))
+  fi
+}
+
 # @description Full hardware report: every section that is available.
 # @description Полный отчёт об оборудовании: все доступные секции.
 #   Missing tools are skipped with a note, the report never fails.
 #   Отсутствующие инструменты пропускаются с пометкой, отчёт не падает.
 system::hw::summary() {
-  log::header "CPU"
-  utils::attempt system::hw::cpu
+  HW_SUMMARY_SHOWN=0
+  HW_SUMMARY_SKIPPED=0
 
-  log::header "Memory"
-  utils::attempt system::hw::memory
+  system::hw::__section "CPU" system::hw::cpu
+  system::hw::__section "Memory" system::hw::memory
+  system::hw::__section "Block devices" system::hw::block
+  system::hw::__section "GPU" system::hw::gpu
+  system::hw::__section "PCI tree" system::hw::pci
+  system::hw::__section "USB tree" system::hw::usb
+  system::hw::__section "DMI / BIOS" system::hw::dmi
+  system::hw::__section "Kernel log (last 10)" system::hw::dmesg 10
 
-  log::header "Block devices"
-  utils::attempt system::hw::block
-
-  log::header "GPU"
-  utils::attempt system::hw::gpu
-
-  log::header "PCI tree"
-  utils::attempt system::hw::pci
-
-  log::header "USB tree"
-  utils::attempt system::hw::usb
-
-  log::header "DMI / BIOS"
-  utils::attempt system::hw::dmi
-
-  log::header "Kernel log (last 10)"
-  utils::attempt system::hw::dmesg 10
+  log::info "Summary: ${HW_SUMMARY_SHOWN} sections shown, ${HW_SUMMARY_SKIPPED} skipped/unknown"
 }
 
 # @description Show available system::hw:: commands / Список команд system::hw::
@@ -395,6 +449,16 @@ declare -g SYSTEM_HW_LOADED="1"
 #   mb.usb.count  mb.pci.count  mb.tpm.present  mb.efi.{mode,secure_boot}
 #   mb.os.{name,kernel,arch,hostname}
 #
+# Value encoding / Кодирование значений:
+#   sizes — human-readable, one decimal (B/KiB/MiB/GiB/TiB), raw value kept
+#     under <key>.raw (e.g. mb.cache.l3.raw="12288K")
+#   размеры — человекочитаемые, один знак после запятой (B/KiB/MiB/GiB/TiB),
+#     сырое значение сохраняется под <key>.raw (напр. mb.cache.l3.raw="12288K")
+#   booleans — yes/no/unknown (facts.sh uses 1/0; hw keeps its own style)
+#   булевы значения — yes/no/unknown (в facts.sh — 1/0; в hw свой стиль)
+#   efi mode — uefi/bios;  virtualization — vmx/svm/no;  flag markers — "1"
+#   режим EFI — uefi/bios;  виртуализация — vmx/svm/no;  маркеры флагов — "1"
+#
 # Test hooks (override paths) / Тестовые хуки (переопределение путей):
 #   HW_DMI_PATH, HW_HWMON_PATH, HW_POWER_PATH, HW_NET_PATH, HW_BLOCK_PATH
 # ==========================================
@@ -410,12 +474,10 @@ declare -g SYSTEM_HW_LOADED="1"
 declare -gA HW_DB=()
 declare -g HW_CWD=""
 declare -g HW_BUILT=0
+# Счётчики последней сводки / Last summary counters
+declare -g -i HW_SUMMARY_SHOWN=0
+declare -g -i HW_SUMMARY_SKIPPED=0
 
-# @private
-# @description Read a DMI file if readable, store under a key.
-# @description Прочитать DMI-файл, если он доступен, и сохранить по ключу.
-# @param $1 DB key / Ключ БД
-# @param $2 File name under HW_DMI_PATH / Имя файла в HW_DMI_PATH
 # @private
 # @description Read a file if readable (never empty $(hw::__read_file f) trap:
 # an extra redirection disables the $(<file) special case and discards
@@ -429,11 +491,63 @@ hw::__read_file() {
   fi
 }
 
+# @private
+# @description Read a DMI file if readable, store under a key.
+# @description Прочитать DMI-файл, если он доступен, и сохранить по ключу.
+# @param $1 DB key / Ключ БД
+# @param $2 File name under HW_DMI_PATH / Имя файла в HW_DMI_PATH
 hw::__read_dmi() {
   local f="${HW_DMI_PATH}/${2}"
   if [[ -r "${f}" ]]; then
     hw::__set "${1}" "$(<"${f}")"
   fi
+}
+
+# @private
+# @description Convert a size to a human-readable form (bytes → B/KiB/MiB/GiB/TiB,
+# one decimal). Accepts plain bytes or suffixed sysfs/cpuinfo values ("12288K",
+# "8192 KB"). / Преобразовать размер в человекочитаемый вид (байты →
+# B/KiB/MiB/GiB/TiB, один знак после запятой). Принимает байты или значения
+# с суффиксом sysfs/cpuinfo ("12288K", "8192 KB").
+# @param $1 Size / Размер
+# @stdout e.g. "12.0 MiB" / напр. «12.0 MiB»
+hw::__human_size() {
+  local v="${1:-0}"
+  local -i mult=1
+
+  # Суффиксы sysfs/cpuinfo (порядок: сначала многосимвольные)
+  # sysfs/cpuinfo suffixes (long ones first)
+  case "${v}" in
+    *TB) v="${v%TB}"; mult=$(( 1024 * 1024 * 1024 * 1024 )) ;;
+    *GB) v="${v%GB}"; mult=$(( 1024 * 1024 * 1024 )) ;;
+    *MB) v="${v%MB}"; mult=$(( 1024 * 1024 )) ;;
+    *KB) v="${v%KB}"; mult=1024 ;;
+    *T)  v="${v%T}";  mult=$(( 1024 * 1024 * 1024 * 1024 )) ;;
+    *G)  v="${v%G}";  mult=$(( 1024 * 1024 * 1024 )) ;;
+    *M)  v="${v%M}";  mult=$(( 1024 * 1024 )) ;;
+    *K)  v="${v%K}";  mult=1024 ;;
+    *B)  v="${v%B}" ;;
+  esac
+  v="${v// /}"
+
+  if [[ ! "${v}" =~ ^[0-9]+$ ]]; then
+    # Не разобралось — отдаём как есть / Unparseable — pass through
+    printf '%s\n' "${1}"
+    return 0
+  fi
+
+  # Один знак после запятой, единицы по 1024 / One decimal, 1024-based units
+  printf '%s\n' "$(( v * mult ))" | awk '
+    {
+      split("B KiB MiB GiB TiB", u)
+      n = $1
+      i = 1
+      while (n >= 1024 && i < 5) {
+        n /= 1024
+        i++
+      }
+      printf "%.1f %s\n", n, u[i]
+    }'
 }
 
 # @private
@@ -490,7 +604,10 @@ hw::__build() {
   local mem_total_kb=""
   mem_total_kb="$(utils::attempt awk '/^MemTotal:/{print $2}' /proc/meminfo)"
   if is::number "${mem_total_kb}"; then
-    hw::__set mb.memory.total_bytes "$(( mem_total_kb * 1024 ))"
+    # Человекочитаемый размер; сырые байты — под .raw
+    # Human-readable size; raw bytes kept under .raw
+    hw::__set mb.memory.total_bytes "$(hw::__human_size "$(( mem_total_kb * 1024 ))")"
+    hw::__set mb.memory.total_bytes.raw "$(( mem_total_kb * 1024 ))"
     hw::__set mb.memory.total_mb "$(( mem_total_kb / 1024 ))"
   fi
   hw::__build_memory_spd
@@ -508,8 +625,13 @@ hw::__build() {
   hw::__build_storage
 
   # --- Counters / счётчики
-  hw::__set mb.usb.count "$(ls -1 /sys/bus/usb/devices 2>/dev/null | wc -l)"
-  hw::__set mb.pci.count "$(ls -1 /sys/bus/pci/devices 2>/dev/null | wc -l)"
+  # wc -l выводит с ведущими пробелами — приводим к чистому целому
+  # wc -l pads with leading spaces — normalize to a plain integer
+  local usb_count pci_count
+  usb_count="$(ls -1 /sys/bus/usb/devices 2>/dev/null | wc -l)"
+  pci_count="$(ls -1 /sys/bus/pci/devices 2>/dev/null | wc -l)"
+  hw::__set mb.usb.count "$(printf '%d' "${usb_count}")"
+  hw::__set mb.pci.count "$(printf '%d' "${pci_count}")"
   if [[ -d /sys/class/tpm/tpm0 ]]; then
     hw::__set mb.tpm.present "yes"
   else
@@ -573,7 +695,10 @@ hw::__build_cpu() {
   hw::__set mb.cpu.threads "${threads}"
   hw::__set mb.cpu.cores "${#seen_cores[@]}"
   hw::__set mb.cpu.sockets "${#seen_sockets[@]}"
-  is::not_empty "${cache_l3}" && hw::__set mb.cache.l3 "${cache_l3}"
+  is::not_empty "${cache_l3}" && {
+    hw::__set mb.cache.l3 "$(hw::__human_size "${cache_l3}")"
+    hw::__set mb.cache.l3.raw "${cache_l3}"
+  }
 
   local freq
   freq="$(hw::__read_file /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq)"
@@ -596,18 +721,24 @@ hw::__build_cpu() {
     *) hw::__set mb.cpu.virtualization "no" ;;
   esac
 
-  # Кэши L1/L2 из sysfs / Caches from sysfs
-  local cache_dir idx type level size
+  # Кэши L1/L2 из sysfs (сырой размер, напр. "12288K", хранится под .raw)
+  # Caches from sysfs (raw size, e.g. "12288K", kept under .raw)
+  local cache_dir type level size cache_key
   for cache_dir in /sys/devices/system/cpu/cpu0/cache/index*; do
     type="$(hw::__read_file "${cache_dir}/type")"
     level="$(hw::__read_file "${cache_dir}/level")"
     size="$(hw::__read_file "${cache_dir}/size")"
+    cache_key=""
     case "${level}:${type}" in
-      1:Data)      hw::__set mb.cache.l1d "${size}" ;;
-      1:Instruction) hw::__set mb.cache.l1i "${size}" ;;
-      2:*)         hw::__set mb.cache.l2 "${size}" ;;
-      3:*)         hw::__set mb.cache.l3 "${size}" ;;
+      1:Data)      cache_key="mb.cache.l1d" ;;
+      1:Instruction) cache_key="mb.cache.l1i" ;;
+      2:*)         cache_key="mb.cache.l2" ;;
+      3:*)         cache_key="mb.cache.l3" ;;
     esac
+    if is::not_empty "${cache_key}"; then
+      hw::__set "${cache_key}" "$(hw::__human_size "${size}")"
+      hw::__set "${cache_key}.raw" "${size}"
+    fi
   done
 }
 
@@ -678,7 +809,13 @@ hw::__build_power() {
       Mains)
         local online
         online="$(hw::__read_file "${p}/online")"
-        is::not_empty "${online}" && hw::__set mb.power.ac_online "${online}"
+        # sysfs отдаёт 0/1 — приводим к единому стилю yes/no
+        # sysfs gives 0/1 — normalize to the shared yes/no style
+        case "${online}" in
+          1) hw::__set mb.power.ac_online "yes" ;;
+          0) hw::__set mb.power.ac_online "no" ;;
+          *) is::not_empty "${online}" && hw::__set mb.power.ac_online "${online}" ;;
+        esac
         ;;
     esac
   done
@@ -879,9 +1016,16 @@ hw::find() {
   hw::__ensure
   local sub="${1:?substring required}"
   local k
+  local -a matches=()
   for k in "${!HW_DB[@]}"; do
-    [[ "${k}" == *"${sub}"* ]] && printf '%s = %s\n' "${k}" "${HW_DB[${k}]}"
-  done | sort
+    [[ "${k}" == *"${sub}"* ]] && matches+=("${k} = ${HW_DB[${k}]}")
+  done
+  if (( ${#matches[@]} == 0 )); then
+    # Отчёт вместо тишины / Report instead of silence
+    printf '0 matches for "%s"\n' "${sub}"
+    return 0
+  fi
+  printf '%s\n' "${matches[@]}" | sort
   return 0
 }
 
