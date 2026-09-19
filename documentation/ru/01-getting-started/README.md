@@ -12,7 +12,7 @@
 
 ## Требования
 
-- Bash 4.0+
+- Bash 4.4+ (минимум CI)
 - Linux (основная платформа; macOS поддерживается частично)
 
 Ничего больше не требуется: BS использует только встроенные команды bash и
@@ -87,56 +87,48 @@ sudo ./install.sh uninstall      # system
   (например, `core/args.sh`, `lib/automation.sh`). Вложенные модули вроде
   `lib/io/streams.sh` находятся в подкаталогах и подключаются по пути.
 
-## Первый скрипт за 5 строк
+## Первый скрипт
+
+Рабочая копия: [examples/hello.sh](../../../examples/hello.sh).
 
 ```bash
 #!/usr/bin/env bs
-load "core/args"
+# shellcheck shell=bash
+set -euo pipefail
+
 load "lib/io/streams"
 
-args::define hello
-args::require "$@"
-io::streams::print "works: $(args::get 1)"
+io::streams::print "hello from BS ${BS_VERSION}"
 ```
 
 - `#!/usr/bin/env bs` — запускает скрипт через интерпретатор `bs`; ядро
   фреймворка загружается до вашего кода, bootstrap-бойлерплейт не нужен.
-- `load "core/args"` — подключает модуль по пути относительно `BS_ROOT`, без
-  расширения `.sh`. Не подключайте модули фреймворка через `source`.
-- `args::define hello` — объявляет позиционный параметр: уровень 1 принимает
-  только значение `hello`.
-- `args::parse "$@"` — валидирует аргументы; при ошибке сам печатает причину
-  и usage в stderr и возвращает ненулевой код. `-h` / `--help` обрабатывается
-  автоматически.
+- `# shellcheck shell=bash` — обязательно на строке 2, если shebang — `bs`.
+- `set -euo pipefail` — строгий режим только в точках входа (скрипты, тесты),
+  никогда внутри модулей `lib/` / `core/`.
+- `load "lib/io/streams"` — путь относительно `BS_ROOT`, без `.sh`. Не
+  подключайте модули фреймворка через `source` в новых скриптах.
 - `io::streams::print` — безопасный вывод: обёртка над `printf '%s\n'`,
-  которая не ломается на значениях вроде `-n` или `-e`. `args::get 1`
-  возвращает первый провалидированный позиционный параметр.
+  которая не ломается на значениях вроде `-n` или `-e`. `BS_VERSION`
+  задаёт ядро.
 
 ## Запуск скриптов
 
 ```bash
-# Via the bs command (also works from an uninstalled repository)
-./bs run script.sh hello
-
-# Directly, when bs is in PATH and the script is executable
-chmod +x script.sh
-./script.sh hello
+./bs run examples/hello.sh
+./examples/hello.sh          # когда bs в PATH
 ```
 
-Некорректный ввод отклоняется `args::parse`:
-
-```text
-$ ./bs run script.sh bye
-ERROR: unknown parameter: "bye"
-Usage: bash [hello]
-```
-
-Попробуйте встроенные примеры:
+Примеры со стартовой страницы:
 
 ```bash
-./bs run examples/argsparseexample.sh deploy now --env production --dry-run
-./bs run examples/passwordgenexample.sh --length 24 --count 5
+./bs run examples/hello.sh     # короткий скрипт
+./bs run examples/todo.sh      # TUI todo list (lib/tui)
+./bs run examples/pulse.sh     # пульс возможностей машины
 ```
+
+CLI на `core/args` (авто-help, валидация) — в
+[туториале «Первый скрипт»](../05-tutorials/first-script.md).
 
 ## Куда идти дальше
 

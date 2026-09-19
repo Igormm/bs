@@ -11,7 +11,7 @@ code style and with zero external dependencies.
 
 ## Requirements
 
-- Bash 4.0+
+- Bash 4.4+ (CI minimum)
 - Linux (primary platform; macOS is partially supported)
 
 Nothing else is required: BS relies on bash built-ins and standard system
@@ -86,57 +86,48 @@ sudo ./install.sh uninstall      # system
   (for example `core/args.sh`, `lib/automation.sh`). Nested modules such as
   `lib/io/streams.sh` live in subdirectories and are loaded by path.
 
-## Your first script in 5 lines
+## Your first script
+
+Runnable copy: [examples/hello.sh](../../../examples/hello.sh).
 
 ```bash
 #!/usr/bin/env bs
-load "core/args"
+# shellcheck shell=bash
+set -euo pipefail
+
 load "lib/io/streams"
 
-args::define hello
-args::require "$@"
-io::streams::print "works: $(args::get 1)"
+io::streams::print "hello from BS ${BS_VERSION}"
 ```
 
 - `#!/usr/bin/env bs` — runs the script through the `bs` interpreter; the
   framework core is loaded before your code, so no bootstrap boilerplate is
   needed.
-- `load "core/args"` — loads a module by its path relative to `BS_ROOT`,
-  without the `.sh` extension. Never `source` framework modules directly.
-- `args::define hello` — declares a positional parameter: level 1 accepts
-  only the value `hello`.
-- `args::parse "$@"` — validates the arguments; on error it prints the
-  reason and usage to stderr and returns non-zero. `-h` / `--help` is
-  handled automatically.
+- `# shellcheck shell=bash` — required on line 2 when the shebang is `bs`.
+- `set -euo pipefail` — strict mode belongs in entry points (scripts, tests),
+  never inside `lib/` or `core/` modules.
+- `load "lib/io/streams"` — path relative to `BS_ROOT`, no `.sh`. Never
+  `source` framework modules directly in a new script.
 - `io::streams::print` — safe output: a `printf '%s\n'` wrapper that does
-  not break on values like `-n` or `-e`. `args::get 1` returns the first
-  validated positional parameter.
+  not break on values like `-n` or `-e`. `BS_VERSION` is set by core.
 
 ## Running scripts
 
 ```bash
-# Via the bs command (also works from an uninstalled repository)
-./bs run script.sh hello
-
-# Directly, when bs is in PATH and the script is executable
-chmod +x script.sh
-./script.sh hello
+./bs run examples/hello.sh
+./examples/hello.sh          # when bs is in PATH
 ```
 
-Invalid input is rejected by `args::parse`:
-
-```text
-$ ./bs run script.sh bye
-ERROR: unknown parameter: "bye"
-Usage: bash [hello]
-```
-
-Try the bundled examples:
+Landing examples:
 
 ```bash
-./bs run examples/argsparseexample.sh deploy now --env production --dry-run
-./bs run examples/passwordgenexample.sh --length 24 --count 5
+./bs run examples/hello.sh     # short script
+./bs run examples/todo.sh      # TUI todo list (lib/tui)
+./bs run examples/pulse.sh     # host capability pulse
 ```
+
+CLI with `core/args` (auto-help, validation) is in the
+[first-script tutorial](../05-tutorials/first-script.md).
 
 ## Where to go next
 

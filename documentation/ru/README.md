@@ -8,7 +8,7 @@ English version: [documentation/en/](../en/README.md)
 
 ## С чего начать
 
-1. [Начало работы](01-getting-started/README.md) — установка, `bs doctor`, первый скрипт за 5 строк.
+1. [Начало работы](01-getting-started/README.md) — установка, `bs doctor`, `examples/hello.sh`.
 2. [Архитектура](02-core-concepts/architecture.md) — как устроена загрузка: `boot.sh` → `bs` → `bootstrap/init.sh` → `loader.sh` → `core/` → `lib/`.
 3. [Туториал «Первый скрипт»](05-tutorials/first-script.md) — пошагово: от пустого файла до CLI-утилиты.
 

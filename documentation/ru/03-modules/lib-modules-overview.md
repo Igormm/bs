@@ -45,6 +45,24 @@ load "lib/data/dataprocessor"
 
 Ключевые функции: `presentation::header`, `presentation::table`, `ps1config::set_theme`, `bosatheme::apply`.
 
+## tui — `lib/tui/`
+
+Чистый bash TUI ([tui.sh](../../../lib/tui/tui.sh)): двойной буфер с diff-рендером, truecolor, парсер клавиш/мыши, виджеты (list, input, confirm, menu, progress, spinner), стек модалок. Пример: [todo.sh](../../../examples/todo.sh).
+
+Ключевые функции: `tui::init`, `tui::box`, `tui::list`, `tui::key_read`, `tui::modal::open`, `tui::render`, `tui::quit`.
+
+## platform — `lib/platform/`
+
+Вектор возможностей с кэшем ([facts.sh](../../../lib/platform/facts.sh)): kernel, distro, userland, libc, `/proc`/`/sys`, пробы утилит (`grep -P`, `sed -z`, SHA-цепочка). Feature-detect, не ветвиться по `uname`. Пример: [pulse.sh](../../../examples/pulse.sh).
+
+Ключевые функции: `platform::get`, `platform::tier`, `platform::probe`, `platform::dump`.
+
+## rfc — `lib/rfc/`
+
+RFC-хелперы: UUID 4/7 ([uuid.sh](../../../lib/rfc/uuid.sh)), URI, CSV.
+
+Ключевые функции: `uuid::gen`, `uuid::gen_v7`, `uuid::validate`.
+
 ## network — `lib/network/`
 
 - [sshnetwork.sh](../../../lib/network/sshnetwork.sh) — операции по SSH в локальной сети: обнаружение устройств, удалённое выполнение команд, передача файлов и туннели.

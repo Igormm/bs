@@ -21,6 +21,14 @@ If `bs` is in your `PATH`, the scripts are also directly executable:
 ./examples/<file> [args]
 ```
 
+## Start here
+
+| File | Demonstrates | Run |
+| --- | --- | --- |
+| [hello.sh](../../../examples/hello.sh) | Shortest useful script: shebang `bs`, `load`, `io::streams::print` | `./bs run examples/hello.sh` |
+| [todo.sh](../../../examples/todo.sh) | TUI todo list on `lib/tui`: list, input/confirm modals, `~/.todo.tsv` | `./bs run examples/todo.sh` |
+| [pulse.sh](../../../examples/pulse.sh) | Host capability pulse: `lib/platform/facts`, probe chains, UUID v7, hw if `/proc` | `./bs run examples/pulse.sh` |
+
 ## Examples
 
 | File | Demonstrates | Run |

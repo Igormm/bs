@@ -45,6 +45,24 @@ Terminal presentation: colored output helpers ([presentation.sh](../../../lib/ui
 
 Key functions: `presentation::header`, `presentation::table`, `ps1config::set_theme`, `bosatheme::apply`.
 
+## tui — `lib/tui/`
+
+Pure-bash terminal UI ([tui.sh](../../../lib/tui/tui.sh)): double-buffered diff renderer, truecolor, key/mouse parser, widgets (list, input, confirm, menu, progress, spinner), modal stack. Example: [todo.sh](../../../examples/todo.sh).
+
+Key functions: `tui::init`, `tui::box`, `tui::list`, `tui::key_read`, `tui::modal::open`, `tui::render`, `tui::quit`.
+
+## platform — `lib/platform/`
+
+Capability vector with cache ([facts.sh](../../../lib/platform/facts.sh)): kernel, distro, userland, libc, `/proc`/`/sys`, tool probes (`grep -P`, `sed -z`, sha chain). Feature-detect, do not branch on `uname`. Example: [pulse.sh](../../../examples/pulse.sh).
+
+Key functions: `platform::get`, `platform::tier`, `platform::probe`, `platform::dump`.
+
+## rfc — `lib/rfc/`
+
+RFC helpers: UUID 4/7 ([uuid.sh](../../../lib/rfc/uuid.sh)), URI, CSV.
+
+Key functions: `uuid::gen`, `uuid::gen_v7`, `uuid::validate`.
+
 ## network — `lib/network/`
 
 - [sshnetwork.sh](../../../lib/network/sshnetwork.sh) — SSH-based operations across the local network: device discovery, remote command execution, file transfer and tunnels.

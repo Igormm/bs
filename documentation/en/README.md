@@ -8,7 +8,7 @@ an I/O streams abstraction and a set of system modules.
 
 ## Start here
 
-1. [Getting Started](01-getting-started/README.md) — installation, `bs doctor`, a first script in 5 lines.
+1. [Getting Started](01-getting-started/README.md) — installation, `bs doctor`, `examples/hello.sh`.
 2. [Architecture](02-core-concepts/architecture.md) — how loading works: `boot.sh` → `bs` → `bootstrap/init.sh` → `loader.sh` → `core/` → `lib/`.
 3. [Tutorial: Your First Script](05-tutorials/first-script.md) — step by step: from an empty file to a CLI utility.
 

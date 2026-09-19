@@ -36,16 +36,19 @@ consistent code style and with zero external dependencies.
 - **`core/lang`** — языковое ядро: предикаты `is::file`, `is::empty`,
   `is::command`, строки `str::*`, коллекции `arr::*`/`map::*`, интроспекция
   `bs::func_name` и `bs::type_of`
+- **`lib/tui`** — чистый bash TUI: diff-рендер, клавиши/мышь, модалки
+- **`lib/platform/facts`** — вектор возможностей (пробы, не `uname`)
+- **`lib/rfc/*`** — UUID (RFC 4122/9562), URI, CSV
 - **`lib/integration/*`** — HTTP-клиент, LLM (OpenAI/Ollama), Kubernetes,
   JSON-контракт результата для интеграции с Go-backend / CI
 - **`lib/system/*`** — дистрибутивы, пакеты, пользователи, сервисы, сеть,
-  устройства (20+ модулей)
+  устройства, hw (20+ модулей)
 - **Тесты и CI** — свой тест-фреймворк, ShellCheck, матрица
   ubuntu / debian / almalinux 8–9 (bash 4.4–5.x)
 
 ## Требования / Requirements
 
-- Bash 4.0+
+- Bash 4.4+ (CI-минимум; Bash 4.0–4.3 не проверяется)
 - Linux (основная платформа; macOS — частично)
 
 ## Быстрый старт / Quick start
@@ -60,27 +63,47 @@ consistent code style and with zero external dependencies.
 # Список модулей / List modules
 ./bs list
 
-# Запуск примеров / Run examples
-./bs run examples/argsparseexample.sh deploy now --env production --dry-run
-./bs run examples/passwordgenexample.sh --length 24 --count 5
-./bs run examples/http_example.sh
-./bs run examples/llm_example.sh
-./bs run examples/k8s_example.sh
+# Три примера со стартовой / Three landing examples
+./bs run examples/hello.sh
+./bs run examples/todo.sh
+./bs run examples/pulse.sh
 ```
 
-## Свой скрипт за 5 строк / A script in 5 lines
+## 1. Короткий скрипт / A short script
+
+`examples/hello.sh`:
 
 ```bash
 #!/usr/bin/env bs
-load "core/args"
+# shellcheck shell=bash
+set -euo pipefail
+
 load "lib/io/streams"
 
-args::define hello
-args::require "$@"
-io::streams::print "works: $(args::get 1)"
+io::streams::print "hello from BS ${BS_VERSION}"
 ```
 
-Запуск / Run: `./script.sh hello` (с `bs` в PATH) или `bs run script.sh hello`.
+Запуск / Run: `./bs run examples/hello.sh`
+
+## 2. TUI todo list
+
+Чистый bash, `lib/tui`: список, модалки ввода/подтверждения, файл `~/.todo.tsv`.
+
+```bash
+./bs run examples/todo.sh
+./bs run examples/todo.sh --file /tmp/tasks.tsv
+```
+
+Клавиши / Keys: `↑↓` выбор, `Enter` toggle, `a` add, `e` edit, `d` delete, `q` выход.
+
+## 3. Пульс машины / Host pulse
+
+Вектор возможностей: тир, userland, пробы `grep -P`/`sed -z`, SHA-цепочка,
+железо если есть `/proc`. Не `uname`-ветвление.
+
+```bash
+./bs run examples/pulse.sh
+```
 
 ## Установка / Installation
 
@@ -129,12 +152,15 @@ sudo ./install.sh
 bs                  # stage-2: CLI и shebang-интерпретатор / CLI & interpreter
 boot.sh             # stage-1: проверка среды и поиск BS_ROOT
 bootstrap/          # init.sh, загрузчик модулей loader.sh
-core/               # const, logger, errorhandler, utils, version, args
-lib/                # io, system, ui, network, data, integration, ...
+core/               # prereq, lang, const, logger, errorhandler, utils,
+                    # version, config, deps; args и repl — по запросу
+lib/                # io, tui, system, ui, network, data, platform, rfc,
+                    # integration, ...
 install/            # модульный установщик / modular installer
 tests/              # тест-фреймворк и наборы тестов / test framework & suites
-examples/           # примеры (bs run examples/...) 
+examples/           # примеры (bs run examples/...)
 documentation/      # документация: en/ и ru/ / docs: en/ & ru/
+AGENTS.md           # контракт для ИИ / AI agent contract
 ```
 
 ## Тестирование / Testing
