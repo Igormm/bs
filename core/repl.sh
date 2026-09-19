@@ -151,7 +151,7 @@ repl::__command() {
     :q|:quit|:exit)
       return 1 ;;
     :version)
-      printf '%s\n' "${BS_VERSION:-unknown}" ;;
+      bs::version::print ;;
     :list)
       local file
       while IFS= read -r file; do

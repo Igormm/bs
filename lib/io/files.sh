@@ -44,13 +44,24 @@ declare -g IO_FILES_LOADED="1"
 # ==========================================
 
 # @private
+# @description Build a re-runnable command line with shell-quoted args.
+# @description Собрать перезапускаемую командную строку с экранированными аргументами.
+# @param $@ Command and arguments / Команда и аргументы
+# @stdout Quoted command line without trailing space / Команда в кавычках без хвостового пробела
+io::files::__dry_cmd() {
+  local dry_cmd
+  dry_cmd="$(printf '%q ' "$@")"
+  printf '%s' "${dry_cmd% }"
+}
+
+# @private
 # @description Execute command, honoring dry-run and debug modes.
 # @description Выполнить команду с учётом dry-run и debug.
 # @param $@ Command and arguments / Команда и аргументы
 # @return 0 in dry-run, command exit code otherwise / 0 в dry-run, иначе код команды
 io::files::__exec() {
   if [[ "${FRAMEWORK_DRY_RUN:-false}" == "true" ]]; then
-    log::warn "[DRY-RUN] $*"
+    log::info "[DRY-RUN] $(io::files::__dry_cmd "$@")"
     return "${E_SUCCESS}"
   fi
 
@@ -163,7 +174,7 @@ io::files::__backup_if_needed() {
   log::info "Creating backup: ${dst} -> ${backup}"
 
   if [[ "${FRAMEWORK_DRY_RUN:-false}" == "true" ]]; then
-    log::warn "[DRY-RUN] mv -- ${dst} ${backup}"
+    log::info "[DRY-RUN] $(io::files::__dry_cmd mv -- "${dst}" "${backup}")"
     return 0
   fi
 
@@ -192,7 +203,7 @@ io::files::__atomic_replace() {
   fi
 
   if [[ "${FRAMEWORK_DRY_RUN:-false}" == "true" ]]; then
-    log::warn "[DRY-RUN] mv -- ${temp_path} ${dst}"
+    log::info "[DRY-RUN] $(io::files::__dry_cmd mv -- "${temp_path}" "${dst}")"
     return 0
   fi
 
@@ -236,7 +247,7 @@ io::files::__atomic_copy_file() {
   is::not_empty "${temp_path}" || return "${E_ERROR}"
 
   if [[ "${FRAMEWORK_DRY_RUN:-false}" == "true" ]]; then
-    log::warn "[DRY-RUN] atomic copy: cp -p -- ${src} ${temp_path}; mv -- ${temp_path} ${dst}"
+    log::info "[DRY-RUN] $(io::files::__dry_cmd cp -p -- "${src}" "${temp_path}"); $(io::files::__dry_cmd mv -- "${temp_path}" "${dst}")"
     return 0
   fi
 
@@ -269,7 +280,7 @@ io::files::__atomic_copy_dir() {
   is::not_empty "${temp_path}" || return "${E_ERROR}"
 
   if [[ "${FRAMEWORK_DRY_RUN:-false}" == "true" ]]; then
-    log::warn "[DRY-RUN] atomic copy dir: cp -a ${src}/. ${temp_path}/; mv -- ${temp_path} ${dst}"
+    log::info "[DRY-RUN] $(io::files::__dry_cmd cp -a "${src}/." "${temp_path}/"); $(io::files::__dry_cmd mv -- "${temp_path}" "${dst}")"
     return 0
   fi
 
@@ -348,7 +359,7 @@ io::files::ensure_dir() {
 
   if is::not_empty "${mode}"; then
     if [[ "${FRAMEWORK_DRY_RUN:-false}" == "true" ]]; then
-      log::warn "[DRY-RUN] chmod ${mode} ${dir_path}"
+      log::info "[DRY-RUN] $(io::files::__dry_cmd chmod "${mode}" "${dir_path}")"
     elif ! system::permissions::chmod "${dir_path}" "${mode}"; then
       return "${LIB_ERROR_FILE_OPERATION}"
     fi
@@ -383,7 +394,9 @@ io::files::append() {
   shift
 
   if [[ "${FRAMEWORK_DRY_RUN:-false}" == "true" ]]; then
-    log::warn "[DRY-RUN] append to ${file_path}: $*"
+    local dry_append
+    dry_append="$(io::files::__dry_cmd printf '%s\n' "$*")"
+    log::info "[DRY-RUN] ${dry_append} >> $(printf '%q' "${file_path}")"
     return "${E_SUCCESS}"
   fi
 
@@ -754,6 +767,8 @@ io::files::copy_matching() {
   local rel_path
   local target
   local target_dir
+  local copied=0
+  local skipped=0
 
   while IFS= read -r -d '' file; do
     rel_path="${file#${src}/}"
@@ -768,7 +783,17 @@ io::files::copy_matching() {
       log::error "Failed to copy matching file: ${file} -> ${target}"
       return "${LIB_ERROR_FILE_OPERATION}"
     fi
+
+    # Счётчик: в dry-run файл не копируется, а пропускается
+    # Counter: in dry-run the file is skipped, not copied
+    if [[ "${FRAMEWORK_DRY_RUN:-false}" == "true" ]]; then
+      skipped=$(( skipped + 1 ))
+    else
+      copied=$(( copied + 1 ))
+    fi
   done < <(find "${find_args[@]}" -print0)
+
+  log::info "copied ${copied} files, skipped ${skipped}"
 
   return "${E_SUCCESS}"
 }
@@ -836,7 +861,7 @@ io::files::move() {
   log::info "Trying atomic fallback (copy + remove): ${src} -> ${dst}"
 
   if [[ "${FRAMEWORK_DRY_RUN:-false}" == "true" ]]; then
-    log::warn "[DRY-RUN] cp -a ${src} ${dst}; rm -rf -- ${src}"
+    log::info "[DRY-RUN] $(io::files::__dry_cmd cp -a "${src}" "${dst}"); $(io::files::__dry_cmd rm -rf -- "${src}")"
     return "${E_SUCCESS}"
   fi
 

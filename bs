@@ -76,19 +76,19 @@ BS Framework ${BS_VERSION} – command launcher & shebang interpreter
 Usage: bs [command] [args...]
 
 Commands:
-  help, -h, --help      Show this help
-  version               Print framework version
-  env                   Show environment (BS_ROOT, PATH)
-  list                  List available modules (core/, lib/)
-  lang-doc              Emit a JSON index of function docs (LSP metadata)
-  lsp                   Run the language server (stdin/stdout, JSON-RPC)
-  chat                  Interactive LLM chat (openai/ollama, --url for custom)
-  doctor                Check framework integrity
-  run <script> [args]   Execute script inside BS environment
-  build <script>        Assemble a standalone self-extracting script
-  repl                   Interactive REPL (BS shell / интерактивная консоль)
-  update                   Apply repo changes to installed copies (no reinstall)
-  init-shell             Print snippet for ~/.bashrc or ~/.zshrc
+  help, -h, --help    Show this help
+  version             Print framework version
+  env                 Show environment (BS_ROOT, PATH)
+  list                List available modules (core/, lib/)
+  lang-doc            Emit a JSON index of function docs (LSP metadata)
+  lsp                 Run the language server (stdin/stdout, JSON-RPC)
+  chat                Interactive LLM chat (openai/ollama, --url for custom)
+  doctor              Check framework integrity
+  run <script> [args] Execute script inside BS environment
+  build <script>      Assemble a standalone self-extracting script
+  repl                Interactive REPL (BS shell / интерактивная консоль)
+  update              Apply repo changes to installed copies (no reinstall)
+  init-shell          Print snippet for ~/.bashrc or ~/.zshrc
 
 Shebang mode:
   #!/usr/bin/env bs
@@ -101,15 +101,20 @@ Examples:
 HELP
 }
 
-version() { printf 'BS Framework version: %s\n' "$BS_VERSION"; }
+version() { bs::version::print; }
 env_cmd() { printf 'BS_ROOT=%s\nPATH=%s\n' "$BS_ROOT" "$PATH"; }
 
 list_cmd() {
   echo 'Available modules:'
   local file
+  local count=0
   while IFS= read -r file; do
-    is::file "${file}" && printf '  %s\n' "${file#"${BS_ROOT}"/}"
+    if is::file "${file}"; then
+      printf '  %s\n' "${file#"${BS_ROOT}"/}"
+      count=$(( count + 1 ))
+    fi
   done < <(find "${BS_ROOT}/core" "${BS_ROOT}/lib" -type f -name '*.sh' 2>/dev/null | sort)
+  printf '%d modules\n' "${count}"
 }
 
 lang_doc_cmd() {
@@ -269,6 +274,10 @@ chat_cmd() {
 
 doctor_cmd() {
   local fail=0
+  local pass=0
+  local start_ms
+  start_ms=$(utils::now_ms)
+
   # Вектор возможностей / Capability vector
   if [[ "${1:-}" == "--capabilities" ]]; then
     load "lib/platform/facts"
@@ -280,33 +289,46 @@ doctor_cmd() {
     printf '  --capabilities  print the platform capability vector\n'
     return 0
   fi
-  echo "BS doctor report"
-  echo "BS_ROOT: $BS_ROOT"
+
+  log::info "BS doctor report"
+  log::info "BS_ROOT: ${BS_ROOT}"
+
+  # Единая таблица статусов: STATUS | ITEM | DETAIL
+  # One aligned status table: STATUS | ITEM | DETAIL
+  log::info "$(printf '  %-8s | %-30s | %s' "STATUS" "ITEM" "DETAIL")"
+  log::info "$(printf '  %-8s | %-30s | %s' "--------" "------------------------------" "--------")"
 
   # Bash version / Версия bash
-  echo "Bash version: ${BASH_VERSION}"
   if [[ ${BASH_VERSINFO[0]} -ge 4 ]]; then
-    echo "  [OK] Bash version"
+    log::success "$(printf '  %-8s | %-30s | %s' "OK" "Bash version" "${BASH_VERSION}")"
+    pass=$(( pass + 1 ))
   else
-    echo "  [FAIL] Bash 4.0+ required"; fail=1
+    log::error "$(printf '  %-8s | %-30s | %s' "FAIL" "Bash version" "Bash 4.0+ required")"
+    fail=1
   fi
 
   # Required core files / Обязательные файлы ядра
   local req=(bootstrap/init.sh bootstrap/loader.sh core/prereq.sh core/lang.sh core/const.sh core/logger.sh core/errorhandler.sh core/version.sh core/utils.sh core/config.sh core/deps.sh core/repl.sh)
+  local f
   for f in "${req[@]}"; do
     if is::file "${BS_ROOT}/${f}"; then
-      echo "  [OK] ${f}"
+      log::success "$(printf '  %-8s | %-30s | %s' "OK" "${f}" "required core file")"
+      pass=$(( pass + 1 ))
     else
-      echo "  [FAIL] ${f}"; fail=1
+      log::error "$(printf '  %-8s | %-30s | %s' "FAIL" "${f}" "required core file missing")"
+      fail=1
     fi
   done
 
   # Required directories / Обязательные директории
+  local d
   for d in core lib; do
     if is::dir "${BS_ROOT}/${d}"; then
-      echo "  [OK] dir ${d}"
+      log::success "$(printf '  %-8s | %-30s | %s' "OK" "dir ${d}" "required directory")"
+      pass=$(( pass + 1 ))
     else
-      echo "  [FAIL] dir ${d}"; fail=1
+      log::error "$(printf '  %-8s | %-30s | %s' "FAIL" "dir ${d}" "required directory missing")"
+      fail=1
     fi
   done
 
@@ -314,28 +336,33 @@ doctor_cmd() {
   local opt
   for opt in shellcheck jq curl wget kubectl; do
     if is::command "${opt}"; then
-      echo "  [OK] optional tool: ${opt}"
+      log::success "$(printf '  %-8s | %-30s | %s' "OK" "tool ${opt}" "found")"
+      pass=$(( pass + 1 ))
     else
-      echo "  [OPTIONAL] missing tool: ${opt}"
+      log::warn "$(printf '  %-8s | %-30s | %s' "OPTIONAL" "tool ${opt}" "not found")"
     fi
   done
 
   # Optional dependency check for lib modules / Проверка опциональных зависимостей lib-модулей
   if is::function deps::check_module; then
-    echo "Module dependency check:"
     local module
     for module in lib/integration/result lib/integration/http lib/integration/llm lib/integration/k8s; do
       if is::file "${BS_ROOT}/${module}.sh"; then
         if utils::quiet deps::check_module "${module}"; then
-          echo "  [OK] ${module}: dependencies satisfied"
+          log::success "$(printf '  %-8s | %-30s | %s' "OK" "module ${module}" "dependencies satisfied")"
+          pass=$(( pass + 1 ))
         else
           local missing
           missing="$(utils::attempt deps::list_missing "${module}")"
-          echo "  [OPTIONAL] ${module}: missing dependencies: ${missing}"
+          log::warn "$(printf '  %-8s | %-30s | %s' "OPTIONAL" "module ${module}" "missing dependencies: ${missing}")"
         fi
       fi
     done
   fi
+
+  local end_ms
+  end_ms=$(utils::now_ms)
+  log::info "doctor: ${pass} passed, ${fail} failed ($(( end_ms - start_ms )) ms)"
 
   return "$fail"
 }
@@ -710,10 +737,10 @@ case "${1:-help}" in
   lang-doc)       shift; lang_doc_cmd "$@" ;;
   lsp)            shift; lsp_cmd "$@" ;;
   chat)           shift; chat_cmd "$@" ;;
-  update)           shift; update_cmd "$@" ;;
-  sync)             shift; log::warn "sync is deprecated — use: bs update" && update_cmd "$@" ;;
-  rfc)              shift; rfc_cmd "$@" ;;
-  audit)            shift; audit_cmd "$@" ;;
+  update)         shift; update_cmd "$@" ;;
+  sync)           shift; log::warn "sync is deprecated — use: bs update" && update_cmd "$@" ;;
+  rfc)            shift; rfc_cmd "$@" ;;
+  audit)          shift; audit_cmd "$@" ;;
   doctor)         shift || true; doctor_cmd "$@" ;;
   run)            shift; run_cmd "$@" ;;
   build)          shift; build_cmd "$@" ;;

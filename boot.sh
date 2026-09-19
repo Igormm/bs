@@ -42,12 +42,12 @@ fi
 
 # 4. Валидация
 if [[ -z "${BS_ROOT:-}" ]]; then
-  printf 'Error: BS framework not found (searched: repo, ~/.local/lib/bs, /usr/local/lib/bs)\n' >&2
+  printf 'ERROR: BS framework not found (searched: repo, ~/.local/lib/bs, /usr/local/lib/bs)\n' >&2
   exit 2
 fi
 
 if [[ ! -x "${BS_ROOT}/bs" ]]; then
-  printf 'Error: bs script not found or not executable in BS_ROOT=%s\n' "$BS_ROOT" >&2
+  printf 'ERROR: bs script not found or not executable in BS_ROOT=%s\n' "$BS_ROOT" >&2
   exit 2
 fi
 

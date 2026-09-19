@@ -465,6 +465,13 @@ io::process::guard() {
   done
 
   if is::not_empty "${reason}"; then
+    case "${reason}" in
+      timeout)
+        log::info "timeout after ${IO_PROCESS_CONFIG[timeout]}s" ;;
+      hang)
+        log::info "hang after ${IO_PROCESS_CONFIG[hang_after]}s" ;;
+    esac
+
     io::process::__diagnose "${pid}" "${reason}" "${diag_dir}"
     io::process::__terminate "${pid}"
     wait "${pid}"
@@ -504,6 +511,11 @@ io::process::guard() {
   if [[ "${IO_PROCESS_CONFIG[auto_diag_dir]}" == "true" ]]; then
     utils::ignore rm -rf "${diag_dir}"
   fi
+
+  # Итоговая сводка по времени выполнения / Final timing summary
+  local elapsed_ms
+  elapsed_ms=$(( $(utils::now_ms) - start_ms ))
+  log::info "ok in $(( elapsed_ms / 1000 )).$(( (elapsed_ms % 1000) / 100 ))s"
 
   IO_PROCESS_CURRENT_PID=""
   return "${cmd_rc}"
