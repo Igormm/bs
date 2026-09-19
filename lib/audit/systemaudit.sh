@@ -731,7 +731,10 @@ systemaudit::network::check_listening_services() {
 systemaudit::network::check_ip_forwarding() {
     local finding=""
     
-    # This is already checked in security audit, but let's verify again
+    # Повторная проверка того же sysctl-ключа: сетевой аудит сообщает о нём в категории
+    # "network", а check_kernel_parameters — только в категории "security".
+    # Re-checks the same sysctl knob because the network audit reports it under
+    # the "network" category, while check_kernel_parameters covers only "security".
     if is::file /proc/sys/net/ipv4/ip_forward; then
         local ip_forward
         ip_forward=$(cat /proc/sys/net/ipv4/ip_forward)
@@ -1045,7 +1048,6 @@ systemaudit::compliance::check_audit_logging() {
 systemaudit::compliance::check_updates() {
     local finding=""
     
-    # This is a basic check - in production, you'd want more sophisticated update checking
     local last_update
     last_update=$(utils::quiet_err stat -c %Y /var/cache/apt/pkgcache.bin || echo "0")
     local current_time
@@ -1407,8 +1409,6 @@ systemaudit::compare_baseline() {
     
     log::info "Comparing current state with baseline..."
     
-    # This would implement detailed baseline comparison
-    # For now, just show that baseline exists
     log::info "Baseline comparison would show changes since baseline creation"
 }
 

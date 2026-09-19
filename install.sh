@@ -35,15 +35,17 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # Определить каталог с файлами установки
 INSTALLER_DIR="${SCRIPT_DIR}/install"
 
-# Проверить каталог с core модулями
+# Проверяем, что файлы и каталоги, от которых зависит инсталлятор, на месте:
+# явная ошибка "файл не найден" до source понятнее молчаливого сбоя загрузки.
+# Verify the files and directories the installer depends on are present:
+# an explicit "not found" error beats a silent sourcing failure.
 if [[ ! -d "${SCRIPT_DIR}/core" ]]; then
   printf 'ERROR: core modules directory not found: %s\n' "${SCRIPT_DIR}/core" >&2
   exit 1
 fi
 
-# Проверить файл утилит
 if [[ ! -f "${SCRIPT_DIR}/core/utils.sh" ]]; then
-  printf 'ERROR: Core utilites not found: %s\n' "${SCRIPT_DIR}/core/utils.sh" >&2
+  printf 'ERROR: Core utilities not found: %s\n' "${SCRIPT_DIR}/core/utils.sh" >&2
   exit 1
 fi
 
@@ -67,85 +69,71 @@ fi
 # Использовать строгий режим (как только функция доступна)
 utils::strict
 
-# Проверить файл утилит
 if [[ ! -f "${SCRIPT_DIR}/core/const.sh" ]]; then
   printf 'ERROR: Core module const not found: %s\n' "${SCRIPT_DIR}/core/const.sh" >&2
   exit 1
 fi
 
-# Проверить файл утилит
 if [[ ! -f "${SCRIPT_DIR}/core/errorhandler.sh" ]]; then
   printf 'ERROR: Core module error handler not found: %s\n' "${SCRIPT_DIR}/core/errorhandler.sh" >&2
   exit 1
 fi
 
-# Проверить файл утилит
 if [[ ! -f "${SCRIPT_DIR}/core/logger.sh" ]]; then
   printf 'ERROR: Core module logger not found: %s\n' "${SCRIPT_DIR}/core/logger.sh" >&2
   exit 1
 fi
 
-# Проверить файл утилит
 if [[ ! -f "${SCRIPT_DIR}/core/version.sh" ]]; then
   printf 'ERROR: Core module version not found: %s\n' "${SCRIPT_DIR}/core/version.sh" >&2
   exit 1
 fi
 
-# Проверить каталог с bootstrap
 if [[ ! -d "${SCRIPT_DIR}/bootstrap" ]]; then
   printf 'ERROR: bootstrap modules directory not found: %s\n' "${SCRIPT_DIR}/bootstrap" >&2
   exit 1
 fi
 
-# Проверить файлы необходимые для самозагрузки
 if [[ ! -f "${SCRIPT_DIR}/bootstrap/init.sh" ]]; then
-  printf 'ERROR: bootstrap init utilites not found: %s\n' "${SCRIPT_DIR}/bootstrap/init.sh" >&2
+  printf 'ERROR: bootstrap init utilities not found: %s\n' "${SCRIPT_DIR}/bootstrap/init.sh" >&2
   exit 1
 fi
 
-# Проверить файлы необходимые для самозагрузки
 if [[ ! -f "${SCRIPT_DIR}/bootstrap/loader.sh" ]]; then
-  printf 'ERROR: bootstrap loader utilites not found: %s\n' "${SCRIPT_DIR}/bootstrap/loader.sh" >&2
+  printf 'ERROR: bootstrap loader utilities not found: %s\n' "${SCRIPT_DIR}/bootstrap/loader.sh" >&2
   exit 1
 fi
 
-# Проверить каталог с модулями для инсталяции 
 if [[ ! -d "${INSTALLER_DIR}" ]]; then
   printf 'ERROR: installation directory not found: %s\n' "${INSTALLER_DIR}" >&2
   exit 1
 fi
 
-# Проверить файл инсталятор 
 if [[ ! -f "${INSTALLER_DIR}/main.sh" ]]; then
   printf 'ERROR: installation file main.sh not found: %s\n' "${INSTALLER_DIR}/main.sh" >&2
   exit 1
 fi
 
-# Проверить файл инсталятор
 if [[ ! -f "${INSTALLER_DIR}/actions.sh" ]]; then
   printf 'ERROR: installation file actions.sh not found: %s\n' "${INSTALLER_DIR}/actions.sh" >&2
   exit 1
 fi
 
-# Проверить файл инсталятор
 if [[ ! -f "${INSTALLER_DIR}/checks.sh" ]]; then
   printf 'ERROR: installation file checks.sh not found: %s\n' "${INSTALLER_DIR}/checks.sh" >&2
   exit 1
 fi
 
-# Проверить файл инсталятор
 if [[ ! -f "${INSTALLER_DIR}/path_manager.sh" ]]; then
   printf 'ERROR: installation file path_manager.sh not found: %s\n' "${INSTALLER_DIR}/path_manager.sh" >&2
   exit 1
 fi
 
-# Проверить добавление Actions
 if ! source -- "${INSTALLER_DIR}/actions.sh"; then
   printf 'ERROR: failed to source file: %s\n' "${INSTALLER_DIR}/actions.sh" >&2
   exit 1
 fi
 
-# Проверить функцию utils::strict 
 if ! declare -F -- "utils::strict" >/dev/null 2>&1; then
   printf 'ERROR: required function %q not defined\n' "utils::strict" >&2
   exit 1
@@ -161,5 +149,5 @@ fi
 # Interpreter check: based on the real process, not on $SHELL
 check_shell_environment
 
-# Run the modular installer / Запустить модуль инсталяции 
+# Run the modular installer / Запустить модуль инсталляции
 source "${INSTALLER_DIR}/main.sh" "$@"

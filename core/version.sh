@@ -24,7 +24,7 @@ export BS_NAME="BS (Bash Open Source Architecture) BOSA Framework"
 # @example
 #   bs::version::print
 bs::version::print() {
-    printf '%s %s\n' "${BS_NAME}" "${BS_VERSION}"
+    printf 'BS Framework version: %s\n' "${BS_VERSION}"
 }
 
 # @description Get version as string / Получить версию как строку
@@ -54,7 +54,10 @@ bs::version::compare() {
     read -ra v1_parts <<< "${ver1}"
     read -ra v2_parts <<< "${ver2}"
 
-    # Determine max number of parts to compare
+    # У версий разное число частей (1.0 vs 1.0.1): отсутствующие части
+    # считаются 0, поэтому сравниваем до самой длинной версии.
+    # Versions have different part counts (1.0 vs 1.0.1): missing parts
+    # count as 0, so we compare up to the longest version.
     local -i max_parts
     if [[ ${#v1_parts[@]} -gt ${#v2_parts[@]} ]]; then
         max_parts=${#v1_parts[@]}
@@ -62,13 +65,17 @@ bs::version::compare() {
         max_parts=${#v2_parts[@]}
     fi
 
-    # Compare each part numerically
+    # Части сравниваем как числа, а не как строки: иначе "10" < "9".
+    # Parts are compared numerically, not as strings: otherwise "10" < "9".
     local -i i
     for ((i=0; i<max_parts; i++)); do
         local part1="${v1_parts[i]:-0}"
         local part2="${v2_parts[i]:-0}"
 
-        # Ensure both parts are numeric for comparison
+        # Нечисловые части (например, суффиксы "1.2.0-beta") заменяем на 0,
+        # чтобы числовое сравнение не падало.
+        # Non-numeric parts (e.g. suffixes like "1.2.0-beta") are replaced
+        # with 0 so the numeric comparison cannot fail.
         part1="${part1//[^0-9]/0}"
         part2="${part2//[^0-9]/0}"
 
@@ -79,6 +86,5 @@ bs::version::compare() {
         fi
     done
 
-    # If we get here, versions are equal
     return 0
 }

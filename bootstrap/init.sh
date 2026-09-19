@@ -11,6 +11,7 @@
 # this file is sourced and must not change the caller's shell settings
 
 # @description Show usage help. This file must be sourced.
+# @description Показать справку. Этот файл должен подключаться через source.
 usage() {
   cat <<'HELP'
 BS bootstrap init

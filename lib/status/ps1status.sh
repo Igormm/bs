@@ -122,13 +122,6 @@ readonly PS1_STATUS_COLOR_RESET="\033[0m"              # Reset
 # Module initialization
 
 ps1status::init() {
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# func_name - локальная переменная для этой функции
-# func_name - local variable for this function
-#
-
     
 
     log::info "Initializing PS1 Status module..."
@@ -182,18 +175,6 @@ ps1status::init() {
 # Check dependencies
 
 ps1status::check_dependencies() {
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# func_name - локальная переменная для этой функции
-# func_name - local variable for this function
-#
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# missing_deps - локальная переменная для этой функции
-# missing_deps - local variable for this function
-#
     local missing_deps=()
 
     
@@ -240,18 +221,6 @@ ps1status::check_dependencies() {
 # Install dependencies
 
 ps1status::install_dependencies() {
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# func_name - локальная переменная для этой функции
-# func_name - local variable for this function
-#
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# deps - локальная переменная для этой функции
-# deps - local variable for this function
-#
     local deps=("$@")
 
     
@@ -299,13 +268,6 @@ ps1status::install_dependencies() {
 # Initialize status components
 
 ps1status::init_components() {
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# func_name - локальная переменная для этой функции
-# func_name - local variable for this function
-#
-
     
 
     log::debug "Initializing PS1 status components..."
@@ -349,22 +311,9 @@ ps1status::init_components() {
 # Start background monitoring
 
 ps1status::start_monitoring() {
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# func_name - локальная переменная для этой функции
-# func_name - local variable for this function
-#
-
     
 
     # Check if monitoring is already running
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# monitor_pid - локальная переменная для этой функции
-# monitor_pid - local variable for this function
-#
     local monitor_pid
 
     monitor_pid=$(ps aux | grep "ps1status::monitor_loop" | grep -v grep | awk '{print $2}' || true)
@@ -384,12 +333,6 @@ ps1status::start_monitoring() {
     # Start monitoring in background
 
     ps1status::monitor_loop &
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# bg_pid - локальная переменная для этой функции
-# bg_pid - local variable for this function
-#
     local bg_pid=$!
 
     
@@ -429,31 +372,12 @@ ps1status::monitor_loop() {
 # Stop monitoring
 
 ps1status::stop_monitoring() {
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# func_name - локальная переменная для этой функции
-# func_name - local variable for this function
-#
-
     
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# pid_file - локальная переменная для этой функции
-# pid_file - local variable for this function
-#
     local pid_file="${PS1_STATUS_CONFIG_DIR}/monitor.pid"
 
     
 
     if is::file "${pid_file}"; then
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# monitor_pid - локальная переменная для этой функции
-# monitor_pid - local variable for this function
-#
         local monitor_pid
 
         monitor_pid=$(cat "${pid_file}")
@@ -515,20 +439,7 @@ ps1status::wireguard::init() {
 }
 
 ps1status::wireguard::update() {
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# func_name - локальная переменная для этой функции
-# func_name - local variable for this function
-#
-
     
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# status - локальная переменная для этой функции
-# status - local variable for this function
-#
     local status="down"
 
     
@@ -564,19 +475,7 @@ ps1status::wireguard::update() {
 }
 
 ps1status::wireguard::get_status() {
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# status_file - локальная переменная для этой функции
-# status_file - local variable for this function
-#
     local status_file="${PS1_STATUS_CACHE_DIR}/wireguard.status"
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# status - локальная переменная для этой функции
-# status - local variable for this function
-#
     local status="down"
 
     
@@ -640,34 +539,9 @@ ps1status::network::init() {
 }
 
 ps1status::network::update() {
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# func_name - локальная переменная для этой функции
-# func_name - local variable for this function
-#
-
     
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# status - локальная переменная для этой функции
-# status - local variable for this function
-#
     local status="down"
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# total_latency - локальная переменная для этой функции
-# total_latency - local variable for this function
-#
     local total_latency=0
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# successful_pings - локальная переменная для этой функции
-# successful_pings - local variable for this function
-#
     local successful_pings=0
 
     
@@ -685,12 +559,6 @@ ps1status::network::update() {
             
 
             # Get latency
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# latency - локальная переменная для этой функции
-# latency - local variable for this function
-#
             local latency
 
             latency=$(utils::quiet_err ping -c 1 -W 1 "${host}" | grep "time=" | sed 's/.*time=\([0-9.]*\).*/\1/' || echo "0")
@@ -704,12 +572,6 @@ ps1status::network::update() {
     
 
     # Calculate average latency
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# avg_latency - локальная переменная для этой функции
-# avg_latency - local variable for this function
-#
     local avg_latency=0
 
     if [[ "${successful_pings}" -gt 0 ]]; then
@@ -735,33 +597,9 @@ ps1status::network::update() {
 }
 
 ps1status::network::get_status() {
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# status_file - локальная переменная для этой функции
-# status_file - local variable for this function
-#
     local status_file="${PS1_STATUS_CACHE_DIR}/network.status"
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# latency_file - локальная переменная для этой функции
-# latency_file - local variable for this function
-#
     local latency_file="${PS1_STATUS_CACHE_DIR}/network.latency"
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# status - локальная переменная для этой функции
-# status - local variable for this function
-#
     local status="down"
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# latency - локальная переменная для этой функции
-# latency - local variable for this function
-#
     local latency="0"
 
     
@@ -839,18 +677,6 @@ ps1status::speed::init() {
 }
 
 ps1status::speed::update() {
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# func_name - локальная переменная для этой функции
-# func_name - local variable for this function
-#
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# current_time - локальная переменная для этой функции
-# current_time - local variable for this function
-#
     local current_time=$(utils::now_s)
 
     
@@ -870,41 +696,17 @@ ps1status::speed::update() {
     
 
     # Quick speed test (download only for performance)
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# start_time - локальная переменная для этой функции
-# start_time - local variable for this function
-#
     local start_time=$(utils::now_float)
 
     
 
     if utils::quiet_err curl -s -o /dev/null --max-time 10 "${PS1_STATUS_SPEED_TEST_URL}"; then
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# end_time - локальная переменная для этой функции
-# end_time - local variable for this function
-#
         local end_time=$(utils::now_float)
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# duration - локальная переменная для этой функции
-# duration - local variable for this function
-#
         local duration=$(echo "${end_time} - ${start_time}" | utils::quiet_err bc -l || echo "1")
 
         
 
         # Calculate speed in Mbps
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# speed - локальная переменная для этой функции
-# speed - local variable for this function
-#
         local speed=$(echo "scale=1; 8 / ${duration}" | utils::quiet_err bc -l || echo "0")
 
         
@@ -926,19 +728,7 @@ ps1status::speed::update() {
 }
 
 ps1status::speed::get_status() {
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# speed_file - локальная переменная для этой функции
-# speed_file - local variable for this function
-#
     local speed_file="${PS1_STATUS_CACHE_DIR}/speed.download"
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# speed - локальная переменная для этой функции
-# speed - local variable for this function
-#
     local speed="0"
 
     
@@ -990,27 +780,8 @@ ps1status::audio::init() {
 }
 
 ps1status::audio::update() {
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# func_name - локальная переменная для этой функции
-# func_name - local variable for this function
-#
-
     
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# volume - локальная переменная для этой функции
-# volume - local variable for this function
-#
     local volume="0"
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# muted - локальная переменная для этой функции
-# muted - local variable for this function
-#
     local muted="false"
 
     
@@ -1018,12 +789,6 @@ ps1status::audio::update() {
     # Try PulseAudio first
 
     if utils::has pactl; then
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# sink_info - локальная переменная для этой функции
-# sink_info - local variable for this function
-#
         local sink_info
 
         sink_info=$(utils::quiet_err pactl info | grep "Default Sink" | cut -d: -f2 | xargs)
@@ -1031,12 +796,6 @@ ps1status::audio::update() {
         
 
         if is::not_empty "${sink_info}"; then
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# sink_volume - локальная переменная для этой функции
-# sink_volume - local variable for this function
-#
             local sink_volume
 
             sink_volume=$(utils::quiet_err pactl list sinks | grep -A 10 "${sink_info}" | grep "Volume:" | head -1)
@@ -1066,12 +825,6 @@ ps1status::audio::update() {
     # Fallback to ALSA
 
     elif utils::has amixer; then
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# mixer_info - локальная переменная для этой функции
-# mixer_info - local variable for this function
-#
         local mixer_info
 
         mixer_info=$(utils::quiet_err amixer get Master || utils::quiet_err amixer get PCM)
@@ -1115,33 +868,9 @@ ps1status::audio::update() {
 }
 
 ps1status::audio::get_status() {
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# volume_file - локальная переменная для этой функции
-# volume_file - local variable for this function
-#
     local volume_file="${PS1_STATUS_CACHE_DIR}/audio.volume"
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# muted_file - локальная переменная для этой функции
-# muted_file - local variable for this function
-#
     local muted_file="${PS1_STATUS_CACHE_DIR}/audio.muted"
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# volume - локальная переменная для этой функции
-# volume - local variable for this function
-#
     local volume="0"
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# muted - локальная переменная для этой функции
-# muted - local variable for this function
-#
     local muted="false"
 
     
@@ -1189,13 +918,6 @@ ps1status::audio::get_status() {
 # Toggle audio mute
 
 ps1status::audio::toggle_mute() {
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# func_name - локальная переменная для этой функции
-# func_name - local variable for this function
-#
-
     
 
     if utils::has pactl; then
@@ -1217,18 +939,6 @@ ps1status::audio::toggle_mute() {
 # Adjust volume
 
 ps1status::audio::adjust_volume() {
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# func_name - локальная переменная для этой функции
-# func_name - local variable for this function
-#
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# delta - локальная переменная для этой функции
-# delta - local variable for this function
-#
     local delta="${1:-5}"
 
     
@@ -1268,22 +978,9 @@ ps1status::system::init() {
 }
 
 ps1status::system::update() {
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# func_name - локальная переменная для этой функции
-# func_name - local variable for this function
-#
-
     
 
     # Get CPU usage
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# cpu_usage - локальная переменная для этой функции
-# cpu_usage - local variable for this function
-#
     local cpu_usage
 
     cpu_usage=$(utils::quiet_err ps -o %cpu= -A | awk '{s+=$1} END {print s}' | xargs || echo "0")
@@ -1291,12 +988,6 @@ ps1status::system::update() {
     
 
     # Get memory usage
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# mem_usage - локальная переменная для этой функции
-# mem_usage - local variable for this function
-#
     local mem_usage
 
     if utils::has free; then
@@ -1312,12 +1003,6 @@ ps1status::system::update() {
     
 
     # Get load average
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# load_avg - локальная переменная для этой функции
-# load_avg - local variable for this function
-#
     local load_avg
 
     load_avg=$(uptime | awk -F'load average:' '{print $2}' | awk -F',' '{print $1}' | xargs || echo "0")
@@ -1343,49 +1028,13 @@ ps1status::system::update() {
 }
 
 ps1status::system::get_status() {
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# cpu_file - локальная переменная для этой функции
-# cpu_file - local variable for this function
-#
     local cpu_file="${PS1_STATUS_CACHE_DIR}/system.cpu"
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# mem_file - локальная переменная для этой функции
-# mem_file - local variable for this function
-#
     local mem_file="${PS1_STATUS_CACHE_DIR}/system.mem"
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# load_file - локальная переменная для этой функции
-# load_file - local variable for this function
-#
     local load_file="${PS1_STATUS_CACHE_DIR}/system.load"
 
     
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# cpu - локальная переменная для этой функции
-# cpu - local variable for this function
-#
     local cpu="0"
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# mem - локальная переменная для этой функции
-# mem - local variable for this function
-#
     local mem="0"
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# load - локальная переменная для этой функции
-# load - local variable for this function
-#
     local load="0"
 
     
@@ -1415,19 +1064,7 @@ ps1status::system::get_status() {
     
 
     # Format system status
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# cpu_indicator - локальная переменная для этой функции
-# cpu_indicator - local variable for this function
-#
     local cpu_indicator="▪"
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# mem_indicator - локальная переменная для этой функции
-# mem_indicator - local variable for this function
-#
     local mem_indicator="▪"
 
     
@@ -1479,18 +1116,6 @@ ps1status::system::get_status() {
 # Enable status component
 
 ps1status::enable_component() {
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# func_name - локальная переменная для этой функции
-# func_name - local variable for this function
-#
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# component - локальная переменная для этой функции
-# component - local variable for this function
-#
     local component="${1:-}"
 
     
@@ -1536,18 +1161,6 @@ ps1status::enable_component() {
 # Disable status component
 
 ps1status::disable_component() {
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# func_name - локальная переменная для этой функции
-# func_name - local variable for this function
-#
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# component - локальная переменная для этой функции
-# component - local variable for this function
-#
     local component="${1:-}"
 
     
@@ -1563,12 +1176,6 @@ ps1status::disable_component() {
     
 
     # Remove from enabled components
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# new_components - локальная переменная для этой функции
-# new_components - local variable for this function
-#
     local new_components=()
 
     for enabled_component in "${PS1_STATUS_ENABLED_COMPONENTS[@]}"; do
@@ -1616,20 +1223,7 @@ ps1status::get_enabled_components() {
 # Build PS1 status line
 
 ps1status::build_ps1() {
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# func_name - локальная переменная для этой функции
-# func_name - local variable for this function
-#
-
     
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# status_line - локальная переменная для этой функции
-# status_line - local variable for this function
-#
     local status_line=""
 
     
@@ -1639,12 +1233,6 @@ ps1status::build_ps1() {
     for component in "${PS1_STATUS_ENABLED_COMPONENTS[@]}"; do
 
         if utils::has "ps1status::${component}::get_status"; then
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# component_status - локальная переменная для этой функции
-# component_status - local variable for this function
-#
             local component_status
 
             component_status=$("ps1status::${component}::get_status")
@@ -1658,26 +1246,8 @@ ps1status::build_ps1() {
     
 
     # Add standard PS1 components
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# user_host - локальная переменная для этой функции
-# user_host - local variable for this function
-#
     local user_host="\[\033[01;32m\]\u@\h\[\033[00m\]"
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# working_dir - локальная переменная для этой функции
-# working_dir - local variable for this function
-#
     local working_dir="\[\033[01;34m\]\w\[\033[00m\]"
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# prompt_char - локальная переменная для этой функции
-# prompt_char - local variable for this function
-#
     local prompt_char="\[\033[01;31m\]\$\[\033[00m\]"
 
     
@@ -1695,13 +1265,6 @@ ps1status::build_ps1() {
 # Enable PS1 status (install in PROMPT_COMMAND)
 
 ps1status::enable() {
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# func_name - локальная переменная для этой функции
-# func_name - local variable for this function
-#
-
     
 
     # Add to PROMPT_COMMAND if not already there
@@ -1725,13 +1288,6 @@ ps1status::enable() {
 # Disable PS1 status
 
 ps1status::disable() {
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# func_name - локальная переменная для этой функции
-# func_name - local variable for this function
-#
-
     
 
     # Remove from PROMPT_COMMAND
@@ -1811,13 +1367,6 @@ ps1status::equalizer::get_status() {
 # Toggle equalizer
 
 ps1status::equalizer::toggle() {
-
-#
-# ЛОКАЛЬНАЯ ПЕРЕМЕННАЯ / LOCAL VARIABLE:
-# func_name - локальная переменная для этой функции
-# func_name - local variable for this function
-#
-
     
 
     if utils::has pulseeffects; then
@@ -1910,7 +1459,7 @@ Status Indicators:
 
   Audio: ♪♪♪ (high), ♪♪ (medium), ♪ (low), ♪M (muted), ♪0 (zero)
 
-  System: ●● (CPU/Memory indicators)
+  System: ▪▪ (CPU/Memory indicators)
 
 Configuration:
 

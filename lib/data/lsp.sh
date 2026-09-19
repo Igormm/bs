@@ -65,6 +65,8 @@ lsp::__ensure_index() {
 # @description Найти функцию по точному имени в индексе + открытых файлах.
 #   The index goes via stdin (a single argv entry is capped at ~128 KiB
 #   by the kernel MAX_ARG_STRLEN — the full index is bigger).
+#   Индекс передаётся через stdin (один элемент argv ограничен ~128 КиБ
+#   лимитом ядра MAX_ARG_STRLEN — полный индекс больше).
 # @param $1 Word / Слово
 # @stdout JSON object or null / JSON-объект или null
 lsp::__find_by_name() {
