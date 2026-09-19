@@ -38,8 +38,14 @@ readonly LANGDOC_JQ_FILTER="${BS_ROOT}/lib/data/langdoc.jq"
 #   langdoc::parse_file "${BS_ROOT}/core/lang.sh"
 langdoc::parse_file() {
   local -r __ld_file="${1:?file required}"
-  is::file "${__ld_file}" || return 1
-  is::command jq || return 1
+  if ! is::file "${__ld_file}"; then
+    log::error "langdoc::parse_file: file not found: ${__ld_file} / файл не найден: ${__ld_file}"
+    return 1
+  fi
+  if ! is::command jq; then
+    log::error "langdoc::parse_file: jq is required (install jq) / требуется jq (установите jq)"
+    return 1
+  fi
   jq -Rs -c --arg file "${__ld_file}" -f "${LANGDOC_JQ_FILTER}" "${__ld_file}"
 }
 
@@ -54,7 +60,10 @@ langdoc::parse_file() {
 langdoc::parse_text() {
   local -r __ld_text="${1-}"
   local -r __ld_file="${2:-<stdin>}"
-  is::command jq || return 1
+  if ! is::command jq; then
+    log::error "langdoc::parse_text: jq is required (install jq) / требуется jq (установите jq)"
+    return 1
+  fi
   printf '%s' "${__ld_text}" | jq -Rs -c --arg file "${__ld_file}" -f "${LANGDOC_JQ_FILTER}"
 }
 
@@ -67,7 +76,10 @@ langdoc::parse_text() {
 #   langdoc::index "${BS_ROOT}"
 langdoc::index() {
   local -r __ld_root="${1:-${BS_ROOT}}"
-  is::command jq || return 1
+  if ! is::command jq; then
+    log::error "langdoc::index: jq is required (install jq) / требуется jq (установите jq)"
+    return 1
+  fi
   local __ld_file
   {
     while IFS= read -r __ld_file; do

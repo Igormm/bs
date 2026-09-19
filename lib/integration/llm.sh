@@ -53,7 +53,7 @@ __llm::validate_provider() {
       return 0
       ;;
     *)
-      log::warn "Unsupported LLM provider: ${provider}"
+      log::warn "llm: unsupported provider: ${provider} (supported: openai, ollama) / неподдерживаемый провайдер: ${provider} (поддерживаются: openai, ollama)"
       return "${E_INVALID}"
       ;;
   esac
@@ -223,7 +223,7 @@ __llm::request() {
   response="$(curl "${curl_args[@]}" 2>/dev/null)" || rc=$?
 
   if [[ "${rc}" -ne 0 ]]; then
-    log::error "LLM request failed (curl exit ${rc})"
+    log::error "llm: request failed (curl exit ${rc}; check LLM_OPENAI_URL/LLM_OLLAMA_HOST and network) / запрос не удался (код curl ${rc}; проверьте LLM_OPENAI_URL/LLM_OLLAMA_HOST и сеть)"
     return "${INTEGRATION_ERROR_LLM}"
   fi
 
@@ -355,8 +355,8 @@ llm::chat() {
   esac
 
   if is::empty "${content}"; then
-    log::warn "LLM response did not contain expected content"
-    printf '%s' "${response}"
+    log::warn "llm::chat: response did not contain expected content / ответ не содержит ожидаемого содержимого"
+    log::debug "llm::chat: raw response: ${response}"
     return "${INTEGRATION_ERROR_LLM}"
   fi
 
@@ -466,8 +466,8 @@ llm::chat_turn() {
   esac
 
   if is::empty "${content}"; then
-    log::warn "LLM response did not contain expected content"
-    printf '%s' "${response}"
+    log::warn "llm::chat_turn: response did not contain expected content / ответ не содержит ожидаемого содержимого"
+    log::debug "llm::chat_turn: raw response: ${response}"
     return "${INTEGRATION_ERROR_LLM}"
   fi
 

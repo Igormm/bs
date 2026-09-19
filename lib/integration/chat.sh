@@ -121,7 +121,7 @@ chat::repl() {
     __ch_reply="$(chat::turn "${__ch_provider}" "${__ch_model}" "${__ch_system}" "${__ch_one_shot}")" || __ch_rc=$?
     __ch_elapsed=$(( $(utils::now_ms) - __ch_start ))
     if (( __ch_rc != 0 )); then
-      log::error "chat failed (rc=${__ch_rc})"
+      log::error "chat::turn: request failed (rc=${__ch_rc}; check provider/model/network) / сбой запроса (rc=${__ch_rc}; проверьте провайдера/модель/сеть)"
       return "${__ch_rc}"
     fi
     printf '%s\n' "${__ch_reply}"
@@ -186,7 +186,7 @@ chat::repl() {
     __ch_elapsed=$(( $(utils::now_ms) - __ch_start ))
 
     if (( __ch_rc != 0 )); then
-      log::error "chat failed (rc=${__ch_rc})"
+      log::error "chat::turn: request failed (rc=${__ch_rc}; check provider/model/network) / сбой запроса (rc=${__ch_rc}; проверьте провайдера/модель/сеть)"
       continue
     fi
 

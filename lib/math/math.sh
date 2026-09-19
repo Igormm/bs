@@ -173,7 +173,7 @@ __math::run() {
     name="${pair%%=*}"
     value="${pair#*=}"
     [[ "${name}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || {
-      log::error "math: invalid variable name: ${name}"
+      log::error "math: invalid variable name: ${name} (use [A-Za-z_][A-Za-z0-9_]*) / неверное имя переменной: ${name} (допустимо [A-Za-z_][A-Za-z0-9_]*)"
       return 1
     }
     value="${value#"${value%%[![:space:]]*}"}"

@@ -95,8 +95,13 @@ regex::matches() {
     log::error "regex::matches: PCRE unavailable (grep -P and perl not found) / PCRE недоступен (нет grep -P и perl)"
     return "${LIB_ERROR_DEPENDENCY_MISSING:-101}"
   fi
-  [[ "${__rg_str}" =~ ${__rg_pattern} ]]
-  return $?
+  local __rg_status=0 __rg_err=""
+  __rg_err="$({ [[ "${__rg_str}" =~ ${__rg_pattern} ]]; } 2>&1)" || __rg_status=$?
+  if (( __rg_status == 2 )); then
+    log::error "regex::matches: invalid ERE pattern: ${__rg_pattern} (bash: ${__rg_err}) / неверный ERE-паттерн: ${__rg_pattern} (bash: ${__rg_err})"
+    return 2
+  fi
+  return "${__rg_status}"
 }
 
 # @description Predicate alias of regex::matches / Предикат-алиас matches.

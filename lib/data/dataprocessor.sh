@@ -2,35 +2,9 @@
 # shellcheck shell=bash
 # shellcheck disable=SC2155
 
-# dataprocessor.sh — Data Processing Module for BS Framework
-# Модуль обработки данных для фреймворка BS
+# lib/data/dataprocessor.sh — data processing module: JSON/XML/CSV/YAML queries, validation, conversion
+# lib/data/dataprocessor.sh — модуль обработки данных: запросы, валидация и преобразование JSON/XML/CSV/YAML
 #
-# Description:
-#   Comprehensive data processing module supporting:
-#   - XPath queries for XML
-#   - JPath queries for JSON
-#   - JSON manipulation and validation
-#   - XML parsing and transformation
-#   - CSV processing and conversion
-#   - Cross-format data conversion
-#
-# Features:
-#   - Query languages support (XPath, JPath)
-#   - Data validation and transformation
-#   - Cross-format conversion
-#   - Streaming processing for large files
-#   - Error handling and reporting
-#
-# Dependencies:
-#   - jq (for JSON processing)
-#   - xmllint (for XML processing)
-#   - xmlstarlet (for XPath support)
-#   - csvkit (for CSV processing)
-#   - python3 (for advanced XPath)
-#
-# @author BS Framework
-# @since 2026-01-06
-# @version 1.0.0
 # @depends core/const, core/logger, core/utils, core/errorhandler, lib/system/platformcheck
 
 # Source Guard / Защита от повторной загрузки
@@ -48,7 +22,10 @@ readonly DATA_PROCESSOR_MAX_FILE_SIZE="100M"
 DATA_PROCESSOR_FORMATS=("json" "xml" "csv" "yaml" "tsv")
 
 # Module initialization
-# @description Initialize the data processor module, create config/cache directories and check dependencies | Инициализировать модуль обработки данных, создать каталоги конфигурации и кэша и проверить зависимости
+# @description Initialize the data processor module, create config/cache
+#   directories and check dependencies.
+# @description Инициализировать модуль обработки данных, создать каталоги
+#   конфигурации и кэша и проверить зависимости.
 dataprocessor::init() {
     
     log::info "Initializing Data Processor module..."
@@ -71,7 +48,10 @@ dataprocessor::init() {
 }
 
 # Check dependencies
-# @description Check required dependencies (jq, xmllint, xmlstarlet, python3) and install missing ones | Проверить требуемые зависимости (jq, xmllint, xmlstarlet, python3) и установить отсутствующие
+# @description Check required dependencies (jq, xmllint, xmlstarlet, python3)
+#   and install missing ones.
+# @description Проверить требуемые зависимости (jq, xmllint, xmlstarlet,
+#   python3) и установить отсутствующие.
 dataprocessor::check_dependencies() {
     local missing_deps=()
     
@@ -96,7 +76,10 @@ dataprocessor::check_dependencies() {
 }
 
 # Install dependencies
-# @description Install missing data-processing dependencies via apt, dnf or brew per platform | Установить отсутствующие зависимости обработки данных через apt, dnf или brew в зависимости от платформы
+# @description Install missing data-processing dependencies via apt, dnf or
+#   brew per platform.
+# @description Установить отсутствующие зависимости обработки данных через
+#   apt, dnf или brew в зависимости от платформы.
 dataprocessor::install_dependencies() {
     local deps=("$@")
     
@@ -127,7 +110,8 @@ dataprocessor::install_dependencies() {
 # ============================================================================
 
 # Validate JSON
-# @description Validate JSON syntax with jq | Проверить корректность синтаксиса JSON с помощью jq
+# @description Validate JSON syntax with jq.
+# @description Проверить корректность синтаксиса JSON с помощью jq.
 dataprocessor::json::validate() {
     local json_data="${1:-}"
     
@@ -144,7 +128,9 @@ dataprocessor::json::validate() {
 }
 
 # Pretty print JSON
-# @description Format and pretty print JSON data in a readable indented form | Отформатировать и красиво вывести данные JSON в читаемом виде с отступами
+# @description Format and pretty print JSON data in a readable indented form.
+# @description Отформатировать и красиво вывести данные JSON в читаемом виде
+#   с отступами.
 dataprocessor::json::pretty() {
     local json_data="${1:-}"
     
@@ -160,7 +146,8 @@ dataprocessor::json::pretty() {
 }
 
 # Minify JSON
-# @description Minify and compact JSON data by removing whitespace | Минифицировать и сжать данные JSON, удалив пробелы
+# @description Minify and compact JSON data by removing whitespace.
+# @description Минифицировать и сжать данные JSON, удалив пробелы.
 dataprocessor::json::minify() {
     local json_data="${1:-}"
     
@@ -176,7 +163,9 @@ dataprocessor::json::minify() {
 }
 
 # Query JSON with JPath (jq syntax)
-# @description Query and extract data from JSON using jq / JPath syntax | Выполнить запрос и извлечь данные из JSON с помощью синтаксиса jq / JPath
+# @description Query and extract data from JSON using jq / JPath syntax.
+# @description Выполнить запрос и извлечь данные из JSON с помощью
+#   синтаксиса jq / JPath.
 dataprocessor::json::query() {
     local json_data="${1:-}"
     local query="${2:-}"
@@ -193,7 +182,9 @@ dataprocessor::json::query() {
 }
 
 # Update JSON value
-# @description Update or set a value in JSON data at a given path | Обновить или установить значение в данных JSON по указанному пути
+# @description Update or set a value in JSON data at a given path.
+# @description Обновить или установить значение в данных JSON по указанному
+#   пути.
 dataprocessor::json::update() {
     local json_data="${1:-}"
     local path="${2:-}"
@@ -211,7 +202,8 @@ dataprocessor::json::update() {
 }
 
 # Delete JSON key
-# @description Delete a key or value from JSON data at a given path | Удалить ключ или значение из данных JSON по указанному пути
+# @description Delete a key or value from JSON data at a given path.
+# @description Удалить ключ или значение из данных JSON по указанному пути.
 dataprocessor::json::delete() {
     local json_data="${1:-}"
     local path="${2:-}"
@@ -228,7 +220,8 @@ dataprocessor::json::delete() {
 }
 
 # Merge JSON objects
-# @description Merge two JSON objects together combining their data | Объединить два объекта JSON, совместив их данные
+# @description Merge two JSON objects together combining their data.
+# @description Объединить два объекта JSON, совместив их данные.
 dataprocessor::json::merge() {
     local json1="${1:-}"
     local json2="${2:-}"
@@ -245,7 +238,8 @@ dataprocessor::json::merge() {
 }
 
 # Convert JSON to CSV
-# @description Convert JSON data to CSV format | Преобразовать данные JSON в формат CSV
+# @description Convert JSON data to CSV format.
+# @description Преобразовать данные JSON в формат CSV.
 dataprocessor::json::to_csv() {
     local json_data="${1:-}"
     
@@ -272,7 +266,8 @@ dataprocessor::json::to_csv() {
 # ============================================================================
 
 # Validate XML
-# @description Validate XML syntax using xmllint | Проверить корректность синтаксиса XML с помощью xmllint
+# @description Validate XML syntax using xmllint.
+# @description Проверить корректность синтаксиса XML с помощью xmllint.
 dataprocessor::xml::validate() {
     local xml_data="${1:-}"
     
@@ -285,7 +280,8 @@ dataprocessor::xml::validate() {
 }
 
 # Pretty print XML
-# @description Format and pretty print XML data with indentation | Отформатировать и красиво вывести данные XML с отступами
+# @description Format and pretty print XML data with indentation.
+# @description Отформатировать и красиво вывести данные XML с отступами.
 dataprocessor::xml::pretty() {
     local xml_data="${1:-}"
     
@@ -301,7 +297,10 @@ dataprocessor::xml::pretty() {
 }
 
 # Query XML with XPath
-# @description Query XML data using XPath expressions with xmlstarlet or xmllint | Выполнить запрос к данным XML с помощью выражений XPath через xmlstarlet или xmllint
+# @description Query XML data using XPath expressions with xmlstarlet or
+#   xmllint.
+# @description Выполнить запрос к данным XML с помощью выражений XPath через
+#   xmlstarlet или xmllint.
 dataprocessor::xml::xpath() {
     local xml_data="${1:-}"
     local xpath_query="${2:-}"
@@ -326,7 +325,8 @@ dataprocessor::xml::xpath() {
 }
 
 # Convert XML to JSON
-# @description Convert XML data to JSON format using xmltodict | Преобразовать данные XML в формат JSON с помощью xmltodict
+# @description Convert XML data to JSON format using xmltodict.
+# @description Преобразовать данные XML в формат JSON с помощью xmltodict.
 dataprocessor::xml::to_json() {
     local xml_data="${1:-}"
     
@@ -354,7 +354,8 @@ except Exception as e:
 }
 
 # Convert XML to CSV
-# @description Convert XML data to CSV format via JSON | Преобразовать данные XML в формат CSV через JSON
+# @description Convert XML data to CSV format via JSON.
+# @description Преобразовать данные XML в формат CSV через JSON.
 dataprocessor::xml::to_csv() {
     local xml_data="${1:-}"
     local xpath_query="${2:-//row}"
@@ -372,7 +373,8 @@ dataprocessor::xml::to_csv() {
 }
 
 # Extract XML elements
-# @description Extract XML elements by name using XPath | Извлечь элементы XML по имени с помощью XPath
+# @description Extract XML elements by name using XPath.
+# @description Извлечь элементы XML по имени с помощью XPath.
 dataprocessor::xml::extract() {
     local xml_data="${1:-}"
     local element_name="${2:-}"
@@ -391,7 +393,9 @@ dataprocessor::xml::extract() {
 # ============================================================================
 
 # Validate CSV
-# @description Validate CSV data by checking consistent column counts | Проверить корректность данных CSV, сравнив количество столбцов в строках
+# @description Validate CSV data by checking consistent column counts.
+# @description Проверить корректность данных CSV, сравнив количество столбцов
+#   в строках.
 dataprocessor::csv::validate() {
     local csv_data="${1:-}"
     
@@ -411,6 +415,7 @@ dataprocessor::csv::validate() {
             line_cols=$(echo "${line}" | awk -F',' '{print NF}')
             
             if [[ "${line_cols}" != "${header_cols}" ]]; then
+                log::error "dataprocessor::csv::validate: line ${line_num}: expected ${header_cols} columns, got ${line_cols} / строка ${line_num}: ожидалось ${header_cols} столбцов, получено ${line_cols}"
                 return 1
             fi
         fi
@@ -421,7 +426,9 @@ dataprocessor::csv::validate() {
 }
 
 # Convert CSV to JSON
-# @description Convert CSV data to JSON format with csvjson or a fallback | Преобразовать данные CSV в формат JSON с помощью csvjson или резервной реализацией
+# @description Convert CSV data to JSON format with csvjson or a fallback.
+# @description Преобразовать данные CSV в формат JSON с помощью csvjson или
+#   резервной реализацией.
 dataprocessor::csv::to_json() {
     local csv_data="${1:-}"
     
@@ -479,7 +486,8 @@ dataprocessor::csv::to_json() {
 }
 
 # Filter CSV data
-# @description Filter CSV rows by a column value matching a pattern | Отфильтровать строки CSV по значению в указанном столбце
+# @description Filter CSV rows by a column value matching a pattern.
+# @description Отфильтровать строки CSV по значению в указанном столбце.
 dataprocessor::csv::filter() {
     local csv_data="${1:-}"
     local column="${2:-}"
@@ -523,7 +531,9 @@ dataprocessor::csv::filter() {
 }
 
 # Sort CSV data
-# @description Sort CSV rows by a column in ascending or descending order | Отсортировать строки CSV по столбцу в порядке возрастания или убывания
+# @description Sort CSV rows by a column in ascending or descending order.
+# @description Отсортировать строки CSV по столбцу в порядке возрастания или
+#   убывания.
 dataprocessor::csv::sort() {
     local csv_data="${1:-}"
     local column="${2:-}"
@@ -563,7 +573,9 @@ dataprocessor::csv::sort() {
 # ============================================================================
 
 # Convert YAML to JSON
-# @description Convert YAML data to JSON format with yq or pyyaml | Преобразовать данные YAML в формат JSON с помощью yq или pyyaml
+# @description Convert YAML data to JSON format with yq or pyyaml.
+# @description Преобразовать данные YAML в формат JSON с помощью yq или
+#   pyyaml.
 dataprocessor::yaml::to_json() {
     local yaml_data="${1:-}"
     
@@ -593,7 +605,9 @@ except Exception as e:
 }
 
 # Convert JSON to YAML
-# @description Convert JSON data to YAML format with yq or pyyaml | Преобразовать данные JSON в формат YAML с помощью yq или pyyaml
+# @description Convert JSON data to YAML format with yq or pyyaml.
+# @description Преобразовать данные JSON в формат YAML с помощью yq или
+#   pyyaml.
 dataprocessor::json::to_yaml() {
     local json_data="${1:-}"
     
@@ -628,7 +642,10 @@ except Exception as e:
 # ============================================================================
 
 # Auto-detect format and convert
-# @description Auto-detect the input data format and convert it to a target output format | Автоматически определить формат входных данных и преобразовать их в целевой выходной формат
+# @description Auto-detect the input data format and convert it to a target
+#   output format.
+# @description Автоматически определить формат входных данных и преобразовать
+#   их в целевой выходной формат.
 dataprocessor::convert() {
     local input_data="${1:-}"
     local output_format="${2:-}"
@@ -684,7 +701,8 @@ dataprocessor::convert() {
 }
 
 # Detect data format
-# @description Detect the format of input data: json, xml, csv or yaml | Определить формат входных данных: json, xml, csv или yaml
+# @description Detect the format of input data: json, xml, csv or yaml.
+# @description Определить формат входных данных: json, xml, csv или yaml.
 dataprocessor::detect_format() {
     local data="${1:-}"
     
@@ -723,7 +741,9 @@ dataprocessor::detect_format() {
 # ============================================================================
 
 # Query JSON with JSONPath
-# @description Query JSON data using JSONPath syntax converted to jq | Выполнить запрос к данным JSON с помощью синтаксиса JSONPath, преобразованного в jq
+# @description Query JSON data using JSONPath syntax converted to jq.
+# @description Выполнить запрос к данным JSON с помощью синтаксиса JSONPath,
+#   преобразованного в jq.
 dataprocessor::jpath::query() {
     local json_data="${1:-}"
     local jpath_query="${2:-}"
@@ -741,7 +761,8 @@ dataprocessor::jpath::query() {
 }
 
 # Convert JSONPath to jq syntax
-# @description Convert a JSONPath expression into equivalent jq syntax | Преобразовать выражение JSONPath в эквивалентный синтаксис jq
+# @description Convert a JSONPath expression into equivalent jq syntax.
+# @description Преобразовать выражение JSONPath в эквивалентный синтаксис jq.
 dataprocessor::jpath::to_jq() {
     local jpath="${1:-}"
     
@@ -767,7 +788,10 @@ dataprocessor::jpath::to_jq() {
 # ============================================================================
 
 # Query with advanced XPath features
-# @description Query XML with advanced XPath features using lxml, falling back to basic XPath | Выполнить запрос к XML с расширенными возможностями XPath через lxml с возвратом к базовому XPath
+# @description Query XML with advanced XPath features using lxml, falling back
+#   to basic XPath.
+# @description Выполнить запрос к XML с расширенными возможностями XPath через
+#   lxml с возвратом к базовому XPath.
 dataprocessor::xpath::query() {
     local xml_data="${1:-}"
     local xpath_query="${2:-}"
@@ -809,7 +833,10 @@ except Exception as e:
 # ============================================================================
 
 # Get file info
-# @description Get information about a file: size, type and sample bytes as JSON | Получить информацию о файле: размер, тип и пример данных в виде JSON
+# @description Get information about a file: size, type and sample bytes as
+#   JSON.
+# @description Получить информацию о файле: размер, тип и пример данных в
+#   виде JSON.
 dataprocessor::file::info() {
     local file_path="${1:-}"
     
@@ -832,18 +859,16 @@ dataprocessor::file::info() {
     local first_bytes
     first_bytes=$(head -c 100 "${file_path}" | utils::quiet_err od -c | head -1 || echo "")
     
-    cat << EOF
-{
-  "path": "${file_path}",
-  "size": ${file_size},
-  "type": "${file_type}",
-  "sample": "${first_bytes}"
-}
-EOF
+    jq -nc --arg path "${file_path}" --argjson size "${file_size:-0}" \
+        --arg type "${file_type}" --arg sample "${first_bytes}" \
+        '{path: $path, size: $size, type: $type, sample: $sample}'
 }
 
 # Process large files with streaming
-# @description Process large files in chunks by invoking a processor function on each chunk | Обработать большие файлы по частям, вызывая функцию-обработчик для каждого фрагмента
+# @description Process large files in chunks by invoking a processor function
+#   on each chunk.
+# @description Обработать большие файлы по частям, вызывая
+#   функцию-обработчик для каждого фрагмента.
 dataprocessor::stream::process() {
     local file_path="${1:-}"
     local processor="${2:-}"
@@ -874,7 +899,10 @@ dataprocessor::stream::process() {
 }
 
 # Validate data structure
-# @description Validate a data structure in a given format (json, xml, csv) or auto-detected | Проверить структуру данных в заданном формате (json, xml, csv) или с автоматическим определением
+# @description Validate a data structure in a given format (json, xml, csv) or
+#   auto-detected.
+# @description Проверить структуру данных в заданном формате (json, xml, csv)
+#   или с автоматическим определением.
 dataprocessor::validate() {
     local data="${1:-}"
     local format="${2:-auto}"
@@ -910,7 +938,10 @@ dataprocessor::validate() {
 # Информация о модуле
 # ============================================================================
 
-# @description Show module info: supported formats, query languages, available functions and usage | Показать информацию о модуле: поддерживаемые форматы, языки запросов, доступные функции и примеры использования
+# @description Show module info: supported formats, query languages, available
+#   functions and usage.
+# @description Показать информацию о модуле: поддерживаемые форматы, языки
+#   запросов, доступные функции и примеры использования.
 dataprocessor::info() {
     cat << EOF
 Data Processor Module v1.0.0
