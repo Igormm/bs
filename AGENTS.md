@@ -99,6 +99,8 @@ Reusable workflow skills live in `.agents/skills/` (Kimi Code / agents-compatibl
 - `bs-review-module` — skeptical critic pass over a module (bash-pitfalls checklist, §11 lens, prioritized doubt report).
 - `bs-check-artifacts` — scan for traces of unfinished AI generation and leakage of request/prompt text into code and docs.
 - `bs-cli-markdown-style` — apply the «markdown simplicity» principle to CLI/interface/output/docs design (7-criteria test, Russian).
+- `bs-device-module` — write Linux device/hardware modules (evdev/sysfs, binary decoding, test hooks, graceful degradation).
+- `bs-ai-toolchain` — operate BS as an AI toolbox (discovery ladder, verification loops, generation contracts).
 
 ## MCP / API provider suggestions
 
