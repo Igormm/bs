@@ -1,6 +1,14 @@
-# BOSA Framework Examples
+# BS Framework Examples
 
-This directory contains example scripts demonstrating various features and use cases of the BOSA framework.
+Runnable scripts. Landing three:
+
+```bash
+./bs run examples/hello.sh     # short script
+./bs run examples/todo.sh      # TUI todo list
+./bs run examples/pulse.sh     # host capability pulse
+```
+
+Full table: [documentation/en/06-examples](../documentation/en/06-examples/README.md) · [ru](../documentation/ru/06-examples/README.md).
 
 ## Examples Included
 

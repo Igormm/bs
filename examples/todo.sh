@@ -1,124 +1,38 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
-# examples/todo.sh — terminal todo list with modal windows (pure bash TUI)
-# examples/todo.sh — терминальный todo list с модальными окнами (TUI)
+# examples/todo.sh — terminal todo list on lib/tui
+# examples/todo.sh — терминальный todo list на lib/tui
+#
+#   ./bs run examples/todo.sh
+#   ./bs run examples/todo.sh --file /tmp/tasks.tsv
+#
+# Keys / Клавиши:
+#   ↑↓ j k   select / выбор
+#   Enter    toggle / зачеркнуть
+#   a        add / добавить
+#   e        edit / править
+#   d        delete / удалить
+#   q        quit / выход
 
-# Пример применения фреймворка: декларативные args, коллекции core/lang,
-# чистый bash-TUI (ANSI + read) без внешних зависимостей.
-# Framework demo: declarative args, core/lang collections, pure bash TUI.
+set -euo pipefail
 
 load "core/args"
-load "core/lang"
-
-# ==========================================
-# Config / Конфигурация
-# ==========================================
+load "lib/io/streams"
+load "lib/tui/tui"
 
 args::flag file value "${HOME}/.todo.tsv"
 args::require "$@"
 
-# Данные: строки "OPEN\tтекст" / "DONE\tтекст"
-# Data: lines "OPEN\ttext" / "DONE\ttext"
 readonly TODO_TASK_FILE="$(args::flag_get file)"
 
-# Состояние / State
 declare -a TODO_TASKS=()
 declare -i TODO_SELECT=0
+declare -g TODO_INPUT=""
+declare -gi TODO_CURSOR=0
+declare -gi TODO_CONFIRM_SEL=0
+declare -gi TODO_CONFIRM_IDX=0
+declare -g TODO_EDIT_MODE="add"
 
-# ==========================================
-# Терминал: ANSI-примитивы / Terminal primitives
-# ==========================================
-
-todo::hide_cursor()   { printf '\e[?25l'; }
-todo::show_cursor()   { printf '\e[?25h'; }
-todo::move()          { printf '\e[%d;%dH' "$1" "$2"; }
-todo::clear_screen()  { printf '\e[2J\e[H'; }
-todo::enter_alt()     { printf '\e[?1049h'; }
-todo::leave_alt()     { printf '\e[?1049l'; }
-todo::bold()          { printf '\e[1m'; }
-todo::dim()           { printf '\e[2m'; }
-todo::reverse()       { printf '\e[7m'; }
-todo::strike()        { printf '\e[9m'; }
-todo::reset_style()   { printf '\e[0m'; }
-
-# @description Размер терминала / Terminal size (fallback 80x24).
-todo::size() {
-  local cols lines
-  if is::command tput; then
-    cols="$(tput cols 2>/dev/null || printf 80)"
-    lines="$(tput lines 2>/dev/null || printf 24)"
-  else
-    cols=80
-    lines=24
-  fi
-  TODO_COLS="${cols}"
-  TODO_LINES="${lines}"
-}
-
-# @description Модальное окно с рамкой (центрированное).
-# @description Modal box with a border (centered).
-# @param $1 title / заголовок
-# @param $2 height / высота
-# @param $3 width / ширина
-todo::box() {
-  local -r title="$1" h="$2" w="$3"
-  local x y
-  x=$(( (TODO_COLS - w) / 2 ))
-  y=$(( (TODO_LINES - h) / 2 ))
-  local i
-  todo::move "${y}" "${x}"; printf '╔═ %s %s╗' "${title}" "$(str::repeat "═" $(( w - 6 - ${#title} )))"
-  for (( i = 1; i < h - 1; i++ )); do
-    todo::move "$(( y + i ))" "${x}"; printf '║'; todo::move "$(( y + i ))" "$(( x + w - 1 ))"; printf '║'
-  done
-  todo::move "$(( y + h - 1 ))" "${x}"; printf '╚%s╝' "$(str::repeat "═" $(( w - 2 )))"
-  TODO_BOX_X="${x}"
-  TODO_BOX_Y="${y}"
-  TODO_BOX_W="${w}"
-}
-
-# @description Текст внутри окна (с отступами).
-# @description Text inside the box (with padding).
-# @param $1 row (0-based from box top), $2 text
-todo::box_text() {
-  local -r row="$1" text="$2"
-  todo::move "$(( TODO_BOX_Y + 1 + row ))" "$(( TODO_BOX_X + 2 ))"
-  printf '%s' "${text:0:$(( TODO_BOX_W - 4 ))}"
-}
-
-# ==========================================
-# Клавиатура / Keyboard
-# ==========================================
-
-# @description Прочитать клавишу, распознать стрелки.
-# @description Read a key, translate arrows.
-# @stdout key name: UP DOWN LEFT RIGHT ENTER ESC or the char
-todo::key() {
-  local k seq
-  IFS= read -r -s -n1 k || k=""
-  if [[ "${k}" == $'\e' ]]; then
-    IFS= read -r -s -n2 -t 0.05 seq || seq=""
-    case "${seq}" in
-      '[A') printf 'UP\n' ;;
-      '[B') printf 'DOWN\n' ;;
-      '[C') printf 'RIGHT\n' ;;
-      '[D') printf 'LEFT\n' ;;
-      *)    printf 'ESC\n' ;;
-    esac
-    return 0
-  fi
-  case "${k}" in
-    $'\n'|"") printf 'ENTER\n' ;;
-    $'\x7f'|$'\b') printf 'BACKSPACE\n' ;;
-    *) printf '%s\n' "${k}" ;;
-  esac
-}
-
-# ==========================================
-# Данные / Data
-# ==========================================
-
-# @description Загрузить задачи из файла.
-# @description Load tasks from the file.
 todo::load() {
   TODO_TASKS=()
   if is::file "${TODO_TASK_FILE}"; then
@@ -126,115 +40,15 @@ todo::load() {
   fi
 }
 
-# @description Сохранить задачи (атомарно: tmp + mv).
-# @description Save tasks (atomically: tmp + mv).
 todo::save() {
   local tmp="${TODO_TASK_FILE}.tmp"
-  : > "${tmp}"
   local line
+  : > "${tmp}"
   for line in "${TODO_TASKS[@]}"; do
     printf '%s\n' "${line}" >> "${tmp}"
   done
   mv -f -- "${tmp}" "${TODO_TASK_FILE}"
 }
-
-# ==========================================
-# Рендер / Rendering
-# ==========================================
-
-todo::render() {
-  local i line status text
-  todo::clear_screen
-  todo::move 1 1
-  todo::bold; printf ' BS Todo '; todo::reset_style
-  printf '  [↑↓] move  [Enter] toggle  [a] add  [e] edit  [d] delete  [q] quit\n'
-  printf '%s\n' "$(str::repeat "─" "${TODO_COLS}")"
-
-  for (( i = 0; i < ${#TODO_TASKS[@]}; i++ )); do
-    line="${TODO_TASKS[${i}]}"
-    status="${line%%$'\t'*}"
-    text="${line#*$'\t'}"
-    todo::move "$(( i + 3 ))" 1
-    if (( i == TODO_SELECT )); then
-      todo::reverse
-      printf '▶ '
-    else
-      printf '  '
-    fi
-    case "${status}" in
-      DONE) todo::dim; todo::strike; printf '✓ %s' "${text}"; todo::reset_style ;;
-      *)    printf '· %s' "${text}"; todo::reset_style ;;
-    esac
-  done
-
-  # Строка статуса / Status line
-  local done_count=$((0)) open_count=$((0))
-  for line in "${TODO_TASKS[@]}"; do
-    [[ "${line}" == DONE* ]] && done_count=$(( done_count + 1 )) || open_count=$(( open_count + 1 ))
-  done
-  todo::move "$(( TODO_LINES - 1 ))" 1
-  todo::dim
-  printf '%s: %d open, %d done — %s\n' "${TODO_TASK_FILE}" "${open_count}" "${done_count}" "$(date '+%H:%M')"
-  todo::reset_style
-}
-
-# ==========================================
-# Модальные окна / Modal windows
-# ==========================================
-
-# @description Модальное окно ввода текста.
-# @description Modal text input window.
-# @param $1 title / заголовок
-# @param $2 initial value / начальное значение
-# @stdout введённый текст (ESC — пусто и код 1)
-# @return 0 ok, 1 cancelled
-TODO_INPUT_RESULT=""
-todo::input_modal() {
-  local -r title="$1"
-  local text="${2-}"
-  local key
-  while true; do
-    todo::clear_screen
-    todo::box "${title}" 5 60
-    todo::box_text 1 "▸ ${text}_"
-    key="$(todo::key)"
-    case "${key}" in
-      ENTER) break ;;
-      ESC)   return 1 ;;
-      BACKSPACE) text="${text%?}" ;;
-      *)     text+="${key}" ;;
-    esac
-  done
-  TODO_INPUT_RESULT="${text}"
-  return 0
-}
-
-# @description Модальное подтверждение (Yes/No).
-# @description Modal confirmation (Yes/No).
-# @param $1 title / заголовок
-# @param $2 message / сообщение
-# @return 0 yes, 1 no
-todo::confirm_modal() {
-  local -r title="$1" message="$2"
-  local key
-  while true; do
-    todo::clear_screen
-    todo::box "${title}" 5 52
-    todo::box_text 1 "${message}"
-    todo::box_text 2 "  [ Enter = Yes ]   [ Esc = No ]"
-    key="$(todo::key)"
-    case "${key}" in
-      ENTER) return 0 ;;
-      ESC)   return 1 ;;
-      y|Y|д|Д) return 0 ;;
-      n|N|н|Н) return 1 ;;
-    esac
-  done
-}
-
-# ==========================================
-# Действия / Actions
-# ==========================================
 
 todo::toggle() {
   local line="${TODO_TASKS[${1}]}"
@@ -245,58 +59,211 @@ todo::toggle() {
   fi
 }
 
-todo::add() {
-  if todo::input_modal "Add task / Новая задача"; then
-    TODO_TASKS+=("OPEN"$'\t'"${TODO_INPUT_RESULT}")
+todo::apply_input() {
+  local text="${TODO_INPUT}"
+  is::not_empty "${text}" || return 0
+  if [[ "${TODO_EDIT_MODE}" == "edit" ]]; then
+    local line="${TODO_TASKS[${TODO_SELECT}]}"
+    local status="${line%%$'\t'*}"
+    TODO_TASKS[${TODO_SELECT}]="${status}"$'\t'"${text}"
+  else
+    TODO_TASKS+=("OPEN"$'\t'"${text}")
     TODO_SELECT=$(( ${#TODO_TASKS[@]} - 1 ))
   fi
 }
 
-todo::edit() {
-  local line="${TODO_TASKS[${1}]}"
-  local status="${line%%$'\t'*}" text="${line#*$'\t'}"
-  if todo::input_modal "Edit task / Редактировать" "${text}"; then
-    TODO_TASKS[${1}]="${status}"$'\t'"${TODO_INPUT_RESULT}"
-  fi
-}
-
 todo::delete() {
-  if todo::confirm_modal "Delete task / Удалить задачу" "${TODO_TASKS[${1}]}"; then
-    arr::splice TODO_TASKS "${1}" $(( ${1} + 1 ))
-    (( TODO_SELECT >= ${#TODO_TASKS[@]} )) && TODO_SELECT=$(( ${#TODO_TASKS[@]} - 1 ))
-    (( TODO_SELECT < 0 )) && TODO_SELECT=0
+  arr::splice TODO_TASKS "${TODO_CONFIRM_IDX}" $(( TODO_CONFIRM_IDX + 1 ))
+  if (( TODO_SELECT >= ${#TODO_TASKS[@]} )); then
+    TODO_SELECT=$(( ${#TODO_TASKS[@]} - 1 ))
+  fi
+  if (( TODO_SELECT < 0 )); then
+    TODO_SELECT=0
   fi
 }
 
-# ==========================================
-# Main / Главный цикл
-# ==========================================
+todo::open_input() {
+  TODO_EDIT_MODE="${1}"
+  TODO_INPUT=""
+  TODO_CURSOR=0
+  if [[ "${TODO_EDIT_MODE}" == "edit" ]]; then
+    local line="${TODO_TASKS[${TODO_SELECT}]}"
+    TODO_INPUT="${line#*$'\t'}"
+    TODO_CURSOR=${#TODO_INPUT}
+  fi
+  tui::modal::open input todo::modal_input_draw
+}
+
+todo::open_confirm() {
+  TODO_CONFIRM_SEL=0
+  TODO_CONFIRM_IDX="${TODO_SELECT}"
+  tui::modal::open confirm todo::modal_confirm_draw
+}
+
+todo::modal_input_draw() {
+  local title="Add task"
+  [[ "${TODO_EDIT_MODE}" == "edit" ]] && title="Edit task"
+  local -i w=56 h=5
+  tui::center "${w}" "${h}"
+  tui::box "${TUI_CENTER_Y}" "${TUI_CENTER_X}" "${w}" "${h}" \
+    "${title}" "$(tui::style bold cyan)"
+  tui::put $(( TUI_CENTER_Y + 2 )) $(( TUI_CENTER_X + 2 )) "▸"
+  tui::input $(( TUI_CENTER_Y + 2 )) $(( TUI_CENTER_X + 4 )) $(( w - 6 )) \
+    "${TODO_INPUT}" "${TODO_CURSOR}"
+}
+
+todo::modal_confirm_draw() {
+  local line="${TODO_TASKS[${TODO_CONFIRM_IDX}]:-}"
+  tui::confirm "Delete task" "${line#*$'\t'}" "${TODO_CONFIRM_SEL}"
+}
+
+todo::draw() {
+  tui::titlebar "  BS Todo  •  ${TODO_TASK_FILE}" "$(tui::style bold bg_blue white)"
+  local -i total=${#TODO_TASKS[@]}
+  tui::box 3 2 $(( TUI_COLS - 3 )) $(( TUI_LINES - 5 )) \
+    "Tasks (${total})" "$(tui::style bold cyan)"
+  if (( total == 0 )); then
+    tui::put 5 4 "empty — press [a] to add" "$(tui::style dim)"
+  else
+    local -i vis=$(( TUI_LINES - 8 ))
+    local -i offset=0
+    (( TODO_SELECT < offset )) && offset=${TODO_SELECT}
+    (( TODO_SELECT >= offset + vis )) && offset=$(( TODO_SELECT - vis + 1 ))
+    local -i i idx
+    for (( i = 0; i < vis; i++ )); do
+      idx=$(( offset + i ))
+      (( idx >= total )) && break
+      local line="${TODO_TASKS[${idx}]}"
+      local status="${line%%$'\t'*}"
+      local text="${line#*$'\t'}"
+      if (( idx == TODO_SELECT )); then
+        local mark="▸ · ${text}"
+        [[ "${status}" == "DONE" ]] && mark="▸ ✓ ${text}"
+        tui::put $(( 4 + i )) 4 "${mark}" "$(tui::style bold reverse cyan)"
+      elif [[ "${status}" == "DONE" ]]; then
+        tui::put $(( 4 + i )) 4 "  ✓ ${text}" "$(tui::style dim strike)"
+      else
+        tui::put $(( 4 + i )) 4 "  · ${text}" ""
+      fi
+    done
+  fi
+  tui::statusbar \
+    "  ↑↓ select  Enter toggle  a add  e edit  d delete  q quit" \
+    "$(tui::style bg_black white)"
+}
+
+todo::type() {
+  local -r key="${1}"
+  case "${key}" in
+    ENTER|ESC|BACKSPACE|LEFT|RIGHT|UP|DOWN|TAB|UNKNOWN) return 0 ;;
+  esac
+  [[ "${#key}" -eq 1 ]] || return 0
+  TODO_INPUT="${TODO_INPUT:0:${TODO_CURSOR}}${key}${TODO_INPUT:${TODO_CURSOR}}"
+  TODO_CURSOR=$(( TODO_CURSOR + 1 ))
+}
 
 main() {
-  todo::size
   todo::load
-  todo::enter_alt
-  todo::hide_cursor
-  trap 'todo::show_cursor; todo::leave_alt' EXIT
+  tui::init
 
-  local key
   while true; do
-    todo::render
-    key="$(todo::key)"
-    case "${key}" in
-      q|Q|й|Й) break ;;
-      UP|k|K|ц|Ц)   (( TODO_SELECT > 0 )) && TODO_SELECT=$(( TODO_SELECT - 1 )) ;;
-      DOWN|j|J|о|О) (( TODO_SELECT < ${#TODO_TASKS[@]} - 1 )) && TODO_SELECT=$(( TODO_SELECT + 1 )) ;;
-      ENTER)        (( ${#TODO_TASKS[@]} > 0 )) && { todo::toggle "${TODO_SELECT}"; todo::save; } ;;
-      a|A|ф|Ф)      todo::add; todo::save ;;
-      e|E|у|У)      (( ${#TODO_TASKS[@]} > 0 )) && { todo::edit "${TODO_SELECT}"; todo::save; } ;;
-      d|D|в|В)      (( ${#TODO_TASKS[@]} > 0 )) && { todo::delete "${TODO_SELECT}"; todo::save; } ;;
+    tui::handle_resize
+    tui::buf::clear
+    todo::draw
+    tui::modal::draw_all
+    tui::render
+    tui::key_read
+
+    local top
+    top="$(tui::modal::top)"
+    case "${top}" in
+      input)
+        case "${TUI_KEY}" in
+          ENTER)
+            tui::modal::close
+            todo::apply_input
+            todo::save
+            ;;
+          ESC) tui::modal::close ;;
+          BACKSPACE)
+            if (( TODO_CURSOR > 0 )); then
+              TODO_INPUT="${TODO_INPUT:0:${TODO_CURSOR}-1}${TODO_INPUT:${TODO_CURSOR}}"
+              TODO_CURSOR=$(( TODO_CURSOR - 1 ))
+            fi
+            ;;
+          LEFT)
+            if (( TODO_CURSOR > 0 )); then
+              TODO_CURSOR=$(( TODO_CURSOR - 1 ))
+            fi
+            ;;
+          RIGHT)
+            if (( TODO_CURSOR < ${#TODO_INPUT} )); then
+              TODO_CURSOR=$(( TODO_CURSOR + 1 ))
+            fi
+            ;;
+          *) todo::type "${TUI_KEY}" ;;
+        esac
+        ;;
+      confirm)
+        case "${TUI_KEY}" in
+          ENTER)
+            tui::modal::close
+            if (( TODO_CONFIRM_SEL == 0 )); then
+              todo::delete
+              todo::save
+            fi
+            ;;
+          ESC) tui::modal::close ;;
+          LEFT|RIGHT|TAB)
+            TODO_CONFIRM_SEL=$(( 1 - TODO_CONFIRM_SEL ))
+            ;;
+          y|Y|д|Д)
+            tui::modal::close
+            todo::delete
+            todo::save
+            ;;
+          n|N|н|Н) tui::modal::close ;;
+        esac
+        ;;
+      *)
+        case "${TUI_KEY}" in
+          q|Q|й|Й) break ;;
+          UP|k|K|ц|Ц)
+            if (( TODO_SELECT > 0 )); then
+              TODO_SELECT=$(( TODO_SELECT - 1 ))
+            fi
+            ;;
+          DOWN|j|J|о|О)
+            if (( TODO_SELECT < ${#TODO_TASKS[@]} - 1 )); then
+              TODO_SELECT=$(( TODO_SELECT + 1 ))
+            fi
+            ;;
+          ENTER)
+            if (( ${#TODO_TASKS[@]} > 0 )); then
+              todo::toggle "${TODO_SELECT}"
+              todo::save
+            fi
+            ;;
+          a|A|ф|Ф) todo::open_input add ;;
+          e|E|у|У)
+            if (( ${#TODO_TASKS[@]} > 0 )); then
+              todo::open_input edit
+            fi
+            ;;
+          d|D|в|В)
+            if (( ${#TODO_TASKS[@]} > 0 )); then
+              todo::open_confirm
+            fi
+            ;;
+        esac
+        ;;
     esac
   done
 
-  todo::show_cursor
-  todo::leave_alt
-  printf 'Tasks saved: %s (%d)\n' "${TODO_TASK_FILE}" "${#TODO_TASKS[@]}"
+  tui::quit
+  io::streams::print "Tasks saved: ${TODO_TASK_FILE} (${#TODO_TASKS[@]})"
 }
 
-main "$@"
+if [[ -n "${BASH_EXECUTION_STRING:-}" || "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi
