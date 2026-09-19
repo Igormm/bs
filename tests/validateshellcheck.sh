@@ -22,18 +22,15 @@ readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${PROJECT_ROOT}"
 
-# Цвета для вывода / Output colors
-readonly RED='\033[0;31m'
-readonly GREEN='\033[0;32m'
-readonly YELLOW='\033[1;33m'
-readonly BLUE='\033[0;34m'
-readonly NC='\033[0m' # No Color
+# Общий фреймворк: print_header, цвета и гейт NO_COLOR / TERM=dumb / не-tty
+# Shared framework: print_header, colors and the NO_COLOR / TERM=dumb / non-tty gate
+source "${SCRIPT_DIR}/testframework.sh"
 
 # ShellCheck обязателен для CI, локально прогон честно пропускается
 # ShellCheck is required for CI; local runs are skipped honestly
 if ! command -v shellcheck >/dev/null 2>&1; then
-    echo -e "${YELLOW}⊘ shellcheck not installed, skipping (CI installs it)${NC}"
-    echo -e "${YELLOW}⊘ shellcheck не установлен, пропуск (в CI устанавливается)${NC}"
+    echo -e "${YELLOW}▶ shellcheck not installed, skipping (CI installs it)${NC}"
+    echo -e "${YELLOW}▶ shellcheck не установлен, пропуск (в CI устанавливается)${NC}"
     exit 0
 fi
 
@@ -42,8 +39,8 @@ fi
 mapfile -t files < <(find . -name "*.sh" -not -path "./.git/*" | sort)
 files+=("./bs")
 
-echo -e "${BLUE}ShellCheck validation (${#files[@]} files)${NC}"
-echo -e "${BLUE}Проверка ShellCheck (${#files[@]} файлов)${NC}"
+print_header "ShellCheck Validation / Проверка ShellCheck"
+echo -e "${BLUE}Checking ${#files[@]} files / Проверка ${#files[@]} файлов${NC}"
 echo
 
 # -s bash: shebang '#!/usr/bin/env bs' неизвестен ShellCheck,

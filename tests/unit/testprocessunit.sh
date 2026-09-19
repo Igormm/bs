@@ -20,8 +20,7 @@ export BS_HOME="${BS_PROJECT_ROOT}"
 load "lib/io/process"
 
 main() {
-    print_header "IO Process Guard Unit Tests"
-    print_header "Модульные тесты Process Guard"
+    print_header "IO Process Guard Unit Tests / Модульные тесты Process Guard"
 
     testframework::init
 
@@ -31,7 +30,7 @@ main() {
     # ==========================================
     # Normal exit / Нормальное завершение
     # ==========================================
-    testframework::section "Normal execution"
+    testframework::section "Normal execution / Нормальное выполнение"
 
     local rc=0
     io::process::guard --timeout 5 -- true || rc=$?
@@ -44,7 +43,7 @@ main() {
     # ==========================================
     # Timeout / Таймаут
     # ==========================================
-    testframework::section "Timeout"
+    testframework::section "Timeout / Таймаут"
 
     local diag_dir="${tmp_dir}/timeout_diag"
     mkdir -p "${diag_dir}"
@@ -58,7 +57,7 @@ main() {
     # ==========================================
     # Hang detection / Обнаружение зависания
     # ==========================================
-    testframework::section "Hang detection"
+    testframework::section "Hang detection / Обнаружение зависания"
 
     diag_dir="${tmp_dir}/hang_diag"
     mkdir -p "${diag_dir}"
@@ -72,7 +71,7 @@ main() {
     # ==========================================
     # Output prevents hang / Вывод предотвращает hang
     # ==========================================
-    testframework::section "Output activity prevents hang"
+    testframework::section "Output activity prevents hang / Вывод предотвращает зависание"
 
     rc=0
     io::process::guard --timeout 0 --hang-after 1 --timeout 3 -- bash -c 'for i in 1 2 3; do echo tick; sleep 0.6; done' || rc=$?
@@ -81,7 +80,7 @@ main() {
     # ==========================================
     # Strace availability / Наличие strace
     # ==========================================
-    testframework::section "Strace diagnostics"
+    testframework::section "Strace diagnostics / Диагностика strace"
 
     if utils::has strace && utils::has sudo && sudo -n true 2>/dev/null; then
         diag_dir="${tmp_dir}/strace_diag"
@@ -97,7 +96,7 @@ main() {
     # ==========================================
     # Dry-run / Сухой прогон
     # ==========================================
-    testframework::section "Dry-run mode"
+    testframework::section "Dry-run mode / Сухой прогон"
 
     export FRAMEWORK_DRY_RUN=true
     rc=0
@@ -108,7 +107,7 @@ main() {
     # ==========================================
     # Invalid arguments / Неверные аргументы
     # ==========================================
-    testframework::section "Argument validation"
+    testframework::section "Argument validation / Валидация аргументов"
 
     rc=0
     io::process::guard --timeout abc -- true || rc=$?
@@ -121,7 +120,7 @@ main() {
     # ==========================================
     # Background execution / Фоновое выполнение
     # ==========================================
-    testframework::section "Background and detach"
+    testframework::section "Background and detach / Фон и detach"
 
     local bg_pid
     bg_pid="$(io::process::background sleep 0.1)"

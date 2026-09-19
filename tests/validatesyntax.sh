@@ -18,20 +18,9 @@ readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly BS_PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${BS_PROJECT_ROOT}"
 
-# Цвета для вывода
-readonly RED='\033[0;31m'
-readonly GREEN='\033[0;32m'
-readonly YELLOW='\033[1;33m'
-readonly BLUE='\033[0;34m'
-readonly NC='\033[0m' # No Color
-
-# Заголовок
-print_header() {
-    echo -e "${BLUE}========================================${NC}"
-    echo -e "${BLUE}$1${NC}"
-    echo -e "${BLUE}========================================${NC}"
-    echo
-}
+# Общий фреймворк: print_header, цвета и гейт NO_COLOR / TERM=dumb / не-tty
+# Shared framework: print_header, colors and the NO_COLOR / TERM=dumb / non-tty gate
+source "${SCRIPT_DIR}/testframework.sh"
 
 # Функция проверки синтаксиса
 # @description Check syntax of a bash file
@@ -59,8 +48,7 @@ validate_file() {
 
 # Основная функция
 main() {
-    print_header "BS Framework Syntax Validation"
-    print_header "Проверка синтаксиса фреймворка BS"
+    print_header "BS Framework Syntax Validation / Проверка синтаксиса фреймворка BS"
 
     echo -e "${YELLOW}Validating bash syntax for all project files...${NC}"
     echo -e "${YELLOW}Проверка синтаксиса bash для всех файлов проекта...${NC}"

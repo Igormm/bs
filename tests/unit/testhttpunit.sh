@@ -20,8 +20,7 @@ export BS_HOME="${BS_PROJECT_ROOT}"
 load "lib/integration/http"
 
 main() {
-    print_header "HTTP Client Unit Tests"
-    print_header "Модульные тесты HTTP-клиента"
+    print_header "HTTP Client Unit Tests / Модульные тесты HTTP-клиента"
 
     testframework::init
 
@@ -31,7 +30,7 @@ main() {
     # ==========================================
     # backend detection
     # ==========================================
-    testframework::section "backend detection"
+    testframework::section "Backend detection / Определение бэкенда"
 
     if utils::has curl || utils::has wget; then
         testframework::assert_command "source ${BS_PROJECT_ROOT}/lib/integration/http.sh; __http::backend" "backend returns curl or wget"
@@ -42,7 +41,7 @@ main() {
     # ==========================================
     # http::get
     # ==========================================
-    testframework::section "http::get"
+    testframework::section "http::get / HTTP GET"
 
     local response
     response="$(http::get "https://api.github.com" 2>/dev/null || true)"
@@ -55,7 +54,7 @@ main() {
     # ==========================================
     # http::post dry-run
     # ==========================================
-    testframework::section "http::post dry-run"
+    testframework::section "http::post dry-run / Сухой прогон http::post"
 
     export FRAMEWORK_DRY_RUN=true
     local rc=0
@@ -66,7 +65,7 @@ main() {
     # ==========================================
     # http::download dry-run
     # ==========================================
-    testframework::section "http::download dry-run"
+    testframework::section "http::download dry-run / Сухой прогон http::download"
 
     export FRAMEWORK_DRY_RUN=true
     rc=0
@@ -78,7 +77,7 @@ main() {
     # ==========================================
     # http::retry
     # ==========================================
-    testframework::section "http::retry"
+    testframework::section "http::retry / Повторные попытки"
 
     local retry_script="${tmp_dir}/retry.sh"
     cat > "${retry_script}" <<'EOF'
@@ -102,7 +101,7 @@ EOF
     # ==========================================
     # http::request missing deps
     # ==========================================
-    testframework::section "http::request validation"
+    testframework::section "http::request validation / Валидация запроса"
 
     rc=0
     http::request "" "https://example.com" || rc=$?

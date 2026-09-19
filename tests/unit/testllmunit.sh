@@ -20,8 +20,7 @@ export BS_HOME="${BS_PROJECT_ROOT}"
 load "lib/integration/llm"
 
 main() {
-    print_header "LLM Client Unit Tests"
-    print_header "Модульные тесты LLM-клиента"
+    print_header "LLM Client Unit Tests / Модульные тесты LLM-клиента"
 
     testframework::init
 
@@ -31,7 +30,7 @@ main() {
     # ==========================================
     # providers
     # ==========================================
-    testframework::section "providers"
+    testframework::section "Providers / Провайдеры"
 
     testframework::assert_command "source ${BS_PROJECT_ROOT}/lib/integration/llm.sh; llm::providers | grep -q openai" "llm::providers includes openai"
     testframework::assert_command "source ${BS_PROJECT_ROOT}/lib/integration/llm.sh; llm::providers | grep -q ollama" "llm::providers includes ollama"
@@ -39,7 +38,7 @@ main() {
     # ==========================================
     # validate provider
     # ==========================================
-    testframework::section "validate provider"
+    testframework::section "Validate provider / Проверка провайдера"
 
     testframework::assert_command "source ${BS_PROJECT_ROOT}/lib/integration/llm.sh; __llm::validate_provider openai" "openai is valid provider"
     testframework::assert_command "source ${BS_PROJECT_ROOT}/lib/integration/llm.sh; __llm::validate_provider ollama" "ollama is valid provider"
@@ -48,7 +47,7 @@ main() {
     # ==========================================
     # json escape
     # ==========================================
-    testframework::section "json escape"
+    testframework::section "JSON escape / Экранирование JSON"
 
     testframework::assert_equal 'hello' "$(source ${BS_PROJECT_ROOT}/lib/integration/llm.sh; __llm::json_escape 'hello')" "json_escape preserves simple string"
     testframework::assert_equal 'line1\nline2' "$(source ${BS_PROJECT_ROOT}/lib/integration/llm.sh; __llm::json_escape $'line1\nline2')" "json_escape escapes newline"
@@ -56,7 +55,7 @@ main() {
     # ==========================================
     # request body builders
     # ==========================================
-    testframework::section "request body builders"
+    testframework::section "Request body builders / Сборка тела запроса"
 
     local openai_body
     openai_body="$(source ${BS_PROJECT_ROOT}/lib/integration/llm.sh; __llm::openai_body gpt-test 'Hello world')"
@@ -71,7 +70,7 @@ main() {
     # ==========================================
     # chat dry-run
     # ==========================================
-    testframework::section "chat dry-run"
+    testframework::section "Chat dry-run / Сухой прогон чата"
 
     export FRAMEWORK_DRY_RUN=true
     local chat_response
@@ -82,7 +81,7 @@ main() {
     # ==========================================
     # chat missing key
     # ==========================================
-    testframework::section "chat missing key"
+    testframework::section "Chat missing key / Отсутствует ключ"
 
     local rc=0
     OPENAI_API_KEY="" llm::chat openai gpt-test "Hello" >/dev/null 2>&1 || rc=$?
@@ -91,7 +90,7 @@ main() {
     # ==========================================
     # chat_file
     # ==========================================
-    testframework::section "chat_file"
+    testframework::section "chat_file / Чат по файлу"
 
     local test_file="${tmp_dir}/prompt.txt"
     printf 'Explain this file' > "${test_file}"
@@ -109,7 +108,7 @@ main() {
     # ==========================================
     # json_query fallback
     # ==========================================
-    testframework::section "json_query"
+    testframework::section "json_query / JSON-запросы"
 
     testframework::assert_equal 'hello' "$(source ${BS_PROJECT_ROOT}/lib/integration/llm.sh; __llm::json_query '{"choices":[{"message":{"content":"hello"}}]}' '.choices[0].message.content')" "json_query extracts openai content"
     testframework::assert_equal 'world' "$(source ${BS_PROJECT_ROOT}/lib/integration/llm.sh; __llm::json_query '{"message":{"content":"world"}}' '.message.content')" "json_query extracts ollama content"

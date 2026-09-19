@@ -20,8 +20,7 @@ export BS_HOME="${BS_PROJECT_ROOT}"
 load "lib/integration/k8s"
 
 main() {
-    print_header "Kubernetes Client Unit Tests"
-    print_header "Модульные тесты Kubernetes-клиента"
+    print_header "Kubernetes Client Unit Tests / Модульные тесты Kubernetes-клиента"
 
     testframework::init
 
@@ -31,7 +30,7 @@ main() {
     # ==========================================
     # availability
     # ==========================================
-    testframework::section "availability"
+    testframework::section "Availability / Доступность"
 
     if utils::has kubectl; then
         testframework::assert_command "source ${BS_PROJECT_ROOT}/lib/integration/k8s.sh; k8s::is_available" "k8s::is_available returns true when kubectl exists"
@@ -42,7 +41,7 @@ main() {
     # ==========================================
     # kubectl args builder
     # ==========================================
-    testframework::section "kubectl args builder"
+    testframework::section "kubectl args builder / Сборка аргументов kubectl"
 
     local args
     args="$(source ${BS_PROJECT_ROOT}/lib/integration/k8s.sh; K8S_NAMESPACE=prod; __k8s::kubectl_args get pods)"
@@ -58,7 +57,7 @@ main() {
     # ==========================================
     # arg_present
     # ==========================================
-    testframework::section "arg_present"
+    testframework::section "arg_present / Поиск аргумента"
 
     testframework::assert_command "source ${BS_PROJECT_ROOT}/lib/integration/k8s.sh; __k8s::arg_present '-n' get pods -n kube-system" "arg_present finds short flag"
     testframework::assert_false "source ${BS_PROJECT_ROOT}/lib/integration/k8s.sh; __k8s::arg_present '-n' get pods" "arg_present does not find missing flag"
@@ -66,7 +65,7 @@ main() {
     # ==========================================
     # context validation
     # ==========================================
-    testframework::section "context validation"
+    testframework::section "Context validation / Валидация контекста"
 
     local rc=0
     k8s::context::use "" >/dev/null 2>&1 || rc=$?
@@ -75,7 +74,7 @@ main() {
     # ==========================================
     # pod validation
     # ==========================================
-    testframework::section "pod validation"
+    testframework::section "Pod validation / Валидация пода"
 
     rc=0
     k8s::pod::logs "" >/dev/null 2>&1 || rc=$?
@@ -88,7 +87,7 @@ main() {
     # ==========================================
     # deployment validation
     # ==========================================
-    testframework::section "deployment validation"
+    testframework::section "Deployment validation / Валидация деплоймента"
 
     rc=0
     k8s::deployment::restart "" >/dev/null 2>&1 || rc=$?
@@ -101,7 +100,7 @@ main() {
     # ==========================================
     # apply validation
     # ==========================================
-    testframework::section "apply validation"
+    testframework::section "Apply validation / Валидация apply"
 
     rc=0
     k8s::apply "" >/dev/null 2>&1 || rc=$?
@@ -114,7 +113,7 @@ main() {
     # ==========================================
     # get validation
     # ==========================================
-    testframework::section "get validation"
+    testframework::section "Get validation / Валидация get"
 
     rc=0
     k8s::get "" >/dev/null 2>&1 || rc=$?
@@ -123,7 +122,7 @@ main() {
     # ==========================================
     # dry-run commands
     # ==========================================
-    testframework::section "dry-run commands"
+    testframework::section "Dry-run commands / Сухой прогон команд"
 
     export FRAMEWORK_DRY_RUN=true
 
@@ -150,7 +149,7 @@ main() {
     # ==========================================
     # missing kubectl
     # ==========================================
-    testframework::section "missing kubectl"
+    testframework::section "Missing kubectl / Нет kubectl"
 
     if ! utils::has kubectl; then
         rc=0
