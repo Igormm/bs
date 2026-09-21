@@ -28,16 +28,19 @@ load "lib/data/dataprocessor"
 - [streams.sh](../../../lib/io/streams.sh) — низкоуровневое управление потоками ввода-вывода: вывод, чтение, перенаправление файловых дескрипторов, каналы и определение TTY.
 - [files.sh](../../../lib/io/files.sh) — высокоуровневые файловые операции: копирование, перемещение, синхронизация и удаление файлов/каталогов с dry-run и единой обработкой ошибок.
 - [process.sh](../../../lib/io/process.sh) — обёртка-сторож процесса: таймаут, hang-детекция по stdout/stderr, диагностический снимок `/proc/<pid>` и `strace`.
+- [tree.sh](../../../lib/io/tree.sh) — создать дерево файлов проекта из yaml/yml/txt/ini/csv.
 
-Ключевые функции: `io::streams::print`, `io::streams::read_line`, `io::streams::redirect_stdout`, `io::streams::pipe`, `io::files::copy_dir`, `io::files::sync_dir`, `io::files::copy_matching`, `io::files::move`, `io::files::remove`, `io::process::guard`.
+Ключевые функции: `io::streams::print`, `io::streams::read_line`, `io::streams::redirect_stdout`, `io::streams::pipe`, `io::files::copy_dir`, `io::files::sync_dir`, `io::files::copy_matching`, `io::files::move`, `io::files::remove`, `io::process::guard`, `io::tree::create`.
 
-Подробнее: [io-streams.md](io-streams.md), [io-files.md](io-files.md), [io-process.md](io-process.md)
+Подробнее: [io-streams.md](io-streams.md), [io-files.md](io-files.md), [io-process.md](io-process.md), [io-tree.md](io-tree.md)
 
 ## system — `lib/system/`
 
-Самая большая группа: обёртки над повседневным администрированием Linux. Модули: [devices.sh](../../../lib/system/devices.sh), [display.sh](../../../lib/system/display.sh), [distro.sh](../../../lib/system/distro.sh) (определение дистрибутива), [distrologic.sh](../../../lib/system/distrologic.sh) (логика пакетов и сервисов по дистрибутивам), [info.sh](../../../lib/system/info.sh), [keyboard.sh](../../../lib/system/keyboard.sh), [locale.sh](../../../lib/system/locale.sh), [logging.sh](../../../lib/system/logging.sh), [network.sh](../../../lib/system/network.sh), [packages.sh](../../../lib/system/packages.sh), [permissions.sh](../../../lib/system/permissions.sh), [platformcheck.sh](../../../lib/system/platformcheck.sh), [processes.sh](../../../lib/system/processes.sh), [routing.sh](../../../lib/system/routing.sh), [safety.sh](../../../lib/system/safety.sh) (dry-run / подтверждение действий), [schedule.sh](../../../lib/system/schedule.sh) (помощники at/cron), [security.sh](../../../lib/system/security.sh), [services.sh](../../../lib/system/services.sh), [system.sh](../../../lib/system/system.sh), [time.sh](../../../lib/system/time.sh), [users.sh](../../../lib/system/users.sh), [utils.sh](../../../lib/system/utils.sh).
+Самая большая группа: обёртки над повседневным администрированием Linux. Модули: [devices.sh](../../../lib/system/devices.sh), [display.sh](../../../lib/system/display.sh), [distro.sh](../../../lib/system/distro.sh) (определение дистрибутива), [distrologic.sh](../../../lib/system/distrologic.sh) (логика пакетов и сервисов по дистрибутивам), [info.sh](../../../lib/system/info.sh), [keyboard.sh](../../../lib/system/keyboard.sh), [locale.sh](../../../lib/system/locale.sh), [logging.sh](../../../lib/system/logging.sh), [network.sh](../../../lib/system/network.sh), [packages.sh](../../../lib/system/packages.sh), [permissions.sh](../../../lib/system/permissions.sh), [platformcheck.sh](../../../lib/system/platformcheck.sh), [processes.sh](../../../lib/system/processes.sh), [routing.sh](../../../lib/system/routing.sh), [sensor.sh](../../../lib/system/sensor.sh) (сенсоры evdev + диагностика), [safety.sh](../../../lib/system/safety.sh) (dry-run / подтверждение действий), [schedule.sh](../../../lib/system/schedule.sh) (помощники at/cron), [security.sh](../../../lib/system/security.sh), [services.sh](../../../lib/system/services.sh), [system.sh](../../../lib/system/system.sh), [time.sh](../../../lib/system/time.sh), [users.sh](../../../lib/system/users.sh), [utils.sh](../../../lib/system/utils.sh).
 
-Ключевые функции: `system::distro::detect`, `system::info::all`, `system::packages::install`, `safety::execute`.
+Ключевые функции: `system::distro::detect`, `system::info::all`, `system::packages::install`, `safety::execute`, `sensor::devices`, `sensor::events`, `sensor::diagnose`.
+
+Подробнее: [system-sensor.md](system-sensor.md)
 
 ## ui — `lib/ui/`
 
@@ -89,6 +92,14 @@ RFC-хелперы: UUID 4/7 ([uuid.sh](../../../lib/rfc/uuid.sh)), URI, CSV.
 Ключевые функции: `http::get`, `http::post`, `http::retry`, `llm::chat`, `llm::chat_file`, `k8s::pod::list`, `k8s::deployment::restart`, `k8s::apply`, `vkapi::api_call`, `vkmusic::search_and_download`, `wireguard::create_interface`, `wireguard::add_peer`, `result::run`, `result::wrap`, `result::ok`, `result::error`.
 
 Подробнее: [integration-http.md](integration-http.md), [integration-llm.md](integration-llm.md), [integration-k8s.md](integration-k8s.md), [integration-result.md](integration-result.md)
+
+## ts — `lib/ts/`
+
+- [toolchain.sh](../../../lib/ts/toolchain.sh) — обнаружение и гейты валидации инструментария TypeScript: рантаймы, пакетные менеджеры по лок-файлу, инспектура проекта, гейт `tsc`/`eslint`/`prettier` с машиночитаемым выводом, диагностика окружения и проверка портов.
+
+Ключевые функции: `ts::toolchain::detect_runtime`, `ts::toolchain::lockfile_pm`, `ts::toolchain::tsc_bin`, `ts::toolchain::validate`, `ts::toolchain::doctor`, `ts::toolchain::port_free`.
+
+Подробнее: [ts-toolchain.md](ts-toolchain.md)
 
 ## frameworks — `lib/frameworks/`
 

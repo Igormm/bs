@@ -28,16 +28,19 @@ Most lib modules follow the same conventions: a `<module>::init` function, a `<m
 - [streams.sh](../../../lib/io/streams.sh) — low-level I/O stream management: printing, reading, fd redirection, pipes and TTY detection.
 - [files.sh](../../../lib/io/files.sh) — high-level file operations: copying, moving, syncing, and removing files/directories with dry-run and unified error handling.
 - [process.sh](../../../lib/io/process.sh) — process guard wrapper: timeout, hang detection via stdout/stderr, diagnostic snapshot of `/proc/<pid>` and `strace`.
+- [tree.sh](../../../lib/io/tree.sh) — create a project file tree from yaml/yml/txt/ini/csv.
 
-Key functions: `io::streams::print`, `io::streams::read_line`, `io::streams::redirect_stdout`, `io::streams::pipe`, `io::files::copy_dir`, `io::files::sync_dir`, `io::files::copy_matching`, `io::files::move`, `io::files::remove`, `io::process::guard`.
+Key functions: `io::streams::print`, `io::streams::read_line`, `io::streams::redirect_stdout`, `io::streams::pipe`, `io::files::copy_dir`, `io::files::sync_dir`, `io::files::copy_matching`, `io::files::move`, `io::files::remove`, `io::process::guard`, `io::tree::create`.
 
-Details: [io-streams.md](io-streams.md), [io-files.md](io-files.md), [io-process.md](io-process.md)
+Details: [io-streams.md](io-streams.md), [io-files.md](io-files.md), [io-process.md](io-process.md), [io-tree.md](io-tree.md)
 
 ## system — `lib/system/`
 
-The largest group: wrappers around day-to-day Linux system administration. Modules: [devices.sh](../../../lib/system/devices.sh), [display.sh](../../../lib/system/display.sh), [distro.sh](../../../lib/system/distro.sh) (distro detection), [distrologic.sh](../../../lib/system/distrologic.sh) (per-distro package/service logic), [info.sh](../../../lib/system/info.sh), [keyboard.sh](../../../lib/system/keyboard.sh), [locale.sh](../../../lib/system/locale.sh), [logging.sh](../../../lib/system/logging.sh), [network.sh](../../../lib/system/network.sh), [packages.sh](../../../lib/system/packages.sh), [permissions.sh](../../../lib/system/permissions.sh), [platformcheck.sh](../../../lib/system/platformcheck.sh), [processes.sh](../../../lib/system/processes.sh), [routing.sh](../../../lib/system/routing.sh), [safety.sh](../../../lib/system/safety.sh) (dry-run / confirmation gate), [schedule.sh](../../../lib/system/schedule.sh) (at/cron helpers), [security.sh](../../../lib/system/security.sh), [services.sh](../../../lib/system/services.sh), [system.sh](../../../lib/system/system.sh), [time.sh](../../../lib/system/time.sh), [users.sh](../../../lib/system/users.sh), [utils.sh](../../../lib/system/utils.sh).
+The largest group: wrappers around day-to-day Linux system administration. Modules: [devices.sh](../../../lib/system/devices.sh), [display.sh](../../../lib/system/display.sh), [distro.sh](../../../lib/system/distro.sh) (distro detection), [distrologic.sh](../../../lib/system/distrologic.sh) (per-distro package/service logic), [info.sh](../../../lib/system/info.sh), [keyboard.sh](../../../lib/system/keyboard.sh), [locale.sh](../../../lib/system/locale.sh), [logging.sh](../../../lib/system/logging.sh), [network.sh](../../../lib/system/network.sh), [packages.sh](../../../lib/system/packages.sh), [permissions.sh](../../../lib/system/permissions.sh), [platformcheck.sh](../../../lib/system/platformcheck.sh), [processes.sh](../../../lib/system/processes.sh), [routing.sh](../../../lib/system/routing.sh), [sensor.sh](../../../lib/system/sensor.sh) (touch/sensor evdev access + diagnostics), [safety.sh](../../../lib/system/safety.sh) (dry-run / confirmation gate), [schedule.sh](../../../lib/system/schedule.sh) (at/cron helpers), [security.sh](../../../lib/system/security.sh), [services.sh](../../../lib/system/services.sh), [system.sh](../../../lib/system/system.sh), [time.sh](../../../lib/system/time.sh), [users.sh](../../../lib/system/users.sh), [utils.sh](../../../lib/system/utils.sh).
 
-Key functions: `system::distro::detect`, `system::info::all`, `system::packages::install`, `safety::execute`.
+Key functions: `system::distro::detect`, `system::info::all`, `system::packages::install`, `safety::execute`, `sensor::devices`, `sensor::events`, `sensor::diagnose`.
+
+Details: [system-sensor.md](system-sensor.md)
 
 ## ui — `lib/ui/`
 
@@ -89,6 +92,14 @@ Clients for external services, VPN tooling, LLMs, Kubernetes and connectors to o
 Key functions: `http::get`, `http::post`, `http::retry`, `llm::chat`, `llm::chat_file`, `k8s::pod::list`, `k8s::deployment::restart`, `k8s::apply`, `vkapi::api_call`, `vkmusic::search_and_download`, `wireguard::create_interface`, `wireguard::add_peer`, `result::run`, `result::wrap`, `result::ok`, `result::error`.
 
 Details: [integration-http.md](integration-http.md), [integration-llm.md](integration-llm.md), [integration-k8s.md](integration-k8s.md), [integration-result.md](integration-result.md)
+
+## ts — `lib/ts/`
+
+- [toolchain.sh](../../../lib/ts/toolchain.sh) — detection and validation gates for the TypeScript dev toolchain: runtimes, lockfile-aware package managers, project layout, `tsc`/`eslint`/`prettier` gate with machine-readable output, doctor and port checks.
+
+Key functions: `ts::toolchain::detect_runtime`, `ts::toolchain::lockfile_pm`, `ts::toolchain::tsc_bin`, `ts::toolchain::validate`, `ts::toolchain::doctor`, `ts::toolchain::port_free`.
+
+Details: [ts-toolchain.md](ts-toolchain.md)
 
 ## frameworks — `lib/frameworks/`
 
