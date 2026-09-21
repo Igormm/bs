@@ -30,3 +30,6 @@ Examples from real history:
 - NEVER mutate git history: no `git rebase`, `git reset`, `git push --force` unless the user explicitly asks.
 - Before committing, run the validation cycle (`bs-validate` skill): `bash tests/validatesyntax.sh && bash tests/validateshellcheck.sh && bash tests/runalltests.sh`. Do not commit on a red run.
 - Review `git status` and `git diff --staged` before committing; stage only files belonging to this change — do not sweep up unrelated modifications.
+
+For splitting, ordering and bisect/revert safety of larger changes, layer the
+`bs-commit-pro` skill on top of this format.

@@ -96,6 +96,7 @@ Reusable workflow skills live in `.agents/skills/` (Kimi Code / agents-compatibl
 - `bs-validate` — the mandatory validation cycle after any change.
 - `bs-docs-sync` — keep `documentation/en/` and `documentation/ru/` in sync.
 - `bs-commit-style` — commit message conventions and history-safety rules.
+- `bs-commit-pro` — professional commit engineering (atomic intent, staging discipline, bisect/revert safety, series ordering).
 - `bs-review-module` — skeptical critic pass over a module (bash-pitfalls checklist, §11 lens, prioritized doubt report).
 - `bs-check-artifacts` — scan for traces of unfinished AI generation and leakage of request/prompt text into code and docs.
 - `bs-cli-markdown-style` — apply the «markdown simplicity» principle to CLI/interface/output/docs design (7-criteria test, Russian).
