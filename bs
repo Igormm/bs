@@ -83,6 +83,7 @@ Commands:
   lang-doc            Emit a JSON index of function docs (LSP metadata)
   lsp                 Run the language server (stdin/stdout, JSON-RPC)
   chat                Interactive LLM chat (openai/ollama, --url for custom)
+  api                 OpenAPI 3.x client (load spec, list paths, call operations)
   doctor              Check framework integrity
   run <script> [args] Execute script inside BS environment
   build <script>      Assemble a standalone self-extracting script
@@ -581,6 +582,63 @@ rfc_cmd() {
 }
 
 # ==========================================
+# bs api: OpenAPI 3.x client (spec load, introspect, call)
+# bs api: OpenAPI 3.x клиент (загрузка схемы, интроспекция, вызовы)
+# ==========================================
+
+api_cmd() {
+  local sub="${1:-}"
+  shift || true
+
+  load "lib/api/openapi"
+
+  case "${sub}" in
+    load)
+      local name="${1-}" source="${2-}"
+      if [[ $# -lt 2 ]] || is::empty "${name}" || is::empty "${source}"; then
+        die "api load: requires NAME and FILE-or-URL (e.g. bs api load petstore ./openapi.json)"
+      fi
+      api::spec::load "${name}" "${source}" || die "api load: failed"
+      ;;
+    list)
+      api::spec::list
+      ;;
+    info)
+      [[ $# -ge 1 ]] || die "api info: requires spec NAME"
+      api::spec::info "$1"
+      ;;
+    paths)
+      [[ $# -ge 1 ]] || die "api paths: requires spec NAME (use --method GET to filter)"
+      api::paths "$@"
+      ;;
+    call)
+      [[ $# -ge 3 ]] || die "api call: requires NAME METHOD PATH (e.g. bs api call petstore GET /pets --json)"
+      api::call "$@" || die "api call: failed"
+      ;;
+    drop)
+      [[ $# -ge 1 ]] || die "api drop: requires spec NAME"
+      api::spec::drop "$1"
+      ;;
+    -h|--help|"")
+      printf 'Usage: bs api <subcommand> [args]\n\n'
+      printf 'OpenAPI 3.x client / OpenAPI 3.x клиент\n'
+      printf '  load NAME FILE|URL   load a spec (URL is cached) / загрузить схему\n'
+      printf '  list                 loaded specs / загруженные схемы\n'
+      printf '  info NAME            title, version, server / заголовок, версия, сервер\n'
+      printf '  paths NAME [--method M]  list operations / список операций\n'
+      printf '  call NAME METHOD PATH [--name VALUE ...] [--token T] [--body B] [--json]\n'
+      printf '  drop NAME            unload a spec / выгрузить схему\n\n'
+      printf 'Examples / Примеры:\n'
+      printf '  bs api load petstore https://petstore3.swagger.io/api/v3/openapi.json\n'
+      printf '  bs api call petstore GET /pet/{petId} --petId 1 --json\n'
+      return 0 ;;
+    *)
+      die "api: unknown subcommand: ${sub} (see: bs api --help)"
+      ;;
+  esac
+}
+
+# ==========================================
 # bs audit: GNU-only tool usage in core/ and lib/
 # bs audit: использование GNU-only инструментов в core/ и lib/
 # ==========================================
@@ -718,7 +776,7 @@ update_cmd() {
 # первый аргумент — путь к существующему скрипту, а не команда.
 if [[ $# -ge 1 && -f "$1" ]]; then
   case "$1" in
-    help|-h|--help|version|env|list|lang-doc|lsp|chat|sync|rfc|audit|doctor|run|build|repl|init-shell) : ;;
+    help|-h|--help|version|env|list|lang-doc|lsp|chat|sync|rfc|api|audit|doctor|run|build|repl|init-shell) : ;;
     *) BS_SHEBANG=1 ;;
   esac
 fi
@@ -740,6 +798,7 @@ case "${1:-help}" in
   update)         shift; update_cmd "$@" ;;
   sync)           shift; log::warn "sync is deprecated — use: bs update" && update_cmd "$@" ;;
   rfc)            shift; rfc_cmd "$@" ;;
+  api)            shift; api_cmd "$@" ;;
   audit)          shift; audit_cmd "$@" ;;
   doctor)         shift || true; doctor_cmd "$@" ;;
   run)            shift; run_cmd "$@" ;;

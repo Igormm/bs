@@ -15,10 +15,13 @@ export BS_HOME="${BS_PROJECT_ROOT}"
 
 load "lib/api/openapi"
 
-# Test fixture / Тестовая схема
-readonly API_TEST_SPEC="${TEST_SCRIPT_DIR}/../../.art/testapi-spec.json"
+# Isolated test dir: spec + registry + mock / Изолированный каталог теста
+declare -g API_TEST_DIR=""
 
 api_test::write_spec() {
+  API_TEST_DIR="$(mktemp -d)"
+  API_TEST_SPEC="${API_TEST_DIR}/petstore.json"
+  API_SPEC_REGISTRY="${API_TEST_DIR}/registry.tsv"
   cat > "${API_TEST_SPEC}" <<'EOF'
 {
   "openapi": "3.0.0",
@@ -53,7 +56,8 @@ EOF
 }
 
 api_test::setup_mock() {
-  API_TEST_BIN="$(mktemp -d)"
+  API_TEST_BIN="${API_TEST_DIR}/bin"
+  mkdir -p "${API_TEST_BIN}"
   API_TEST_LOG="${API_TEST_BIN}/curl.log"
   export API_TEST_LOG
   cat > "${API_TEST_BIN}/curl" <<'EOF'
@@ -68,7 +72,6 @@ EOF
 
 api_test::teardown_mock() {
   export PATH="${PATH#${API_TEST_BIN}:}"
-  rm -rf -- "${API_TEST_BIN}"
 }
 
 test_spec_load() {
@@ -77,7 +80,7 @@ test_spec_load() {
   testframework::assert_equal "${API_TEST_SPEC}" "${API_SPECS[petstore]}" "spec stored under name"
 
   # Не-OpenAPI документ отклоняется / non-OpenAPI rejected
-  local bad="/tmp/opencode/notopenapi.json"
+  local bad="${API_TEST_DIR}/notopenapi.json"
   printf '{"swagger": "2.0"}' > "${bad}"
   testframework::assert_false "api::spec::load bad ${bad}" "rejects non-OpenAPI 3.x"
 
@@ -167,7 +170,7 @@ main() {
   testframework::section "Output / Вывод"
   test_call_pretty_mode
 
-  rm -f -- "${API_TEST_SPEC}"
+  rm -rf -- "${API_TEST_DIR}"
   testframework::summary
 }
 

@@ -33,6 +33,8 @@ declare -gA API_SPECS=()
 declare -gA API_SPEC_AUTH=()
 # Cache dir for specs fetched from URLs / Кэш для схем, скачанных по URL
 declare -g API_SPEC_CACHE_DIR="${XDG_CACHE_HOME:-${HOME}/.cache}/bs/api"
+# Registry: name<TAB>file — survives across processes / Реестр: имя<TAB>путь
+declare -g API_SPEC_REGISTRY="${API_SPEC_CACHE_DIR}/registry.tsv"
 
 # @description Load an OpenAPI spec from a file or URL.
 # @description Загрузить OpenAPI-схему из файла или URL.
@@ -67,6 +69,10 @@ api::spec::load() {
 
   API_SPECS["${name}"]="${spec_file}"
   API_SPEC_AUTH["${name}"]=""
+  mkdir -p -- "$(dirname -- "${API_SPEC_REGISTRY}")"
+  grep -v "^${name}"$'\t' "${API_SPEC_REGISTRY}" > "${API_SPEC_REGISTRY}.tmp" 2>/dev/null || true
+  printf '%s\t%s\n' "${name}" "${spec_file}" >> "${API_SPEC_REGISTRY}.tmp"
+  mv -- "${API_SPEC_REGISTRY}.tmp" "${API_SPEC_REGISTRY}"
   log::debug "api::spec::load: loaded ${name} from ${spec_file}"
   return 0
 }
@@ -77,10 +83,17 @@ api::spec::load() {
 api::spec::drop() {
   local -r name="${1:?spec name required}"
   if [[ -z "${API_SPECS[${name}]+x}" ]]; then
+    api::__registry_load
+  fi
+  if [[ -z "${API_SPECS[${name}]+x}" ]]; then
     log::warn "api::spec::drop: spec '${name}' is not loaded"
     return 1
   fi
   unset "API_SPECS[${name}]" "API_SPEC_AUTH[${name}]"
+  if [[ -f "${API_SPEC_REGISTRY}" ]]; then
+    grep -v "^${name}"$'\t' "${API_SPEC_REGISTRY}" > "${API_SPEC_REGISTRY}.tmp" 2>/dev/null || true
+    mv -- "${API_SPEC_REGISTRY}.tmp" "${API_SPEC_REGISTRY}"
+  fi
   return 0
 }
 
@@ -102,6 +115,7 @@ api::spec::auth() {
 # @description List loaded specs / Список загруженных схем.
 api::spec::list() {
   local name
+  api::__registry_load || true
   if (( ${#API_SPECS[@]} == 0 )); then
     printf 'No specs loaded / Схемы не загружены\n'
     return 0
@@ -292,10 +306,28 @@ api::call() {
 # @param $1 spec name
 api::__spec_file() {
   local -r name="$1"
+  if [[ -z "${API_SPECS[${name}]+x}" ]]; then
+    api::__registry_load
+  fi
   if [[ -z "${API_SPECS[${name}]+x}" ]] || ! is::file "${API_SPECS[${name}]}"; then
     log::error "api::__spec_file: spec '${name}' is not loaded (api::spec::load ${name} --from FILE-or-URL)"
     return 1
   fi
+  return 0
+}
+
+# @private
+# @description Restore specs from the on-disk registry (survives processes).
+# @description Восстановить схемы из реестра на диске (переживает процессы).
+api::__registry_load() {
+  [[ -f "${API_SPEC_REGISTRY}" ]] || return 1
+  local line name file
+  while IFS=$'\t' read -r name file; do
+    if is::file "${file}"; then
+      API_SPECS["${name}"]="${file}"
+      API_SPEC_AUTH["${name}"]=""
+    fi
+  done < "${API_SPEC_REGISTRY}"
   return 0
 }
 
