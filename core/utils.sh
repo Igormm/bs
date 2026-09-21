@@ -100,6 +100,109 @@ utils::attempt() {
   "$@" 2>/dev/null || :
 }
 
+# Временный файл/каталог с авто-очисткой при выходе.
+# Заменяет идиому: tmp="$(mktemp)" ... rm -f "${tmp}"
+# @function utils::tempfile
+# @description Temp file/dir with automatic cleanup on exit (removed even
+# @description Временный файл/каталог с авто-очисткой при выходе (удаляется
+# @description on error via the module cleanup hook).
+# @description даже при ошибке через cleanup-хук модуля).
+# @param $1 [--dir] create a directory instead of a file / создать каталог
+# @param $2 [PREFIX] mktemp prefix / префикс mktemp
+# @stdout path to the temp file/dir / путь к временному файлу/каталогу
+#
+# Пути пишутся в файловый реестр (подстановки $(...) живут в subshell'ах и
+# массив не пережил бы их); очистку выполняет главный процесс при выходе —
+# BASH_SUBSHELL guard не даёт subshell'у удалить чужие файлы раньше времени.
+# Paths go to an on-disk registry (command substitutions run in subshells,
+# an array would not survive them); the main process cleans up on exit —
+# the BASH_SUBSHELL guard stops a subshell from deleting other files early.
+declare -g UTILS_TMP_REGISTRY="${TMPDIR:-/tmp}/bs-tmp-registry.$$"
+
+utils::tempfile() {
+  local dir_mode=0
+  local prefix="bs.$$"
+  case "${1:-}" in
+    --dir) dir_mode=1; prefix="${2:-bs.$$}" ;;
+    *) prefix="${1:-bs.$$}" ;;
+  esac
+  local path
+  if (( dir_mode == 1 )); then
+    path="$(mktemp -d "${TMPDIR:-/tmp}/${prefix}.XXXXXX")" || return 1
+  else
+    path="$(mktemp "${TMPDIR:-/tmp}/${prefix}.XXXXXX")" || return 1
+  fi
+  printf '%s\n' "${path}" >> "${UTILS_TMP_REGISTRY}"
+  printf '%s\n' "${path}"
+  return 0
+}
+
+# @private
+# @description Remove all recorded temp paths (main process only).
+# @description Удалить все записанные временные пути (только главный процесс).
+utils::__tmp_cleanup() {
+  (( BASH_SUBSHELL == 0 )) || return 0
+  [[ -f "${UTILS_TMP_REGISTRY}" ]] || return 0
+  local p
+  while IFS= read -r p; do
+    [[ -n "${p}" ]] && rm -rf -- "${p}"
+  done < "${UTILS_TMP_REGISTRY}"
+  rm -f -- "${UTILS_TMP_REGISTRY}"
+  return 0
+}
+
+# Человеческий размер: байты или строка с суффиксом (12288K, 1.5G) → "12.0 KiB".
+# @function utils::human_size
+# @description Human-readable size: bytes or suffixed string → "12.0 KiB".
+# @description Человеческий размер: байты или строка с суффиксом → "12.0 KiB".
+# @param $1 size: plain bytes or suffixed (K/M/G/T, KiB/MiB/GiB) / размер
+# @stdout normalized size / нормализованный размер
+utils::human_size() {
+  local v="${1:-0}"
+  local -i mult=1
+  case "${v}" in
+    *TB) v="${v%TB}"; mult=$(( 1024 * 1024 * 1024 * 1024 )) ;;
+    *GB) v="${v%GB}"; mult=$(( 1024 * 1024 * 1024 )) ;;
+    *MB) v="${v%MB}"; mult=$(( 1024 * 1024 )) ;;
+    *KB) v="${v%KB}"; mult=1024 ;;
+    *T)  v="${v%T}";  mult=$(( 1024 * 1024 * 1024 * 1024 )) ;;
+    *G)  v="${v%G}";  mult=$(( 1024 * 1024 * 1024 )) ;;
+    *M)  v="${v%M}";  mult=$(( 1024 * 1024 )) ;;
+    *K)  v="${v%K}";  mult=1024 ;;
+    *B)  v="${v%B}" ;;
+  esac
+  v="${v// /}"
+  if [[ ! "${v}" =~ ^[0-9]+$ ]]; then
+    printf '%s\n' "${1}"
+    return 0
+  fi
+  printf '%s\n' "$(( v * mult ))" | awk '{
+      split("B KiB MiB GiB TiB", u)
+      n = $1
+      i = 1
+      while (n >= 1024 && i < 5) { n /= 1024; i++ }
+      printf "%.1f %s\n", n, u[i]
+    }'
+}
+
+# Ограниченное чтение файла (первые N байт).
+# Заменяет идиому: head -c N -- file с проверкой существования файла
+# @function utils::head_bytes
+# @description Read the first N bytes of a file (existence-checked).
+# @description Прочитать первые N байт файла (с проверкой существования).
+# @param $1 file path / путь к файлу
+# @param $2 max bytes / максимум байт
+# @stdout first N bytes / первые N байт
+utils::head_bytes() {
+  local -r file="${1:?file required}"
+  local -r max="${2:-4000}"
+  if ! is::file "${file}"; then
+    return 1
+  fi
+  head -c "${max}" -- "${file}"
+  return 0
+}
+
 # Текущее время в секундах (epoch).
 # Заменяет идиому: date +%s
 # @function utils::now_s
@@ -315,4 +418,12 @@ utils::boot_dir() {
   BOOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../bootstrap" &>/dev/null && pwd)"
   export BOOT_DIR
 }
+
+# Регистрация очистки temp-файлов при загрузке: подстановки $(...) не переживут
+# регистрацию, поэтому она происходит здесь, в главном процессе.
+# Register temp cleanup at load time: command substitutions would lose the
+# registration, so it happens here, in the main process.
+if declare -F cleanup::add >/dev/null 2>&1; then
+  cleanup::add utils::__tmp_cleanup
+fi
 

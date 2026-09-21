@@ -152,7 +152,7 @@ osagent::exec() {
         log::error "osagent::exec: files.read requires an existing file path"
         return 2
       fi
-      head -c 4000 -- "${path}"
+      utils::head_bytes "${path}" 4000
       # WRAPPER-CANDIDATE: utils::head_bytes — files.read caps output ad-hoc; a shared truncate-read helper would serve api/tui/agent / кандидат-обёртка: utils::head_bytes — ограниченное чтение повторяется в api/tui/agent
       ;;
     api.call)

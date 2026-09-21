@@ -513,44 +513,8 @@ hw::__read_dmi() {
 # @param $1 Size / Размер
 # @stdout e.g. "12.0 MiB" / напр. «12.0 MiB»
 hw::__human_size() {
-  local v="${1:-0}"
-  local -i mult=1
-
-  # Суффиксы sysfs/cpuinfo (порядок: сначала многосимвольные)
-  # sysfs/cpuinfo suffixes (long ones first)
-  case "${v}" in
-    *TB) v="${v%TB}"; mult=$(( 1024 * 1024 * 1024 * 1024 )) ;;
-    *GB) v="${v%GB}"; mult=$(( 1024 * 1024 * 1024 )) ;;
-    *MB) v="${v%MB}"; mult=$(( 1024 * 1024 )) ;;
-    *KB) v="${v%KB}"; mult=1024 ;;
-    *T)  v="${v%T}";  mult=$(( 1024 * 1024 * 1024 * 1024 )) ;;
-    *G)  v="${v%G}";  mult=$(( 1024 * 1024 * 1024 )) ;;
-    *M)  v="${v%M}";  mult=$(( 1024 * 1024 )) ;;
-    *K)  v="${v%K}";  mult=1024 ;;
-    *B)  v="${v%B}" ;;
-  esac
-  v="${v// /}"
-
-  if [[ ! "${v}" =~ ^[0-9]+$ ]]; then
-    # Не разобралось — отдаём как есть / Unparseable — pass through
-    printf '%s\n' "${1}"
-    return 0
-  fi
-
-  # Один знак после запятой, единицы по 1024 / One decimal, 1024-based units
-  printf '%s\n' "$(( v * mult ))" | awk '
-    {
-      split("B KiB MiB GiB TiB", u)
-      n = $1
-      i = 1
-      while (n >= 1024 && i < 5) {
-        n /= 1024
-        i++
-      }
-      printf "%.1f %s\n", n, u[i]
-    }'
+  utils::human_size "${1:-0}"
 }
-
 # @private
 # @description Set one DB entry / Записать одну запись БД.
 # @param $1 key / ключ

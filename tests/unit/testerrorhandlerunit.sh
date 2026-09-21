@@ -83,7 +83,7 @@ main() {
     }
     
     cleanup::add "test::cleanup_marker"
-    testframework::assert_true "${#BS_CLEANUP_STACK[@]} -eq 1" "Cleanup function added to stack"
+    testframework::assert_true "'${BS_CLEANUP_STACK[*]}' == *'test::cleanup_marker'*" "Cleanup function added to stack"
     
     cleanup::__run_all
     cleanup::__run_all

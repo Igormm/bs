@@ -84,7 +84,46 @@ main() {
     testframework::section "Time primitives / Примитивы времени"
     test_time_primitives
 
+    testframework::section "Wrappers / Обёртки"
+    test_tempfile
+    test_human_size
+    test_head_bytes
+
     testframework::summary
+}
+
+
+# Test utils::tempfile creates and cleans up
+test_tempfile() {
+    local t1 t2
+    t1="$(utils::tempfile)"
+    testframework::assert_true "-e '${t1}'" "utils::tempfile creates a file"
+    t2="$(utils::tempfile --dir)"
+    testframework::assert_true "-d '${t2}'" "utils::tempfile --dir creates a directory"
+
+    utils::__tmp_cleanup
+    testframework::assert_true "! -e '${t1}'" "utils::__tmp_cleanup removes files"
+    testframework::assert_true "! -e '${t2}'" "utils::__tmp_cleanup removes directories"
+}
+
+# Test utils::human_size normalization
+test_human_size() {
+    testframework::assert_equal "15.5 GiB" "$(utils::human_size 16626573312)" "human_size bytes"
+    testframework::assert_equal "12.0 MiB" "$(utils::human_size 12288K)" "human_size suffixed"
+    testframework::assert_equal "1.0 KiB" "$(utils::human_size 1024)" "human_size exact KiB"
+    testframework::assert_equal "abc" "$(utils::human_size abc)" "human_size passes through unparseable"
+}
+
+# Test utils::head_bytes capped read
+test_head_bytes() {
+    local tmp
+    tmp="$(utils::tempfile)"
+    printf 'hello world
+' > "${tmp}"
+    testframework::assert_equal "hello" "$(utils::head_bytes "${tmp}" 5)" "head_bytes caps read"
+    testframework::assert_equal "hello world" "$(utils::head_bytes "${tmp}")" "head_bytes default 4000"
+    testframework::assert_false "utils::head_bytes /no/such 5" "head_bytes rejects missing file"
+    utils::__tmp_cleanup
 }
 
 main "$@"
