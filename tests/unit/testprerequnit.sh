@@ -117,10 +117,23 @@ main() {
     testframework::section "Source Relative / Относительный source"
     test_source_relative
 
+    testframework::section "Shell / Оболочка"
+    test_shell_helpers
+
     testframework::section "Script Dir / Каталог скрипта"
     test_script_dir
 
     testframework::summary
+}
+
+
+# Test shell capability helpers / Хелперы оболочки как capability
+test_shell_helpers() {
+    testframework::assert_equal "bash" "$(bs::shell::name)" "shell name is bash under bash"
+    testframework::assert_equal "1" "$(bs::shell::ok)" "bash 4+ is shell_ok"
+    testframework::assert_true "'$(bs::shell::version)' =~ ^[0-9]+$" "shell version is numeric"
+    # is_sourced: этот тест-файл исполняется (не source'ится) → NOT sourced
+    bs::shell::is_sourced && testframework::fail "test file executed directly must not be sourced" || testframework::assert_true "0 -eq 0" "executed file is not sourced"
 }
 
 main "$@"

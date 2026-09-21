@@ -28,23 +28,15 @@ HELP
 
 # If executed directly, warn and exit. We only support bash/zsh.
 # При прямом исполнении — предупредить и выйти. Поддерживаем только bash/zsh.
-# В bash при source $0 — имя вызывающего shell'а; в zsh при source $0 — имя
-# файла, поэтому zsh определяет исполнение через ZSH_EVAL_CONTEXT, а bash —
-# через BASH_SOURCE.
-# In bash $0 is the caller shell when sourced; in zsh $0 becomes the file name,
-# so zsh detects direct execution via ZSH_EVAL_CONTEXT, bash via BASH_SOURCE.
-if [[ -n "${ZSH_VERSION:-}" ]]; then
-  if [[ "${ZSH_EVAL_CONTEXT}" == toplevel* ]]; then
-    printf 'ERROR: This script must be sourced, not executed.\n' >&2
-    usage
-    exit 1
-  fi
-elif [[ -n "${BASH_VERSION:-}" ]]; then
-  if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
-    printf 'ERROR: This script must be sourced, not executed.\n' >&2
-    usage
-    exit 1
-  fi
+# Рантайм-оболочку определяем здесь инлайн (BASH_VERSION/ZSH_VERSION), потому
+# что ядро ещё не загружено; готовые хелперы — core/prereq.sh: bs::shell::*.
+# Runtime shell is detected inline here (BASH_VERSION/ZSH_VERSION) because the
+# kernel is not loaded yet; the canonical helpers live in core/prereq.sh: bs::shell::*.
+if [[ -n "${ZSH_VERSION:-}" && "${ZSH_EVAL_CONTEXT}" == toplevel* ]] ||
+   [[ -n "${BASH_VERSION:-}" && "${BASH_SOURCE[0]}" == "$0" && "${#BASH_SOURCE[@]}" -eq 1 ]]; then
+  printf 'ERROR: This script must be sourced, not executed.\n' >&2
+  usage
+  exit 1
 fi
 
 # Idempotency: skip if already initialized

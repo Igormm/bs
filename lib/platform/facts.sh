@@ -93,22 +93,11 @@ platform::__build() {
   PF_FACTS[kernel]="${kernel:-unknown}"
   PF_FACTS[arch]="${arch:-unknown}"
   PF_FACTS[bash]="${BASH_VERSION}"
-  PF_FACTS[bash_version]="${BASH_VERSINFO[0]:-0}"
-  # Оболочка как capability: bash 4+ — полное ядро, zsh — инициализация,
-  # прочие (dash/sh/fish) — не поддерживаются.
-  # Shell as a capability: bash 4+ — full kernel, zsh — init-level,
-  # others (dash/sh/fish) — unsupported.
-  if [[ -n "${BASH_VERSION:-}" ]]; then
-    PF_FACTS[shell]="bash"
-    PF_FACTS[shell_ok]="1"
-    (( BASH_VERSINFO[0] >= 4 )) || PF_FACTS[shell_ok]="0"
-  elif [[ -n "${ZSH_VERSION:-}" ]]; then
-    PF_FACTS[shell]="zsh"
-    PF_FACTS[shell_ok]="0"
-  else
-    PF_FACTS[shell]="unknown"
-    PF_FACTS[shell_ok]="0"
-  fi
+  # Оболочка как capability — единый источник: core/prereq.sh (bs::shell::*).
+  # Shell as a capability — single source: core/prereq.sh (bs::shell::*).
+  PF_FACTS[shell]="$(bs::shell::name)"
+  PF_FACTS[shell_ok]="$(bs::shell::ok)"
+  PF_FACTS[shell_version]="$(bs::shell::version)"
 
   # distro / family из os-release
   distro="$(awk -F= '/^ID=/{print $2}' /etc/os-release 2>/dev/null | tr -d '"')"
@@ -225,7 +214,7 @@ platform::__ensure() {
 
 # @description Get one fact (capability vector entry).
 # @description Получить один факт (запись вектора возможностей).
-# @param $1 Key: kernel/arch/distro/family/repo/userland/libc/bash/bash_version/shell/shell_ok/tier/
+# @param $1 Key: kernel/arch/distro/family/repo/userland/libc/bash/shell_version/shell/shell_ok/tier/
 #        procfs/sysfs/dmi/tool_* / Ключ
 # @param $2 [optional] Default / Значение по умолчанию
 # @stdout the fact / факт
