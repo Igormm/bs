@@ -83,6 +83,15 @@ GNU-only инструменты и их fallback:
 - `posix` — только POSIX-инструменты (fallback-режим);
 - `bsd` — macOS/FreeBSD слои совместимости.
 
+**Оболочка — часть вектора возможностей** (факты `shell`, `shell_ok`,
+`bash_version`): bash 4+ — полное ядро; zsh — только инициализация
+(`bootstrap/init.sh`); dash/sh/fish — не поддерживаются. Тиры ниже
+предполагают `shell_ok=1`, проверяется через `platform::get shell_ok`.
+**The shell is part of the capability vector** (facts `shell`, `shell_ok`,
+`bash_version`): bash 4+ — full kernel; zsh — init-level only
+(`bootstrap/init.sh`); dash/sh/fish — unsupported. The tiers below assume
+`shell_ok=1`, checked via `platform::get shell_ok`.
+
 Скрипт при старте проверяет нужный тир и падает с понятной ошибкой,
 если возможности нет (вместо криптопада из-за `sed -z`).
 

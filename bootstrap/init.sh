@@ -27,10 +27,24 @@ HELP
 }
 
 # If executed directly, warn and exit. We only support bash/zsh.
-if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
-  printf 'ERROR: This script must be sourced, not executed.\n' >&2
-  usage
-  exit 1
+# При прямом исполнении — предупредить и выйти. Поддерживаем только bash/zsh.
+# В bash при source $0 — имя вызывающего shell'а; в zsh при source $0 — имя
+# файла, поэтому zsh определяет исполнение через ZSH_EVAL_CONTEXT, а bash —
+# через BASH_SOURCE.
+# In bash $0 is the caller shell when sourced; in zsh $0 becomes the file name,
+# so zsh detects direct execution via ZSH_EVAL_CONTEXT, bash via BASH_SOURCE.
+if [[ -n "${ZSH_VERSION:-}" ]]; then
+  if [[ "${ZSH_EVAL_CONTEXT}" == toplevel* ]]; then
+    printf 'ERROR: This script must be sourced, not executed.\n' >&2
+    usage
+    exit 1
+  fi
+elif [[ -n "${BASH_VERSION:-}" ]]; then
+  if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    printf 'ERROR: This script must be sourced, not executed.\n' >&2
+    usage
+    exit 1
+  fi
 fi
 
 # Idempotency: skip if already initialized
@@ -44,7 +58,9 @@ fi
 if [[ -n "${BS_ROOT:-}" && -d "${BS_ROOT}" ]]; then
   :
 else
-  readonly __BS_INIT_DIR__="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd -P)"
+  # Bash: BASH_SOURCE[0]; zsh: funcsourcetrace[1] (BASH_SOURCE у zsh пуст)
+  __bs_src__="${BASH_SOURCE[0]:-${funcsourcetrace[1]%:*}}"
+  readonly __BS_INIT_DIR__="$(cd -- "$(dirname -- "${__bs_src__}")" >/dev/null 2>&1 && pwd -P)"
   readonly __BS_ROOT_CANDIDATE__="$(cd -- "${__BS_INIT_DIR__}/.." >/dev/null 2>&1 && pwd -P)"
   if [[ -d "${__BS_ROOT_CANDIDATE__}" && -f "${__BS_ROOT_CANDIDATE__}/bs" ]]; then
     export BS_ROOT="${__BS_ROOT_CANDIDATE__}"

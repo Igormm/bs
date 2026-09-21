@@ -84,6 +84,13 @@ Compatibility tiers (for the version and `bs doctor`):
 - `gnu-linux` — GNU userland (`grep -P`, `sed -z`, `sha256sum`);
 - `posix` — POSIX-only tools (fallback mode);
 - `bsd` — macOS/FreeBSD compatibility layers.
+**The shell is part of the capability vector** (facts `shell`, `shell_ok`,
+`bash_version`): bash 4+ — full kernel; zsh — init-level only
+(`bootstrap/init.sh`); dash/sh/fish — unsupported. The tiers below assume
+`shell_ok=1`, checked via `platform::get shell_ok`.
+**Оболочка — часть вектора возможностей** (факты `shell`, `shell_ok`,
+`bash_version`): bash 4+ — полное ядро; zsh — только инициализация
+(`bootstrap/init.sh`); dash/sh/fish — не поддерживаются.
 
 A script checks the required tier at startup and fails with a clear
 message if the capability is missing (instead of a cryptic crash from

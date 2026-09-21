@@ -71,11 +71,22 @@ main() {
 
     testframework::section "Facts / Факты"
     test_facts
+    testframework::section "Shell / Оболочка"
+    test_shell_facts
 
     testframework::section "Cache / Кэш"
     test_cache
 
     testframework::summary
+}
+
+
+# Test shell capability facts / Факты оболочки как capability
+test_shell_facts() {
+    platform::reset >/dev/null 2>&1
+    testframework::assert_equal "bash" "$(platform::get shell)" "shell fact is bash on this machine"
+    testframework::assert_equal "1" "$(platform::get shell_ok)" "shell_ok is 1 for bash 4+"
+    testframework::assert_true "'$(platform::get bash_version)' =~ ^[0-9]+$" "bash_version is numeric"
 }
 
 main "$@"
