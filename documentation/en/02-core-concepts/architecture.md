@@ -79,7 +79,7 @@ not found.
 The [bs](../../../bs) script is the unified entry point. It runs under
 `set -euo pipefail` with `IFS=$'\n\t'` and performs the following:
 
-- Defines `readonly BS_VERSION` (currently `0.5.0`).
+- Defines `readonly BS_VERSION` (currently `0.5.2`).
 - Resolves `BS_ROOT` if it is not already set: first the script's own
   directory (when it contains `bootstrap/init.sh`), then
   `~/.local/lib/bs` and `/usr/local/lib/bs`.

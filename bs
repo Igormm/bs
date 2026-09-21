@@ -20,7 +20,7 @@ if [[ -z "${BASH_VERSION:-}" || ${BASH_VERSINFO[0]} -lt 4 ]]; then
 fi
 
 # 1. Версия фреймворка 
-readonly BS_VERSION='0.5.0'
+readonly BS_VERSION='0.5.2'
 
 # 3. Определение BS_ROOT (если ещё не задан) 
 if [[ -z "${BS_ROOT:-}" ]]; then
@@ -760,7 +760,23 @@ update_cmd() {
       continue
     fi
     log::info "syncing ${from} -> ${target}"
-    cp -a "${from}/bootstrap" "${from}/core" "${from}/lib" "${from}/bs" "${target}/"
+    # Атомарная замена: копируем во временный каталог, затем mv (rename).
+    # Atomic replace: copy to a temp dir, then mv (rename) — a running `bs`
+    # keeps the old inode instead of reading a half-truncated file.
+    local tmp_dir
+    tmp_dir="${target}/.update.$$"
+    rm -rf -- "${tmp_dir}"
+    mkdir -p -- "${tmp_dir}"
+    if ! cp -a "${from}/bootstrap" "${from}/core" "${from}/lib" "${from}/bs" "${tmp_dir}/"; then
+      rm -rf -- "${tmp_dir}"
+      log::error "update: copy failed for ${target} (source files intact)"
+      continue
+    fi
+    mv -f -- "${tmp_dir}/bs" "${target}/bs"
+    rm -rf -- "${target}/bootstrap" && mv -f -- "${tmp_dir}/bootstrap" "${target}/bootstrap"
+    rm -rf -- "${target}/core" && mv -f -- "${tmp_dir}/core" "${target}/core"
+    rm -rf -- "${target}/lib" && mv -f -- "${tmp_dir}/lib" "${target}/lib"
+    rmdir -- "${tmp_dir}" 2>/dev/null || true
     ok=1
     if (( verbose == 1 )); then
       log::info "  files: $(find "${from}/core" "${from}/lib" -name '*.sh' | wc -l) modules copied"
