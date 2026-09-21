@@ -14,7 +14,7 @@ The project documentation is fully bilingual: `documentation/en/` and `documenta
 3. Code examples inside docs must follow the code style guide (they are user-facing templates): `#!/usr/bin/env bs` + `# shellcheck shell=bash`, `load "..."`, framework abstractions.
 4. If the change affects conventions listed in `AGENTS.md` (module skeleton, testing rules, validation commands), update `AGENTS.md` too.
 5. In-code comments are also bilingual ru/en in this project — keep comment pairs in sync when editing code.
-6. If AI-facing prompts are affected (`ai/lib-prompt.md`, `ai/core-prompt.md`), update them as well.
+6. If AI-facing prompts are affected (`.agents/prompts/lib-prompt.md`, `.agents/prompts/core-prompt.md`), update them as well.
 
 ## Pitfalls
 

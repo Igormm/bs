@@ -6,9 +6,9 @@ BS — это Bash-фреймворк с чёткими соглашениями
 
 1. Прочитай `AGENTS.md` в корне репозитория.
 2. Прочитай `documentation/ru/code-style-guide.md`.
-3. Для задач в `lib/` используй промпт `ai/lib-prompt.md`.
-4. Для задач в `core/` используй промпт `ai/core-prompt.md`.
-5. Для идей по MCP, провайдерам и CI читай `ai/mcp-integration.md`.
+3. Для задач в `lib/` используй промпт `.agents/prompts/lib-prompt.md`.
+4. Для задач в `core/` используй промпт `.agents/prompts/core-prompt.md`.
+5. Для идей по MCP, провайдерам и CI читай `.agents/guides/mcp-integration.md`.
 5. После изменений запусти:
    ```bash
    bash tests/validatesyntax.sh

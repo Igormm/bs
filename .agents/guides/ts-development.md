@@ -43,7 +43,7 @@ TUI-дашбордом на `lib/tui` (прецедент: `examples/sensor_tui.
 - Мок для фронта: bash-скрипт на listener-цепочке (`socat → ncat`, по
   образцу probe-цепочек `integration/http.sh`), раздаёт JSON-фикстуры из
   каталога; фронт (vite proxy) пишется против него, реальный бэк — позже.
-  Совпадает с MVP из `ai/webserver-analysis.md`.
+  Совпадает с MVP из `.art/webserver-analysis.md`.
 - Смоук против TS-бэкенда: `http::get/post/retry` +
   `dataprocessor::json::query` (jq) — контракты проверяются без Node,
   результат — JSON-контракт `integration/result.sh` для CI.

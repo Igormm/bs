@@ -6,9 +6,9 @@ BS is a Bash framework with strict conventions. LLMs and agents can write module
 
 1. Read `AGENTS.md` in the repository root.
 2. Read `documentation/en/code-style-guide.md`.
-3. For `lib/` tasks use the prompt in `ai/lib-prompt.md`.
-4. For `core/` tasks use the prompt in `ai/core-prompt.md`.
-5. For MCP, provider and CI ideas read `ai/mcp-integration.md`.
+3. For `lib/` tasks use the prompt in `.agents/prompts/lib-prompt.md`.
+4. For `core/` tasks use the prompt in `.agents/prompts/core-prompt.md`.
+5. For MCP, provider and CI ideas read `.agents/guides/mcp-integration.md`.
 5. After changes run:
    ```bash
    bash tests/validatesyntax.sh

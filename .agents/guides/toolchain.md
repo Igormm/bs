@@ -18,7 +18,7 @@
 | Формализация | `# @depends`, `# @description/@param/@return` docblock'и | машиночитаемые контракты; loader валидирует граф зависимостей |
 | Верификация | `validatesyntax.sh`, `validateshellcheck.sh`, `runalltests.sh` | self-check-цикл: агент генерирует → валидирует → исправляет |
 | Feedback loop | `tests/testframework.sh` asserts | быстрый (секунды) замыкающий контур для итераций |
-| Контекст | `AGENTS.md`, `ai/*-prompt.md`, `.agents/skills/*` | роль, правила, готовые workflow-процедуры |
+| Контекст | `AGENTS.md`, `.agents/prompts/*-prompt.md`, `.agents/skills/*` | роль, правила, готовые workflow-процедуры |
 | Интеграции | `lib/integration/llm.sh`, `chat.sh`, `result.sh` | BS сам выступает потребителем LLM (OpenAI/Ollama) |
 | Дистрибуция | `bs build` (standalone), `bs update` | агенту не нужен окружение — артефакт самодостаточен |
 
@@ -27,7 +27,7 @@
 
 ## 2. Чего не хватает (gap analysis)
 
-1. **MCP-сервер**. Идеи зафиксированы в `ai/mcp-integration.md`, но кода нет.
+1. **MCP-сервер**. Идеи зафиксированы в `.agents/guides/mcp-integration.md`, но кода нет.
    Минимальный набор инструментов: `bs_list`, `bs_doctor`, `bs_lang_doc`,
    `bs_run`, `validate(all)`, `test(run)`, `read_module`.
    Реализация — тонкая обёртка (node/python или даже `bs` + JSON-RPC по

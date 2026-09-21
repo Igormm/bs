@@ -88,7 +88,7 @@ Consider also a `diff-quality` check that compares the changed files against `AG
 For large repositories, feed the model only the relevant subset:
 
 - `AGENTS.md`
-- `ai/lib-prompt.md` or `ai/core-prompt.md`
+- `.agents/prompts/lib-prompt.md` or `.agents/prompts/core-prompt.md`
 - `documentation/{ru,en}/code-style-guide.md`
 - The target module and its tests
 - Modules listed in `# @depends` comments

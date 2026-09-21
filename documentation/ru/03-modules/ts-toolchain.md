@@ -65,5 +65,5 @@ ts::toolchain::port_free 5173     # ss → netstat → /dev/tcp (0 — своб�
 
 ## Связанное
 
-- `ai/ts-development.md` — BS как операционный слой TS-разработки.
+- `.agents/guides/ts-development.md` — BS как операционный слой TS-разработки.
 - `lib/integration/http.sh` + `lib/data/dataprocessor.sh` — smoke-тесты API.

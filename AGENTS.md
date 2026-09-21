@@ -83,8 +83,8 @@ When asked to implement a feature:
 
 For focused development tasks, use the dedicated prompt files:
 
-- `ai/lib-prompt.md` — implement or modify `lib/` modules.
-- `ai/core-prompt.md` — implement or modify `core/` modules.
+- `.agents/prompts/lib-prompt.md` — implement or modify `lib/` modules.
+- `.agents/prompts/core-prompt.md` — implement or modify `core/` modules.
 
 ## Agent skills
 

@@ -9,8 +9,8 @@ This guide helps human developers work with the BS Bash framework through LLMs a
    - English: `documentation/en/code-style-guide.md`
    - Russian: `documentation/ru/code-style-guide.md`
 3. Use the dedicated prompt files when asking an AI to write code:
-   - `ai/lib-prompt.md` — for new or updated `lib/` modules.
-   - `ai/core-prompt.md` — for changes to the `core/` kernel.
+   - `.agents/prompts/lib-prompt.md` — for new or updated `lib/` modules.
+   - `.agents/prompts/core-prompt.md` — for changes to the `core/` kernel.
 4. After the AI produces code, always run the validators:
    ```bash
    bash tests/validatesyntax.sh
@@ -22,7 +22,7 @@ This guide helps human developers work with the BS Bash framework through LLMs a
 
 - `documentation/en/08-development/ai-development.md` — full English guide.
 - `documentation/ru/08-development/ai-development.md` — full Russian guide.
-- `ai/mcp-integration.md` — ideas for MCP servers, API providers, CI and security.
+- `.agents/guides/mcp-integration.md` — ideas for MCP servers, API providers, CI and security.
 
 ## Tips for good results
 

@@ -66,5 +66,5 @@ ts::toolchain::port_free 5173  # 0 free / E_ERROR occupied (ss→netstat→/dev/
 
 ## Related
 
-- `ai/ts-development.md` — how BS wraps a local TS front/back-end stack.
+- `.agents/guides/ts-development.md` — how BS wraps a local TS front/back-end stack.
 - `lib/integration/http.sh` + `lib/data/dataprocessor.sh` — API smoke tests.
