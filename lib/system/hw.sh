@@ -165,6 +165,7 @@ system::hw::bios_version() {
 
 # ==========================================
 # Printers: human-readable reports
+# WRAPPER-CANDIDATE: utils::human_size — hw::__human_size is module-local; promote to core (facts.sh, ps1status print sizes too) / кандидат-обёртка: utils::human_size — hw::__human_size локальна, нужна в facts.sh и ps1status
 # Принтеры: человекочитаемые отчёты
 # ==========================================
 

@@ -11,6 +11,7 @@
 
 # Source Guard
 bs::guard "CORE_LANG" || return 0
+# NOTE: raw redirects inside hot loops here are intentional — wrapper calls would fork / примечание: сырые redirect в горячих циклах намеренны — обёртки форкают
 
 # Метаданные модуля / Module metadata
 # shellcheck disable=SC2034

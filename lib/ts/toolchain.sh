@@ -40,6 +40,7 @@ ts::toolchain::runtime_version() {
     }
     local raw
     raw="$(utils::quiet_err "${bin}" --version 2>/dev/null)" || raw=""
+    # WRAPPER-CANDIDATE: utils::attempt — this pattern (quiet_err + 2>/dev/null + || raw="") is utils::attempt verbatim / кандидат-обёртка: utils::attempt — этот паттерн есть готовый абстракцией в core
     raw="${raw#v}"
     str::trim "${raw}"
 }

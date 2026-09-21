@@ -12,6 +12,7 @@
 # Usage / Использование:
 #   load "lib/io/process"
 #   io::process::guard --timeout 60 --hang-after 30 -- wget https://example.com/file.iso
+# WRAPPER-CANDIDATE: process::timeout — unify timeout/hang-after semantics used ad-hoc across lib/ / кандидат-обёртка: process::timeout — единая семантика таймаутов вместо разрозненных вызовов
 #
 # @depends core/const, core/logger, core/utils, core/errorhandler
 
@@ -191,6 +192,7 @@ io::process::__ensure_diagnostic_dir() {
 
   if is::empty "${dir}"; then
     dir="$(mktemp -d)"
+    # WRAPPER-CANDIDATE: utils::tempfile — auto-register cleanup, current code must rm -rf by hand (7 modules repeat this) / кандидат-обёртка: utils::tempfile — авто-очистка вместо ручного rm (паттерн повторён в 7 модулях)
     if is::empty "${dir}" || ! is::dir "${dir}"; then
       log::error "Failed to create diagnostic directory"
       return "${LIB_ERROR_FILE_OPERATION}"

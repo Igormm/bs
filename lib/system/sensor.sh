@@ -209,6 +209,7 @@ sensor::info() {
     done
     printf 'readable=%s\n' "$(is::readable "$(sensor::device_path "${ev}")" && printf yes || printf no)"
     printf 'capabilities_ev=%s\n' "$(utils::quiet_err cat "${dir}/device/capabilities/ev" 2>/dev/null)"
+    # WRAPPER-CANDIDATE: utils::quiet_err already used; the trailing 2>/dev/null is redundant here (double suppression) — drop one / кандидат-обёртка: utils::quiet_err уже применён, хвост 2>/dev/null дублирует подавление
     printf 'capabilities_key=%s\n' "$(utils::quiet_err cat "${dir}/device/capabilities/key" 2>/dev/null)"
     printf 'capabilities_abs=%s\n' "$(utils::quiet_err cat "${dir}/device/capabilities/abs" 2>/dev/null)"
     return "${E_SUCCESS}"

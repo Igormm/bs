@@ -153,6 +153,7 @@ osagent::exec() {
         return 2
       fi
       head -c 4000 -- "${path}"
+      # WRAPPER-CANDIDATE: utils::head_bytes — files.read caps output ad-hoc; a shared truncate-read helper would serve api/tui/agent / кандидат-обёртка: utils::head_bytes — ограниченное чтение повторяется в api/tui/agent
       ;;
     api.call)
       spec="$(jq -r '.spec // empty' <<< "${args}")"
