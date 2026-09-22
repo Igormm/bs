@@ -96,10 +96,11 @@ Details: [integration-http.md](integration-http.md), [integration-llm.md](integr
 ## ts — `lib/ts/`
 
 - [toolchain.sh](../../../lib/ts/toolchain.sh) — detection and validation gates for the TypeScript dev toolchain: runtimes, lockfile-aware package managers, project layout, `tsc`/`eslint`/`prettier` gate with machine-readable output, doctor and port checks.
+- [stack.sh](../../../lib/ts/stack.sh) — local mini stack (`thriller`): init/up/down/status/logs.
 
-Key functions: `ts::toolchain::detect_runtime`, `ts::toolchain::lockfile_pm`, `ts::toolchain::tsc_bin`, `ts::toolchain::validate`, `ts::toolchain::doctor`, `ts::toolchain::port_free`.
+Key functions: `ts::toolchain::detect_runtime`, `ts::toolchain::lockfile_pm`, `ts::toolchain::tsc_bin`, `ts::toolchain::validate`, `ts::toolchain::doctor`, `ts::toolchain::port_free`, `ts::stack::init`, `ts::stack::up`, `ts::stack::down`.
 
-Details: [ts-toolchain.md](ts-toolchain.md)
+Details: [ts-toolchain.md](ts-toolchain.md), [ts-stack.md](ts-stack.md)
 
 ## frameworks — `lib/frameworks/`
 

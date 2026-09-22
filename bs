@@ -84,6 +84,7 @@ Commands:
   lsp                 Run the language server (stdin/stdout, JSON-RPC)
   chat                Interactive LLM chat (openai/ollama, --url for custom)
   api                 OpenAPI 3.x client (load spec, list paths, call operations)
+  ts                  TypeScript toolchain + local mini stack (thriller)
   doctor              Check framework integrity
   run <script> [args] Execute script inside BS environment
   build <script>      Assemble a standalone self-extracting script
@@ -787,12 +788,47 @@ update_cmd() {
   log::success "sync done — changes are live without reinstalling"
 }
 
+ts_cmd() {
+  case "${1:-}" in
+    -h|--help|"")
+      printf 'Usage: bs ts <command> [args]\n\n'
+      printf 'TypeScript toolchain and a local mini stack (thriller).\n\n'
+      printf '  doctor [dir]     TS environment summary\n'
+      printf '  validate [dir]   tsc / eslint / prettier gate\n'
+      printf '  port-free PORT   is TCP port free\n'
+      printf '  init [dir]       scaffold api + fixtures + public\n'
+      printf '  up [dir]         start api (and web if present)\n'
+      printf '  down             stop\n'
+      printf '  status           pids / ports / alive\n'
+      printf '  logs [api|web]   last log lines\n'
+      return 0 ;;
+  esac
+  local -r sub="$1"
+  shift || true
+  case "${sub}" in
+    doctor)
+      load "lib/ts/toolchain"
+      ts::toolchain::doctor "$@" ;;
+    validate)
+      load "lib/ts/toolchain"
+      ts::toolchain::validate "$@" ;;
+    port-free)
+      load "lib/ts/toolchain"
+      ts::toolchain::port_free "$@" ;;
+    init|up|down|status|logs)
+      load "lib/ts/stack"
+      "ts::stack::${sub}" "$@" ;;
+    *)
+      die "ts: unknown command: ${sub} (see: bs ts --help)" ;;
+  esac
+}
+
 # 6. Shebang-режим 
 # Если bs вызван как интерпретатор shebang'а (#!/usr/bin/env bs),
 # первый аргумент — путь к существующему скрипту, а не команда.
 if [[ $# -ge 1 && -f "$1" ]]; then
   case "$1" in
-    help|-h|--help|version|env|list|lang-doc|lsp|chat|sync|rfc|api|audit|doctor|run|build|repl|init-shell) : ;;
+    help|-h|--help|version|env|list|lang-doc|lsp|chat|sync|rfc|api|ts|audit|doctor|run|build|repl|init-shell) : ;;
     *) BS_SHEBANG=1 ;;
   esac
 fi
@@ -815,6 +851,7 @@ case "${1:-help}" in
   sync)           shift; log::warn "sync is deprecated — use: bs update" && update_cmd "$@" ;;
   rfc)            shift; rfc_cmd "$@" ;;
   api)            shift; api_cmd "$@" ;;
+  ts)             shift; ts_cmd "$@" ;;
   audit)          shift; audit_cmd "$@" ;;
   doctor)         shift || true; doctor_cmd "$@" ;;
   run)            shift; run_cmd "$@" ;;

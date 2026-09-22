@@ -96,10 +96,11 @@ RFC-хелперы: UUID 4/7 ([uuid.sh](../../../lib/rfc/uuid.sh)), URI, CSV.
 ## ts — `lib/ts/`
 
 - [toolchain.sh](../../../lib/ts/toolchain.sh) — обнаружение и гейты валидации инструментария TypeScript: рантаймы, пакетные менеджеры по лок-файлу, инспектура проекта, гейт `tsc`/`eslint`/`prettier` с машиночитаемым выводом, диагностика окружения и проверка портов.
+- [stack.sh](../../../lib/ts/stack.sh) — локальный мини-стек (`thriller`): init/up/down/status/logs.
 
-Ключевые функции: `ts::toolchain::detect_runtime`, `ts::toolchain::lockfile_pm`, `ts::toolchain::tsc_bin`, `ts::toolchain::validate`, `ts::toolchain::doctor`, `ts::toolchain::port_free`.
+Ключевые функции: `ts::toolchain::detect_runtime`, `ts::toolchain::lockfile_pm`, `ts::toolchain::tsc_bin`, `ts::toolchain::validate`, `ts::toolchain::doctor`, `ts::toolchain::port_free`, `ts::stack::init`, `ts::stack::up`, `ts::stack::down`.
 
-Подробнее: [ts-toolchain.md](ts-toolchain.md)
+Подробнее: [ts-toolchain.md](ts-toolchain.md), [ts-stack.md](ts-stack.md)
 
 ## frameworks — `lib/frameworks/`
 

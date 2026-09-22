@@ -25,6 +25,7 @@
 
 | Файл | Что демонстрирует | Запуск |
 | --- | --- | --- |
+| [tree_example.sh](../../../examples/tree_example.sh) | Дерево проекта из yaml через `io::tree` | `./bs run examples/tree_example.sh` |
 | [hello.sh](../../../examples/hello.sh) | Самый короткий полезный скрипт: shebang `bs`, `load`, `io::streams::print` | `./bs run examples/hello.sh` |
 | [todo.sh](../../../examples/todo.sh) | TUI todo list на `lib/tui`: список, модалки ввода/подтверждения, `~/.todo.tsv` | `./bs run examples/todo.sh` |
 | [pulse.sh](../../../examples/pulse.sh) | Пульс возможностей хоста: `lib/platform/facts`, цепочки проб, UUID v7, hw при `/proc` | `./bs run examples/pulse.sh` |
