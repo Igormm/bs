@@ -104,7 +104,7 @@ After initialization `bs` chooses one of two modes:
   through `run_cmd`. This is what makes `#!/usr/bin/env bs` work.
 - **CLI mode.** Otherwise the first argument is dispatched as a command:
   `help`, `version`, `env`, `list`, `doctor`, `run <script> [args]`,
-  `init-shell`.
+  `init-shell`, `update`, `uninstall`.
 
 `run_cmd` (also used by `bs run`) executes the target script in a **new bash
 process**: it unsets the inherited `BS_INITIALIZED`, sources

@@ -95,6 +95,7 @@ Commands:
   build <script>      Assemble a standalone self-extracting script
   repl                Interactive REPL (BS shell / интерактивная консоль)
   update              Apply repo changes to installed copies (no reinstall)
+  uninstall           Remove installed BS copies (wrapper + lib tree)
   init-shell          Print snippet for ~/.bashrc or ~/.zshrc
 
 Shebang mode:
@@ -789,6 +790,111 @@ update_cmd() {
   log::success "sync done — changes are live without reinstalling"
 }
 
+# ==========================================
+# bs uninstall: remove installed BS copies / удаление установленных копий
+# ==========================================
+
+uninstall_cmd() {
+  local -a targets=()
+  local explicit=0
+  local verbose=0
+
+  while [[ $# -gt 0 ]]; do
+    case "${1:-}" in
+      --local)
+        explicit=1
+        targets+=("${HOME:-}/.local/lib/bs")
+        shift ;;
+      --system)
+        explicit=1
+        targets+=("/usr/local/lib/bs")
+        shift ;;
+      --lib)
+        shift
+        [[ $# -ge 1 ]] || die "uninstall: --lib requires a target directory"
+        explicit=1
+        targets+=("$1")
+        shift ;;
+      -v|--verbose)
+        verbose=1
+        shift ;;
+      -h|--help)
+        printf 'Usage: bs uninstall [--local] [--system] [--lib DIR] [-v]\n\n'
+        printf 'Removes installed BS copies (lib tree + wrapper).\n'
+        printf '  --local   remove ~/.local/lib/bs and its wrapper in ~/.local/bin\n'
+        printf '  --system  remove /usr/local/lib/bs and its wrapper (needs root)\n'
+        printf '  --lib DIR remove a custom install directory\n'
+        printf 'Without flags: remove every detected install (local + system).\n'
+        printf 'Safety: only directories that are unmistakably BS installs are\n'
+        printf 'removed; a wrapper is deleted only when it points back at the target.\n'
+        printf 'PATH lines in rc files are cleaned by: ./install.sh --local uninstall\n'
+        return 0 ;;
+      *)
+        die "uninstall: unknown argument: $1" ;;
+    esac
+  done
+
+  # Детект установок / Detect installs
+  if (( explicit == 0 )); then
+    if is::dir "${HOME:-}/.local/lib/bs"; then
+      targets+=("${HOME:-}/.local/lib/bs")
+    fi
+    if is::dir "/usr/local/lib/bs"; then
+      targets+=("/usr/local/lib/bs")
+    fi
+  fi
+
+  if (( ${#targets[@]} == 0 )); then
+    die "uninstall: no BS installs found (use --local, --system or --lib DIR)"
+  fi
+
+  local target ok=0
+  for target in "${targets[@]}"; do
+    target="${target%/}"   # нормализация: убрать завершающий слеш / strip trailing slash
+    # Безопасность: удаляем только каталоги, которые однозначно являются BS
+    # Safety: only remove directories that are unmistakably BS installs
+    if [[ ! -f "${target}/bs" || ! -f "${target}/bootstrap/init.sh" ]]; then
+      log::warn "uninstall: not a BS install, skipping: ${target}"
+      continue
+    fi
+    # Никогда не удалять исходный чекаут/рабочий BS_ROOT
+    # Never remove the source checkout or the running BS_ROOT
+    if [[ "${target}" == "${BS_ROOT}" || -d "${target}/.git" ]]; then
+      log::warn "uninstall: refusing to remove the BS source checkout: ${target}"
+      continue
+    fi
+    if ! [[ -w "${target}" ]]; then
+      log::warn "uninstall: target not writable: ${target} (try: sudo bs uninstall --system)"
+      continue
+    fi
+
+    local bin_dir wrapper
+    bin_dir="${target%/lib/bs}/bin"
+    wrapper="${bin_dir}/bs"
+    log::info "uninstalling ${target}"
+    # Wrapper удаляется только если указывает на этот target
+    # Wrapper is removed only when it points back at this install
+    if [[ -f "${wrapper}" ]] && grep -Fq "BS_ROOT=\"${target}\"" "${wrapper}" 2>/dev/null; then
+      rm -f -- "${wrapper}"
+      if (( verbose == 1 )); then
+        log::info "  removed: ${wrapper}"
+      fi
+    elif [[ -f "${wrapper}" ]]; then
+      log::warn "uninstall: wrapper not matching this install, left in place: ${wrapper}"
+    fi
+
+    rm -rf -- "${target}"
+    if (( verbose == 1 )); then
+      log::info "  removed: ${target}"
+    fi
+    rmdir -- "${bin_dir}" 2>/dev/null || true
+    ok=1
+  done
+
+  (( ok == 1 )) || die "uninstall: nothing removed — target is not a BS install or not writable (see messages above)"
+  log::success "uninstall done"
+}
+
 ts_cmd() {
   case "${1:-}" in
     -h|--help|"")
@@ -829,7 +935,7 @@ ts_cmd() {
 # первый аргумент — путь к существующему скрипту, а не команда.
 if [[ $# -ge 1 && -f "$1" ]]; then
   case "$1" in
-    help|-h|--help|version|env|list|lang-doc|lsp|chat|sync|rfc|api|ts|audit|doctor|run|build|repl|init-shell) : ;;
+    help|-h|--help|version|env|list|lang-doc|lsp|chat|sync|rfc|api|ts|audit|doctor|run|build|repl|init-shell|update|uninstall) : ;;
     *) BS_SHEBANG=1 ;;
   esac
 fi
@@ -849,6 +955,7 @@ case "${1:-help}" in
   lsp)            shift; lsp_cmd "$@" ;;
   chat)           shift; chat_cmd "$@" ;;
   update)         shift; update_cmd "$@" ;;
+  uninstall)      shift; uninstall_cmd "$@" ;;
   sync)           shift; log::warn "sync is deprecated — use: bs update" && update_cmd "$@" ;;
   rfc)            shift; rfc_cmd "$@" ;;
   api)            shift; api_cmd "$@" ;;

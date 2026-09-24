@@ -59,9 +59,12 @@ PREFIX=/opt/bs sudo ./install.sh
 ```bash
 sudo ./install.sh uninstall        # system
 ./install.sh --local uninstall     # local
+bs uninstall --local               # CLI: remove installed copies (no rc-file edits)
 ```
 
 `uninstall` (alias: `remove`) deletes `TARGET_BIN` and `TARGET_LIB`. In local mode it additionally removes `BIN_DIR`/`LIB_DIR` only if they are empty (`rmdir`), so other files in `~/.local` are never touched. The installer-added PATH line is also removed from `~/.bashrc` and `~/.zshrc` (exact match only; user edits are left untouched).
+
+`bs uninstall` is the CLI counterpart (see `bs uninstall --help`): it removes the lib tree and the wrapper, and only for directories that are unmistakably BS installs. It does not touch rc files — run `./install.sh --local uninstall` from the source repo if PATH-line cleanup is needed.
 
 ## PATH management (local mode)
 

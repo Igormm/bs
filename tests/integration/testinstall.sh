@@ -79,7 +79,11 @@ test_local_install() {
 
     local version_out
     version_out="$(env HOME="${iso}" "${bin}" version)"
-    testframework::assert_equal "BS Framework version: 0.5.2" "${version_out}" "installed bs version works"
+    # Версия берётся из исходника bs, а не хардкодится (BS_VERSION живёт там)
+    # Version is taken from the bs source, not hardcoded (BS_VERSION lives there)
+    local version_repo
+    version_repo="$(sed -n "s/^readonly BS_VERSION='\([0-9.]*\)'$/\1/p" "${BS_PROJECT_ROOT}/bs" | head -n 1)"
+    testframework::assert_equal "BS Framework version: ${version_repo}" "${version_out}" "installed bs version works"
 
     local list_out
     list_out="$(env HOME="${iso}" "${bin}" list)"
@@ -201,6 +205,64 @@ test_uninstall_keeps_user_edits() {
     fi
 }
 
+# bs uninstall: CLI-удаление установленных копий
+# bs uninstall: CLI removal of installed copies
+test_bs_uninstall() {
+    local iso rc=0 out
+    iso="$(mk_isolated_home)"
+    run_installer "${iso}" --local >/dev/null 2>&1 || true
+
+    out="$(env HOME="${iso}" "${BS_PROJECT_ROOT}/bs" uninstall --lib "${iso}/.local/lib/bs")" || rc=$?
+    testframework::assert_equal "0" "${rc}" "bs uninstall exits 0"
+
+    if [[ -e "${iso}/.local/bin/bs" || -d "${iso}/.local/lib/bs" ]]; then
+        testframework::assert_true "false" "bs uninstall removes wrapper and libs"
+    else
+        testframework::assert_true "true" "bs uninstall removes wrapper and libs"
+    fi
+
+    # Safety: a non-BS directory must survive untouched
+    local not_bs="${TMP_ROOT}/not-bs.$$"
+    mkdir -p "${not_bs}"
+    rc=0
+    env HOME="${iso}" "${BS_PROJECT_ROOT}/bs" uninstall --lib "${not_bs}" >/dev/null 2>&1 || rc=$?
+    testframework::assert_equal "1" "${rc}" "bs uninstall refuses a non-BS directory"
+    testframework::assert_command "test -d '${not_bs}'" "non-BS directory is left untouched"
+
+    # Safety: the BS source checkout must survive untouched
+    rc=0
+    env HOME="${iso}" "${BS_PROJECT_ROOT}/bs" uninstall --lib "${BS_PROJECT_ROOT}" >/dev/null 2>&1 || rc=$?
+    testframework::assert_equal "1" "${rc}" "bs uninstall refuses the source checkout"
+    testframework::assert_command "test -d '${BS_PROJECT_ROOT}/core'" "source checkout is left untouched"
+
+    # A wrapper that does NOT point back at the target must survive
+    run_installer "${iso}" --local >/dev/null 2>&1 || true
+    local fake_wrapper="${iso}/.local/bin/bs"
+    printf '#!/usr/bin/env bash\nexport BS_ROOT="/elsewhere/bs"\nexec "$BS_ROOT/bs" "$@"\n' > "${fake_wrapper}"
+    chmod 0755 "${fake_wrapper}"
+    rc=0
+    env HOME="${iso}" "${BS_PROJECT_ROOT}/bs" uninstall --lib "${iso}/.local/lib/bs" >/dev/null 2>&1 || rc=$?
+    testframework::assert_equal "0" "${rc}" "bs uninstall with mismatched wrapper exits 0"
+    testframework::assert_command "test -f '${fake_wrapper}'" "mismatched wrapper survives uninstall"
+    testframework::assert_true "! -d '${iso}/.local/lib/bs'" "lib tree is still removed"
+}
+
+# bs uninstall --local in an isolated HOME
+test_bs_uninstall_local() {
+    local iso rc=0
+    iso="$(mk_isolated_home)"
+    run_installer "${iso}" --local >/dev/null 2>&1 || true
+
+    env HOME="${iso}" "${BS_PROJECT_ROOT}/bs" uninstall --local >/dev/null 2>&1 || rc=$?
+    testframework::assert_equal "0" "${rc}" "bs uninstall --local exits 0"
+
+    if [[ -e "${iso}/.local/bin/bs" || -d "${iso}/.local/lib/bs" ]]; then
+        testframework::assert_true "false" "bs uninstall --local removes wrapper and libs"
+    else
+        testframework::assert_true "true" "bs uninstall --local removes wrapper and libs"
+    fi
+}
+
 test_system_mode_requires_root() {
     if [[ "$(id -u)" -eq 0 ]]; then
         printf "  ⊘ Skipping system-mode root check: running as root\n"
@@ -231,6 +293,8 @@ main() {
     testframework::section "Uninstall / Удаление"
     test_uninstall
     test_uninstall_keeps_user_edits
+    test_bs_uninstall
+    test_bs_uninstall_local
 
     testframework::section "PATH helpers / Настройка PATH"
     test_path_flag

@@ -59,9 +59,12 @@ PREFIX=/opt/bs sudo ./install.sh
 ```bash
 sudo ./install.sh uninstall        # system
 ./install.sh --local uninstall     # local
+bs uninstall --local               # CLI: удалить установленные копии (без правок rc-файлов)
 ```
 
 `uninstall` (псевдоним: `remove`) удаляет `TARGET_BIN` и `TARGET_LIB`. В локальном режиме дополнительно удаляются `BIN_DIR`/`LIB_DIR`, но только если они пустые (`rmdir`), поэтому другие файлы в `~/.local` не затрагиваются. Также из `~/.bashrc` и `~/.zshrc` удаляется строка PATH, добавленная установщиком (только точное совпадение — пользовательские правки не трогаются).
+
+`bs uninstall` — CLI-аналог (см. `bs uninstall --help`): удаляет дерево lib и wrapper, и только для каталогов, которые однозначно являются установками BS. rc-файлы не трогает — если нужна очистка строк PATH, запустите `./install.sh --local uninstall` из исходного репозитория.
 
 ## Управление PATH (локальный режим)
 
