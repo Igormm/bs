@@ -27,6 +27,8 @@ bs::source_relative "../../core/lang.sh" "../../core/const.sh" "../../core/error
 # Сам парсер — jq-фильтр (langdoc.jq): один процесс jq на файл.
 # ==========================================
 
+# @global LANGDOC_JQ_FILTER — Langdoc: jq filter file path (category: constant)
+# @global LANGDOC_JQ_FILTER — Langdoc: путь к файлу jq-фильтра (категория: constant)
 readonly LANGDOC_JQ_FILTER="${BS_ROOT}/lib/data/langdoc.jq"
 
 # @description Emit one JSON object per documented function in a file.

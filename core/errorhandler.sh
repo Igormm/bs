@@ -20,6 +20,8 @@ bs::guard "ERRORHANDLER" || return 0
 # Зависимости / Dependencies
 bs::source_relative "const.sh" "logger.sh"
 
+# @global BS_CLEANUP_STACK — Errorhandler: cleanup action stack (LIFO) (category: env)
+# @global BS_CLEANUP_STACK — Errorhandler: стек действий очистки (LIFO) (категория: env)
 declare -ga BS_CLEANUP_STACK=()
 
 # @description Add cleanup function to stack / Добавить функцию очистки в стек

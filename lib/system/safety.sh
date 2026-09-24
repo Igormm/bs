@@ -9,8 +9,11 @@ bs::guard "SYSTEM_SAFETY" || return 0
 # Зависимости / Dependencies
 bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh"
 
-# Safety levels / Уровни безопасности
+# @global SAFETY_LEVEL — Safety: level: paranoid/strict/normal/relaxed (category: constant)
+# @global SAFETY_LEVEL — Safety: уровень: paranoid/strict/normal/relaxed (категория: constant)
 declare -g SAFETY_LEVEL="normal"  # paranoid, strict, normal, relaxed
+# @global SAFETY_DRY_RUN — Safety: dry run mode (true/false) (category: constant)
+# @global SAFETY_DRY_RUN — Safety: режим «сухого запуска» (true/false) (категория: constant)
 declare -g SAFETY_DRY_RUN="false" # true/false
 
 # @description Set safety level / Установить уровень безопасности

@@ -13,9 +13,14 @@ bs::guard "DATA_PROCESSOR" || return 0
 # Зависимости / Dependencies
 bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/errorhandler.sh" "../system/platformcheck.sh"
 
-# Data processor configuration
+# @global DATA_PROCESSOR_CONFIG_DIR — Hook: data processor config directory (category: constant)
+# @global DATA_PROCESSOR_CONFIG_DIR — Хук: каталог конфигурации обработчика данных (категория: constant)
 readonly DATA_PROCESSOR_CONFIG_DIR="${HOME}/.config/dataprocessor"
+# @global DATA_PROCESSOR_CACHE_DIR — Hook: data processor cache directory (category: constant)
+# @global DATA_PROCESSOR_CACHE_DIR — Хук: каталог кэша обработчика данных (категория: constant)
 readonly DATA_PROCESSOR_CACHE_DIR="/tmp/data_processor_cache"
+# @global DATA_PROCESSOR_MAX_FILE_SIZE — Hook: max input file size (category: constant)
+# @global DATA_PROCESSOR_MAX_FILE_SIZE — Хук: максимальный размер входного файла (категория: constant)
 readonly DATA_PROCESSOR_MAX_FILE_SIZE="100M"
 
 # Module state

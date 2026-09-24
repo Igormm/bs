@@ -24,10 +24,12 @@ bs::guard "IO_INTEGRATION_K8S" || return 0
 # Зависимости / Dependencies
 bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "result.sh"
 
-# Module version / Версия модуля
+# @global IO_INTEGRATION_K8S_VERSION — Module version (category: module-flag)
+# @global IO_INTEGRATION_K8S_VERSION — Версия модуля (категория: module-flag)
 declare -g IO_INTEGRATION_K8S_VERSION="1.0.0"
 
-# Default namespace / Пространство имён по умолчанию
+# @global K8S_NAMESPACE — Hook: default k8s namespace (category: hook)
+# @global K8S_NAMESPACE — Хук: пространство имён k8s по умолчанию (категория: hook)
 : "${K8S_NAMESPACE:=default}"
 
 # ==========================================

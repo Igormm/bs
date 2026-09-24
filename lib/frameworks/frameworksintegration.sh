@@ -17,9 +17,14 @@ bs::guard "FRAMEWORKS_INTEGRATION" || return 0
 # Зависимости / Dependencies
 bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/errorhandler.sh"
 
-# Frameworks Integration configuration
+# @global FRAMEWORKS_CONFIG_DIR — Hook: frameworks config directory (category: constant)
+# @global FRAMEWORKS_CONFIG_DIR — Хук: каталог конфигурации фреймворков (категория: constant)
 readonly FRAMEWORKS_CONFIG_DIR="${HOME}/.config/bs_frameworks"
+# @global FRAMEWORKS_PLUGIN_DIR — Hook: frameworks plugin directory (category: constant)
+# @global FRAMEWORKS_PLUGIN_DIR — Хук: каталог плагинов фреймворков (категория: constant)
 readonly FRAMEWORKS_PLUGIN_DIR="${FRAMEWORKS_CONFIG_DIR}/plugins"
+# @global FRAMEWORKS_CACHE_DIR — Hook: frameworks cache directory (category: constant)
+# @global FRAMEWORKS_CACHE_DIR — Хук: каталог кэша фреймворков (категория: constant)
 readonly FRAMEWORKS_CACHE_DIR="/tmp/bs_frameworks"
 
 # Module state variables

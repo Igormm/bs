@@ -18,7 +18,11 @@ bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/uti
 # Примечание: строгий режим (set -euo pipefail) задаётся только в точках входа
 # Note: strict mode (set -euo pipefail) is set only in entry points
 
+# @global PLATFORM_CHECK_VERSION — Module version (category: module-flag)
+# @global PLATFORM_CHECK_VERSION — Версия модуля (категория: module-flag)
 declare -g PLATFORM_CHECK_VERSION="1.0.0"
+# @global PLATFORM_CHECK_RESULTS — Platformcheck: capability check results map (category: constant)
+# @global PLATFORM_CHECK_RESULTS — Platformcheck: карта результатов проверок возможностей (категория: constant)
 declare -g -A PLATFORM_CHECK_RESULTS
 
 # ==========================================

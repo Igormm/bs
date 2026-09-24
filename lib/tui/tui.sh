@@ -40,26 +40,58 @@ bs::source_relative "../../core/lang.sh" "../../core/utils.sh"
 # Terminal state / Состояние терминала
 # ==========================================
 
+# @global TUI_ACTIVE — Tui: active flag (0/1) (category: constant)
+# @global TUI_ACTIVE — Tui: флаг активности (0/1) (категория: constant)
 declare -g TUI_ACTIVE=0
+# @global TUI_COLS — Tui: terminal columns (category: constant)
+# @global TUI_COLS — Tui: число колонок терминала (категория: constant)
 declare -g TUI_COLS=80
+# @global TUI_LINES — Tui: terminal lines (category: constant)
+# @global TUI_LINES — Tui: число строк терминала (категория: constant)
 declare -g TUI_LINES=24
+# @global TUI_TRUECOLOR — Tui: truecolor support (0/1) (category: constant)
+# @global TUI_TRUECOLOR — Tui: поддержка truecolor (0/1) (категория: constant)
 declare -g TUI_TRUECOLOR=0
+# @global TUI_STTY_SAVE — Tui: saved stty state (category: constant)
+# @global TUI_STTY_SAVE — Tui: сохранённое состояние stty (категория: constant)
 declare -g TUI_STTY_SAVE=""
+# @global TUI_KEY — Tui: last pressed key (category: constant)
+# @global TUI_KEY — Tui: последняя нажатая клавиша (категория: constant)
 declare -g TUI_KEY=""
+# @global TUI_KEY_CHAR — Tui: last key character (category: constant)
+# @global TUI_KEY_CHAR — Tui: символ последней клавиши (категория: constant)
 declare -g TUI_KEY_CHAR=""
+# @global TUI_MOUSE_X — Tui: mouse X position (category: constant)
+# @global TUI_MOUSE_X — Tui: позиция мыши X (категория: constant)
 declare -g TUI_MOUSE_X=0
+# @global TUI_MOUSE_Y — Tui: mouse Y position (category: constant)
+# @global TUI_MOUSE_Y — Tui: позиция мыши Y (категория: constant)
 declare -g TUI_MOUSE_Y=0
+# @global TUI_MOUSE_BUTTON — Tui: mouse button state (category: constant)
+# @global TUI_MOUSE_BUTTON — Tui: состояние кнопки мыши (категория: constant)
 declare -g TUI_MOUSE_BUTTON=0
+# @global TUI_RESIZED — Tui: resize flag (0/1) (category: constant)
+# @global TUI_RESIZED — Tui: флаг изменения размера (0/1) (категория: constant)
 declare -g TUI_RESIZED=0
 
-# Screen buffer / Буфер экрана: "r,c" → char; "r,c:s" → style
+# @global TUI_BUF — Tui: screen buffer map (category: constant)
+# @global TUI_BUF — Tui: буфер экрана (категория: constant)
 declare -gA TUI_BUF=()
+# @global TUI_BUF_STYLE — Tui: screen buffer styles map (category: constant)
+# @global TUI_BUF_STYLE — Tui: стили буфера экрана (категория: constant)
 declare -gA TUI_BUF_STYLE=()
+# @global TUI_LAST — Tui: last frame map (category: constant)
+# @global TUI_LAST — Tui: последний кадр (категория: constant)
 declare -gA TUI_LAST=()
+# @global TUI_LAST_STYLE — Tui: last frame styles map (category: constant)
+# @global TUI_LAST_STYLE — Tui: стили последнего кадра (категория: constant)
 declare -gA TUI_LAST_STYLE=()
 
-# Modal stack / Стек модальных окон: name → draw function
+# @global TUI_MODAL_DRAW — Tui: modal draw map (category: constant)
+# @global TUI_MODAL_DRAW — Tui: карта отрисовки модалок (категория: constant)
 declare -gA TUI_MODAL_DRAW=()
+# @global TUI_MODAL_STACK — Tui: modal stack (category: constant)
+# @global TUI_MODAL_STACK — Tui: стек модальных окон (категория: constant)
 declare -ga TUI_MODAL_STACK=()
 
 # ==========================================
@@ -452,8 +484,11 @@ tui::__mouse_sgr() {
 # Borders / Рамки
 # ==========================================
 
-# Текущий набор рамки / Current border set
+# @global TUI_BORDER_TL — Tui: top-left corner char (category: constant)
+# @global TUI_BORDER_TL — Tui: символ верхнего левого угла (категория: constant)
 declare -g TUI_BORDER_TL="╔" TUI_BORDER_TR="╗" TUI_BORDER_BL="╚" TUI_BORDER_BR="╝"
+# @global TUI_BORDER_H — Tui: horizontal border char (category: constant)
+# @global TUI_BORDER_H — Tui: символ горизонтальной рамки (категория: constant)
 declare -g TUI_BORDER_H="═" TUI_BORDER_V="║"
 
 # @description Select a border style / Выбрать стиль рамки.

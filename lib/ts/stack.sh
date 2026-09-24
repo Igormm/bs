@@ -16,14 +16,24 @@ bs::source_relative "../../core/const.sh" "../../core/logger.sh" \
   "../../core/utils.sh" "../../core/lang.sh" \
   "../../core/errorhandler.sh" "toolchain.sh" "../io/files.sh"
 
-# shellcheck disable=SC2034
+# @global TS_STACK_VERSION — Module version (category: module-flag)
+# @global TS_STACK_VERSION — Версия модуля (категория: module-flag)
 declare -g TS_STACK_VERSION="1.0.0"
-# shellcheck disable=SC2034
+# @global TS_STACK_LOADED — Module loaded flag (category: module-flag)
+# @global TS_STACK_LOADED — Флаг загрузки модуля (категория: module-flag)
 declare -g TS_STACK_LOADED="1"
 
+# @global TS_STACK_NAME — Hook: mini-stack project name (category: hook)
+# @global TS_STACK_NAME — Хук: имя проекта мини-стека (категория: hook)
 : "${TS_STACK_NAME:=thriller}"
+# @global TS_STACK_STATE — Hook: stack state directory (category: hook)
+# @global TS_STACK_STATE — Хук: каталог состояния стека (категория: hook)
 : "${TS_STACK_STATE:=${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/bs-ts}"
+# @global TS_STACK_API_PORT — Hook: API port (category: hook)
+# @global TS_STACK_API_PORT — Хук: порт API (категория: hook)
 : "${TS_STACK_API_PORT:=8787}"
+# @global TS_STACK_WEB_PORT — Hook: web port (category: hook)
+# @global TS_STACK_WEB_PORT — Хук: порт веб-интерфейса (категория: hook)
 : "${TS_STACK_WEB_PORT:=5173}"
 
 # ==========================================

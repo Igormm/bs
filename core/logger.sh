@@ -28,10 +28,17 @@
 
 bs::guard "LOGGER" || return 0
 
-# Настройки по умолчанию / Default settings
+# @global BS_LOG_LEVEL — Env: log level (DEBUG/INFO/WARN/ERROR) (category: env)
+# @global BS_LOG_LEVEL — Env: уровень логирования (DEBUG/INFO/WARN/ERROR) (категория: env)
 : "${BS_LOG_LEVEL:=INFO}"
+# @global BS_LOG_COLOR — Env: log color mode: auto/always/never (category: env)
+# @global BS_LOG_COLOR — Env: режим цвета лога: auto/always/never (категория: env)
 : "${BS_LOG_COLOR:=auto}"
+# @global BS_LOG_FORMAT — Env: log format: text/raw (category: env)
+# @global BS_LOG_FORMAT — Env: формат лога: text/raw (категория: env)
 : "${BS_LOG_FORMAT:=text}"
+# @global BS_LOG_TIMESTAMP — Env: log timestamp: true/false (category: env)
+# @global BS_LOG_TIMESTAMP — Env: временная метка в логе: true/false (категория: env)
 : "${BS_LOG_TIMESTAMP:=true}"
 
 # ==========================================
@@ -425,7 +432,8 @@ if is::empty "${E_SUCCESS:-}"; then
     readonly E_ERROR=1
 fi
 
-# Отмечаем модуль как загруженный / Mark module as loaded
+# @global LOGGER_LOADED — Module loaded flag (category: module-flag)
+# @global LOGGER_LOADED — Флаг загрузки модуля (категория: module-flag)
 declare -g LOGGER_LOADED="1"
 
 log::debug "Logger module initialized with level: ${BS_LOG_LEVEL}, color: ${BS_LOG_COLOR}" 2>/dev/null || true

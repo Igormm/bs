@@ -20,8 +20,11 @@
 # Source Guard / Защита от повторной загрузки
 bs::guard "CORE_REPL" || return 0
 
-# История сессии / Session history (последние 200 строк)
+# @global REPL_HISTORY — Repl: command history (category: constant)
+# @global REPL_HISTORY — Repl: история команд (категория: constant)
 declare -g REPL_HISTORY=()
+# @global REPL_HISTORY_MAX — Repl: max history entries (category: constant)
+# @global REPL_HISTORY_MAX — Repl: максимум записей истории (категория: constant)
 readonly REPL_HISTORY_MAX=200
 
 # @description Показать справку REPL / Show REPL help

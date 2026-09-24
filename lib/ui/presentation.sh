@@ -136,20 +136,42 @@ else
     export PRESENTATION_BG_BRIGHT_WHITE=""
 fi
 
-# Define common symbols
+# @global PRESENTATION_SYMBOL_CHECK — Presentation: check symbol (category: constant)
+# @global PRESENTATION_SYMBOL_CHECK — Presentation: символ «галочка» (категория: constant)
 export PRESENTATION_SYMBOL_CHECK="✓"
+# @global PRESENTATION_SYMBOL_CROSS — Presentation: cross symbol (category: constant)
+# @global PRESENTATION_SYMBOL_CROSS — Presentation: символ «крест» (категория: constant)
 export PRESENTATION_SYMBOL_CROSS="✗"
+# @global PRESENTATION_SYMBOL_ARROW — Presentation: arrow symbol (category: constant)
+# @global PRESENTATION_SYMBOL_ARROW — Presentation: символ «стрелка» (категория: constant)
 export PRESENTATION_SYMBOL_ARROW="→"
+# @global PRESENTATION_SYMBOL_POINTER — Presentation: pointer symbol (category: constant)
+# @global PRESENTATION_SYMBOL_POINTER — Presentation: символ «указатель» (категория: constant)
 export PRESENTATION_SYMBOL_POINTER=">"
+# @global PRESENTATION_SYMBOL_STAR — Presentation: star symbol (category: constant)
+# @global PRESENTATION_SYMBOL_STAR — Presentation: символ «звезда» (категория: constant)
 export PRESENTATION_SYMBOL_STAR="★"
+# @global PRESENTATION_SYMBOL_DIAMOND — Presentation: diamond symbol (category: constant)
+# @global PRESENTATION_SYMBOL_DIAMOND — Presentation: символ «ромб» (категория: constant)
 export PRESENTATION_SYMBOL_DIAMOND="◆"
+# @global PRESENTATION_SYMBOL_BULLET — Presentation: bullet symbol (category: constant)
+# @global PRESENTATION_SYMBOL_BULLET — Presentation: символ «маркер списка» (категория: constant)
 export PRESENTATION_SYMBOL_BULLET="•"
 
-# Define common emojis as fallback text
+# @global PRESENTATION_EMOJI_CHECK — Presentation: check emoji (category: constant)
+# @global PRESENTATION_EMOJI_CHECK — Presentation: эмодзи «галочка» (категория: constant)
 export PRESENTATION_EMOJI_CHECK="✅"
+# @global PRESENTATION_EMOJI_CROSS — Presentation: cross emoji (category: constant)
+# @global PRESENTATION_EMOJI_CROSS — Presentation: эмодзи «крест» (категория: constant)
 export PRESENTATION_EMOJI_CROSS="❌"
+# @global PRESENTATION_EMOJI_WARN — Presentation: warning emoji (category: constant)
+# @global PRESENTATION_EMOJI_WARN — Presentation: эмодзи «предупреждение» (категория: constant)
 export PRESENTATION_EMOJI_WARN="⚠️"
+# @global PRESENTATION_EMOJI_INFO — Presentation: info emoji (category: constant)
+# @global PRESENTATION_EMOJI_INFO — Presentation: эмодзи «инфо» (категория: constant)
 export PRESENTATION_EMOJI_INFO="ℹ️"
+# @global PRESENTATION_EMOJI_HEART — Presentation: heart emoji (category: constant)
+# @global PRESENTATION_EMOJI_HEART — Presentation: эмодзи «сердце» (категория: constant)
 export PRESENTATION_EMOJI_HEART="❤️"
 
 # @description Colorize text with specified color

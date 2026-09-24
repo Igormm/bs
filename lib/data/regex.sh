@@ -36,13 +36,11 @@ bs::source_relative "../../core/lang.sh" "../../core/utils.sh" "../../core/error
 #   regex::replace — многострочная цепочка выше.
 # ==========================================
 
-# Cached capability probes (probed once, reused on every call) /
-# Кэш проб возможностей (проба один раз, переиспользуется в каждом вызове)
-# RX_PCRE: 1 = grep -P works, 0 = not, "" = not probed yet
-# RX_PCRE: 1 = grep -P работает, 0 = нет, "" = ещё не проверялось
+# @global RX_PCRE — Regex: PCRE support flag (grep -P) (category: constant)
+# @global RX_PCRE — Regex: флаг поддержки PCRE (grep -P) (категория: constant)
 declare -g RX_PCRE=""
-# RX_SED_Z: 1 = sed -z works, 0 = not, "" = not probed yet
-# RX_SED_Z: 1 = sed -z работает, 0 = нет, "" = ещё не проверялось
+# @global RX_SED_Z — Regex: sed -z support flag (category: constant)
+# @global RX_SED_Z — Regex: флаг поддержки sed -z (категория: constant)
 declare -g RX_SED_Z=""
 
 # @private

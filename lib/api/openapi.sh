@@ -27,13 +27,17 @@ bs::source_relative "../../core/lang.sh" "../../core/const.sh" "../../core/logge
 #   api::call petstore GET /pets --limit 10 --json
 # ==========================================
 
-# Loaded specs: name -> spec file path / Загруженные схемы: имя -> путь
+# @global API_SPECS — Openapi: loaded specs map (category: constant)
+# @global API_SPECS — Openapi: карта загруженных спецификаций (категория: constant)
 declare -gA API_SPECS=()
-# Auth tokens: name -> token / Токены: имя -> токен
+# @global API_SPEC_AUTH — Hook: per-spec auth tokens map (category: constant)
+# @global API_SPEC_AUTH — Хук: карта токенов авторизации по спецификациям (категория: constant)
 declare -gA API_SPEC_AUTH=()
-# Cache dir for specs fetched from URLs / Кэш для схем, скачанных по URL
+# @global API_SPEC_CACHE_DIR — Hook: spec cache directory (category: constant)
+# @global API_SPEC_CACHE_DIR — Хук: каталог кэша спецификаций (категория: constant)
 declare -g API_SPEC_CACHE_DIR="${XDG_CACHE_HOME:-${HOME}/.cache}/bs/api"
-# Registry: name<TAB>file — survives across processes / Реестр: имя<TAB>путь
+# @global API_SPEC_REGISTRY — Openapi: spec registry file (category: constant)
+# @global API_SPEC_REGISTRY — Openapi: файл реестра спецификаций (категория: constant)
 declare -g API_SPEC_REGISTRY="${API_SPEC_CACHE_DIR}/registry.tsv"
 
 # @description Load an OpenAPI spec from a file or URL.

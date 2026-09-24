@@ -21,7 +21,8 @@ bs::guard "IO_INTEGRATION_HTTP" || return 0
 # Зависимости / Dependencies
 bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh"
 
-# Module version / Версия модуля
+# @global IO_INTEGRATION_HTTP_VERSION — Module version (category: module-flag)
+# @global IO_INTEGRATION_HTTP_VERSION — Версия модуля (категория: module-flag)
 declare -g IO_INTEGRATION_HTTP_VERSION="1.0.0"
 
 # ==========================================

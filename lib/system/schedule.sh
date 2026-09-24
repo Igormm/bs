@@ -18,8 +18,8 @@ bs::guard "SYSTEM_SCHEDULE" || return 0
 # Зависимости / Dependencies
 bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh"
 
-# Метаданные модуля / Module metadata
-# shellcheck disable=SC2034
+# @global SYSTEM_SCHEDULE_VERSION — Module version (category: module-flag)
+# @global SYSTEM_SCHEDULE_VERSION — Версия модуля (категория: module-flag)
 declare -g SYSTEM_SCHEDULE_VERSION="1.0.0"
 
 # @description Schedule a one-shot command with `at`.
@@ -101,6 +101,6 @@ system::schedule::cron_list() {
     crontab -l 2>/dev/null || log::info "No cron jobs for ${USER:-current user}"
 }
 
-# Метка загрузки / Load marker
-# shellcheck disable=SC2034
+# @global SYSTEM_SCHEDULE_LOADED — Module loaded flag (category: module-flag)
+# @global SYSTEM_SCHEDULE_LOADED — Флаг загрузки модуля (категория: module-flag)
 declare -g SYSTEM_SCHEDULE_LOADED="1"

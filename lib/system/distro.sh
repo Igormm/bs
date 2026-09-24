@@ -10,12 +10,20 @@ bs::guard "SYSTEM_DISTRO" || return 0
 # Зависимости / Dependencies
 bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh"
 
-# Global variables for detected distribution / Глобальные переменные для определенного
-# дистрибутива
+# @global DISTRO_ID — Distro: OS ID from /etc/os-release (category: constant)
+# @global DISTRO_ID — Distro: ID ОС из /etc/os-release (категория: constant)
 declare -g DISTRO_ID=""
+# @global DISTRO_NAME — Distro: human-readable distro name (category: constant)
+# @global DISTRO_NAME — Distro: читаемое имя дистрибутива (категория: constant)
 declare -g DISTRO_NAME=""
+# @global DISTRO_VERSION — Distro: OS version (category: module-flag)
+# @global DISTRO_VERSION — Distro: версия ОС (категория: module-flag)
 declare -g DISTRO_VERSION=""
+# @global DISTRO_FAMILY — Distro: package family (debian/rhel/arch/suse...) (category: constant)
+# @global DISTRO_FAMILY — Distro: семейство пакетов (debian/rhel/arch/suse...) (категория: constant)
 declare -g DISTRO_FAMILY=""  # debian, redhat, arch, suse, etc.
+# @global DISTRO_PACKAGE_MANAGER — Distro: package manager command (category: constant)
+# @global DISTRO_PACKAGE_MANAGER — Distro: команда пакетного менеджера (категория: constant)
 declare -g DISTRO_PACKAGE_MANAGER=""
 
 # @description Detect Linux distribution / Определить дистрибутив Linux

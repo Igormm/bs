@@ -33,10 +33,11 @@ bs::guard "IO_FILES" || return 0
 # Зависимости / Dependencies
 bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/errorhandler.sh" "../system/permissions.sh"
 
-# Module version / Версия модуля
-# shellcheck disable=SC2034
+# @global IO_FILES_VERSION — Module version (category: module-flag)
+# @global IO_FILES_VERSION — Версия модуля (категория: module-flag)
 declare -g IO_FILES_VERSION="1.0.0"
-# shellcheck disable=SC2034
+# @global IO_FILES_LOADED — Module loaded flag (category: module-flag)
+# @global IO_FILES_LOADED — Флаг загрузки модуля (категория: module-flag)
 declare -g IO_FILES_LOADED="1"
 
 # ==========================================
@@ -412,7 +413,8 @@ io::files::append() {
 # Temporary files / Временные файлы
 # ==========================================
 
-# Registry of temp paths created with --cleanup / Реестр временных путей с --cleanup
+# @global IO_FILES_TEMPFILES — Files: temp files registry (category: constant)
+# @global IO_FILES_TEMPFILES — Files: реестр временных файлов (категория: constant)
 declare -ga IO_FILES_TEMPFILES=()
 
 # @private

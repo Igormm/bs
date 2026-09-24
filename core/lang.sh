@@ -13,8 +13,8 @@
 bs::guard "CORE_LANG" || return 0
 # NOTE: raw redirects inside hot loops here are intentional — wrapper calls would fork / примечание: сырые redirect в горячих циклах намеренны — обёртки форкают
 
-# Метаданные модуля / Module metadata
-# shellcheck disable=SC2034
+# @global CORE_LANG_VERSION — Module version (category: module-flag)
+# @global CORE_LANG_VERSION — Версия модуля (категория: module-flag)
 declare -g CORE_LANG_VERSION="1.0.0"
 
 # ==========================================

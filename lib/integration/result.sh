@@ -22,7 +22,8 @@ bs::guard "IO_INTEGRATION_RESULT" || return 0
 # Зависимости / Dependencies
 bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../io/streams.sh"
 
-# Module version / Версия модуля
+# @global IO_INTEGRATION_RESULT_VERSION — Module version (category: module-flag)
+# @global IO_INTEGRATION_RESULT_VERSION — Версия модуля (категория: module-flag)
 declare -g IO_INTEGRATION_RESULT_VERSION="1.0.0"
 
 # ==========================================

@@ -43,23 +43,48 @@ bs::guard "INTEGRATION_VK_API" || return 0
 # Зависимости / Dependencies
 bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/errorhandler.sh" "../system/platformcheck.sh"
 
-# Error codes fallbacks (no readonly): values live in core/const.sh;
-# assign defaults only when const.sh was not loaded (standalone mode).
+# @global LIB_ERROR_INVALID_ARGS — Lib error: invalid arguments (category: error-const)
+# @global LIB_ERROR_INVALID_ARGS — Ошибка lib: неверные аргументы (категория: error-const)
 : "${LIB_ERROR_INVALID_ARGS:=3}"
+# @global LIB_ERROR_FILE_OPERATION — Lib error: file operation failed (category: error-const)
+# @global LIB_ERROR_FILE_OPERATION — Ошибка lib: сбой файловой операции (категория: error-const)
 : "${LIB_ERROR_FILE_OPERATION:=100}"
+# @global LIB_ERROR_DEPENDENCY_MISSING — Lib error: required dependency missing (category: error-const)
+# @global LIB_ERROR_DEPENDENCY_MISSING — Ошибка lib: отсутствует обязательная зависимость (категория: error-const)
 : "${LIB_ERROR_DEPENDENCY_MISSING:=101}"
+# @global LIB_ERROR_PLATFORM_UNSUPPORTED — Lib error: platform not supported (category: error-const)
+# @global LIB_ERROR_PLATFORM_UNSUPPORTED — Ошибка lib: платформа не поддерживается (категория: error-const)
 : "${LIB_ERROR_PLATFORM_UNSUPPORTED:=102}"
+# @global LIB_ERROR_INVALID_STATE — Lib error: invalid module state (category: error-const)
+# @global LIB_ERROR_INVALID_STATE — Ошибка lib: неверное состояние модуля (категория: error-const)
 : "${LIB_ERROR_INVALID_STATE:=104}"
+# @global LIB_ERROR_API_REQUEST — Lib error: API request failed (category: error-const)
+# @global LIB_ERROR_API_REQUEST — Ошибка lib: сбой API-запроса (категория: error-const)
 : "${LIB_ERROR_API_REQUEST:=105}"
+# @global LIB_ERROR_INVALID_RESPONSE — Lib error: invalid API response (category: error-const)
+# @global LIB_ERROR_INVALID_RESPONSE — Ошибка lib: неверный ответ API (категория: error-const)
 : "${LIB_ERROR_INVALID_RESPONSE:=106}"
+# @global LIB_ERROR_API_RESPONSE — Lib error: API responded with error (category: error-const)
+# @global LIB_ERROR_API_RESPONSE — Ошибка lib: API вернул ошибку (категория: error-const)
 : "${LIB_ERROR_API_RESPONSE:=107}"
 
-# VK API configuration constants
+# @global VK_API_VERSION — Vkapi: API version (category: module-flag)
+# @global VK_API_VERSION — Vkapi: версия API (категория: module-flag)
 readonly VK_API_VERSION="5.131"
+# @global VK_API_BASE_URL — Vkapi: API base URL (category: constant)
+# @global VK_API_BASE_URL — Vkapi: базовый URL API (категория: constant)
 readonly VK_API_BASE_URL="https://api.vk.com/method"
+# @global VK_OAUTH_BASE_URL — Vkapi: OAuth base URL (category: constant)
+# @global VK_OAUTH_BASE_URL — Vkapi: базовый URL OAuth (категория: constant)
 readonly VK_OAUTH_BASE_URL="https://oauth.vk.com"
+# @global VK_API_RATE_LIMIT_DELAY — Vkapi: delay between requests (s) (category: constant)
+# @global VK_API_RATE_LIMIT_DELAY — Vkapi: задержка между запросами (с) (категория: constant)
 readonly VK_API_RATE_LIMIT_DELAY=0.34  # 3 requests per second
+# @global VK_API_MAX_RETRIES — Vkapi: max retries per request (category: constant)
+# @global VK_API_MAX_RETRIES — Vkapi: максимум повторов запроса (категория: constant)
 readonly VK_API_MAX_RETRIES=3
+# @global VK_API_CACHE_TTL — Vkapi: response cache TTL (s) (category: constant)
+# @global VK_API_CACHE_TTL — Vkapi: TTL кэша ответов (с) (категория: constant)
 readonly VK_API_CACHE_TTL=300  # 5 minutes
 
 # Module state variables

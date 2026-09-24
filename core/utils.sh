@@ -100,23 +100,8 @@ utils::attempt() {
   "$@" 2>/dev/null || :
 }
 
-# Временный файл/каталог с авто-очисткой при выходе.
-# Заменяет идиому: tmp="$(mktemp)" ... rm -f "${tmp}"
-# @function utils::tempfile
-# @description Temp file/dir with automatic cleanup on exit (removed even
-# @description Временный файл/каталог с авто-очисткой при выходе (удаляется
-# @description on error via the module cleanup hook).
-# @description даже при ошибке через cleanup-хук модуля).
-# @param $1 [--dir] create a directory instead of a file / создать каталог
-# @param $2 [PREFIX] mktemp prefix / префикс mktemp
-# @stdout path to the temp file/dir / путь к временному файлу/каталогу
-#
-# Пути пишутся в файловый реестр (подстановки $(...) живут в subshell'ах и
-# массив не пережил бы их); очистку выполняет главный процесс при выходе —
-# BASH_SUBSHELL guard не даёт subshell'у удалить чужие файлы раньше времени.
-# Paths go to an on-disk registry (command substitutions run in subshells,
-# an array would not survive them); the main process cleans up on exit —
-# the BASH_SUBSHELL guard stops a subshell from deleting other files early.
+# @global UTILS_TMP_REGISTRY — Utils: temp file registry ($$-scoped) (category: constant)
+# @global UTILS_TMP_REGISTRY — Utils: реестр временных файлов (в скоупе $$) (категория: constant)
 declare -g UTILS_TMP_REGISTRY="${TMPDIR:-/tmp}/bs-tmp-registry.$$"
 
 utils::tempfile() {
@@ -305,7 +290,7 @@ utils::ensure_source() {
   local -r file="${1:?File path is required}"
   local -r func="${2:?Function name is required}"
 
-  #  валидация аргументов 
+  #  валидация аргументов
   is::not_empty ${file} || { log::error "file argument is empty"; return "${E_INVALID:-2}"; }
   is::not_empty ${func} || { log::error "function argument is empty"; return "${E_INVALID:-2}"; }
 
@@ -337,6 +322,7 @@ utils::ensure_shell_version() {
         log::error "SHELL variable is not set, cannot verify shell version"
         return "${E_ERROR:-1}"
     fi
+
     local -r shell_name="$(basename "$SHELL")"
 
     case "${shell_name}" in
@@ -369,7 +355,7 @@ utils::ensure_shell_version() {
 ## @global Устанавливает FRAMEWORK_ROOT
 utils::detect_root() {
     local script_source
-    
+
     # 1. Пробуем получить из переменной окружения
     if is::not_empty "${FRAMEWORK_ROOT:-}" && is::dir "${FRAMEWORK_ROOT}"; then
         # log:: опционален для utils (нижний уровень) / log:: is optional for utils
@@ -378,32 +364,32 @@ utils::detect_root() {
         fi
         return 0
     fi
-    
+
     # 2. Определяем путь к скрипту
     if [[ "${BASH_SOURCE[0]+x}" == "x" ]]; then
         script_source="${BASH_SOURCE[0]}"
     else
         script_source="$0"
     fi
-    
+
     # 3. Обработка симлинков
     if is::symlink "${script_source}"; then
         script_source="$(readlink -f -- "${script_source}")"
     fi
-    
+
     # 4. Безопасное получение директории
     local script_dir
     script_dir="$(dirname -- "${script_source}")"
-    
+
     # 5. Переход на уровень выше (если скрипт в bin/)
     if [[ "$(basename -- "${script_dir}")" == "bin" ]]; then
         script_dir="$(dirname -- "${script_dir}")"
     fi
-    
+
     # 6. Абсолютный путь
     FRAMEWORK_ROOT="$(cd -- "${script_dir}" && pwd -P)"
     export FRAMEWORK_ROOT
-    
+
     # log:: опционален для utils (нижний уровень) / log:: is optional for utils
     if declare -F log::info >/dev/null 2>&1; then
         log::info "Корень фреймворка: ${FRAMEWORK_ROOT}"
@@ -413,7 +399,6 @@ utils::detect_root() {
 
 #bootdir
 # @description Определить каталог bootstrap/ фреймворка / Detect framework bootstrap/ dir
-# @global Устанавливает и экспортирует BOOT_DIR / Sets and exports BOOT_DIR
 utils::boot_dir() {
   BOOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../bootstrap" &>/dev/null && pwd)"
   export BOOT_DIR
@@ -426,4 +411,3 @@ utils::boot_dir() {
 if declare -F cleanup::add >/dev/null 2>&1; then
   cleanup::add utils::__tmp_cleanup
 fi
-

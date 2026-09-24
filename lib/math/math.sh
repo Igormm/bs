@@ -44,11 +44,12 @@ bs::source_relative "../../core/lang.sh" "../../core/const.sh" "../../core/utils
 # (gcc/clang).
 # ==========================================
 
-# Cache dir / Каталог кэша
+# @global MATH_CACHE_DIR — Hook: math compile cache directory (category: hook)
+# @global MATH_CACHE_DIR — Хук: каталог кэша компиляции math (категория: hook)
 : "${MATH_CACHE_DIR:=${XDG_CACHE_HOME:-${HOME:-/tmp}/.cache}/bs/math}"
 
-# Helpers available in every expression (math.h + small extras).
-# Хелперы, доступные в каждом выражении (math.h + небольшие дополнения).
+# @global MATH_TEMPLATE_HEAD — Math: C template header (category: constant)
+# @global MATH_TEMPLATE_HEAD — Math: заголовок C-шаблона (категория: constant)
 readonly MATH_TEMPLATE_HEAD='#include <math.h>
 #include <stdio.h>
 #include <locale.h>
@@ -64,8 +65,12 @@ readonly MATH_TEMPLATE_HEAD='#include <math.h>
 int main(void) {
   setlocale(LC_ALL, "C");'
 
+# @global MATH_TEMPLATE_EXPR_OPEN — Math: C template expression opener (category: constant)
+# @global MATH_TEMPLATE_EXPR_OPEN — Math: открывающая часть выражения C-шаблона (категория: constant)
 readonly MATH_TEMPLATE_EXPR_OPEN='  double __result = ('
 
+# @global MATH_TEMPLATE_TAIL — Math: C template tail (category: constant)
+# @global MATH_TEMPLATE_TAIL — Math: хвост C-шаблона (категория: constant)
 readonly MATH_TEMPLATE_TAIL=');
   printf(FMT "\n", __result);
   return 0;

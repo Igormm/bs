@@ -65,10 +65,16 @@ bs::source_relative "../system/platformcheck.sh"
 
 # PS1 Status configuration
 
+# @global PS1_STATUS_CONFIG_DIR — Hook: ps1 status config directory (category: constant)
+# @global PS1_STATUS_CONFIG_DIR — Хук: каталог конфигурации PS1-статуса (категория: constant)
 readonly PS1_STATUS_CONFIG_DIR="${HOME}/.config/ps1status"
 
+# @global PS1_STATUS_CACHE_DIR — Hook: ps1 status cache directory (category: constant)
+# @global PS1_STATUS_CACHE_DIR — Хук: каталог кэша PS1-статуса (категория: constant)
 readonly PS1_STATUS_CACHE_DIR="/tmp/ps1_status_cache"
 
+# @global PS1_STATUS_UPDATE_INTERVAL — Ps1status: update interval (s) (category: constant)
+# @global PS1_STATUS_UPDATE_INTERVAL — Ps1status: интервал обновления (с) (категория: constant)
 readonly PS1_STATUS_UPDATE_INTERVAL=5  # seconds
 
 # Status components state
@@ -99,24 +105,44 @@ PS1_STATUS_ENABLED_COMPONENTS=(
 
 # Color definitions for status indicators
 
+# @global PS1_STATUS_COLOR_WIREGUARD_UP — Ps1status color: wireguard up (green) (category: constant)
+# @global PS1_STATUS_COLOR_WIREGUARD_UP — Цвет ps1status: wireguard включён (зелёный) (категория: constant)
 readonly PS1_STATUS_COLOR_WIREGUARD_UP="\033[0;32m"    # Green
 
+# @global PS1_STATUS_COLOR_WIREGUARD_DOWN — Ps1status color: wireguard down (red) (category: constant)
+# @global PS1_STATUS_COLOR_WIREGUARD_DOWN — Цвет ps1status: wireguard выключен (красный) (категория: constant)
 readonly PS1_STATUS_COLOR_WIREGUARD_DOWN="\033[0;31m"  # Red
 
+# @global PS1_STATUS_COLOR_NETWORK_UP — Ps1status color: network up (green) (category: constant)
+# @global PS1_STATUS_COLOR_NETWORK_UP — Цвет ps1status: сеть доступна (зелёный) (категория: constant)
 readonly PS1_STATUS_COLOR_NETWORK_UP="\033[0;32m"      # Green
 
+# @global PS1_STATUS_COLOR_NETWORK_DOWN — Ps1status color: network down (red) (category: constant)
+# @global PS1_STATUS_COLOR_NETWORK_DOWN — Цвет ps1status: сеть недоступна (красный) (категория: constant)
 readonly PS1_STATUS_COLOR_NETWORK_DOWN="\033[0;31m"    # Red
 
+# @global PS1_STATUS_COLOR_SPEED_GOOD — Ps1status color: speed good (green) (category: constant)
+# @global PS1_STATUS_COLOR_SPEED_GOOD — Цвет ps1status: скорость хорошая (зелёный) (категория: constant)
 readonly PS1_STATUS_COLOR_SPEED_GOOD="\033[0;32m"      # Green
 
+# @global PS1_STATUS_COLOR_SPEED_MEDIUM — Ps1status color: speed medium (yellow) (category: constant)
+# @global PS1_STATUS_COLOR_SPEED_MEDIUM — Цвет ps1status: скорость средняя (жёлтый) (категория: constant)
 readonly PS1_STATUS_COLOR_SPEED_MEDIUM="\033[0;33m"    # Yellow
 
+# @global PS1_STATUS_COLOR_SPEED_SLOW — Ps1status color: speed slow (red) (category: constant)
+# @global PS1_STATUS_COLOR_SPEED_SLOW — Цвет ps1status: скорость низкая (красный) (категория: constant)
 readonly PS1_STATUS_COLOR_SPEED_SLOW="\033[0;31m"      # Red
 
+# @global PS1_STATUS_COLOR_AUDIO_ON — Ps1status color: audio on (magenta) (category: constant)
+# @global PS1_STATUS_COLOR_AUDIO_ON — Цвет ps1status: аудио включено (пурпурный) (категория: constant)
 readonly PS1_STATUS_COLOR_AUDIO_ON="\033[0;35m"        # Magenta
 
+# @global PS1_STATUS_COLOR_AUDIO_OFF — Ps1status color: audio off (gray) (category: constant)
+# @global PS1_STATUS_COLOR_AUDIO_OFF — Цвет ps1status: аудио выключено (серый) (категория: constant)
 readonly PS1_STATUS_COLOR_AUDIO_OFF="\033[0;37m"       # Gray
 
+# @global PS1_STATUS_COLOR_RESET — Ps1status color: reset (category: constant)
+# @global PS1_STATUS_COLOR_RESET — Цвет ps1status: сброс (категория: constant)
 readonly PS1_STATUS_COLOR_RESET="\033[0m"              # Reset
 
 # Module initialization

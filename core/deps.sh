@@ -19,7 +19,8 @@ bs::guard "CORE_DEPS" || return 0
 # Зависимости / Dependencies
 bs::source_relative "const.sh" "logger.sh" "utils.sh"
 
-# Module version / Версия модуля
+# @global CORE_DEPS_VERSION — Module version (category: module-flag)
+# @global CORE_DEPS_VERSION — Версия модуля (категория: module-flag)
 declare -g CORE_DEPS_VERSION="1.0.0"
 
 # ==========================================

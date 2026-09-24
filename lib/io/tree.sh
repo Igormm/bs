@@ -12,16 +12,27 @@ bs::source_relative "../../core/const.sh" "../../core/logger.sh" \
   "../../core/utils.sh" "../../core/lang.sh" \
   "../../core/errorhandler.sh" "files.sh" "../rfc/csv.sh"
 
-# shellcheck disable=SC2034
+# @global IO_TREE_VERSION — Module version (category: module-flag)
+# @global IO_TREE_VERSION — Версия модуля (категория: module-flag)
 declare -g IO_TREE_VERSION="1.0.0"
-# shellcheck disable=SC2034
+# @global IO_TREE_LOADED — Module loaded flag (category: module-flag)
+# @global IO_TREE_LOADED — Флаг загрузки модуля (категория: module-flag)
 declare -g IO_TREE_LOADED="1"
 
-# Canonical entries / Канонические записи
+# @global IO_TREE_KIND — Tree: node kind cache (category: constant)
+# @global IO_TREE_KIND — Tree: кэш типов узлов (категория: constant)
 declare -ga IO_TREE_KIND=()
+# @global IO_TREE_PATH — Tree: node path cache (category: constant)
+# @global IO_TREE_PATH — Tree: кэш путей узлов (категория: constant)
 declare -ga IO_TREE_PATH=()
+# @global IO_TREE_BODY — Tree: file body cache (category: constant)
+# @global IO_TREE_BODY — Tree: кэш содержимого файлов (категория: constant)
 declare -ga IO_TREE_BODY=()
+# @global IO_TREE_DRY_RUN — Tree: dry run flag (0/1) (category: constant)
+# @global IO_TREE_DRY_RUN — Tree: флаг «сухого запуска» (0/1) (категория: constant)
 declare -g IO_TREE_DRY_RUN=0
+# @global IO_TREE_FORCE — Tree: force overwrite flag (0/1) (category: constant)
+# @global IO_TREE_FORCE — Tree: флаг принудительной перезаписи (0/1) (категория: constant)
 declare -g IO_TREE_FORCE=0
 
 # ==========================================

@@ -29,17 +29,33 @@ bs::guard "AUDIT_SYSTEM" || return 0
 # Зависимости / Dependencies
 bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/errorhandler.sh" "../system/platformcheck.sh" "../system/processes.sh"
 
-# Audit configuration
+# @global AUDIT_CONFIG_DIR — Hook: audit config directory (category: constant)
+# @global AUDIT_CONFIG_DIR — Хук: каталог конфигурации аудита (категория: constant)
 readonly AUDIT_CONFIG_DIR="${HOME}/.config/systemaudit"
+# @global AUDIT_REPORT_DIR — Hook: audit reports directory (category: constant)
+# @global AUDIT_REPORT_DIR — Хук: каталог отчётов аудита (категория: constant)
 readonly AUDIT_REPORT_DIR="${AUDIT_CONFIG_DIR}/reports"
+# @global AUDIT_CACHE_DIR — Hook: audit cache directory (category: constant)
+# @global AUDIT_CACHE_DIR — Хук: каталог кэша аудита (категория: constant)
 readonly AUDIT_CACHE_DIR="/tmp/system_audit_cache"
+# @global AUDIT_BASELINE_FILE — Hook: audit baseline file (category: constant)
+# @global AUDIT_BASELINE_FILE — Хук: файл базовой линии аудита (категория: constant)
 readonly AUDIT_BASELINE_FILE="${AUDIT_CONFIG_DIR}/baseline.json"
 
-# Audit severity levels
+# @global AUDIT_SEVERITY_CRITICAL — Audit severity level: CRITICAL (category: constant)
+# @global AUDIT_SEVERITY_CRITICAL — Уровень серьёзности аудита: CRITICAL (категория: constant)
 readonly AUDIT_SEVERITY_CRITICAL="CRITICAL"
+# @global AUDIT_SEVERITY_HIGH — Audit severity level: HIGH (category: constant)
+# @global AUDIT_SEVERITY_HIGH — Уровень серьёзности аудита: HIGH (категория: constant)
 readonly AUDIT_SEVERITY_HIGH="HIGH"
+# @global AUDIT_SEVERITY_MEDIUM — Audit severity level: MEDIUM (category: constant)
+# @global AUDIT_SEVERITY_MEDIUM — Уровень серьёзности аудита: MEDIUM (категория: constant)
 readonly AUDIT_SEVERITY_MEDIUM="MEDIUM"
+# @global AUDIT_SEVERITY_LOW — Audit severity level: LOW (category: constant)
+# @global AUDIT_SEVERITY_LOW — Уровень серьёзности аудита: LOW (категория: constant)
 readonly AUDIT_SEVERITY_LOW="LOW"
+# @global AUDIT_SEVERITY_INFO — Audit severity level: INFO (category: constant)
+# @global AUDIT_SEVERITY_INFO — Уровень серьёзности аудита: INFO (категория: constant)
 readonly AUDIT_SEVERITY_INFO="INFO"
 
 # Module state

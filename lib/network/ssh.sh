@@ -23,9 +23,8 @@ bs::source_relative "../../core/lang.sh" "../../core/const.sh" "../../core/utils
 # Тестовый хук: SSH_MOCK=<скрипт> заменяет ssh; RSYNC_MOCK — rsync.
 # ==========================================
 
-# Socket directory for ControlMaster connections / Сокеты multiplex
-# Default at load; callers MUST use the ${BS_SSH_SOCKET_DIR:-...} form —
-# `unset` removes the variable entirely and set -u would abort otherwise.
+# @global BS_SSH_SOCKET_DIR — Hook: SSH agent socket directory (category: env)
+# @global BS_SSH_SOCKET_DIR — Хук: каталог сокетов SSH-agent (категория: env)
 : "${BS_SSH_SOCKET_DIR:=${XDG_RUNTIME_DIR:-/tmp}/bs-ssh}"
 
 # Flag parser state (private) / Состояние разбора флагов (приватное)
@@ -34,6 +33,8 @@ __SSH_FLAG_USER=""
 __SSH_FLAG_PORT=""
 __SSH_FLAG_KEY=""
 __SSH_FLAG_TIMEOUT="10"
+# @global __SSH_FLAG_REST — Ssh: internal remaining flag args (category: private)
+# @global __SSH_FLAG_REST — Ssh: внутренний остаток флаг-аргументов (категория: private)
 declare -ga __SSH_FLAG_REST=()
 
 # @private

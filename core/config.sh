@@ -19,15 +19,22 @@ bs::guard "CORE_CONFIG" || return 0
 # Зависимости / Dependencies
 bs::source_relative "const.sh" "logger.sh" "utils.sh"
 
-# Module version / Версия модуля
+# @global CORE_CONFIG_VERSION — Module version (category: module-flag)
+# @global CORE_CONFIG_VERSION — Версия модуля (категория: module-flag)
 declare -g CORE_CONFIG_VERSION="1.0.0"
 
-# Global configuration associative array / Глобальный ассоциативный массив конфигурации
+# @global BS_CONFIG — Config: loaded configuration map (category: env)
+# @global BS_CONFIG — Config: карта загруженной конфигурации (категория: env)
 declare -gA BS_CONFIG
 
-# Default configuration file paths / Пути к файлам конфигурации по умолчанию
+# @global BS_CONFIG_USER_DIR — Env: user config dir ~/.config/bs (category: env)
+# @global BS_CONFIG_USER_DIR — Env: каталог конфигурации пользователя ~/.config/bs (категория: env)
 readonly BS_CONFIG_USER_DIR="${HOME}/.config/bs"
+# @global BS_CONFIG_USER_FILE — Env: user config file (category: env)
+# @global BS_CONFIG_USER_FILE — Env: файл конфигурации пользователя (категория: env)
 readonly BS_CONFIG_USER_FILE="${BS_CONFIG_USER_DIR}/config.sh"
+# @global BS_CONFIG_LOCAL_FILE — Env: local (cwd) config file name (category: env)
+# @global BS_CONFIG_LOCAL_FILE — Env: имя локального (cwd) конфиг-файла (категория: env)
 readonly BS_CONFIG_LOCAL_FILE=".bsrc"
 
 # ==========================================

@@ -26,14 +26,24 @@ bs::guard "IO_INTEGRATION_LLM" || return 0
 # Зависимости / Dependencies
 bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "result.sh"
 
-# Module version / Версия модуля
+# @global IO_INTEGRATION_LLM_VERSION — Module version (category: module-flag)
+# @global IO_INTEGRATION_LLM_VERSION — Версия модуля (категория: module-flag)
 declare -g IO_INTEGRATION_LLM_VERSION="1.0.0"
 
-# Default configuration / Конфигурация по умолчанию
+# @global LLM_OPENAI_URL — Hook: OpenAI-compatible endpoint (category: hook)
+# @global LLM_OPENAI_URL — Хук: эндпоинт, совместимый с OpenAI (категория: hook)
 : "${LLM_OPENAI_URL:=https://api.openai.com/v1/chat/completions}"
+# @global LLM_OPENAI_MODEL — Hook: default OpenAI model (category: hook)
+# @global LLM_OPENAI_MODEL — Хук: модель OpenAI по умолчанию (категория: hook)
 : "${LLM_OPENAI_MODEL:=gpt-3.5-turbo}"
+# @global LLM_OLLAMA_HOST — Hook: Ollama host (category: hook)
+# @global LLM_OLLAMA_HOST — Хук: адрес Ollama (категория: hook)
 : "${LLM_OLLAMA_HOST:=http://localhost:11434}"
+# @global LLM_OLLAMA_MODEL — Hook: default Ollama model (category: hook)
+# @global LLM_OLLAMA_MODEL — Хук: модель Ollama по умолчанию (категория: hook)
 : "${LLM_OLLAMA_MODEL:=llama3}"
+# @global LLM_TIMEOUT — Hook: LLM request timeout (s) (category: hook)
+# @global LLM_TIMEOUT — Хук: таймаут LLM-запроса (с) (категория: hook)
 : "${LLM_TIMEOUT:=60}"
 
 # ==========================================

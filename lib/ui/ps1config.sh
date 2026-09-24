@@ -17,13 +17,26 @@ bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/uti
 
 set -euo pipefail
 
-# Глобальные переменные модуля
+# @global PS1_CONFIG_VERSION — Module version (category: module-flag)
+# @global PS1_CONFIG_VERSION — Версия модуля (категория: module-flag)
 declare -g PS1_CONFIG_VERSION="1.0.0"
+# @global PS1_CONFIG_THEMES — Ps1config: themes map (category: constant)
+# @global PS1_CONFIG_THEMES — Ps1config: карта тем (категория: constant)
 declare -g -A PS1_CONFIG_THEMES
+# @global PS1_CONFIG_CURRENT_THEME — Ps1config: current theme name (category: constant)
+# @global PS1_CONFIG_CURRENT_THEME — Ps1config: имя текущей темы (категория: constant)
 declare -g PS1_CONFIG_CURRENT_THEME="default"
+# @global PS1_CONFIG_GIT_INFO — Ps1config: git segment info (category: constant)
+# @global PS1_CONFIG_GIT_INFO — Ps1config: информация git-сегмента (категория: constant)
 declare -g PS1_CONFIG_GIT_INFO=""
+# @global PS1_CONFIG_SSH_INFO — Ps1config: ssh segment info (category: constant)
+# @global PS1_CONFIG_SSH_INFO — Ps1config: информация ssh-сегмента (категория: constant)
 declare -g PS1_CONFIG_SSH_INFO=""
+# @global PS1_CONFIG_VIRTUALENV_INFO — Ps1config: virtualenv segment info (category: constant)
+# @global PS1_CONFIG_VIRTUALENV_INFO — Ps1config: информация virtualenv-сегмента (категория: constant)
 declare -g PS1_CONFIG_VIRTUALENV_INFO=""
+# @global PS1_CONFIG_TIME_FORMAT — Ps1config: time format (category: constant)
+# @global PS1_CONFIG_TIME_FORMAT — Ps1config: формат времени (категория: constant)
 declare -g PS1_CONFIG_TIME_FORMAT="%H:%M:%S"
 
 # ==========================================

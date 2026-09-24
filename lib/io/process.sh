@@ -22,20 +22,31 @@ bs::guard "IO_PROCESS" || return 0
 # Зависимости / Dependencies
 bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/errorhandler.sh"
 
-# Module version / Версия модуля
-# shellcheck disable=SC2034
+# @global IO_PROCESS_VERSION — Module version (category: module-flag)
+# @global IO_PROCESS_VERSION — Версия модуля (категория: module-flag)
 declare -g IO_PROCESS_VERSION="1.0.0"
-# shellcheck disable=SC2034
+# @global IO_PROCESS_LOADED — Module loaded flag (category: module-flag)
+# @global IO_PROCESS_LOADED — Флаг загрузки модуля (категория: module-flag)
 declare -g IO_PROCESS_LOADED="1"
 
-# Exit codes specific to this module / Специфичные коды возврата модуля
+# @global IO_PROCESS_EXIT_TIMEOUT — Process: exit code for timeout (124) (category: constant)
+# @global IO_PROCESS_EXIT_TIMEOUT — Process: код выхода при таймауте (124) (категория: constant)
 readonly IO_PROCESS_EXIT_TIMEOUT=124
+# @global IO_PROCESS_EXIT_HANG — Process: exit code for hang (125) (category: constant)
+# @global IO_PROCESS_EXIT_HANG — Process: код выхода при зависании (125) (категория: constant)
 readonly IO_PROCESS_EXIT_HANG=125
+# @global IO_PROCESS_EXIT_KILLED — Process: exit code for killed (126) (category: constant)
+# @global IO_PROCESS_EXIT_KILLED — Process: код выхода при убийстве (126) (категория: constant)
 readonly IO_PROCESS_EXIT_KILLED=126
 
-# Global runtime state / Глобальное состояние выполнения
+# @global IO_PROCESS_CONFIG — Process: current guard configuration (category: constant)
+# @global IO_PROCESS_CONFIG — Process: текущая конфигурация guard (категория: constant)
 declare -gA IO_PROCESS_CONFIG
+# @global IO_PROCESS_CURRENT_PID — Process: current guarded child PID (category: constant)
+# @global IO_PROCESS_CURRENT_PID — Process: PID текущего дочернего процесса (категория: constant)
 declare -g IO_PROCESS_CURRENT_PID=""
+# @global IO_PROCESS_CMD — Process: current guarded command (argv) (category: constant)
+# @global IO_PROCESS_CMD — Process: текущая защищаемая команда (argv) (категория: constant)
 declare -ga IO_PROCESS_CMD=()
 
 # ==========================================

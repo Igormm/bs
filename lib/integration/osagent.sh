@@ -24,11 +24,12 @@ bs::source_relative "../../core/lang.sh" "../../core/const.sh" "../../core/logge
 #   osagent::exec hw.get '{"key": "mb.cpu.model"}'
 # ==========================================
 
-# Allow policy: comma-separated tool patterns (tool or tool:args-substring).
-# Политика доступа: список паттернов через запятую (tool или tool:подстрока-аргументов).
+# @global OSAGENT_ALLOW — Hook: comma-separated allowed osagent commands (category: constant)
+# @global OSAGENT_ALLOW — Хук: разрешённые команды osagent через запятую (категория: constant)
 declare -g OSAGENT_ALLOW="${OSAGENT_ALLOW:-hw.*,platform.*,bs.list,files.read,api.call}"
 
-# Allow arbitrary command execution (osagent.exec) / Разрешить произвольные команды
+# @global OSAGENT_EXEC_ALLOW — Hook: allow osagent exec (true/false) (category: constant)
+# @global OSAGENT_EXEC_ALLOW — Хук: разрешить exec в osagent (true/false) (категория: constant)
 declare -g OSAGENT_EXEC_ALLOW="${OSAGENT_EXEC_ALLOW:-false}"
 
 # @description Print the current permission policy.

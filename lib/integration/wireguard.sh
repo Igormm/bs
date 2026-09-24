@@ -42,11 +42,20 @@ bs::guard "INTEGRATION_WIREGUARD" || return 0
 # Зависимости / Dependencies
 bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/errorhandler.sh" "../system/platformcheck.sh" "../io/files.sh"
 
-# WireGuard configuration constants
+# @global WIREGUARD_CONFIG_DIR — Hook: wireguard config directory (category: constant)
+# @global WIREGUARD_CONFIG_DIR — Хук: каталог конфигурации wireguard (категория: constant)
 readonly WIREGUARD_CONFIG_DIR="/etc/wireguard"
+# @global WIREGUARD_KEY_DIR — Wireguard: keys directory (category: constant)
+# @global WIREGUARD_KEY_DIR — Wireguard: каталог ключей (категория: constant)
 readonly WIREGUARD_KEY_DIR="${WIREGUARD_CONFIG_DIR}/keys"
+# @global WIREGUARD_BACKUP_DIR — Hook: wireguard backup directory (category: constant)
+# @global WIREGUARD_BACKUP_DIR — Хук: каталог резервных копий wireguard (категория: constant)
 readonly WIREGUARD_BACKUP_DIR="/var/backups/wireguard"
+# @global WIREGUARD_DEFAULT_PORT — Wireguard: default listen port (category: constant)
+# @global WIREGUARD_DEFAULT_PORT — Wireguard: порт прослушивания по умолчанию (категория: constant)
 readonly WIREGUARD_DEFAULT_PORT=51820
+# @global WIREGUARD_DEFAULT_KEEPALIVE — Wireguard: default keepalive (s) (category: constant)
+# @global WIREGUARD_DEFAULT_KEEPALIVE — Wireguard: keepalive по умолчанию (с) (категория: constant)
 readonly WIREGUARD_DEFAULT_KEEPALIVE=25
 
 # Module initialization

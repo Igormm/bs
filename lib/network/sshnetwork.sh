@@ -47,13 +47,26 @@ bs::guard "NETWORK_SSH" || return 0
 # Зависимости / Dependencies
 bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/errorhandler.sh" "../system/platformcheck.sh" "../io/files.sh"
 
-# SSH Network configuration constants
+# @global SSH_NETWORK_CONFIG_DIR — Hook: sshnetwork config directory (category: constant)
+# @global SSH_NETWORK_CONFIG_DIR — Хук: каталог конфигурации sshnetwork (категория: constant)
 readonly SSH_NETWORK_CONFIG_DIR="${HOME}/.config/sshnetwork"
+# @global SSH_NETWORK_KNOWN_HOSTS_FILE — Sshnetwork: known devices file (category: constant)
+# @global SSH_NETWORK_KNOWN_HOSTS_FILE — Sshnetwork: файл известных устройств (категория: constant)
 readonly SSH_NETWORK_KNOWN_HOSTS_FILE="${SSH_NETWORK_CONFIG_DIR}/known_devices"
+# @global SSH_NETWORK_LOG_FILE — Sshnetwork: network log file (category: constant)
+# @global SSH_NETWORK_LOG_FILE — Sshnetwork: файл журнала сети (категория: constant)
 readonly SSH_NETWORK_LOG_FILE="${SSH_NETWORK_CONFIG_DIR}/network.log"
+# @global SSH_NETWORK_SCAN_TIMEOUT — Sshnetwork: scan timeout (s) (category: constant)
+# @global SSH_NETWORK_SCAN_TIMEOUT — Sshnetwork: таймаут сканирования (с) (категория: constant)
 readonly SSH_NETWORK_SCAN_TIMEOUT=5
+# @global SSH_NETWORK_CONNECT_TIMEOUT — Sshnetwork: connect timeout (s) (category: constant)
+# @global SSH_NETWORK_CONNECT_TIMEOUT — Sshnetwork: таймаут подключения (с) (категория: constant)
 readonly SSH_NETWORK_CONNECT_TIMEOUT=10
+# @global SSH_NETWORK_DEFAULT_PORT — Sshnetwork: default SSH port (22) (category: constant)
+# @global SSH_NETWORK_DEFAULT_PORT — Sshnetwork: SSH-порт по умолчанию (22) (категория: constant)
 readonly SSH_NETWORK_DEFAULT_PORT=22
+# @global SSH_NETWORK_BASH_PORT — Sshnetwork: alternative SSH port for BS (category: constant)
+# @global SSH_NETWORK_BASH_PORT — Sshnetwork: альтернативный SSH-порт для BS (категория: constant)
 readonly SSH_NETWORK_BASH_PORT=2222  # Alternative SSH port for BS
 
 # Module state variables

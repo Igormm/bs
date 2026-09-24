@@ -239,6 +239,53 @@ get_endpoint() {
 }
 ```
 
+### 4.2 Module-level variable categories and documentation
+
+Every variable declared outside a function (`declare -g`, `readonly`, `export`,
+`: "${VAR:=...}"`) belongs to one of the categories below. The category fixes
+the name mask and whether a doc snippet is required.
+
+| # | Category | Mask | Examples | Snippet |
+|---|---|---|---|---|
+| 1 | Guard flags | `__<MODULE>_SOURCED` | `__ARGS_SOURCED`, `__PREREQ_SOURCED` | no — set programmatically by `bs::guard`, documented once in `core/prereq.sh` |
+| 2 | Module metadata | `<MODULE>_LOADED`, `<MODULE>_VERSION` | `ARGS_LOADED`, `CORE_LANG_VERSION` | yes |
+| 3 | Ephemeral (init.sh temps) | `__name__` | `__bs_src__`, `__BS_INIT_DIR__` | optional |
+| 4 | Nameref locals | `__sl_*`, `__arr_*`, `__map_*`, `__b_*` | `__arr_elem`, `__sl_start` | no — function-local, shadowing-safe by design |
+| 5 | Private functions | `ns::__name` | `log::__format_message` | functions, not variables |
+| 6 | Private locals | `_name` | `_rc`, `_saved_stdout` | no — function-local |
+| 7 | Error constants | `E_*`, `LIB_ERROR_*` | `E_ERROR`, `LIB_ERROR_INVALID_ARGS` | yes |
+| 8 | Framework flags | `FRAMEWORK_*` | `FRAMEWORK_DEBUG`, `FRAMEWORK_DRY_RUN` | yes |
+| 9 | Env vars | `BS_*` | `BS_ROOT`, `BS_SILENT`, `BS_CONFIG_*` | yes |
+| 10 | Module hooks | `<MODULE>_*_{DIR,PATH,MOCK,FILE,TIMEOUT}` | `HW_DMI_PATH`, `LLM_MOCK_RESPONSE`, `VK_API_CACHE_DIR` | yes |
+| 11 | Module constants | `readonly SCREAMING_SNAKE` | `COLOR_RESET`, `SSH_NETWORK_CONNECT_TIMEOUT` | yes |
+| 12 | Module internal state | `__<MODULE>_*` | `__ARGS_TREE`, `__ARGS_FLAGS` | yes |
+
+A `: "${VAR:=...}"` declaration is always a **hook** (category 10) regardless
+of the name suffix.
+
+**Doc snippet format.** Module-level variables in categories 2, 7-11 carry a
+bilingual snippet directly above the declaration:
+
+```bash
+# @global FRAMEWORK_DEBUG — framework flag (category: framework-flag); default false
+# @global FRAMEWORK_DEBUG — флаг фреймворка (категория: framework-flag); по умолчанию false
+declare -g FRAMEWORK_DEBUG=false
+```
+
+- The snippet starts with `# @global <NAME> —`, names the category label and
+  describes the purpose/default. A reader can tell what the variable is
+  without reading its users.
+- Category labels (machine-readable): `guard-flag`, `module-flag`,
+  `ephemeral`, `nameref`, `private-fn`, `underscore`, `error-const`,
+  `framework-flag`, `env`, `hook`, `constant`, `private`.
+- Categories 1, 4, 6 need no snippet (programmatic or function-local).
+
+**Mask hygiene.** Anchored boundaries matter: `\bE_[A-Z][A-Z_]*\b` matches
+`E_ERROR` but NOT the `E__` substring inside `__BS_ROOT_CANDIDATE__` (the
+unbounded `E_[A-Z_]+` does). Check order matters too: anchored `__name__`
+(category 3) before the open-ended `__x_y` (category 4) — `__bs_src__`
+matches both masks.
+
 ## 5. Error handling and logging
 
 The Google guide suggests plain `echo` for errors; the framework provides a

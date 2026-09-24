@@ -30,12 +30,18 @@ bs::guard "IO_STREAMS" || return 0
 # Зависимости / Dependencies
 bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh"
 
-# Версия модуля / Module version
+# @global IO_STREAMS_VERSION — Module version (category: module-flag)
+# @global IO_STREAMS_VERSION — Версия модуля (категория: module-flag)
 declare -g IO_STREAMS_VERSION="1.0.0"
 
-# Номера стандартных потоков / Standard stream numbers
+# @global IO_STREAMS_STDIN — Streams: stdin fd number (0) (category: constant)
+# @global IO_STREAMS_STDIN — Streams: номер fd stdin (0) (категория: constant)
 readonly IO_STREAMS_STDIN=0
+# @global IO_STREAMS_STDOUT — Streams: stdout fd number (1) (category: constant)
+# @global IO_STREAMS_STDOUT — Streams: номер fd stdout (1) (категория: constant)
 readonly IO_STREAMS_STDOUT=1
+# @global IO_STREAMS_STDERR — Streams: stderr fd number (2) (category: constant)
+# @global IO_STREAMS_STDERR — Streams: номер fd stderr (2) (категория: constant)
 readonly IO_STREAMS_STDERR=2
 
 # ==========================================
@@ -540,8 +546,8 @@ io::streams::list_fds() {
 # Инициализация модуля / Module initialization
 # ==========================================
 
-# Отмечаем модуль как загруженный / Mark module as loaded
-# shellcheck disable=SC2034
+# @global IO_STREAMS_LOADED — Module loaded flag (category: module-flag)
+# @global IO_STREAMS_LOADED — Флаг загрузки модуля (категория: module-flag)
 declare -g IO_STREAMS_LOADED="1"
 
 log::debug "IO streams module initialized, version: ${IO_STREAMS_VERSION}"

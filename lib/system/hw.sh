@@ -24,8 +24,8 @@ bs::guard "SYSTEM_HW" || return 0
 # Зависимости / Dependencies
 bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh"
 
-# Метаданные модуля / Module metadata
-# shellcheck disable=SC2034
+# @global SYSTEM_HW_VERSION — Module version (category: module-flag)
+# @global SYSTEM_HW_VERSION — Версия модуля (категория: module-flag)
 declare -g SYSTEM_HW_VERSION="1.0.0"
 
 # ==========================================
@@ -416,8 +416,8 @@ system::hw:: — Hardware information / Информация об оборудо
 EOF
 }
 
-# Метка загрузки / Load marker
-# shellcheck disable=SC2034
+# @global SYSTEM_HW_LOADED — Module loaded flag (category: module-flag)
+# @global SYSTEM_HW_LOADED — Флаг загрузки модуля (категория: module-flag)
 declare -g SYSTEM_HW_LOADED="1"
 
 # ==========================================
@@ -464,19 +464,36 @@ declare -g SYSTEM_HW_LOADED="1"
 #   HW_DMI_PATH, HW_HWMON_PATH, HW_POWER_PATH, HW_NET_PATH, HW_BLOCK_PATH
 # ==========================================
 
-# Path overrides (test hooks) / Переопределение путей (тестовые хуки)
+# @global HW_DMI_PATH — Hook: DMI sysfs path /sys/class/dmi/id (category: hook)
+# @global HW_DMI_PATH — Хук: путь DMI в sysfs /sys/class/dmi/id (категория: hook)
 : "${HW_DMI_PATH:=/sys/class/dmi/id}"
+# @global HW_HWMON_PATH — Hook: hwmon sysfs path /sys/class/hwmon (category: hook)
+# @global HW_HWMON_PATH — Хук: путь hwmon в sysfs /sys/class/hwmon (категория: hook)
 : "${HW_HWMON_PATH:=/sys/class/hwmon}"
+# @global HW_POWER_PATH — Hook: power supply sysfs path /sys/class/power_supply (category: hook)
+# @global HW_POWER_PATH — Хук: путь power_supply в sysfs /sys/class/power_supply (категория: hook)
 : "${HW_POWER_PATH:=/sys/class/power_supply}"
+# @global HW_NET_PATH — Hook: network sysfs path /sys/class/net (category: hook)
+# @global HW_NET_PATH — Хук: путь сетевых устройств в sysfs /sys/class/net (категория: hook)
 : "${HW_NET_PATH:=/sys/class/net}"
+# @global HW_BLOCK_PATH — Hook: block devices sysfs path /sys/class/block (category: hook)
+# @global HW_BLOCK_PATH — Хук: путь блочных устройств в sysfs /sys/class/block (категория: hook)
 : "${HW_BLOCK_PATH:=/sys/block}"
 
-# State / Состояние
+# @global HW_DB — Hw: hardware database map (category: constant)
+# @global HW_DB — Hw: база данных оборудования (категория: constant)
 declare -gA HW_DB=()
+# @global HW_CWD — Hw: current working directory cache (category: constant)
+# @global HW_CWD — Hw: кэш текущего каталога (категория: constant)
 declare -g HW_CWD=""
+# @global HW_BUILT — Hw: database built flag (0/1) (category: constant)
+# @global HW_BUILT — Hw: флаг построения базы (0/1) (категория: constant)
 declare -g HW_BUILT=0
-# Счётчики последней сводки / Last summary counters
+# @global HW_SUMMARY_SHOWN — Hw: summary shown counter (category: constant)
+# @global HW_SUMMARY_SHOWN — Hw: счётчик показанных сводок (категория: constant)
 declare -g -i HW_SUMMARY_SHOWN=0
+# @global HW_SUMMARY_SKIPPED — Hw: summary skipped counter (category: constant)
+# @global HW_SUMMARY_SKIPPED — Hw: счётчик пропущенных сводок (категория: constant)
 declare -g -i HW_SUMMARY_SKIPPED=0
 
 # @private

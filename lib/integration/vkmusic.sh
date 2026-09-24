@@ -46,12 +46,23 @@ bs::guard "INTEGRATION_VK_MUSIC" || return 0
 # Зависимости / Dependencies
 bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/errorhandler.sh" "../system/platformcheck.sh" "vkapi.sh" "../io/files.sh"
 
-# VK Music configuration constants
+# @global VK_MUSIC_CACHE_DIR — Hook: vk music cache directory (category: constant)
+# @global VK_MUSIC_CACHE_DIR — Хук: каталог кэша VK-музыки (категория: constant)
 readonly VK_MUSIC_CACHE_DIR="/tmp/vk_music_cache"
+# @global VK_MUSIC_DOWNLOAD_DIR — Hook: vk music download directory (category: constant)
+# @global VK_MUSIC_DOWNLOAD_DIR — Хук: каталог загрузки VK-музыки (категория: constant)
 readonly VK_MUSIC_DOWNLOAD_DIR="${HOME}/Music/VK"
+# @global VK_MUSIC_PLAYLIST_DIR — Hook: vk music playlists directory (category: constant)
+# @global VK_MUSIC_PLAYLIST_DIR — Хук: каталог плейлистов VK-музыки (категория: constant)
 readonly VK_MUSIC_PLAYLIST_DIR="${HOME}/.config/vkmusic/playlists"
+# @global VK_MUSIC_MAX_DOWNLOAD_SIZE — Hook: max track download size (category: constant)
+# @global VK_MUSIC_MAX_DOWNLOAD_SIZE — Хук: максимальный размер загружаемого трека (категория: constant)
 readonly VK_MUSIC_MAX_DOWNLOAD_SIZE="100M"
+# @global VK_MUSIC_MAX_DURATION — Hook: max track duration (s) (category: constant)
+# @global VK_MUSIC_MAX_DURATION — Хук: максимальная длительность трека (с) (категория: constant)
 readonly VK_MUSIC_MAX_DURATION="3600"  # 1 hour in seconds
+# @global VK_MUSIC_QUALITY — Hook: download quality: high/medium/low (category: constant)
+# @global VK_MUSIC_QUALITY — Хук: качество загрузки: high/medium/low (категория: constant)
 readonly VK_MUSIC_QUALITY="high"  # high, medium, low
 
 # Module state variables

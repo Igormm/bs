@@ -43,57 +43,60 @@ bs::guard "ARGS" || return 0
 # Зависимости / Dependencies
 bs::source_relative "const.sh" "logger.sh"
 
-# Версия модуля / Module version
+# @global ARGS_VERSION — Module version (category: module-flag)
+# @global ARGS_VERSION — Версия модуля (категория: module-flag)
 declare -g ARGS_VERSION="1.0.0"
 
 # ==========================================
 # Состояние модуля / Module state
 # ==========================================
 
-# Дерево параметров: уровень (1-based) → список допустимых имён через пробел
-# Parameter tree: level (1-based) → space-separated list of allowed names
+# @global __ARGS_TREE — Args: internal flag tree (category: private)
+# @global __ARGS_TREE — Args: внутреннее дерево флагов (категория: private)
 declare -g -A __ARGS_TREE=()
 
-# Описания параметров для help: имя → текст
-# Parameter descriptions for help: name → text
+# @global __ARGS_DESCRIPTIONS — Args: internal flag descriptions (category: private)
+# @global __ARGS_DESCRIPTIONS — Args: внутренние описания флагов (категория: private)
 declare -g -A __ARGS_DESCRIPTIONS=()
 
-# Провалидированные параметры после args::parse
-# Validated parameters after args::parse
+# @global ARGS_PARAMS — Args: parsed positional parameters (category: constant)
+# @global ARGS_PARAMS — Args: разобранные позиционные параметры (категория: constant)
 declare -g -a ARGS_PARAMS=()
 
-# Флаг запроса help (-h/--help) / Help request flag (-h/--help)
+# @global ARGS_HELP_REQUESTED — Args: help was requested (0/1) (category: constant)
+# @global ARGS_HELP_REQUESTED — Args: запрошена справка (0/1) (категория: constant)
 declare -g ARGS_HELP_REQUESTED=0
 
-# Объявленные флаги: имя (без --) → тип ("bool" или "value")
-# Declared flags: name (without --) → type ("bool" or "value")
+# @global __ARGS_FLAGS — Args: internal flags map (category: private)
+# @global __ARGS_FLAGS — Args: внутренняя карта флагов (категория: private)
 declare -g -A __ARGS_FLAGS=()
 
-# Описания флагов для help: имя → текст
-# Flag descriptions for help: name → text
+# @global __ARGS_FLAG_DESCRIPTIONS — Args: internal flag descriptions map (category: private)
+# @global __ARGS_FLAG_DESCRIPTIONS — Args: внутренняя карта описаний флагов (категория: private)
 declare -g -A __ARGS_FLAG_DESCRIPTIONS=()
 
-# Провалидированные флаги после args::parse: имя → значение ("1" для bool)
-# Validated flags after args::parse: name → value ("1" for bool)
+# @global ARGS_FLAGS — Args: parsed flags map (category: constant)
+# @global ARGS_FLAGS — Args: карта разобранных флагов (категория: constant)
 declare -g -A ARGS_FLAGS=()
 
-# Дефолтные значения флагов: имя → значение
-# Default flag values: name → value
+# @global __ARGS_FLAG_DEFAULTS — Args: internal flag defaults map (category: private)
+# @global __ARGS_FLAG_DEFAULTS — Args: внутренняя карта значений по умолчанию (категория: private)
 declare -g -A __ARGS_FLAG_DEFAULTS=()
 
-# Валидаторы значений флагов: имя → "number" | "enum:a,b,c" | имя функции
-# Flag value validators: name → "number" | "enum:a,b,c" | function name
+# @global __ARGS_FLAG_VALIDATORS — Args: internal flag validators map (category: private)
+# @global __ARGS_FLAG_VALIDATORS — Args: внутренняя карта валидаторов флагов (категория: private)
 declare -g -A __ARGS_FLAG_VALIDATORS=()
 
-# Минимальное количество позиционных параметров (args::required)
-# Minimum positional parameter count (args::required)
+# @global __ARGS_REQUIRED — Args: internal required-flags counter (category: private)
+# @global __ARGS_REQUIRED — Args: внутренний счётчик обязательных флагов (категория: private)
 declare -g -i __ARGS_REQUIRED=0
 
-# Повторяемый уровень: допустимые имена уровня повторяются без ограничений
-# Variadic level: the level's allowed names may repeat unboundedly
+# @global __ARGS_VARIADIC_LEVEL — Args: internal variadic nesting level (category: private)
+# @global __ARGS_VARIADIC_LEVEL — Args: внутренний уровень вложенности вариадиков (категория: private)
 declare -g -i __ARGS_VARIADIC_LEVEL=0
 
-# Сырые аргументы после "--" / Raw arguments after "--"
+# @global ARGS_REST — Args: remaining arguments after parsing (category: constant)
+# @global ARGS_REST — Args: остаток аргументов после разбора (категория: constant)
 declare -g -a ARGS_REST=()
 
 # ==========================================
@@ -953,7 +956,8 @@ EOF
 # Инициализация модуля / Module initialization
 # ==========================================
 
-# Отмечаем модуль как загруженный / Mark module as loaded
+# @global ARGS_LOADED — Module loaded flag (category: module-flag)
+# @global ARGS_LOADED — Флаг загрузки модуля (категория: module-flag)
 declare -g ARGS_LOADED="1"
 
 log::debug "Args module initialized, version: ${ARGS_VERSION}" 2>/dev/null || true

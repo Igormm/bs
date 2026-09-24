@@ -15,14 +15,18 @@ bs::guard "TS_TOOLCHAIN" || return 0
 # Dependencies / Зависимости
 bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh"
 
-# Metadata / Метаданные
-# shellcheck disable=SC2034
+# @global TS_TOOLCHAIN_VERSION — Module version (category: module-flag)
+# @global TS_TOOLCHAIN_VERSION — Версия модуля (категория: module-flag)
 declare -g TS_TOOLCHAIN_VERSION="1.0.0"
-# shellcheck disable=SC2034
+# @global TS_TOOLCHAIN_LOADED — Module loaded flag (category: module-flag)
+# @global TS_TOOLCHAIN_LOADED — Флаг загрузки модуля (категория: module-flag)
 declare -g TS_TOOLCHAIN_LOADED="1"
 
-# Тестовые хуки / test hooks
+# @global TS_RUNTIMES — Hook: runtimes to probe (node bun deno) (category: hook)
+# @global TS_RUNTIMES — Хук: рантаймы для проверки (node bun deno) (категория: hook)
 : "${TS_RUNTIMES:=node bun deno}"
+# @global TS_PACKAGE_MANAGERS — Hook: package managers to probe (npm pnpm yarn bun) (category: hook)
+# @global TS_PACKAGE_MANAGERS — Хук: пакетные менеджеры для проверки (npm pnpm yarn bun) (категория: hook)
 : "${TS_PACKAGE_MANAGERS:=npm pnpm yarn bun}"
 
 # ==========================================

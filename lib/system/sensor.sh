@@ -14,15 +14,21 @@ bs::guard "SYSTEM_SENSOR" || return 0
 # Dependencies / Зависимости
 bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh"
 
-# Metadata / Метаданные
-# shellcheck disable=SC2034
+# @global SYSTEM_SENSOR_VERSION — Module version (category: module-flag)
+# @global SYSTEM_SENSOR_VERSION — Версия модуля (категория: module-flag)
 declare -g SYSTEM_SENSOR_VERSION="1.0.0"
-# shellcheck disable=SC2034
+# @global SYSTEM_SENSOR_LOADED — Module loaded flag (category: module-flag)
+# @global SYSTEM_SENSOR_LOADED — Флаг загрузки модуля (категория: module-flag)
 declare -g SYSTEM_SENSOR_LOADED="1"
 
-# Test hooks: переопределяются в юнит-тестах (см. HW_DMI_PATH в lib/system/hw)
+# @global SENSOR_INPUT_DIR — Hook: evdev sysfs dir /sys/class/input (category: hook)
+# @global SENSOR_INPUT_DIR — Хук: каталог evdev в sysfs /sys/class/input (категория: hook)
 : "${SENSOR_INPUT_DIR:=/sys/class/input}"
+# @global SENSOR_DEV_DIR — Hook: input device dir /dev/input (category: hook)
+# @global SENSOR_DEV_DIR — Хук: каталог устройств ввода /dev/input (категория: hook)
 : "${SENSOR_DEV_DIR:=/dev/input}"
+# @global SENSOR_EVENT_SIZE — Hook: input event size (empty = auto by LONG_BIT) (category: hook)
+# @global SENSOR_EVENT_SIZE — Хук: размер input-события (пусто = авто по LONG_BIT) (категория: hook)
 : "${SENSOR_EVENT_SIZE:=}"   # пусто — авто-определение по LONG_BIT
 
 # ==========================================

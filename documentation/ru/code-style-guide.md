@@ -244,6 +244,53 @@ get_endpoint() {
 }
 ```
 
+### 4.2 Категории переменных уровня модуля и их документация
+
+Каждая переменная, объявленная вне функции (`declare -g`, `readonly`,
+`export`, `: "${VAR:=...}"`), относится к одной из категорий ниже. Категория
+определяет маску имени и необходимость документационного снипета.
+
+| № | Категория | Маска | Примеры | Снипет |
+|---|---|---|---|---|
+| 1 | Guard-флаги | `__<MODULE>_SOURCED` | `__ARGS_SOURCED`, `__PREREQ_SOURCED` | нет — выставляются программно через `bs::guard`, документированы один раз в `core/prereq.sh` |
+| 2 | Метаданные модуля | `<MODULE>_LOADED`, `<MODULE>_VERSION` | `ARGS_LOADED`, `CORE_LANG_VERSION` | да |
+| 3 | Эфемерные (временные init.sh) | `__name__` | `__bs_src__`, `__BS_INIT_DIR__` | опционально |
+| 4 | Nameref-локальные | `__sl_*`, `__arr_*`, `__map_*`, `__b_*` | `__arr_elem`, `__sl_start` | нет — локальны, защита от shadowing by design |
+| 5 | Приватные функции | `ns::__name` | `log::__format_message` | функции, не переменные |
+| 6 | Приватные локальные | `_name` | `_rc`, `_saved_stdout` | нет — локальны |
+| 7 | Константы ошибок | `E_*`, `LIB_ERROR_*` | `E_ERROR`, `LIB_ERROR_INVALID_ARGS` | да |
+| 8 | Флаги фреймворка | `FRAMEWORK_*` | `FRAMEWORK_DEBUG`, `FRAMEWORK_DRY_RUN` | да |
+| 9 | Env-переменные | `BS_*` | `BS_ROOT`, `BS_SILENT`, `BS_CONFIG_*` | да |
+| 10 | Хуки модулей | `<MODULE>_*_{DIR,PATH,MOCK,FILE,TIMEOUT}` | `HW_DMI_PATH`, `LLM_MOCK_RESPONSE`, `VK_API_CACHE_DIR` | да |
+| 11 | Константы модуля | `readonly SCREAMING_SNAKE` | `COLOR_RESET`, `SSH_NETWORK_CONNECT_TIMEOUT` | да |
+| 12 | Внутреннее состояние модуля | `__<MODULE>_*` | `__ARGS_TREE`, `__ARGS_FLAGS` | да |
+
+Объявление через `: "${VAR:=...}"` — всегда **хук** (категория 10)
+независимо от суффикса имени.
+
+**Формат снипета.** Переменные уровня модуля категорий 2, 7-11 несут
+билингвальный снипет непосредственно над объявлением:
+
+```bash
+# @global FRAMEWORK_DEBUG — framework flag (category: framework-flag); default false
+# @global FRAMEWORK_DEBUG — флаг фреймворка (категория: framework-flag); по умолчанию false
+declare -g FRAMEWORK_DEBUG=false
+```
+
+- Снипет начинается с `# @global <ИМЯ> —`, называет метку категории и
+  описывает назначение/значение по умолчанию. Читатель видит, что это за
+  переменная, не читая места её использования.
+- Метки категорий (машиночитаемые): `guard-flag`, `module-flag`,
+  `ephemeral`, `nameref`, `private-fn`, `underscore`, `error-const`,
+  `framework-flag`, `env`, `hook`, `constant`, `private`.
+- Категории 1, 4, 6 снипета не требуют (программные или локальные).
+
+**Гигиена масок.** Якорение границ обязательно: `\bE_[A-Z][A-Z_]*\b`
+находит `E_ERROR`, но НЕ подстроку `E__` внутри `__BS_ROOT_CANDIDATE__`
+(неограниченная `E_[A-Z_]+` её находит). Порядок проверок тоже важен:
+сначала якорная `__name__` (категория 3), затем открытая `__x_y`
+(категория 4) — `__bs_src__` попадает под обе маски.
+
 ## 5. Обработка ошибок и логирование
 
 Google Guide предлагает для ошибок обычный `echo`; во фреймворке есть модуль

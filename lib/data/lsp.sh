@@ -27,10 +27,17 @@ bs::source_relative "../../core/lang.sh" "../../core/const.sh" "../../core/logge
 # (см. bs lang-doc). Требует jq.
 # ==========================================
 
-# Server state / Состояние сервера
+# @global LSP_INDEX — Lsp: function index JSON (category: constant)
+# @global LSP_INDEX — Lsp: JSON-индекс функций (категория: constant)
 declare -g LSP_INDEX="[]"
+# @global LSP_INDEX_BUILT — Lsp: index built flag (0/1) (category: constant)
+# @global LSP_INDEX_BUILT — Lsp: флаг построения индекса (0/1) (категория: constant)
 declare -g LSP_INDEX_BUILT=0
+# @global LSP_EXTRA — Lsp: extra payload JSON (category: constant)
+# @global LSP_EXTRA — Lsp: дополнительный JSON-payload (категория: constant)
 declare -g LSP_EXTRA="[]"
+# @global LSP_DOCS — Lsp: docs cache map (category: constant)
+# @global LSP_DOCS — Lsp: кэш документов (категория: constant)
 declare -gA LSP_DOCS=()
 
 # @description Send a raw LSP message (Content-Length framing).
