@@ -71,16 +71,20 @@ readonly LIB_ERROR_PLATFORM_UNSUPPORTED=102
 # Диапазон 200–249 зарезервирован для integration-модулей.
 # Range 200–249 is reserved for integration modules.
 
-# Ошибка HTTP-запроса / HTTP request error
+# @global INTEGRATION_ERROR_HTTP — Integration error base: HTTP (category: error-const)
+# @global INTEGRATION_ERROR_HTTP — База кодов ошибок интеграции: HTTP (категория: error-const)
 readonly INTEGRATION_ERROR_HTTP=200
 
-# Ошибка LLM-провайдера / LLM provider error
+# @global INTEGRATION_ERROR_LLM — Integration error base: LLM (category: error-const)
+# @global INTEGRATION_ERROR_LLM — База кодов ошибок интеграции: LLM (категория: error-const)
 readonly INTEGRATION_ERROR_LLM=201
 
-# Ошибка Kubernetes / Kubernetes error
+# @global INTEGRATION_ERROR_K8S — Integration error base: K8s (category: error-const)
+# @global INTEGRATION_ERROR_K8S — База кодов ошибок интеграции: K8s (категория: error-const)
 readonly INTEGRATION_ERROR_K8S=202
 
-# Отсутствует внешняя зависимость модуля / Module external dependency missing
+# @global INTEGRATION_ERROR_MISSING_DEPS — Integration error: missing dependencies (category: error-const)
+# @global INTEGRATION_ERROR_MISSING_DEPS — Ошибка интеграции: отсутствуют зависимости (категория: error-const)
 readonly INTEGRATION_ERROR_MISSING_DEPS=203
 
 #

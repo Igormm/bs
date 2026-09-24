@@ -13,11 +13,11 @@ bs::guard "VERSION" || return 0
 # Владелец переменной — скрипт bs (readonly); здесь задаём только если пусто
 # Owner of the variable is the bs script (readonly); set here only if empty
 if is::empty "${BS_VERSION:-}"; then
-  export BS_VERSION="0.5.2"
+  export BS_VERSION="0.5.3"
 fi
 
-# @description BS Framework Name / Имя фреймворка BS
-# @export BS_NAME The name of the BS framework / Имя фреймворка BS
+# @global BS_NAME — Env: framework full name (category: env)
+# @global BS_NAME — Env: полное имя фреймворка (категория: env)
 export BS_NAME="BS (Bash Open Source Architecture) BOSA Framework"
 
 # @description Print version information / Вывести информацию о версии
