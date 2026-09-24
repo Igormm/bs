@@ -122,6 +122,11 @@ Diagnostics go to stderr. Global variables are not modified.
 
 ### utils::ensure_shell_version
 
+> **Deprecated** — use `bootstrap/bs.sh::bs::shell::ensure_version` instead.
+> It inspects `$SHELL` (the login shell), which lies when sourcing from
+> another shell; the replacement detects the runtime shell via
+> `BASH_VERSION`/`ZSH_VERSION` and is available before the loader.
+
 ```bash
 utils::ensure_shell_version 4
 ```

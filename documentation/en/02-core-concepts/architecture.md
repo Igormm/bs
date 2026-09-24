@@ -58,8 +58,10 @@ entry: ./boot.sh <script> [args]          entry: bs <cmd> | #!/usr/bin/env bs
 [boot.sh](../../../boot.sh) is a minimal pre-loader whose only job is to verify
 the environment and hand control to `bs` as fast as possible:
 
-1. **Environment check.** Requires bash 4.0+; otherwise prints an error and
-   exits with code `1`.
+1. **Pre-kernel namespace.** It sources `bootstrap/bs.sh` — a dependency-free,
+   bash-3.2-compatible file — and runs the shell version gate
+   `bs::shell::ensure_version 4`; otherwise it prints an error and exits with
+   code `1`.
 2. **BS_ROOT lookup**, in priority order:
    - already exported `BS_ROOT`;
    - the directory containing `boot.sh` itself, if `bs` and
@@ -79,7 +81,10 @@ not found.
 The [bs](../../../bs) script is the unified entry point. It runs under
 `set -euo pipefail` with `IFS=$'\n\t'` and performs the following:
 
-- Defines `readonly BS_VERSION` (currently `0.5.2`).
+- Resolves its own directory, sources `bootstrap/bs.sh` (pre-kernel namespace)
+  and runs `bs::shell::ensure_version 4`, so the bash 4+ gate runs before
+  anything else is loaded.
+- Defines `readonly BS_VERSION` (currently `0.5.3`).
 - Resolves `BS_ROOT` if it is not already set: first the script's own
   directory (when it contains `bootstrap/init.sh`), then
   `~/.local/lib/bs` and `/usr/local/lib/bs`.
@@ -120,15 +125,21 @@ Its steps:
    from the file's own location (the parent of `bootstrap/`), verified by the
    presence of the `bs` script. If that fails, initialization aborts with an
    error asking to set `BS_ROOT` manually.
-3. **PATH tweak.** `~/.local/bin` is prepended to `PATH` once (checked against
-   duplicates), which covers local installs.
-4. **BS_HOME.** Defaults to `BS_ROOT` if unset.
-5. **Loader.** Sources `bootstrap/loader.sh` (falling back to
-   `${BS_ROOT}/loader.sh`).
-6. **Core modules**, loaded via `load` in a fixed order:
+3. **Pre-kernel namespace.** Sources `bootstrap/bs.sh` and runs the shell
+   version gate `bs::shell::ensure_version 4` before any kernel code loads —
+   runtime detection via `BASH_VERSION`/`ZSH_VERSION`, never `$SHELL` (the
+   login shell lies when sourcing from another shell).
+4. **PATH tweak.** `~/.local/bin` is prepended to `PATH` once
+   (`bs::append_local_bin_to_path`), which covers local installs.
+5. **BS_HOME.** Defaults to `BS_ROOT` if unset.
+6. **Loader.** Sources `bootstrap/loader.sh` (falling back to
+   `${BS_ROOT}/loader.sh`). The loader also sources `bootstrap/bs.sh` for
+   direct users, so `bs::shell::*` and friends are always available.
+7. **Core modules**, loaded via `load` in a fixed order:
    - `core/prereq` — first: the core primitives `bs::guard`,
      `bs::guard_loaded` and `bs::source_relative`, available a priori to all
-     other modules (modules never source `prereq.sh` manually);
+     other modules (modules never source `prereq.sh` manually); shell
+     detection helpers previously here now live in `bootstrap/bs.sh`;
    - `core/lang` — language primitives over Bash built-ins: introspection
      (`bs::func_name`, `bs::call_stack`, `bs::type_of`), strings (`str::*`),
      collections (`arr::*`, `map::*`);
@@ -154,7 +165,7 @@ Its steps:
 
 [core/guard.sh](../../../core/guard.sh) is kept as a backward-compatible
 wrapper around [core/prereq.sh](../../../core/prereq.sh).
-7. **Marker.** Exports `BS_INITIALIZED=1`. Unless `BS_SILENT=1`, prints the
+8. **Marker.** Exports `BS_INITIALIZED=1`. Unless `BS_SILENT=1`, prints the
    bootstrap path.
 
 Because `core/utils` is always loaded, every BS script can rely on

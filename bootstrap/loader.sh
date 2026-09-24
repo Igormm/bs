@@ -8,16 +8,25 @@
 # Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points
 
+# Pre-kernel root namespace: bs::shell::*, bs::script_dir, PATH tweak.
+# Idempotent via its own guard — safe when init.sh already sourced it.
+# Pre-kernel namespace: bs::shell::*, bs::script_dir, PATH-твик.
+# Идемпотентен через собственный guard — безопасно, если init.sh уже подключил его.
+if [[ -f "$(dirname -- "${BASH_SOURCE[0]}")/bs.sh" ]]; then
+  # shellcheck disable=SC1090
+  source "$(dirname -- "${BASH_SOURCE[0]}")/bs.sh"
+fi
+
 # ============================================================================
 # ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ / GLOBAL VARIABLES
 # ============================================================================
 
-# Ассоциативный массив для отслеживания загруженных модулей
-# Associative array for tracking loaded modules
+# @global BS_LOADED_MODULES — Loader: registry of loaded modules (guard names) (category: env)
+# @global BS_LOADED_MODULES — Loader: реестр загруженных модулей (guard-имена) (категория: env)
 declare -g -A BS_LOADED_MODULES
 
-# Глобальный стек загрузки для обнаружения циклов
-# Global loading stack for cycle detection
+# @global BS_LOAD_STACK — Loader: load stack for cycle detection (category: env)
+# @global BS_LOAD_STACK — Loader: стек загрузки для обнаружения циклов (категория: env)
 declare -g -a BS_LOAD_STACK=()
 
 # ============================================================================

@@ -13,19 +13,24 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-# Ensure running under Bash 4+
-if [[ -z "${BASH_VERSION:-}" || ${BASH_VERSINFO[0]} -lt 4 ]]; then
-  printf 'ERROR: bash 4.0+ required\n' >&2
-  exit 1
+# 1. Каталог entry-point'а — нужен до загрузки чего-либо
+BS_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+
+# 2. Pre-kernel root namespace: shell version gate (bash 3.2-compatible)
+if [[ -f "${BS_DIR}/bootstrap/bs.sh" ]]; then
+  source "${BS_DIR}/bootstrap/bs.sh"
+  bs::shell::ensure_version 4 || exit 1
+else
+  printf 'ERROR: bootstrap/bs.sh not found in %s\n' "$BS_DIR" >&2
+  exit 2
 fi
 
 # 1. Версия фреймворка 
 readonly BS_VERSION='0.5.2'
 
-# 3. Определение BS_ROOT (если ещё не задан) 
+# 4. Определение BS_ROOT (если ещё не задан) 
 if [[ -z "${BS_ROOT:-}" ]]; then
   # Если bs запущен из репо-корня, bootstrap/init.sh рядом
-  BS_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
   if [[ -f "${BS_DIR}/bootstrap/init.sh" ]]; then
     BS_ROOT=$BS_DIR
   else
@@ -300,17 +305,13 @@ doctor_cmd() {
   log::info "$(printf '  %-8s | %-30s | %s' "STATUS" "ITEM" "DETAIL")"
   log::info "$(printf '  %-8s | %-30s | %s' "--------" "------------------------------" "--------")"
 
-  # Bash version / Версия bash
-  if [[ ${BASH_VERSINFO[0]} -ge 4 ]]; then
-    log::success "$(printf '  %-8s | %-30s | %s' "OK" "Bash version" "${BASH_VERSION}")"
-    pass=$(( pass + 1 ))
-  else
-    log::error "$(printf '  %-8s | %-30s | %s' "FAIL" "Bash version" "Bash 4.0+ required")"
-    fail=1
-  fi
+  # Bash version gate already ran in the pre-kernel namespace
+  # (bootstrap/bs.sh::bs::shell::ensure_version) — no re-check here.
+  # Гейт версии bash уже отработал в pre-kernel namespace
+  # (bootstrap/bs.sh::bs::shell::ensure_version) — повторная проверка не нужна.
 
   # Required core files / Обязательные файлы ядра
-  local req=(bootstrap/init.sh bootstrap/loader.sh core/prereq.sh core/lang.sh core/const.sh core/logger.sh core/errorhandler.sh core/version.sh core/utils.sh core/config.sh core/deps.sh core/repl.sh)
+  local req=(bootstrap/init.sh bootstrap/loader.sh bootstrap/bs.sh core/prereq.sh core/lang.sh core/const.sh core/logger.sh core/errorhandler.sh core/version.sh core/utils.sh core/config.sh core/deps.sh core/repl.sh)
   local f
   for f in "${req[@]}"; do
     if is::file "${BS_ROOT}/${f}"; then

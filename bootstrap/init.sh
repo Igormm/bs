@@ -29,9 +29,9 @@ HELP
 # If executed directly, warn and exit. We only support bash/zsh.
 # При прямом исполнении — предупредить и выйти. Поддерживаем только bash/zsh.
 # Рантайм-оболочку определяем здесь инлайн (BASH_VERSION/ZSH_VERSION), потому
-# что ядро ещё не загружено; готовые хелперы — core/prereq.sh: bs::shell::*.
+# что ядро ещё не загружено; канонические хелперы — bootstrap/bs.sh: bs::shell::*.
 # Runtime shell is detected inline here (BASH_VERSION/ZSH_VERSION) because the
-# kernel is not loaded yet; the canonical helpers live in core/prereq.sh: bs::shell::*.
+# kernel is not loaded yet; the canonical helpers live in bootstrap/bs.sh: bs::shell::*.
 if [[ -n "${ZSH_VERSION:-}" && "${ZSH_EVAL_CONTEXT}" == toplevel* ]] ||
    [[ -n "${BASH_VERSION:-}" && "${BASH_SOURCE[0]}" == "$0" && "${#BASH_SOURCE[@]}" -eq 1 ]]; then
   printf 'ERROR: This script must be sourced, not executed.\n' >&2
@@ -42,13 +42,13 @@ fi
 # Idempotency: skip if already initialized
 if [[ -n "${BS_INITIALIZED:-}" ]]; then
   # Best-effort debug if logger is available
-  command -v log::debug >/dev/null 2>&1 && log::debug 'BS already initialized, skipping'
+  [[ "${BS_DEBUG:-0}" == 1 ]] && printf 'DEBUG: BS already initialized, skipping\n' >&2
   return 0
 fi
 
 # Resolve BS_ROOT once
 if [[ -n "${BS_ROOT:-}" && -d "${BS_ROOT}" ]]; then
-  :
+  [[ "${BS_DEBUG:-0}" == 1 ]] && printf 'DEBUG: BS_ROOT already set: %s\n' "${BS_ROOT}" >&2
 else
   # Bash: BASH_SOURCE[0]; zsh: funcsourcetrace[1] (BASH_SOURCE у zsh пуст)
   __bs_src__="${BASH_SOURCE[0]:-${funcsourcetrace[1]%:*}}"
@@ -62,20 +62,28 @@ else
   fi
 fi
 
-# Minimal PATH tweak for local installs
-append_local_bin_to_path() {
-  local -r needle="${HOME}/.local/bin"
-  case ":${PATH}:" in
-    *":${needle}:"*) return 0 ;;
-    *) export PATH="${needle}:${PATH}" ;;
-  esac
-}
+# Pre-kernel root namespace: shell gate and PATH tweak must work BEFORE
+# the loader — bootstrap/bs.sh is dependency-free and bash-3.2-compatible.
+# Pre-kernel namespace: гейт оболочки и PATH-твик обязаны работать ДО
+# loader'а — bootstrap/bs.sh не имеет зависимостей и совместим с bash 3.2.
+if [[ -f "${BS_ROOT}/bootstrap/bs.sh" ]]; then
+  source "${BS_ROOT}/bootstrap/bs.sh"
+else
+  printf 'ERROR: bootstrap/bs.sh not found in BS_ROOT=%s\n' "${BS_ROOT}" >&2
+  return 1
+fi
+
+# Shell version gate before any kernel code runs: runtime detection via
+# BASH_VERSION/ZSH_VERSION, NOT $SHELL (login shell lies when sourcing).
+# Гейт версии оболочки до любого кода ядра: рантайм-детект через
+# BASH_VERSION/ZSH_VERSION, а не $SHELL (логин-оболочка врёт при source).
+bs::shell::ensure_version 4 || return 1
 
 # Add local bin to PATH
-append_local_bin_to_path
+bs::append_local_bin_to_path
 
-# BS_HOME: историческое расхождение с BS_ROOT в lib-модулях
-# BS_HOME: historical mismatch with BS_ROOT in lib modules
+# @global BS_HOME — Env: BS_HOME, defaults to BS_ROOT (historical alias) (category: env)
+# @global BS_HOME — Env: BS_HOME, по умолчанию BS_ROOT (исторический алиас) (категория: env)
 : "${BS_HOME:=${BS_ROOT}}"
 export BS_HOME
 
@@ -106,7 +114,8 @@ load "core/deps"
 # Load configuration from files and env
 config::load
 
-# Mark as initialized
+# @global BS_INITIALIZED — Env: bootstrap initialized marker (category: env)
+# @global BS_INITIALIZED — Env: маркер выполненной инициализации (категория: env)
 export BS_INITIALIZED=1
 
 # Optional info

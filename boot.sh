@@ -14,14 +14,17 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-# 1. Проверка среды: требуется bash 4+
-if [[ -z "${BASH_VERSION:-}" || ${BASH_VERSINFO[0]} -lt 4 ]]; then
-  printf 'ERROR: bash 4.0+ required\n' >&2
+# 1. Определяем каталог, где лежит boot.sh
+BOOT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+
+# 2. Pre-kernel root namespace: shell version gate (bash 3.2-compatible)
+if [[ -f "${BOOT_DIR}/bootstrap/bs.sh" ]]; then
+  source "${BOOT_DIR}/bootstrap/bs.sh"
+  bs::shell::ensure_version 4 || exit 1
+else
+  printf 'ERROR: bootstrap/bs.sh not found in %s\n' "$BOOT_DIR" >&2
   exit 1
 fi
-
-# 2. Определяем каталог, где лежит boot.sh
-BOOT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 
 # 3. BS_ROOT: приоритет поиска
 #  1) Уже экспортирован внешним скриптом

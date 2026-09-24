@@ -56,8 +56,8 @@ bs::source_relative "../core/logger.sh" "../core/utils.sh"  # зависимос
 - Возвращает: 0 при успехе, 1 если каталог не удалось определить
 - Stdout: абсолютный физический путь (`pwd -P`) каталога вызывающего файла
 - Назначение: заменяет бойлерплейт `"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"`.
-  Доступна только после загрузки `core/prereq` — заголовки точек входа,
-  выполняющиеся до `bootstrap/init.sh`, должны оставаться на сырой идиоме.
+  Доступна в pre-kernel namespace (`bootstrap/bs.sh`) — точки входа могут
+  использовать её до загрузки `bootstrap/init.sh`.
 - Пример: `readonly SCRIPT_DIR="$(bs::script_dir)"`
 
 ---

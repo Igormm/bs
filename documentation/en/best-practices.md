@@ -64,7 +64,8 @@ See the [Code Style Guide](code-style-guide.md) for details.
   comment; the loader detects cycles via `BS_LOAD_STACK` and deduplicates loads
   via `BS_LOADED_MODULES`.
 - **Centralized shell checks**: validate Bash 4+ through a single helper
-  (`core/utils.sh::utils::ensure_shell_version` / `install/utils.sh::ensure_bash4`).
+  (`bootstrap/bs.sh::bs::shell::ensure_version`, available before the loader
+  and used by entry points; `utils::ensure_shell_version` is deprecated).
   Do not scatter ad-hoc `BASH_VERSINFO` checks across files.
 - **Logging**: use `log::info|warn|error|debug|trace|success|fatal` and configure
   output via `BS_LOG_LEVEL`, `BS_LOG_COLOR`, `BS_LOG_FORMAT`, `BS_LOG_TIMESTAMP`.

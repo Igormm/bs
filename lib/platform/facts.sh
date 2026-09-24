@@ -26,10 +26,15 @@ bs::source_relative "../../core/lang.sh" "../../core/utils.sh" "../../core/const
 # Test hooks / Тестовые хуки: PLATFORM_CACHE_FILE (путь к кэшу)
 # ==========================================
 
-# Cache file / Файл кэша
+# @global PLATFORM_CACHE_FILE — Hook: platform facts cache file (category: hook)
+# @global PLATFORM_CACHE_FILE — Хук: файл кэша фактов платформы (категория: hook)
 : "${PLATFORM_CACHE_FILE:=${XDG_CACHE_HOME:-${HOME:-/tmp}/.cache}/bs/facts}"
 
+# @global PF_FACTS — Facts: platform capability vector map (category: constant)
+# @global PF_FACTS — Facts: карта вектора возможностей платформы (категория: constant)
 declare -gA PF_FACTS=()
+# @global PF_BUILT — Facts: vector built flag (0/1) (category: constant)
+# @global PF_BUILT — Facts: флаг построения вектора (0/1) (категория: constant)
 declare -g PF_BUILT=0
 
 # @private
@@ -93,8 +98,8 @@ platform::__build() {
   PF_FACTS[kernel]="${kernel:-unknown}"
   PF_FACTS[arch]="${arch:-unknown}"
   PF_FACTS[bash]="${BASH_VERSION}"
-  # Оболочка как capability — единый источник: core/prereq.sh (bs::shell::*).
-  # Shell as a capability — single source: core/prereq.sh (bs::shell::*).
+  # Оболочка как capability — единый источник: bootstrap/bs.sh (bs::shell::*).
+  # Shell as a capability — single source: bootstrap/bs.sh (bs::shell::*).
   PF_FACTS[shell]="$(bs::shell::name)"
   PF_FACTS[shell_ok]="$(bs::shell::ok)"
   PF_FACTS[shell_version]="$(bs::shell::version)"

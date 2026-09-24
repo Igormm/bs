@@ -4,6 +4,7 @@
 # tests/unit/testprerequnit.sh — Модульные тесты для модуля core/prereq
 #
 # Тестирует bs::guard, bs::guard_loaded и bs::source_relative.
+# bs::shell::* и bs::script_dir переехали в bootstrap/bs.sh (см. testbsunit.sh).
 
 set -euo pipefail
 
@@ -85,20 +86,7 @@ test_source_relative() {
 }
 
 # Test bs::script_dir resolves the caller's directory
-test_script_dir() {
-    local dir
-    dir="$(bs::script_dir)"
-    local expected
-    expected="$(cd -- "${TEST_SCRIPT_DIR}" >/dev/null 2>&1 && pwd -P)"
-    testframework::assert_equal "${expected}" "${dir}" "bs::script_dir returns caller directory"
-
-    # Invalid index should fail
-    if bs::script_dir 99 >/dev/null 2>&1; then
-        testframework::assert_true "1 -eq 2" "bs::script_dir fails on invalid index"
-    else
-        testframework::assert_true "0 -eq 0" "bs::script_dir fails on invalid index"
-    fi
-}
+# (bs::script_dir moved to bootstrap/bs.sh — see testbsunit.sh)
 
 main() {
     print_header "Core Prerequisites Unit Tests / Модульные тесты примитивов ядра"
@@ -117,23 +105,7 @@ main() {
     testframework::section "Source Relative / Относительный source"
     test_source_relative
 
-    testframework::section "Shell / Оболочка"
-    test_shell_helpers
-
-    testframework::section "Script Dir / Каталог скрипта"
-    test_script_dir
-
     testframework::summary
-}
-
-
-# Test shell capability helpers / Хелперы оболочки как capability
-test_shell_helpers() {
-    testframework::assert_equal "bash" "$(bs::shell::name)" "shell name is bash under bash"
-    testframework::assert_equal "1" "$(bs::shell::ok)" "bash 4+ is shell_ok"
-    testframework::assert_true "'$(bs::shell::version)' =~ ^[0-9]+$" "shell version is numeric"
-    # is_sourced: этот тест-файл исполняется (не source'ится) → NOT sourced
-    bs::shell::is_sourced && testframework::fail "test file executed directly must not be sourced" || testframework::assert_true "0 -eq 0" "executed file is not sourced"
 }
 
 main "$@"

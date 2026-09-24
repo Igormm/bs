@@ -123,6 +123,11 @@ utils::ensure_source "${ROOT_DIR}/lib/math.sh" add_integers
 
 ### utils::ensure_shell_version
 
+> **Устарела** — используйте `bootstrap/bs.sh::bs::shell::ensure_version`.
+> Она смотрит в `$SHELL` (логин-оболочку), которая врёт при source из другой
+> оболочки; замена определяет рантайм-оболочку через `BASH_VERSION`/
+> `ZSH_VERSION` и доступна до загрузки loader'а.
+
 ```bash
 utils::ensure_shell_version 4
 ```

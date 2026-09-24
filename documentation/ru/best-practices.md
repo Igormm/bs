@@ -64,8 +64,9 @@ documentation/   # Гайды, справочники API, примеры
   `# @depends core/const, core/logger`; загрузчик отслеживает циклы через
   `BS_LOAD_STACK` и дедуплицирует через `BS_LOADED_MODULES`.
 - **Централизованные проверки shell**: проверяй Bash 4+ одним хелпером
-  (`core/utils.sh::utils::ensure_shell_version` / `install/utils.sh::ensure_bash4`).
-  Не разбрасывай ad-hoc проверки `BASH_VERSINFO` по файлам.
+  (`bootstrap/bs.sh::bs::shell::ensure_version` — доступен до загрузки
+  loader'а и используется точками входа; `utils::ensure_shell_version`
+  устарела). Не разбрасывай ad-hoc проверки `BASH_VERSINFO` по файлам.
 - **Логирование**: используй `log::info|warn|error|debug|trace|success|fatal`
   и настраивай вывод через `BS_LOG_LEVEL`, `BS_LOG_COLOR`, `BS_LOG_FORMAT`,
   `BS_LOG_TIMESTAMP`.

@@ -56,8 +56,8 @@ bs::source_relative "../core/logger.sh" "../core/utils.sh"  # dependencies relat
 - Returns: 0 on success, 1 if the directory cannot be resolved
 - Stdout: absolute physical path (`pwd -P`) of the caller's directory
 - Purpose: replaces the boilerplate `"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"`.
-  Available only after `core/prereq` is loaded — entry-point headers that run
-  before `bootstrap/init.sh` must keep the raw idiom.
+  Available in the pre-kernel namespace (`bootstrap/bs.sh`) — entry points
+  can use it before `bootstrap/init.sh` loads.
 - Example: `readonly SCRIPT_DIR="$(bs::script_dir)"`
 
 ---

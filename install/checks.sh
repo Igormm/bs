@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# @tier core — bash 4+ only (gated by bootstrap/bs.sh), works everywhere
+# @tier core — только bash 4+ (гейт в bootstrap/bs.sh), работает везде
 
 # Environment checking functions for the installer
 
@@ -60,14 +62,16 @@ check_shell_environment() {
     fi
 
     # Проверяем поддерживаемость и версии
+    # Версия bash 4+ уже проверена гейтом bootstrap/bs.sh::bs::shell::ensure_version
+    # (install.sh source'ит bootstrap/init.sh до check_shell_environment), поэтому
+    # здесь только диспетчер интерпретаторов и целостность детекта.
+    # Bash 4+ is already gated by bootstrap/bs.sh::bs::shell::ensure_version
+    # (install.sh sources bootstrap/init.sh before check_shell_environment),
+    # so only the interpreter dispatch and detection integrity remain.
     case "$shell_name" in
         bash)
             if [[ -z "${BASH_VERSION:-}" ]]; then
                 printf "ERROR: Shell mismatch. Detected '%s', but \$BASH_VERSION is empty.\n" "$shell_name" >&2
-                exit 1
-            fi
-            if [[ "${BASH_VERSINFO[0]}" -lt 4 ]]; then
-                printf "ERROR: Bash 4+ required, found %s\n" "$BASH_VERSION" >&2
                 exit 1
             fi
             ;;
