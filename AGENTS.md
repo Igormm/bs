@@ -8,6 +8,9 @@ BS is a modular Bash 4+ framework and standard library. It provides:
 
 - `bs` — shebang interpreter and CLI (`#!/usr/bin/env bs`)
 - `bootstrap/loader.sh` — module loader with dependency resolution (`load "lib/io/streams"`)
+- `bootstrap/bs.sh` — pre-kernel root namespace: dependency-free helpers available
+  before the loader (shell detection `bs::shell::*`, `bs::script_dir`, PATH tweak);
+  sourced by entry points, `bootstrap/init.sh` and the loader itself
 - `core/` — framework kernel: `args`, `logger`, `errorhandler`, `const`, `utils`, `version`, `config`, `deps`, `prereq`, `lang`
 - `lib/` — standard library: `io/streams`, `io/files`, `io/process`, `system/*`, `integration/*`, `ui/*`, etc.
 - `tests/` — custom test framework, ShellCheck validation, syntax validation
@@ -92,6 +95,9 @@ Reusable workflow skills live in `.agents/skills/` (Kimi Code / agents-compatibl
 
 - `bs-new-lib-module` — scaffold a new `lib/` module (skeleton, guard, `@depends`, metadata).
 - `bs-new-core-module` — add a `core/` module and register it in `bootstrap/init.sh` + `bs doctor`.
+- `bs-pre-kernel-namespace` — write/edit functions in `bootstrap/bs.sh` (dependency-free helpers usable before the loader).
+- `bs-pre-kernel-boundary` — check that pre-load code uses no core/lib abstractions; after load they are required.
+- `bs-variable-docs` — check that module-level variables carry a bilingual `# @global` snippet naming their category (code-style-guide §4.2).
 - `bs-write-test` — unit/integration test skeleton and `testframework.sh` assert API.
 - `bs-validate` — the mandatory validation cycle after any change.
 - `bs-docs-sync` — keep `documentation/en/` and `documentation/ru/` in sync.
@@ -102,6 +108,26 @@ Reusable workflow skills live in `.agents/skills/` (Kimi Code / agents-compatibl
 - `bs-cli-markdown-style` — apply the «markdown simplicity» principle to CLI/interface/output/docs design (7-criteria test, Russian).
 - `bs-device-module` — write Linux device/hardware modules (evdev/sysfs, binary decoding, test hooks, graceful degradation).
 - `bs-ai-toolchain` — operate BS as an AI toolbox (discovery ladder, verification loops, generation contracts).
+
+### Imported methodology skills (external, verbatim)
+
+General agent-workflow skills imported from [obra/superpowers](https://github.com/obra/superpowers)
+(MIT) and [anthropics/skills](https://github.com/anthropics/skills) (Apache-2.0);
+kept as-is, cross-references between them are intact:
+
+- `brainstorming` — refine intent/design before writing code
+- `writing-plans` — bite-sized implementation plans (file paths, verification steps)
+- `executing-plans` — inline plan execution with review
+- `test-driven-development` — RED-GREEN-REFACTOR cycle
+- `requesting-code-review` / `receiving-code-review` — review workflow by severity
+- `systematic-debugging` — 4-phase root-cause process
+- `verification-before-completion` — prove the fix, then finish
+- `writing-skills` — authoring skills as TDD over process documentation
+- `using-superpowers` — meta intro (required background for the others)
+- `dispatching-parallel-agents` — concurrent subagent workflows
+- `subagent-driven-development` — per-task subagents with two-stage review
+- `using-git-worktrees` / `finishing-a-development-branch` — branch hygiene
+- `skill-creator` — skill authoring/evals (anthropics)
 
 ## MCP / API provider suggestions
 
