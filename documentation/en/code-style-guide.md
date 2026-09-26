@@ -28,7 +28,7 @@ documentation and protection against errors.
 
 ### 1.1 Strict mode
 
-Every entry-point script must enable strict mode: abort on error, on use of
+Every entry point runs under strict mode: abort on error, on use of
 undefined variables and on pipeline failures, plus a safe field separator:
 
 ```bash
@@ -36,17 +36,22 @@ set -euo pipefail
 IFS=$'\n\t'
 ```
 
-The framework provides a helper for this — `utils::strict()`
-([core/utils.sh](../../core/utils.sh)). Strict mode is enabled in entry points
-only, not inside library modules: modules run in the caller's shell and must
-not silently change its options.
+- `#!/usr/bin/env bs` scripts get strict mode from the interpreter: `bs run`
+  enables `set -euo pipefail` **before** the script is sourced — no strict
+  line needed (see [getting-started](../01-getting-started/README.md)).
+- Plain `#!/usr/bin/env bash` entry points (`bs`, `boot.sh`, test runners)
+  set it themselves — via `utils::strict()`
+  ([core/utils.sh](../../core/utils.sh)) or the raw line above:
 
 ```bash
-#!/usr/bin/env bs
-load "core/utils"
+#!/usr/bin/env bash
+source /path/to/bootstrap/init.sh
 
 utils::strict
 ```
+
+Strict mode is enabled in entry points only, never inside library modules:
+modules run in the caller's shell and must not silently change its options.
 
 ### 1.2 Module file structure and Source Guard
 

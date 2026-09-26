@@ -94,7 +94,6 @@ sudo ./install.sh uninstall      # system
 ```bash
 #!/usr/bin/env bs
 # shellcheck shell=bash
-set -euo pipefail
 
 load "lib/io/streams"
 
@@ -104,8 +103,9 @@ io::streams::print "hello from BS ${BS_VERSION}"
 - `#!/usr/bin/env bs` — запускает скрипт через интерпретатор `bs`; ядро
   фреймворка загружается до вашего кода, bootstrap-бойлерплейт не нужен.
 - `# shellcheck shell=bash` — обязательно на строке 2, если shebang — `bs`.
-- `set -euo pipefail` — строгий режим только в точках входа (скрипты, тесты),
-  никогда внутри модулей `lib/` / `core/`.
+- Строгий режим уже включён интерпретатором (`set -euo pipefail` до source
+  вашего скрипта) — строка здесь не нужна. Её ставят только обычные точки
+  входа `#!/usr/bin/env bash`, через `utils::strict`.
 - `load "lib/io/streams"` — путь относительно `BS_ROOT`, без `.sh`. Не
   подключайте модули фреймворка через `source` в новых скриптах.
 - `io::streams::print` — безопасный вывод: обёртка над `printf '%s\n'`,

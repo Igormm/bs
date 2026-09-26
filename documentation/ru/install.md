@@ -93,6 +93,10 @@ export PATH="$HOME/.local/bin:$PATH"
   - `system` (по умолчанию): `/usr/local/lib/bs`;
   - `local` (`--local`): `~/.local/lib/bs`;
   - произвольный: значения `PREFIX`, `BIN_DIR`, `LIB_DIR`.
-- Требуется bash 4.0+; иначе установщик завершается через `check_shell_environment` (по реальному интерпретатору, а не по `$SHELL`).
+- Требуется bash 4.0+; гейт версии выполняется в bootstrap
+  (`bs::shell::ensure_version`, по реальному интерпретатору, а не по
+  `$SHELL`), который установщик подключает до всего остального.
+  `check_shell_environment` занимается только диспетчером интерпретаторов
+  (bash/zsh/ksh/dash/fish).
 - Если BS уже установлена в целевой каталог (`is_already_installed`), установщик останавливается и предлагает сначала удалить старую версию или переопределить `PREFIX`/`BIN_DIR`/`LIB_DIR`.
 - Установщик работает в строгом режиме (`utils::strict`: `set -euo pipefail`) и проверяет каждый подключаемый файл через `utils::ensure_source`.

@@ -93,7 +93,6 @@ Runnable copy: [examples/hello.sh](../../../examples/hello.sh).
 ```bash
 #!/usr/bin/env bs
 # shellcheck shell=bash
-set -euo pipefail
 
 load "lib/io/streams"
 
@@ -104,8 +103,9 @@ io::streams::print "hello from BS ${BS_VERSION}"
   framework core is loaded before your code, so no bootstrap boilerplate is
   needed.
 - `# shellcheck shell=bash` — required on line 2 when the shebang is `bs`.
-- `set -euo pipefail` — strict mode belongs in entry points (scripts, tests),
-  never inside `lib/` or `core/` modules.
+- Strict mode is already enabled by the interpreter (`set -euo pipefail`
+  before your script is sourced) — no strict line needed here. Only plain
+  `#!/usr/bin/env bash` entry points set it themselves, via `utils::strict`.
 - `load "lib/io/streams"` — path relative to `BS_ROOT`, no `.sh`. Never
   `source` framework modules directly in a new script.
 - `io::streams::print` — safe output: a `printf '%s\n'` wrapper that does

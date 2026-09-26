@@ -93,6 +93,9 @@ Rules: `~/.bashrc` is updated if it exists, or if there is no `~/.zshrc`; `~/.zs
   - `system` (default): `/usr/local/lib/bs`;
   - `local` (`--local`): `~/.local/lib/bs`;
   - custom: values of `PREFIX`, `BIN_DIR`, `LIB_DIR`.
-- bash 4.0+ is required; the installer aborts on older shells via `check_shell_environment` (based on the real interpreter, not `$SHELL`).
+- bash 4.0+ is required; the version gate runs in the bootstrap
+  (`bs::shell::ensure_version`, based on the real interpreter, not `$SHELL`),
+  which the installer sources before anything else. `check_shell_environment`
+  handles the interpreter dispatch (bash/zsh/ksh/dash/fish) only.
 - If BS is already installed at the target (`is_already_installed`), the installer stops and suggests uninstalling first or overriding `PREFIX`/`BIN_DIR`/`LIB_DIR`.
 - The installer runs under strict mode (`utils::strict`: `set -euo pipefail`) and validates every file it sources via `utils::ensure_source`.
