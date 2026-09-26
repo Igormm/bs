@@ -8,8 +8,6 @@
 #
 #   ./bs run examples/pulse.sh
 
-set -euo pipefail
-
 load "lib/io/streams"
 load "lib/platform/facts"
 load "lib/ui/presentation"

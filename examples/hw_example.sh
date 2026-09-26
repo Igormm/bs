@@ -3,8 +3,6 @@
 # examples/hw_example.sh — Hardware information module demo
 # examples/hw_example.sh — Демонстрация модуля информации об оборудовании
 
-set -euo pipefail
-
 load "lib/system/hw"
 
 main() {

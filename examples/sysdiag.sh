@@ -17,8 +17,6 @@
 #   bs run examples/sysdiag.sh quick --output /tmp/sysdiag.txt
 #   ./examples/sysdiag.sh quick               # bs в PATH / bs in PATH
 
-set -euo pipefail
-
 load "core/args"
 load "core/utils"
 load "lib/system/hw"

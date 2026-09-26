@@ -3,8 +3,6 @@
 # examples/processguard_example.sh — Process Guard usage demo
 # Пример использования обёртки-сторожа io::process::guard.
 
-set -euo pipefail
-
 load "core/utils"
 load "lib/io/process"
 

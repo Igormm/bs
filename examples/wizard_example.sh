@@ -8,8 +8,6 @@
 # Скруглённые меню со стрелками, мультивыбор, живые данные о системе и
 # прогресс-бар — чистый BS, без внешних TUI-библиотек.
 
-set -euo pipefail
-
 load "core/args"
 load "lib/ui/presentation"
 load "lib/system/hw"

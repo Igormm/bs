@@ -3,8 +3,6 @@
 # examples/k8s_example.sh — Kubernetes client demo
 # Пример использования Kubernetes-клиента BS.
 
-set -euo pipefail
-
 load "core/utils"
 load "lib/integration/k8s"
 

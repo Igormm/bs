@@ -3,8 +3,6 @@
 # examples/llm_example.sh — LLM client demo
 # Пример использования LLM-клиента BS.
 
-set -euo pipefail
-
 load "core/utils"
 load "lib/integration/llm"
 

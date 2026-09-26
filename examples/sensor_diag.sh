@@ -7,8 +7,6 @@
 #   bs run examples/sensor_diag.sh --list
 #   bs run examples/sensor_diag.sh --device event5 --window 5
 
-set -euo pipefail
-
 load "core/args"
 load "lib/io/streams"
 load "lib/system/sensor"

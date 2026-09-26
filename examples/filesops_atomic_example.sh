@@ -3,8 +3,6 @@
 # examples/filesops_atomic_example.sh — FSH atomic/backup/fallback demo
 # Пример атомарного копирования, резервных копий и move-fallback в BS.
 
-set -euo pipefail
-
 load "core/utils"
 load "lib/io/files"
 

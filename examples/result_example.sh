@@ -3,8 +3,6 @@
 # examples/result_example.sh — JSON result contract demo for BS integrations
 # Пример JSON-контракта результата для интеграций BS (Go backend и др.).
 
-set -euo pipefail
-
 load "core/utils"
 load "lib/io/files"
 load "lib/integration/result"

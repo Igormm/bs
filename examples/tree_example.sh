@@ -5,8 +5,6 @@
 #
 #   ./bs run examples/tree_example.sh
 
-set -euo pipefail
-
 load "lib/io/tree"
 load "lib/io/streams"
 

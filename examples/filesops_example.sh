@@ -3,8 +3,6 @@
 # examples/filesops_example.sh — FSH (io::files) usage demo
 # Пример использования модуля файловых операций BS.
 
-set -euo pipefail
-
 load "core/utils"
 load "lib/io/files"
 

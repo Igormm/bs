@@ -3,8 +3,6 @@
 # examples/http_example.sh — HTTP client demo
 # Пример использования HTTP-клиента BS.
 
-set -euo pipefail
-
 load "core/utils"
 load "lib/integration/http"
 load "lib/integration/result"

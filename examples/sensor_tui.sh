@@ -11,8 +11,6 @@
 #   bs run examples/sensor_tui.sh
 #   bs run examples/sensor_tui.sh --device event5
 
-set -euo pipefail
-
 load "core/args"
 load "lib/io/streams"
 load "lib/system/sensor"

@@ -14,8 +14,6 @@
 #   d        delete / удалить
 #   q        quit / выход
 
-set -euo pipefail
-
 load "core/args"
 load "lib/io/streams"
 load "lib/tui/tui"
