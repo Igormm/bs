@@ -40,7 +40,8 @@ IFS=$'\n\t'
   enables `set -euo pipefail` **before** the script is sourced — no strict
   line needed (see [getting-started](../01-getting-started/README.md)).
 - Plain `#!/usr/bin/env bash` entry points (`bs`, `boot.sh`, test runners)
-  set it themselves — via `utils::strict()`
+  set it themselves — via the pre-kernel `bs::strict()`
+  ([bootstrap/bs.sh](../../bootstrap/bs.sh)), via `utils::strict()`
   ([core/utils.sh](../../core/utils.sh)) or the raw line above:
 
 ```bash

@@ -22,6 +22,25 @@
 readonly __BS_SH_SOURCED=1
 
 # ==========================================
+# Strict mode / Строгий режим
+# ==========================================
+
+# @description Enable strict bash mode (set -euo pipefail) and a safe IFS.
+# @description Включить строгий режим bash (set -euo pipefail) и безопасный IFS.
+# @description Pre-kernel equivalent of utils::strict (core/utils.sh): available
+# @description BEFORE the loader runs, so plain-bash entry points (bs, boot.sh)
+# @description can enable strict mode via a named helper instead of a raw line.
+# @description Pre-kernel аналог utils::strict (core/utils.sh): доступна ДО
+# @description запуска loader'а, чтобы обычные bash-точки входа (bs, boot.sh)
+# @description включали строгий режим именованной функцией, а не сырой строкой.
+# @note Entry points only, never inside library modules.
+# @note Только в точках входа, никогда в библиотечных модулях.
+bs::strict() {
+  set -euo pipefail
+  IFS=$'\n\t'
+}
+
+# ==========================================
 # PATH / Local bin
 # ==========================================
 

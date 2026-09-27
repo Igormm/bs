@@ -3,7 +3,7 @@
 # tests/unit/testbsunit.sh — Unit tests for bootstrap/bs.sh (pre-kernel namespace)
 # tests/unit/testbsunit.sh — Модульные тесты bootstrap/bs.sh (pre-kernel namespace)
 #
-# Тестирует bs::shell::*, bs::script_dir, bs::append_local_bin_to_path и guard.
+# Тестирует bs::shell::*, bs::script_dir, bs::strict, bs::append_local_bin_to_path и guard.
 
 set -euo pipefail
 
@@ -75,6 +75,13 @@ test_ensure_version() {
     testframework::assert_true "'${bad_err}' =~ ERROR" "ensure_version rejects a non-numeric version"
 }
 
+# Test bs::strict enables strict mode / bs::strict включает строгий режим
+test_strict() {
+    local ok
+    ok="$(bs::strict; [[ ${-} == *e* ]] && [[ ${-} == *u* ]] && [[ "$(set -o)" == *pipefail*on* ]] && [[ "${IFS}" == $'\n\t' ]] && printf '1' || printf '0')"
+    testframework::assert_true "${ok} -eq 1" "bs::strict sets -e, -u, pipefail and IFS"
+}
+
 # Test bs::script_dir resolves the caller's directory
 test_script_dir() {
     local dir
@@ -110,6 +117,9 @@ main() {
 
     testframework::section "Shell Version Gate / Гейт версии оболочки"
     test_ensure_version
+
+    testframework::section "Strict Mode / Строгий режим"
+    test_strict
 
     testframework::section "Script Dir / Каталог скрипта"
     test_script_dir

@@ -105,7 +105,8 @@ io::streams::print "hello from BS ${BS_VERSION}"
 - `# shellcheck shell=bash` — required on line 2 when the shebang is `bs`.
 - Strict mode is already enabled by the interpreter (`set -euo pipefail`
   before your script is sourced) — no strict line needed here. Only plain
-  `#!/usr/bin/env bash` entry points set it themselves, via `utils::strict`.
+  `#!/usr/bin/env bash` entry points set it themselves, via `utils::strict`
+  (post-kernel) or the pre-kernel `bs::strict` from `bootstrap/bs.sh`.
 - `load "lib/io/streams"` — path relative to `BS_ROOT`, no `.sh`. Never
   `source` framework modules directly in a new script.
 - `io::streams::print` — safe output: a `printf '%s\n'` wrapper that does

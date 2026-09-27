@@ -11,15 +11,15 @@
 #    2 – не найден BS_ROOT или отсутствует bs.
 # 
 
-set -euo pipefail
-IFS=$'\n\t'
-
 # 1. Определяем каталог, где лежит boot.sh
 BOOT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 
 # 2. Pre-kernel root namespace: shell version gate (bash 3.2-compatible)
+#    Строгий режим — через pre-kernel хелпер bs::strict (bootstrap/bs.sh).
+#    Strict mode comes from the pre-kernel helper bs::strict (bootstrap/bs.sh).
 if [[ -f "${BOOT_DIR}/bootstrap/bs.sh" ]]; then
   source "${BOOT_DIR}/bootstrap/bs.sh"
+  bs::strict
   bs::shell::ensure_version 4 || exit 1
 else
   printf 'ERROR: bootstrap/bs.sh not found in %s\n' "$BOOT_DIR" >&2

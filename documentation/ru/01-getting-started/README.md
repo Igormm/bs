@@ -105,7 +105,8 @@ io::streams::print "hello from BS ${BS_VERSION}"
 - `# shellcheck shell=bash` — обязательно на строке 2, если shebang — `bs`.
 - Строгий режим уже включён интерпретатором (`set -euo pipefail` до source
   вашего скрипта) — строка здесь не нужна. Её ставят только обычные точки
-  входа `#!/usr/bin/env bash`, через `utils::strict`.
+  входа `#!/usr/bin/env bash` — через `utils::strict` (после загрузки ядра)
+  или pre-kernel `bs::strict` из `bootstrap/bs.sh`.
 - `load "lib/io/streams"` — путь относительно `BS_ROOT`, без `.sh`. Не
   подключайте модули фреймворка через `source` в новых скриптах.
 - `io::streams::print` — безопасный вывод: обёртка над `printf '%s\n'`,

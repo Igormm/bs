@@ -9,16 +9,15 @@
 #              core/, lib/ (опционально, но doctor ругается).
 # 
 
-# strict
-set -euo pipefail
-IFS=$'\n\t'
-
 # 1. Каталог entry-point'а — нужен до загрузки чего-либо
 BS_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 
 # 2. Pre-kernel root namespace: shell version gate (bash 3.2-compatible)
+#    Строгий режим включается именованной pre-kernel функцией bs::strict.
+#    Strict mode is enabled via the named pre-kernel helper bs::strict.
 if [[ -f "${BS_DIR}/bootstrap/bs.sh" ]]; then
   source "${BS_DIR}/bootstrap/bs.sh"
+  bs::strict
   bs::shell::ensure_version 4 || exit 1
 else
   printf 'ERROR: bootstrap/bs.sh not found in %s\n' "$BS_DIR" >&2
@@ -378,9 +377,9 @@ run_cmd() {
   # Запускаем скрипт в новом bash с уже загруженным BS-окружением
   # Сбрасываем унаследованный BS_INITIALIZED, иначе init.sh пропустит загрузку
   exec bash -c '
-    set -euo pipefail
     unset BS_INITIALIZED
     source "'"${BS_ROOT}/bootstrap/init.sh"'"
+    bs::strict
     script=$1; shift
     source "$script" "$@"
   ' bash "$script" "$@"

@@ -42,7 +42,8 @@ IFS=$'\n\t'
   `bs run` включает `set -euo pipefail` **до** source вашего скрипта —
   строка не нужна (см. [getting-started](../01-getting-started/README.md)).
 - Обычные точки входа `#!/usr/bin/env bash` (`bs`, `boot.sh`, тестовые
-  раннеры) ставят его сами — через `utils::strict()`
+  раннеры) ставят его сами — через pre-kernel `bs::strict()`
+  ([bootstrap/bs.sh](../../bootstrap/bs.sh)), через `utils::strict()`
   ([core/utils.sh](../../core/utils.sh)) или сырой строкой выше:
 
 ```bash
