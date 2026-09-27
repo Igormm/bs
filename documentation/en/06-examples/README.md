@@ -27,6 +27,8 @@ If `bs` is in your `PATH`, the scripts are also directly executable:
 | --- | --- | --- |
 | [tree_example.sh](../../../examples/tree_example.sh) | Project file tree from yaml via `io::tree` | `./bs run examples/tree_example.sh` |
 | [hello.sh](../../../examples/hello.sh) | Shortest useful script: shebang `bs`, `load`, `io::streams::print` | `./bs run examples/hello.sh` |
+| [greet.sh](../../../examples/greet.sh) | Short script with `core/args`: command tree, `--name` / `--loud` flags, validation and auto-help | `./bs run examples/greet.sh hello --name Bob --loud`<br>`./bs run examples/greet.sh --help` |
+| [menu.sh](../../../examples/menu.sh) | Minimal interactive TUI menu on `lib/tui`: `tui::menu`, keys, `Enter` action | `./bs run examples/menu.sh` |
 | [todo.sh](../../../examples/todo.sh) | TUI todo list on `lib/tui`: list, input/confirm modals, `~/.todo.tsv` | `./bs run examples/todo.sh` |
 | [pulse.sh](../../../examples/pulse.sh) | Host capability pulse: `lib/platform/facts`, probe chains, UUID v7, hw if `/proc` | `./bs run examples/pulse.sh` |
 

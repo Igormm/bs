@@ -76,7 +76,6 @@ consistent code style and with zero external dependencies.
 ```bash
 #!/usr/bin/env bs
 # shellcheck shell=bash
-set -euo pipefail
 
 load "lib/io/streams"
 
@@ -84,6 +83,105 @@ io::streams::print "hello from BS ${BS_VERSION}"
 ```
 
 Запуск / Run: `./bs run examples/hello.sh`
+
+### 1.1. Скрипт с параметрами / Script with arguments
+
+`examples/greet.sh` — короткая утилита на `core/args`: дерево команд,
+флаги, авто-help и валидация.
+
+```bash
+#!/usr/bin/env bs
+# shellcheck shell=bash
+
+load "core/args"
+load "lib/io/streams"
+
+main() {
+    args::level 1 hello goodbye
+    args::describe hello "Greet a name"
+    args::describe goodbye "Say goodbye to a name"
+    args::flag name value world
+    args::flag loud
+    args::flag_describe name "Who to greet"
+    args::flag_describe loud "Uppercase the greeting"
+    args::required 1
+    args::require "$@"
+
+    local -r name="${ARGS_FLAGS["name"]:-world}"
+    local msg
+    case "${ARGS_PARAMS[0]}" in
+        hello)   msg="Hello, ${name}!" ;;
+        goodbye) msg="Goodbye, ${name}!" ;;
+    esac
+    args::flag_is_set loud && msg="${msg^^}"
+    io::streams::print "${msg}"
+}
+
+main "$@"
+```
+
+Запуск / Run:
+
+```bash
+./bs run examples/greet.sh hello --name Bob
+./bs run examples/greet.sh hello --name Bob --loud
+./bs run examples/greet.sh --help
+```
+
+### 1.2. TUI-меню / TUI menu
+
+`examples/menu.sh` — минимальное интерактивное меню на `lib/tui`:
+`↑↓` / `j k` — выбор, `Enter` — действие, `q` — выход.
+
+```bash
+#!/usr/bin/env bs
+# shellcheck shell=bash
+
+load "lib/io/streams"
+load "lib/tui/tui"
+
+main() {
+    local -a items=("Run checks" "Show status" "Quit")
+    local -i sel=0
+
+    tui::init
+    while true; do
+        tui::handle_resize
+        tui::buf::clear
+        tui::menu 2 2 items "${sel}" "Menu"
+        tui::render
+        tui::key_read
+
+        case "${TUI_KEY}" in
+            UP|k)
+                if (( sel > 0 )); then
+                    sel=$(( sel - 1 ))
+                fi
+                ;;
+            DOWN|j)
+                if (( sel < ${#items[@]} - 1 )); then
+                    sel=$(( sel + 1 ))
+                fi
+                ;;
+            ENTER)
+                tui::quit
+                case "${sel}" in
+                    0) io::streams::print "Running checks..." ;;
+                    1) io::streams::print "All systems OK." ;;
+                    2) return 0 ;;
+                esac
+                break
+                ;;
+            q)
+                tui::quit
+                return 0
+                ;;
+        esac
+    done
+}
+```
+
+Запуск / Run: `./bs run examples/menu.sh`
 
 ## 2. TUI todo list
 
