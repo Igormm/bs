@@ -186,6 +186,16 @@ check_block() {
     fi
 
     # B. Вызовы API / API calls
+    # Функции ссылаемого файла examples/ известны выдержке (колбэки и т.п.)
+    # Functions of the referenced examples/ file are known to the excerpt
+    local ref=""
+    if printf '%s\n' "${block_lines[@]}" | grep -qE '^(#!/usr/bin/env (bs|bash)|[[:space:]]*load "[^"]+"|[[:space:]]*main[[:space:]]*\()'; then
+        ref="$(sed -n "$((start - 3)),${start}p" "${file}" | grep -oE 'examples/[a-zA-Z0-9_./-]+\.sh' | head -1 || true)"
+        [[ -z "${ref}" ]] && ref="$(printf '%s\n' "${block_lines[0]:-}" | grep -oE 'examples/[a-zA-Z0-9_./-]+\.sh' | head -1 || true)"
+    fi
+    if [[ -n "${ref}" ]] && [[ -f "${BS_PROJECT_ROOT}/${ref}" ]]; then
+        index_module "${BS_PROJECT_ROOT}/${ref}"
+    fi
     local token
     local -A defined_here=()
     local line_no=0
@@ -209,11 +219,6 @@ check_block() {
     # E. Совпадение с реальным файлом examples/ / Match with the real examples/ file
     # Сравниваем только script-блоки (shebang, load или main), не usage-блоки
     # Only script-like blocks are compared (shebang, load or main), not usage blocks
-    local ref=""
-    if printf '%s\n' "${block_lines[@]}" | grep -qE '^(#!/usr/bin/env (bs|bash)|[[:space:]]*load "[^"]+"|[[:space:]]*main[[:space:]]*\()'; then
-        ref="$(sed -n "$((start - 3)),${start}p" "${file}" | grep -oE 'examples/[a-zA-Z0-9_./-]+\.sh' | head -1 || true)"
-        [[ -z "${ref}" ]] && ref="$(printf '%s\n' "${block_lines[0]:-}" | grep -oE 'examples/[a-zA-Z0-9_./-]+\.sh' | head -1 || true)"
-    fi
     if [[ -n "${ref}" ]] && [[ -f "${BS_PROJECT_ROOT}/${ref}" ]]; then
         local norm_file norm_block
         norm_file="$(normalize_code "${BS_PROJECT_ROOT}/${ref}")"

@@ -183,6 +183,31 @@ main() {
 
 Запуск / Run: `./bs run examples/menu.sh`
 
+### 1.3. TUI-приложение / TUI app
+
+`examples/app_demo.sh` — окно с кнопками на высокоуровневом слое `lib/tui/app`:
+фокус, биндинги и модалки берёт на себя фреймворк.
+
+```bash
+load "lib/tui/app"
+
+main() {
+    tui::app::window main "Hello BS" 2 2 30 9
+    tui::app::button main greet "Say hello" 3 4
+    tui::app::on greet app::say_hello
+    tui::app::statusbar "Tab / arrows — next button, Enter — press, q — quit"
+    tui::app::run
+}
+```
+
+- `tui::app::window` / `tui::app::button` — окно и кнопка внутри него.
+- `tui::app::on` — колбэк нажатия кнопки: `app::say_hello` показывает
+  модалку сообщения (`tui::app::message_modal`).
+- `tui::app::run` — главный цикл: `Tab`/`↑↓←→` — фокус кнопок, `Enter` —
+  нажатие, `q` — выход. Полный файл — [examples/app_demo.sh](examples/app_demo.sh).
+
+Запуск / Run: `./bs run examples/app_demo.sh`
+
 ## 2. TUI todo list
 
 Чистый bash, высокоуровневый слой `lib/tui/app` (окна, кнопки, модалки — для
