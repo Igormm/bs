@@ -27,7 +27,7 @@ test_cb_with_arg() {
 }
 
 test_register() {
-    tui::app::reset
+    tui::app::__reset
     tui::app::window main "Hello" 2 2 30 9
     testframework::assert_true '-n "${TUI_APP_WINDOWS[main]:-}"' "window registered"
     testframework::assert_equal "Hello" "${TUI_APP_WINDOWS[main]%%$'\t'*}" "window title stored"
@@ -44,7 +44,7 @@ test_register() {
     testframework::assert_equal "test_cb" "${TUI_APP_BINDINGS[Q]}" "binding stored (Q)"
 
     tui::app::bind "UP" test_cb_with_arg up
-    testframework::assert_true '"${TUI_APP_BINDINGS[UP]}" == test_cb_with_arg*$'"'"'\t'"'"'up' "binding stores args"
+    testframework::assert_true '"${TUI_APP_BINDINGS[UP]}" == test_cb_with_arg*$'"'"'\x1e'"'"'up' "binding stores args"
 
     tui::app::focus greet
     testframework::assert_equal "greet" "${TUI_APP_FOCUS}" "initial focus set"
@@ -53,8 +53,19 @@ test_register() {
     testframework::assert_equal "hello" "${TUI_APP_STATUS}" "statusbar text stored"
 }
 
+test_unknown_ids_warn() {
+    tui::app::__reset
+    local err
+    err="$(tui::app::button ghost btn "B" 3 4 2>&1)"
+    testframework::assert_true '"${err}" == *"unknown window"*' "button with unknown window warns"
+    err="$(tui::app::on ghost test_cb 2>&1)"
+    testframework::assert_true '"${err}" == *"unknown button"*' "on with unknown button warns"
+    err="$(tui::app::focus ghost 2>&1)"
+    testframework::assert_true '"${err}" == *"unknown button"*' "focus with unknown button warns"
+}
+
 test_focus_navigation() {
-    tui::app::reset
+    tui::app::__reset
     tui::app::window main "Hello" 2 2 30 9
     tui::app::button main one "One" 3 4
     tui::app::button main two "Two" 5 4
@@ -78,7 +89,7 @@ test_focus_navigation() {
 }
 
 test_button_press() {
-    tui::app::reset
+    tui::app::__reset
     tui::app::window main "Hello" 2 2 30 9
     tui::app::button main greet "Say hello" 3 4
     tui::app::on greet test_cb
@@ -90,7 +101,7 @@ test_button_press() {
 }
 
 test_bind_precedence() {
-    tui::app::reset
+    tui::app::__reset
     tui::app::window main "Hello" 2 2 30 9
     tui::app::button main quit "Quit" 3 4
     tui::app::on quit test_cb
@@ -110,7 +121,7 @@ test_bind_precedence() {
 }
 
 test_binding_args() {
-    tui::app::reset
+    tui::app::__reset
     tui::app::bind "UP" test_cb_with_arg up
 
     TEST_ARGS=""
@@ -119,7 +130,7 @@ test_binding_args() {
 }
 
 test_input_modal() {
-    tui::app::reset
+    tui::app::__reset
     tui::app::input_modal "Add task" test_cb_with_arg test_cb
 
     tui::app::key h
@@ -154,7 +165,7 @@ test_input_modal() {
 }
 
 test_input_modal_prefill() {
-    tui::app::reset
+    tui::app::__reset
     tui::app::input_modal "Edit task" test_cb_with_arg "" "old text"
 
     testframework::assert_equal "old text" "${TUI_APP_INPUT}" "prefill text loaded"
@@ -162,7 +173,7 @@ test_input_modal_prefill() {
 }
 
 test_confirm_modal() {
-    tui::app::reset
+    tui::app::__reset
     tui::app::confirm_modal "Delete task" "task text" test_cb test_cb
 
     TEST_FIRED=""
@@ -192,7 +203,7 @@ test_confirm_modal() {
 }
 
 test_message_modal() {
-    tui::app::reset
+    tui::app::__reset
     tui::app::message_modal "Hello" "message text" test_cb
 
     TEST_FIRED=""
@@ -206,11 +217,11 @@ test_message_modal() {
 }
 
 test_quit() {
-    tui::app::reset
+    tui::app::__reset
     tui::app::key q
     testframework::assert_equal "1" "${TUI_APP_STOP}" "unbound q sets the quit flag"
 
-    tui::app::reset
+    tui::app::__reset
     tui::app::quit
     testframework::assert_equal "1" "${TUI_APP_STOP}" "tui::app::quit sets the quit flag"
 }
@@ -220,6 +231,7 @@ main() {
 
     testframework::section "Registration / Регистрация"
     test_register
+    test_unknown_ids_warn
 
     testframework::section "Focus navigation / Навигация фокуса"
     test_focus_navigation

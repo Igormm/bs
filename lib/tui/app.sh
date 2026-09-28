@@ -103,9 +103,10 @@ declare -gi TUI_APP_CONFIRM_SEL=0
 # @global TUI_APP_STATUS — Tui: текст статус-бара (категория: state)
 declare -g TUI_APP_STATUS=""
 
+# @private
 # @description Reset all app state (also before run in tests).
 # @description Сбросить всё состояние приложения (и перед run в тестах).
-tui::app::reset() {
+tui::app::__reset() {
     TUI_APP_WINDOWS=()
     TUI_APP_BUTTONS=()
     TUI_APP_CALLBACKS=()
@@ -146,6 +147,9 @@ tui::app::window() {
 tui::app::button() {
     local -r win="${1:?window id required}" id="${2:?button id required}"
     local -r label="${3:?label required}" row="${4:-0}" col="${5:-0}"
+    if is::empty "${TUI_APP_WINDOWS["${win}"]:-}"; then
+        log::warn "tui::app::button: unknown window \"${win}\", declare it with tui::app::window first"
+    fi
     TUI_APP_BUTTONS["${id}"]="${win}"$'\t'"${label}"$'\t'"${row}"$'\t'"${col}"
     TUI_APP_FOCUS_ORDER+=("${id}")
     return "${E_SUCCESS:-0}"
@@ -156,6 +160,9 @@ tui::app::button() {
 # @param $1 button id, $2 callback
 tui::app::on() {
     local -r id="${1:?button id required}" cb="${2:?callback required}"
+    if is::empty "${TUI_APP_BUTTONS["${id}"]:-}"; then
+        log::warn "tui::app::on: unknown button \"${id}\", declare it with tui::app::button first"
+    fi
     TUI_APP_CALLBACKS["${id}"]="${cb}"
     return "${E_SUCCESS:-0}"
 }
@@ -172,7 +179,10 @@ tui::app::bind() {
     local argstr="${cb}"
     local arg
     for arg in "$@"; do
-        argstr+=$'\t'"${arg}"
+        if [[ "${arg}" == *$'\x1e'* ]]; then
+            log::warn "tui::app::bind: argument contains the record separator, splitting may break"
+        fi
+        argstr+=$'\x1e'"${arg}"
     done
     local key
     local IFS='|'
@@ -187,6 +197,9 @@ tui::app::bind() {
 # @param $1 button id
 tui::app::focus() {
     local -r id="${1:?button id required}"
+    if is::empty "${TUI_APP_BUTTONS["${id}"]:-}"; then
+        log::warn "tui::app::focus: unknown button \"${id}\", declare it with tui::app::button first"
+    fi
     TUI_APP_FOCUS="${id}"
     return "${E_SUCCESS:-0}"
 }
@@ -459,10 +472,10 @@ tui::app::key() {
     # Явные биндинги имеют приоритет / Explicit bindings take precedence
     if is::not_empty "${TUI_APP_BINDINGS["${TUI_KEY}"]:-}"; then
         local bdata="${TUI_APP_BINDINGS["${TUI_KEY}"]}"
-        local bcb="${bdata%%$'\t'*}"
+        local bcb="${bdata%%$'\x1e'*}"
         local -a barg=()
-        if [[ "${bdata}" == *$'\t'* ]]; then
-            IFS=$'\t' read -ra barg <<< "${bdata#*$'\t'}"
+        if [[ "${bdata}" == *$'\x1e'* ]]; then
+            IFS=$'\x1e' read -ra barg <<< "${bdata#*$'\x1e'}"
         fi
         "${bcb}" "${barg[@]}"
         return 0
