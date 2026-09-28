@@ -84,7 +84,7 @@ The [bs](../../../bs) script is the unified entry point. It runs under
 - Resolves its own directory, sources `bootstrap/bs.sh` (pre-kernel namespace)
   and runs `bs::shell::ensure_version 4`, so the bash 4+ gate runs before
   anything else is loaded.
-- Defines `readonly BS_VERSION` (currently `0.5.3`).
+- Defines `readonly BS_VERSION` (currently `0.6.0`).
 - Resolves `BS_ROOT` if it is not already set: first the script's own
   directory (when it contains `bootstrap/init.sh`), then
   `~/.local/lib/bs` and `/usr/local/lib/bs`.

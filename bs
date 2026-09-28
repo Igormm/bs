@@ -25,7 +25,7 @@ else
 fi
 
 # 3. Версия фреймворка 
-readonly BS_VERSION='0.5.3'
+readonly BS_VERSION='0.6.0'
 
 # 4. Определение BS_ROOT (если ещё не задан) 
 if [[ -z "${BS_ROOT:-}" ]]; then
