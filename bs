@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 
+#
 #  BS Framework – STAGE-2 UNIFIED ENTRY-POINT / INTERPRETER
 #  Назначение / Purpose:
 #    - инициализировать окружение фреймворка;
@@ -7,7 +7,7 @@
 #    - работать как shebang-интерпретатор (#!/usr/bin/env bs).
 #  Зависимости: bash 4.0+, bootstrap/init.sh, структура каталогов
 #              core/, lib/ (опционально, но doctor ругается).
-# 
+#
 
 # 1. Каталог entry-point'а — нужен до загрузки чего-либо
 BS_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
@@ -24,10 +24,7 @@ else
   exit 2
 fi
 
-# 3. Версия фреймворка 
-readonly BS_VERSION='0.6.0'
-
-# 4. Определение BS_ROOT (если ещё не задан) 
+# 4. Определение BS_ROOT (если ещё не задан)
 if [[ -z "${BS_ROOT:-}" ]]; then
   # Если bs запущен из репо-корня, bootstrap/init.sh рядом
   if [[ -f "${BS_DIR}/bootstrap/init.sh" ]]; then
@@ -56,7 +53,7 @@ export BS_HOME
 : "${BS_SILENT:=1}"
 export BS_SILENT
 
-# 4. Загрузка ядра 
+# 4. Загрузка ядра
 if [[ ! -f "${BS_ROOT}/bootstrap/init.sh" ]]; then
   printf 'ERROR: bootstrap/init.sh not found in BS_ROOT=%s\n' "$BS_ROOT" >&2
   exit 2
@@ -70,7 +67,7 @@ source "${BS_ROOT}/bootstrap/init.sh"
 # EXIT trap for the cleanup stack (core no longer sets it when sourced)
 errorhandler::setup_trap
 
-# 5. Утилитные функции 
+# 5. Утилитные функции
 die()  { error::exit "$*"; }
 
 
@@ -929,7 +926,7 @@ ts_cmd() {
   esac
 }
 
-# 6. Shebang-режим 
+# 6. Shebang-режим
 # Если bs вызван как интерпретатор shebang'а (#!/usr/bin/env bs),
 # первый аргумент — путь к существующему скрипту, а не команда.
 if [[ $# -ge 1 && -f "$1" ]]; then
@@ -944,7 +941,7 @@ if [[ "${BS_SHEBANG:-0}" == "1" ]]; then
   # Функция run_cmd сама сделает exec, поэтому дальше не продолжаем.
 fi
 
-# 7. Обычный CLI-диспетчер 
+# 7. Обычный CLI-диспетчер
 case "${1:-help}" in
   help|-h|--help) help ;;
   version)        version ;;

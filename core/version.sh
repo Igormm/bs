@@ -10,8 +10,8 @@ bs::guard "VERSION" || return 0
 
 # @description BS Framework Version / Версия фреймворка BS
 # @export BS_VERSION The current version of BS / Текущая версия BS
-# Владелец переменной — скрипт bs (readonly); здесь задаём только если пусто
-# Owner of the variable is the bs script (readonly); set here only if empty
+# Единственный источник BS_VERSION — этот модуль; bs и const.sh только используют
+# Single source of BS_VERSION is this module; bs and const.sh only use it
 if is::empty "${BS_VERSION:-}"; then
   export BS_VERSION="0.6.0"
 fi

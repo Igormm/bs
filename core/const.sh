@@ -123,8 +123,8 @@ declare -g FRAMEWORK_DEBUG=false
 declare -g FRAMEWORK_DRY_RUN=false
 
 # Версия фреймворка / Framework version
-# Владелец переменной — скрипт bs (readonly); здесь задаём только если пусто
-# Owner of the variable is the bs script (readonly); set here only if empty
+# Владелец переменной — core/version.sh; здесь задаём только если пусто
+# Owner of the variable is core/version.sh; set here only if empty
 if is::empty "${BS_VERSION:-}"; then
   declare -g BS_VERSION="0.6.0"
 fi

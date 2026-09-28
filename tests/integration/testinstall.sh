@@ -79,10 +79,10 @@ test_local_install() {
 
     local version_out
     version_out="$(env HOME="${iso}" "${bin}" version)"
-    # Версия берётся из исходника bs, а не хардкодится (BS_VERSION живёт там)
-    # Version is taken from the bs source, not hardcoded (BS_VERSION lives there)
+    # Версия берётся из core/version.sh (единственный источник BS_VERSION), а не хардкодится
+    # Version is taken from core/version.sh (single source of BS_VERSION), not hardcoded
     local version_repo
-    version_repo="$(sed -n "s/^readonly BS_VERSION='\([0-9.]*\)'$/\1/p" "${BS_PROJECT_ROOT}/bs" | head -n 1)"
+    version_repo="$(sed -n "s/^[[:space:]]*export BS_VERSION=\"\([0-9.]*\)\"$/\1/p" "${BS_PROJECT_ROOT}/core/version.sh" | head -n 1)"
     testframework::assert_equal "BS Framework version: ${version_repo}" "${version_out}" "installed bs version works"
 
     local list_out
