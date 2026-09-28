@@ -129,6 +129,25 @@ kept as-is, cross-references between them are intact:
 - `using-git-worktrees` / `finishing-a-development-branch` — branch hygiene
 - `skill-creator` — skill authoring/evals (anthropics)
 
+### Imported engineering skills (external, verbatim)
+
+Engineering skills imported from [alirezarezvani/claude-skills](https://github.com/alirezarezvani/claude-skills);
+kept as-is (they are third-party prompts by design):
+
+- `skill-security-auditor` — scan skills/plugins for malicious code before install
+  (run: `python3 .agents/skills/skill-security-auditor/scripts/skill_security_auditor.py <path>`)
+- `zero-hallucination-coder` — Discuss→Map→Decompose→Execute→Verify discipline
+- `named-persona-adversarial-review` — code review through named, sourced engineering philosophies
+- `pr-review-expert` — blast radius, security scan, coverage delta PR review
+- `skill-doctor` — grade the agent/skill setup from real session history (needs Claude Code/Codex logs)
+- `ci-cd-pipeline-builder` — generate CI/CD pipelines (used for `.github/workflows/ci.yml`)
+- `changelog-generator` — Conventional Commits → CHANGELOG.md (used for `CHANGELOG.md`)
+- `codebase-onboarding` — auto-generate onboarding docs from the codebase
+- `tech-debt-tracker` — codebase debt scanner with prioritization
+- `mcp-server-builder` — build MCP servers (for exposing the `bs` CLI as tools)
+- `write-a-skill` / `grill-me` / `handoff` — skill authoring, plan review, work handoff
+- `git-worktree-manager` — worktree lifecycle with automation scripts
+
 ## MCP / API provider suggestions
 
 - **MCP**: expose `bs` CLI commands (`bs doctor`, `bs list`, `bs run`) plus the validator/test scripts as tools.
