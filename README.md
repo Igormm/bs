@@ -185,7 +185,9 @@ main() {
 
 ## 2. TUI todo list
 
-Чистый bash, `lib/tui`: список, модалки ввода/подтверждения, файл `~/.todo.tsv`.
+Чистый bash, высокоуровневый слой `lib/tui/app` (окна, кнопки, модалки — для
+новичков, см. [app_demo.sh](examples/app_demo.sh)): список, модалки
+ввода/подтверждения, файл `~/.todo.tsv`.
 
 ```bash
 ./bs run examples/todo.sh

@@ -29,7 +29,8 @@
 | [hello.sh](../../../examples/hello.sh) | Самый короткий полезный скрипт: shebang `bs`, `load`, `io::streams::print` | `./bs run examples/hello.sh` |
 | [greet.sh](../../../examples/greet.sh) | Короткий скрипт с `core/args`: дерево команд, флаги `--name` / `--loud`, валидация и авто-help | `./bs run examples/greet.sh hello --name Bob --loud`<br>`./bs run examples/greet.sh --help` |
 | [menu.sh](../../../examples/menu.sh) | Минимальное интерактивное TUI-меню на `lib/tui`: `tui::menu`, клавиши, действие по `Enter` | `./bs run examples/menu.sh` |
-| [todo.sh](../../../examples/todo.sh) | TUI todo list на `lib/tui`: список, модалки ввода/подтверждения, `~/.todo.tsv` | `./bs run examples/todo.sh` |
+| [app_demo.sh](../../../examples/app_demo.sh) | TUI для новичков на `lib/tui/app`: окно, кнопки, фокус, модалка сообщения | `./bs run examples/app_demo.sh` |
+| [todo.sh](../../../examples/todo.sh) | TUI todo list на `lib/tui/app`: список, модалки ввода/подтверждения, `~/.todo.tsv` | `./bs run examples/todo.sh` |
 | [pulse.sh](../../../examples/pulse.sh) | Пульс возможностей хоста: `lib/platform/facts`, цепочки проб, UUID v7, hw при `/proc` | `./bs run examples/pulse.sh` |
 
 ## Примеры

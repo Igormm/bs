@@ -50,9 +50,11 @@ load "lib/data/dataprocessor"
 
 ## tui — `lib/tui/`
 
-Чистый bash TUI ([tui.sh](../../../lib/tui/tui.sh)): двойной буфер с diff-рендером, truecolor, парсер клавиш/мыши, виджеты (list, input, confirm, menu, progress, spinner), стек модалок. Пример: [todo.sh](../../../examples/todo.sh).
+Чистый bash TUI ([tui.sh](../../../lib/tui/tui.sh)): двойной буфер с diff-рендером, truecolor, парсер клавиш/мыши, виджеты (list, input, confirm, menu, progress, spinner), стек модалок.
 
-Ключевые функции: `tui::init`, `tui::box`, `tui::list`, `tui::key_read`, `tui::modal::open`, `tui::render`, `tui::quit`.
+Высокоуровневый слой для новичков ([app.sh](../../../lib/tui/app.sh)): декларативные окна и кнопки, биндинги клавиш, модалки сообщения/ввода/подтверждения, статус-бар и главный цикл — без ручного диспатча клавиш. Примеры: [app_demo.sh](../../../examples/app_demo.sh) (окно с кнопками, ~30 строк), [todo.sh](../../../examples/todo.sh) (полный todo list на `tui::app`).
+
+Ключевые функции: `tui::app::window`, `tui::app::button`, `tui::app::bind`, `tui::app::run`, `tui::app::input_modal`, `tui::app::confirm_modal`, `tui::init`, `tui::box`, `tui::list`, `tui::key_read`, `tui::render`, `tui::quit`.
 
 ## platform — `lib/platform/`
 

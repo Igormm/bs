@@ -50,9 +50,11 @@ Key functions: `presentation::header`, `presentation::table`, `ps1config::set_th
 
 ## tui — `lib/tui/`
 
-Pure-bash terminal UI ([tui.sh](../../../lib/tui/tui.sh)): double-buffered diff renderer, truecolor, key/mouse parser, widgets (list, input, confirm, menu, progress, spinner), modal stack. Example: [todo.sh](../../../examples/todo.sh).
+Pure-bash terminal UI ([tui.sh](../../../lib/tui/tui.sh)): double-buffered diff renderer, truecolor, key/mouse parser, widgets (list, input, confirm, menu, progress, spinner), modal stack.
 
-Key functions: `tui::init`, `tui::box`, `tui::list`, `tui::key_read`, `tui::modal::open`, `tui::render`, `tui::quit`.
+Beginner-friendly high-level layer ([app.sh](../../../lib/tui/app.sh)): declarative windows and buttons, key bindings, message/input/confirm modals, statusbar and the main loop — no manual key dispatch. Examples: [app_demo.sh](../../../examples/app_demo.sh) (window with buttons, ~30 lines), [todo.sh](../../../examples/todo.sh) (full todo list on `tui::app`).
+
+Key functions: `tui::app::window`, `tui::app::button`, `tui::app::bind`, `tui::app::run`, `tui::app::input_modal`, `tui::app::confirm_modal`, `tui::init`, `tui::box`, `tui::list`, `tui::key_read`, `tui::render`, `tui::quit`.
 
 ## platform — `lib/platform/`
 
