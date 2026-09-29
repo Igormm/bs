@@ -135,56 +135,56 @@ fi
 
 # @global COLOR_RESET — ANSI color escape: reset (category: constant)
 # @global COLOR_RESET — ANSI-escape цвета: reset (категория: constant)
-readonly COLOR_RESET='\033[0m'
+readonly COLOR_RESET=$'\033[0m'
 # @global COLOR_BLACK — ANSI color escape: black (category: constant)
 # @global COLOR_BLACK — ANSI-escape цвета: black (категория: constant)
-readonly COLOR_BLACK='\033[0;30m'
+readonly COLOR_BLACK=$'\033[0;30m'
 # @global COLOR_RED — ANSI color escape: red (category: constant)
 # @global COLOR_RED — ANSI-escape цвета: red (категория: constant)
-readonly COLOR_RED='\033[0;31m'
+readonly COLOR_RED=$'\033[0;31m'
 # @global COLOR_GREEN — ANSI color escape: green (category: constant)
 # @global COLOR_GREEN — ANSI-escape цвета: green (категория: constant)
-readonly COLOR_GREEN='\033[0;32m'
+readonly COLOR_GREEN=$'\033[0;32m'
 # @global COLOR_YELLOW — ANSI color escape: yellow (category: constant)
 # @global COLOR_YELLOW — ANSI-escape цвета: yellow (категория: constant)
-readonly COLOR_YELLOW='\033[0;33m'
+readonly COLOR_YELLOW=$'\033[0;33m'
 # @global COLOR_BLUE — ANSI color escape: blue (category: constant)
 # @global COLOR_BLUE — ANSI-escape цвета: blue (категория: constant)
-readonly COLOR_BLUE='\033[0;34m'
+readonly COLOR_BLUE=$'\033[0;34m'
 # @global COLOR_PURPLE — ANSI color escape: purple (category: constant)
 # @global COLOR_PURPLE — ANSI-escape цвета: purple (категория: constant)
-readonly COLOR_PURPLE='\033[0;35m'
+readonly COLOR_PURPLE=$'\033[0;35m'
 # @global COLOR_CYAN — ANSI color escape: cyan (category: constant)
 # @global COLOR_CYAN — ANSI-escape цвета: cyan (категория: constant)
-readonly COLOR_CYAN='\033[0;36m'
+readonly COLOR_CYAN=$'\033[0;36m'
 # @global COLOR_WHITE — ANSI color escape: white (category: constant)
 # @global COLOR_WHITE — ANSI-escape цвета: white (категория: constant)
-readonly COLOR_WHITE='\033[0;37m'
+readonly COLOR_WHITE=$'\033[0;37m'
 
 # @global COLOR_BRIGHT_BLACK — ANSI color escape: bright_black (category: constant)
 # @global COLOR_BRIGHT_BLACK — ANSI-escape цвета: bright_black (категория: constant)
-readonly COLOR_BRIGHT_BLACK='\033[0;90m'
+readonly COLOR_BRIGHT_BLACK=$'\033[0;90m'
 # @global COLOR_BRIGHT_RED — ANSI color escape: bright_red (category: constant)
 # @global COLOR_BRIGHT_RED — ANSI-escape цвета: bright_red (категория: constant)
-readonly COLOR_BRIGHT_RED='\033[0;91m'
+readonly COLOR_BRIGHT_RED=$'\033[0;91m'
 # @global COLOR_BRIGHT_GREEN — ANSI color escape: bright_green (category: constant)
 # @global COLOR_BRIGHT_GREEN — ANSI-escape цвета: bright_green (категория: constant)
-readonly COLOR_BRIGHT_GREEN='\033[0;92m'
+readonly COLOR_BRIGHT_GREEN=$'\033[0;92m'
 # @global COLOR_BRIGHT_YELLOW — ANSI color escape: bright_yellow (category: constant)
 # @global COLOR_BRIGHT_YELLOW — ANSI-escape цвета: bright_yellow (категория: constant)
-readonly COLOR_BRIGHT_YELLOW='\033[0;93m'
+readonly COLOR_BRIGHT_YELLOW=$'\033[0;93m'
 # @global COLOR_BRIGHT_BLUE — ANSI color escape: bright_blue (category: constant)
 # @global COLOR_BRIGHT_BLUE — ANSI-escape цвета: bright_blue (категория: constant)
-readonly COLOR_BRIGHT_BLUE='\033[0;94m'
+readonly COLOR_BRIGHT_BLUE=$'\033[0;94m'
 # @global COLOR_BRIGHT_PURPLE — ANSI color escape: bright_purple (category: constant)
 # @global COLOR_BRIGHT_PURPLE — ANSI-escape цвета: bright_purple (категория: constant)
-readonly COLOR_BRIGHT_PURPLE='\033[0;95m'
+readonly COLOR_BRIGHT_PURPLE=$'\033[0;95m'
 # @global COLOR_BRIGHT_CYAN — ANSI color escape: bright_cyan (category: constant)
 # @global COLOR_BRIGHT_CYAN — ANSI-escape цвета: bright_cyan (категория: constant)
-readonly COLOR_BRIGHT_CYAN='\033[0;96m'
+readonly COLOR_BRIGHT_CYAN=$'\033[0;96m'
 # @global COLOR_BRIGHT_WHITE — ANSI color escape: bright_white (category: constant)
 # @global COLOR_BRIGHT_WHITE — ANSI-escape цвета: bright_white (категория: constant)
-readonly COLOR_BRIGHT_WHITE='\033[0;97m'
+readonly COLOR_BRIGHT_WHITE=$'\033[0;97m'
 
 # 
 # Константы для форматирования / Formatting constants

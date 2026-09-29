@@ -130,14 +130,14 @@ log::__get_level_color() {
     local -r level="${1^^}"
 
     case "${level}" in
-        TRACE)   printf '%s\n' '\033[90m' ;;     # Серый / Gray
-        DEBUG)   printf '%s\n' '\033[36m' ;;     # Циан / Cyan
-        INFO)    printf '%s\n' '\033[34m' ;;     # Синий / Blue
-        SUCCESS) printf '%s\n' '\033[32m' ;;     # Зеленый / Green
-        WARN)    printf '%s\n' '\033[33m' ;;     # Желтый / Yellow
-        ERROR)   printf '%s\n' '\033[31m' ;;     # Красный / Red
-        FATAL)   printf '%s\n' '\033[35m' ;;     # Пурпурный / Purple
-        *)       printf '%s\n' '\033[0m' ;;      # Сброс / Reset
+        TRACE)   printf '%s\n' $'\033[90m' ;;     # Серый / Gray
+        DEBUG)   printf '%s\n' $'\033[36m' ;;     # Циан / Cyan
+        INFO)    printf '%s\n' $'\033[34m' ;;     # Синий / Blue
+        SUCCESS) printf '%s\n' $'\033[32m' ;;     # Зеленый / Green
+        WARN)    printf '%s\n' $'\033[33m' ;;     # Желтый / Yellow
+        ERROR)   printf '%s\n' $'\033[31m' ;;     # Красный / Red
+        FATAL)   printf '%s\n' $'\033[35m' ;;     # Пурпурный / Purple
+        *)       printf '%s\n' $'\033[0m' ;;      # Сброс / Reset
     esac
 }
 
@@ -196,9 +196,9 @@ log::__format_message() {
         text|*)
             # Текстовый формат с цветами / Text format with colors
             if log::__is_color_enabled "${fd}"; then
-                local -r color_reset='\033[0m'
+                local -r color_reset=$'\033[0m'
                 local color="$(log::__get_level_color "$level")"
-                local -r bold='\033[1m'
+                local -r bold=$'\033[1m'
                 
                 # Для ошибок и фатальных используем жирный шрифт
                 # For errors and fatal use bold
@@ -208,7 +208,7 @@ log::__format_message() {
                 
                 if is::not_empty "$timestamp"; then
                     printf '%s[%s]%s %s%-5s%s %s\n' \
-                        '\033[90m' "$timestamp" "$color_reset" \
+                        $'\033[90m' "$timestamp" "$color_reset" \
                         "$color" "$level" "$color_reset" \
                         "$text"
                 else

@@ -744,18 +744,21 @@ update_cmd() {
   fi
   is::dir "${from}/core" || die "update: source is not a BS repo: ${from}"
 
-  local target item ok=0
+  local target item ok=0 skipped=0
   for target in "${targets[@]}"; do
     if ! is::dir "${target}"; then
       log::warn "update: target not found, skipping: ${target}"
+      (( skipped += 1 ))
       continue
     fi
     if [[ "${from}" == "${target}" ]]; then
       log::warn "update: source is the same as target: ${target} (running from an installed copy). Run from the repo: ./bs update, or pass --from <repo-path>"
+      (( skipped += 1 ))
       continue
     fi
     if ! [[ -w "${target}" ]]; then
       log::warn "update: target not writable: ${target} (try: sudo bs update --system)"
+      (( skipped += 1 ))
       continue
     fi
     log::info "syncing ${from} -> ${target}"
@@ -769,6 +772,7 @@ update_cmd() {
     if ! cp -a "${from}/bootstrap" "${from}/core" "${from}/lib" "${from}/bs" "${tmp_dir}/"; then
       rm -rf -- "${tmp_dir}"
       log::error "update: copy failed for ${target} (source files intact)"
+      (( skipped += 1 ))
       continue
     fi
     mv -f -- "${tmp_dir}/bs" "${target}/bs"
@@ -782,8 +786,15 @@ update_cmd() {
     fi
   done
 
-  (( ok == 1 )) || die "update: nothing to update — source is not a repo or equals target (see messages above)"
-  log::success "sync done — changes are live without reinstalling"
+  if (( ok == 1 )); then
+    log::header "UPDATE COMPLETE / ОБНОВЛЕНИЕ ЗАВЕРШЕНО"
+    log::success "sync done — changes are live without reinstalling"
+    return 0
+  fi
+  if (( skipped > 0 )); then
+    die "update: nothing to update — every target was skipped (not found / not writable / same as source). See messages above"
+  fi
+  die "update: nothing to update — source is not a BS repo or equals target (see messages above)"
 }
 
 # ==========================================
