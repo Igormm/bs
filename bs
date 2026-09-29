@@ -879,10 +879,25 @@ uninstall_cmd() {
       log::warn "uninstall: wrapper not matching this install, left in place: ${wrapper}"
     fi
 
+    # rm -rf на защищённый target безопасен: выше уже проверено, что это
+    # настоящая BS-установка (bs + bootstrap/init.sh), не чекаут (без .git,
+    # не BS_ROOT) и записываемый. Файл с именем /x/lib/bs не пройдёт
+    # проверку -f "${target}/bs" и будет пропущен.
+    # rm -rf on the guarded target is safe: checks above already proved it is
+    # a real BS install (bs + bootstrap/init.sh), not a checkout (no .git,
+    # not BS_ROOT) and is writable. A *file* named /x/lib/bs fails the
+    # -f "${target}/bs" test and is skipped.
     rm -rf -- "${target}"
     if (( verbose == 1 )); then
       log::info "  removed: ${target}"
     fi
+    # rmdir удаляет только пустой bin_dir; при нестандартном --lib пути
+    # (не .../lib/bs) bin_dir выводится неверно — но каталога нет после
+    # rm -rf, rmdir молча падает, || true глушит. Чужие файлы не трогаются.
+    # rmdir removes only an empty bin_dir; for a non-standard --lib path
+    # (not .../lib/bs) bin_dir is derived wrongly — but the dir is gone
+    # after rm -rf, rmdir fails silently and || true swallows it. Foreign
+    # files are never touched.
     rmdir -- "${bin_dir}" 2>/dev/null || true
     ok=1
   done

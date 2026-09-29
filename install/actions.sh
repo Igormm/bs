@@ -80,14 +80,29 @@ do_uninstall() {
 
   # Remove libs
   if is::dir "${TARGET_LIB}"; then
-    rm -rf "${TARGET_LIB}"
-    printf "Удален: %s\n" "${TARGET_LIB}"
+    # Безопасность: как и bs uninstall, installer не удаляет исходный чекаут
+    # или рабочий BS_ROOT. Если TARGET_LIB содержит .git или совпадает с
+    # SOURCE_ROOT — это репозиторий, а не установленная копия.
+    # Safety: like bs uninstall, the installer never removes the source
+    # checkout or the running BS_ROOT. A TARGET_LIB with .git, or equal to
+    # SOURCE_ROOT, is the repo itself, not an installed copy.
+    if [[ -d "${TARGET_LIB}/.git" || "${TARGET_LIB}" == "${SOURCE_ROOT}" ]]; then
+      printf "ПРЕДУПРЕЖДЕНИЕ: %s — исходный репозиторий, пропускаем\n" "${TARGET_LIB}" >&2
+      printf "WARNING: %s is the source checkout, skipping\n" "${TARGET_LIB}" >&2
+    else
+      rm -rf "${TARGET_LIB}"
+      printf "Удален: %s\n" "${TARGET_LIB}"
+    fi
   else
     printf "Нет каталога: %s\n" "${TARGET_LIB}"
   fi
 
   # Do NOT wipe user's ~/.local trees; only tidy empty parents
   if [[ "${MODE}" == "local" ]]; then
+    # rmdir удаляет ТОЛЬКО пустые каталоги: если в ~/.local/bin или
+    # ~/.local/lib есть другие файлы — они остаются нетронутыми.
+    # rmdir removes ONLY empty dirs: any other files in ~/.local/bin or
+    # ~/.local/lib are left untouched.
     # Attempt to remove empty BIN_DIR
     if is::dir "${BIN_DIR}" && utils::quiet_err rmdir "${BIN_DIR}"; then
       printf "Удален пустой каталог: %s\n" "${BIN_DIR}"
@@ -96,7 +111,11 @@ do_uninstall() {
     if is::dir "${LIB_DIR}" && utils::quiet_err rmdir "${LIB_DIR}"; then
       printf "Удален пустой каталог: %s\n" "${LIB_DIR}"
     fi
-    # Remove the PATH line added by the installer (exact match only)
+    # PATH-строка удаляется только точным совпадением строки, добавленной
+    # установщиком; ручные guard'ы пользователя (например if ! [[ "$PATH" =~ ...
+    # в начале .bashrc) остаются нетронутыми.
+    # Only the exact installer-added line is removed; user's manual PATH
+    # guards (e.g. `if ! [[ "$PATH" =~ ...` at the top of .bashrc) survive.
     # PATH-чистка не должна прерывать удаление при ошибке записи rc-файла
     remove_path_entry "${HOME}/.bashrc" || true
     remove_path_entry "${HOME}/.zshrc" || true

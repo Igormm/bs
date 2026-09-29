@@ -312,6 +312,26 @@ test_bs_uninstall_local() {
     fi
 }
 
+# installer uninstall refuses to remove the source checkout
+# installer uninstall не удаляет исходный чекаут
+test_installer_uninstall_safety() {
+    local iso rc=0 out
+    iso="$(mk_isolated_home)"
+
+    # LIB_DIR pointing at the repo root (has .git) → must be skipped
+    rc=0
+    out="$(env HOME="${iso}" LIB_DIR="${BS_PROJECT_ROOT}" BIN_DIR="${iso}/bin" bash "${INSTALLER}" --local uninstall)" || rc=$?
+    testframework::assert_equal "0" "${rc}" "installer uninstall exits 0 when TARGET_LIB is the repo"
+    testframework::assert_command "test -d '${BS_PROJECT_ROOT}/core'" "repo core/ survives installer uninstall"
+    testframework::assert_command "test -f '${BS_PROJECT_ROOT}/bs'" "repo bs launcher survives installer uninstall"
+
+    # SOURCE_ROOT as TARGET_LIB → also skipped
+    rc=0
+    out="$(env HOME="${iso}" LIB_DIR="$(dirname "${BS_PROJECT_ROOT}")" BIN_DIR="${iso}/bin" bash "${INSTALLER}" --local uninstall)" || rc=$?
+    testframework::assert_equal "0" "${rc}" "installer uninstall exits 0 when TARGET_LIB == SOURCE_ROOT"
+    testframework::assert_command "test -f '${BS_PROJECT_ROOT}/bs'" "repo survives when TARGET_LIB == SOURCE_ROOT"
+}
+
 test_system_mode_requires_root() {
     if [[ "$(id -u)" -eq 0 ]]; then
         printf "  ⊘ Skipping system-mode root check: running as root\n"
@@ -344,6 +364,7 @@ main() {
     test_uninstall_keeps_user_edits
     test_bs_uninstall
     test_bs_uninstall_local
+    test_installer_uninstall_safety
 
     testframework::section "PATH helpers / Настройка PATH"
     test_path_flag

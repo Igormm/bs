@@ -54,6 +54,18 @@ update_path_bashrc() {
 # Удаляется только точное совпадение строки; пользовательские правки не трогаем.
 # Remove the installer-added PATH line from an rc file (idempotent).
 # Only an exact line match is removed; user edits are left untouched.
+#
+# Вопросы, возникавшие при удалении / Questions raised during uninstall:
+#   - ручной guard вроде `if ! [[ "$PATH" =~ "$HOME/.local/bin:..." ]]` в
+#     начале .bashrc НЕ удаляется: это не точное совпадение строки, и
+#     grep -Fvx его пропускает (защита пользовательских правок).
+#     A manual guard like `if ! [[ "$PATH" =~ "$HOME/.local/bin:..." ]]`
+#     at the top of .bashrc is NOT removed: it is not an exact line match,
+#     so grep -Fvx skips it (user-edit protection).
+#   - read-only rc-файл: mv падает, функция возвращает 1, вызывающий код
+#     (do_uninstall) продолжает с || true — удаление не прерывается.
+#     A read-only rc file: mv fails, the function returns 1 and the caller
+#     (do_uninstall) continues with || true — uninstall is not aborted.
 remove_path_entry() {
   local rc_file="$1"
   local line='export PATH="$HOME/.local/bin:$PATH"'
@@ -70,6 +82,10 @@ remove_path_entry() {
   # grep -Fvx исключает только точные совпадения; при пустом результате
   # (файл состоял лишь из этой строки) оставляем пустой файл.
   # utils::attempt сохраняет stdout — в отличие от utils::ignore.
+  # tmp-файл создаётся рядом с rc-файлом: mv в пределах одного каталога —
+  # атомарный rename, не копирование через файловые системы.
+  # The tmp file lives next to the rc file: mv within one directory is an
+  # atomic rename, not a cross-filesystem copy.
   tmp_file="${rc_file}.bs.$$.tmp"
   if ! utils::attempt grep -Fvx "${line}" "${rc_file}" > "${tmp_file}"; then
     rm -f "${tmp_file}"
