@@ -1,0 +1,611 @@
+#!/usr/bin/env bs
+# shellcheck shell=bash
+# examples/ai_user_wizard.sh — wizard: restricted AI-user (opencode) sandbox
+# examples/ai_user_wizard.sh — визард: ограниченный пользователь для ИИ (opencode)
+#
+# Creates a system user with minimal privileges for an AI agent: locked
+# login, scoped sudoers, resource limits, optional systemd sandbox and
+# SELinux context. Run as root. Pure BS framework, no external TUI libs.
+# Создаёт системного пользователя с минимумом привилегий для ИИ-агента:
+# заблокированный вход, точечные sudoers, лимиты ресурсов, опциональная
+# песочница systemd и SELinux-контекст. Запуск от root. Чистый BS.
+
+# Запуск / Run:
+#   sudo bs run examples/ai_user_wizard.sh
+#   sudo ./examples/ai_user_wizard.sh
+
+load "lib/ui/presentation"
+
+# ==========================================
+# Wizard engine / Движок визарда
+# ==========================================
+
+# @private Restore the terminal on any exit (panic-safe).
+# @private Восстановить терминал при любом выходе.
+wiz::__restore() {
+    printf '\033[?25h\033[0m\033[0;0H\033[2J'
+}
+
+# @private Terminal width, clamped to the required box range.
+# @private Ширина терминала, ограниченная требуемым диапазоном рамки.
+wiz::__box_width() {
+    local -i tw
+    tw="$(tput cols 2>/dev/null || echo 80)"
+    (( tw = tw - 4 ))
+    (( tw < 44 )) && tw=44
+    (( tw > 76 )) && tw=76
+    printf '%d' "${tw}"
+}
+
+# @private Display width of a string (wide chars count as 2 cells).
+# @private Ширина строки на экране (широкие символы — 2 клетки).
+wiz::__disp_width() {
+    local s="$1" w=0 c blen i
+    for ((i = 0; i < ${#s}; i++)); do
+        c="${s:i:1}"
+        blen=$(LC_ALL=C printf '%s' "$c" | wc -c)
+        if (( blen >= 4 )); then (( w += 2 )); else (( w += 1 )); fi
+    done
+    printf '%s' "$w"
+}
+
+# @private Frame rule: ╭────╮ / ├────┤ / ╰────╯
+# @private Линия рамки: ╭────╮ / ├────┤ / ╰────╯
+wiz::__rule() {
+    local -r inner="$1" left="$2" right="$3"
+    local line
+    printf -v line '%*s' "${inner}" ''
+    printf '\033[34m%s%s%s\033[0m\n' "${left}" "${line// /─}" "${right}"
+}
+
+# @private Frame row with padding (ANSI-aware width).
+# @private Строка рамки с паддингом (ширина с учётом ANSI).
+# @param $1 Inner width, $2 Content, $3 [optional] ANSI color code
+wiz::__row() {
+    local -r inner="$1" content="$2" color="${3:-}"
+    local w
+    w="$(wiz::__disp_width "${content}")"
+    printf '\033[34m│\033[0m'
+    if is::not_empty "${color}"; then
+        printf '\033[%sm%s\033[0m' "${color}" "${content}"
+    else
+        printf '%s' "${content}"
+    fi
+    printf '%*s\033[34m│\033[0m\n' "$((inner - w))" ''
+}
+
+# @private Multi-line text inside a frame.
+# @private Многострочный текст внутри рамки.
+wiz::__text() {
+    local -r inner="$1"
+    local line
+    while IFS= read -r line; do
+        wiz::__row "${inner}" "${line}"
+    done <<< "${2}"
+}
+
+# @private Green title row.
+# @private Строка-заголовок зелёным.
+wiz::__title_row() {
+    local -r inner="$1" title="$2"
+    wiz::__row "${inner}" "${title}" "1;32"
+}
+
+# @private Dim hint row.
+# @private Затемнённая подсказка.
+wiz::__hint() {
+    wiz::__row "$1" "$2" "90"
+}
+
+# @private Read one key, decoding arrows + digits + q.
+# @private Прочитать клавишу: стрелки + цифры + q.
+# @stdout up|down|enter|space|q|1..9|other
+wiz::__read_key() {
+    local key
+    IFS= read -rsn1 key
+    if [[ "${key}" == $'\e' ]]; then
+        local seq
+        IFS= read -rsn2 -t 0.1 seq || true
+        case "${seq}" in
+            '[A') printf 'up' ;;
+            '[B') printf 'down' ;;
+            *) printf 'esc' ;;
+        esac
+        return
+    fi
+    case "${key}" in
+        '') printf 'enter' ;;
+        ' ') printf 'space' ;;
+        q|Q) printf 'q' ;;
+        [1-9]) printf '%s' "${key}" ;;
+        *) printf '%s' "${key}" ;;
+    esac
+}
+
+# @description Single-choice menu with arrows, digits 1-9, q to cancel.
+# @description Меню с одним выбором: стрелки, цифры 1-9, q — отмена.
+# @param $1 Output variable: selected index (0-based), 99 = cancelled
+# @param $2 Title / Заголовок
+# @param $@ Items / Пункты
+wiz::menu() {
+    local -n __wiz_out="${1:?output variable required}"
+    local -r title="${2:?title required}"
+    shift 2
+    local -a items=("$@")
+    local -r inner="$(wiz::__box_width)"
+
+    local selected=0
+    while true; do
+        printf '\033[H\033[J'
+        wiz::__rule "${inner}" '╭' '╮'
+        wiz::__title_row "${inner}" "${title}"
+        wiz::__rule "${inner}" '├' '┤'
+        for i in "${!items[@]}"; do
+            if (( i == selected )); then
+                wiz::__row "${inner}" "  ▶ ${items[i]}" "36"
+            else
+                wiz::__row "${inner}" "    ${items[i]}"
+            fi
+        done
+        wiz::__rule "${inner}" '╰' '╯'
+        wiz::__hint "${inner}" "  ↑/↓, 1-9 — выбор, Enter — OK, q — отмена"
+
+        local key
+        key="$(wiz::__read_key)"
+        case "${key}" in
+            up)   (( selected = (selected - 1 + ${#items[@]}) % ${#items[@]} )) ;;
+            down) (( selected = (selected + 1) % ${#items[@]} )) ;;
+            enter) break ;;
+            q)    __wiz_out=99; return 0 ;;
+            [1-9])
+                if (( key >= 1 && key <= ${#items[@]} )); then
+                    __wiz_out=$((key - 1)); return 0
+                fi
+                ;;
+        esac
+    done
+
+    __wiz_out=${selected}
+}
+
+# @description Multi-choice menu (checkboxes): Space toggles, Enter confirms.
+# @description Меню множественного выбора (чекбоксы): Space — выбор, Enter — ОК.
+# @param $1 Output variable: indices joined by space, "q" = cancelled
+# @param $2 Title / Заголовок
+# @param $@ Items / Пункты
+wiz::multi_menu() {
+    local -n __wiz_out="${1:?output variable required}"
+    local -r title="${2:?title required}"
+    shift 2
+    local -a items=("$@")
+    local -a checked=()
+    local i
+    for i in "${!items[@]}"; do checked+=(0); done
+    local -r inner="$(wiz::__box_width)"
+
+    local selected=0
+    while true; do
+        printf '\033[H\033[J'
+        wiz::__rule "${inner}" '╭' '╮'
+        wiz::__title_row "${inner}" "${title}"
+        wiz::__rule "${inner}" '├' '┤'
+        for i in "${!items[@]}"; do
+            local mark='○'
+            (( checked[i] == 1 )) && mark='●'
+            if (( i == selected )); then
+                wiz::__row "${inner}" "  ${mark} ${items[i]}" "36"
+            else
+                wiz::__row "${inner}" "  ${mark} ${items[i]}"
+            fi
+        done
+        wiz::__rule "${inner}" '╰' '╯'
+        wiz::__hint "${inner}" "  ↑/↓ — ход, Space — выбор, Enter — ОК, q — отмена"
+
+        case "$(wiz::__read_key)" in
+            up)    (( selected = (selected - 1 + ${#items[@]}) % ${#items[@]} )) ;;
+            down)  (( selected = (selected + 1) % ${#items[@]} )) ;;
+            space) (( checked[selected] = 1 - checked[selected] )) ;;
+            enter) break ;;
+            q)     __wiz_out="q"; return 0 ;;
+        esac
+    done
+
+    local -a picked_idx=()
+    for i in "${!items[@]}"; do
+        (( checked[i] == 1 )) && picked_idx+=("${i}")
+    done
+    __wiz_out="${picked_idx[*]:-}"
+}
+
+# @description Yes/No question inside a frame.
+# @description Вопрос Да/Нет в рамке.
+# @param $1 Output variable: y|n|q
+# @param $2 Question / Вопрос
+wiz::yn() {
+    local -n __wiz_out="${1:?output variable required}"
+    local -r question="$2"
+    local -r inner="$(wiz::__box_width)"
+
+    while true; do
+        printf '\033[H\033[J'
+        wiz::__rule "${inner}" '╭' '╮'
+        wiz::__title_row "${inner}" "${question}"
+        wiz::__row "${inner}" "    Да / Yes"
+        wiz::__row "${inner}" "    Нет / No"
+        wiz::__rule "${inner}" '╰' '╯'
+        wiz::__hint "${inner}" "  y/n или 1/2 — ответ, q — отмена"
+
+        case "$(wiz::__read_key)" in
+            y|Y|1) __wiz_out="y"; return 0 ;;
+            n|N|2) __wiz_out="n"; return 0 ;;
+            q)     __wiz_out="q"; return 0 ;;
+        esac
+    done
+}
+
+# @description Text input with a default value.
+# @description Текстовый ввод со значением по умолчанию.
+# @param $1 Output variable / Выходная переменная
+# @param $2 Prompt / Приглашение
+# @param $3 Default / Значение по умолчанию
+wiz::ask_input() {
+    local -n __wiz_out="${1:?output variable required}"
+    local -r prompt="$2" default="${3:-}"
+    local -r inner="$(wiz::__box_width)"
+    local answer
+
+    printf '\033[H\033[J'
+    wiz::__rule "${inner}" '╭' '╮'
+    wiz::__title_row "${inner}" "${prompt}"
+    wiz::__row "${inner}" ""
+    wiz::__row "${inner}" "  [${default}]" "33"
+    wiz::__row "${inner}" ""
+    wiz::__rule "${inner}" '╰' '╯'
+    wiz::__hint "${inner}" "  Enter — принять по умолчанию, q — отмена"
+    printf '\033[34m│\033[0m \033[33m'
+    IFS= read -r answer || true
+    printf '\033[0m\n'
+
+    case "${answer}" in
+        q|Q) __wiz_out="q" ;;
+        '')  __wiz_out="${default}" ;;
+        *)   __wiz_out="${answer}" ;;
+    esac
+}
+
+# @description Hidden password input with confirmation (retries until match).
+# @description Скрытый ввод пароля с подтверждением (до совпадения).
+# @param $1 Output variable / Выходная переменная
+wiz::ask_pass() {
+    local -n __wiz_out="${1:?output variable required}"
+    local -r inner="$(wiz::__box_width)"
+    local pass1 pass2
+
+    while true; do
+        printf '\033[H\033[J'
+        wiz::__rule "${inner}" '╭' '╮'
+        wiz::__title_row "${inner}" "Пароль сервера / Server password"
+        wiz::__row "${inner}" ""
+        wiz::__hint "${inner}" "  Ввод скрыт / Input is hidden"
+        wiz::__row "${inner}" ""
+        wiz::__rule "${inner}" '╰' '╯'
+        printf '\033[34m│\033[0m \033[33m'
+        IFS= read -rs pass1 || true
+        printf '\033[0m\n'
+        printf '\033[34m│\033[0m \033[33m'
+        IFS= read -rs -p '  Повторите / Repeat: ' pass2 || true
+        printf '\033[0m\n'
+
+        if [[ "${pass1}" == "${pass2}" && -n "${pass1}" ]]; then
+            __wiz_out="${pass1}"
+            return 0
+        fi
+        if is::empty "${pass1}"; then
+            __wiz_out=""
+            return 0
+        fi
+        wiz::__row "${inner}" "  Пароли не совпали / Passwords do not match" "31"
+        wiz::__row "${inner}" "  Enter — повторить / to retry" "90"
+        IFS= read -rsn1 || true
+    done
+}
+
+# ==========================================
+# Progress indicators / Индикаторы прогресса
+# ==========================================
+
+step_go() { printf '  \033[36m▶\033[0m %s\n' "$1"; }
+step_ok() { printf '  \033[32m✓\033[0m %s\n' "$1"; }
+
+# ==========================================
+# Application logic / Логика применения
+# ==========================================
+
+# @private Abort with a framed error.
+# @private Прервать с ошибкой в рамке.
+wiz::fail() {
+    local -r inner="$(wiz::__box_width)" msg="$1"
+    printf '\033[H\033[J'
+    wiz::__rule "${inner}" '╭' '╮'
+    wiz::__title_row "${inner}" "Ошибка / Error"
+    wiz::__text "${inner}" "${msg}"
+    wiz::__rule "${inner}" '╰' '╯'
+    exit 1
+}
+
+main() {
+    signal::on EXIT wiz::__restore
+    signal::on INT wiz::__restore
+
+    # ---- root check / проверка прав
+    if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
+        wiz::fail "Требуются права root / Root required.
+  Запустите: sudo bs run examples/ai_user_wizard.sh
+  Run:        sudo bs run examples/ai_user_wizard.sh"
+    fi
+
+    printf '\033[?25l\033[2J'
+    local -r inner="$(wiz::__box_width)"
+    wiz::__rule "${inner}" '╭' '╮'
+    wiz::__title_row "${inner}" "AI-пользователь / AI USER WIZARD"
+    wiz::__text "${inner}" "
+Создание ограниченного пользователя для ИИ-агента (opencode)
+Creating a restricted user for an AI agent (opencode)"
+    wiz::__rule "${inner}" '╰' '╯'
+    wiz::__hint "${inner}" "  Enter — продолжить / to continue"
+    wiz::__read_key >/dev/null
+
+    # ---- базовые параметры / base parameters
+    local ai_user service port
+    wiz::ask_input ai_user "Имя пользователя / Username" "ai-agent"
+    [[ "${ai_user}" == "q" ]] && exit 0
+    wiz::ask_input service "Имя systemd-сервиса / Service name" "opencode"
+    [[ "${service}" == "q" ]] && exit 0
+    wiz::ask_input port "Порт сервера / Server port" "4096"
+    [[ "${port}" == "q" ]] && exit 0
+    [[ "${port}" =~ ^[0-9]+$ ]] || wiz::fail "Порт должен быть числом / Port must be a number: ${port}"
+
+    # ---- пароль / password mode
+    local pass_mode ai_pass=""
+    wiz::menu pass_mode "Пароль сервера / Server password" \
+        "Сгенерировать / Generate" \
+        "Ввести свой / Enter my own" \
+        "Без пароля / No password"
+    [[ "${pass_mode}" == "99" ]] && exit 0
+    case "${pass_mode}" in
+        0) ai_pass="$(openssl rand -base64 18 | tr '+/' '_-')" ;;
+        1) wiz::ask_pass ai_pass; [[ "${ai_pass}" == "q" ]] && exit 0 ;;
+        2) ai_pass="" ;;
+    esac
+
+    # ---- sudo-права / sudo scopes (checkboxes)
+    local sudo_pick
+    wiz::multi_menu sudo_pick "sudo-права / Sudo scopes" \
+        "systemctl сервис: daemon-reload + enable/start/stop/restart/status" \
+        "firewall-cmd * (открыть порт)" \
+        "systemctl status * (любые юниты)"
+    [[ "${sudo_pick}" == "q" ]] && exit 0
+    local -a sudo_lines=()
+    if [[ "${sudo_pick}" == *"0"* ]]; then
+        sudo_lines+=("systemctl daemon-reload")
+        sudo_lines+=("systemctl enable ${service}.service")
+        sudo_lines+=("systemctl start ${service}.service")
+        sudo_lines+=("systemctl stop ${service}.service")
+        sudo_lines+=("systemctl restart ${service}.service")
+        sudo_lines+=("systemctl status ${service}.service")
+    fi
+    if [[ "${sudo_pick}" == *"1"* ]]; then
+        sudo_lines+=("firewall-cmd *")
+    fi
+    if [[ "${sudo_pick}" == *"2"* ]]; then
+        sudo_lines+=("systemctl status *")
+    fi
+
+    # ---- лимиты / limits
+    local lim
+    wiz::menu lim "Лимиты ресурсов / Resource limits" \
+        "Минимальный / Minimal (nproc=64, nofile=512)" \
+        "Средний / Medium (nproc=128, nofile=4096)" \
+        "Без лимитов / No limits"
+    [[ "${lim}" == "99" ]] && exit 0
+    local nproc nofile
+    case "${lim}" in
+        0) nproc=64;  nofile=512 ;;
+        1) nproc=128; nofile=4096 ;;
+        2) nproc=0;   nofile=0 ;;
+    esac
+
+    # ---- песочница / SELinux / сервис
+    local sandbox selinux svc
+    wiz::yn sandbox "Песочница systemd? / systemd sandbox?"
+    [[ "${sandbox}" == "q" ]] && exit 0
+    wiz::yn selinux "SELinux-контекст? / SELinux context?"
+    [[ "${selinux}" == "q" ]] && exit 0
+    wiz::menu svc "systemd-сервис / systemd service" \
+        "Создать и запустить / Create and start" \
+        "Только создать / Create only" \
+        "Не создавать / Do not create"
+    [[ "${svc}" == "99" ]] && exit 0
+
+    # ---- сводка / summary
+    local summary
+    printf -v summary "%s\n" \
+        "Пользователь / User:  ${ai_user}" \
+        "Сервис / Service:     ${service}  (порт ${port})" \
+        "Пароль:               $([[ -n "${ai_pass}" ]] && echo 'сгенерирован / generated' || echo 'без пароля / none')" \
+        "sudo-команд:          ${#sudo_lines[@]}" \
+        "Лимиты:               nproc=${nproc}, nofile=${nofile}, core=0" \
+        "Песочница:            ${sandbox}   SELinux: ${selinux}" \
+        "systemd-сервис:       $(case ${svc} in 0) echo 'создать+запустить';; 1) echo 'только создать';; 2) echo 'не создавать';; esac)"
+    printf '\033[H\033[J'
+    wiz::__rule "${inner}" '╭' '╮'
+    wiz::__title_row "${inner}" "Сводка / SUMMARY"
+    wiz::__rule "${inner}" '├' '┤'
+    wiz::__text "${inner}" "${summary}"
+    wiz::__rule "${inner}" '╰' '╯'
+    printf '\n'
+    local apply
+    wiz::yn apply "Применить настройки? / Apply settings?"
+    [[ "${apply}" == "q" ]] && exit 0
+    if [[ "${apply}" != "y" ]]; then
+        wiz::fail "Отменено пользователем / Cancelled by user"
+    fi
+
+    # ==========================================
+    # ---- применение / apply
+    # ==========================================
+    printf '\033[H\033[J'
+    local -r w="$(wiz::__box_width)"
+    wiz::__rule "${w}" '╭' '╮'
+    wiz::__title_row "${w}" "Применение / APPLYING"
+    wiz::__rule "${w}" '╰' '╯'
+    printf '\n'
+
+    if ! id "${ai_user}" >/dev/null 2>&1; then
+        step_go "useradd -m -s /usr/sbin/nologin ${ai_user}"
+        useradd -m -s /usr/sbin/nologin "${ai_user}"
+        step_ok "пользователь создан / user created"
+    else
+        step_ok "пользователь существует / user exists"
+    fi
+
+    step_go "passwd -l ${ai_user}  (вход по паролю запрещён / password login locked)"
+    passwd -l "${ai_user}"
+    step_ok "пароль заблокирован / password locked"
+
+    step_go "usermod -aG systemd-journal ${ai_user}"
+    usermod -aG systemd-journal "${ai_user}"
+    step_ok "journal-группа / journal group"
+
+    mkdir -p "/srv/${ai_user}" && chown "${ai_user}":"${ai_user}" "/srv/${ai_user}"
+    step_ok "/srv/${ai_user} готов / ready"
+
+    # ---- sudoers / sudo-права
+    local sudoers_file="/etc/sudoers.d/${ai_user}"
+    if (( ${#sudo_lines[@]} > 0 )); then
+        step_go "запись sudoers / writing ${sudoers_file}"
+        {
+            printf '# Managed by ai_user_wizard / создано визардом\n'
+            local line
+            for line in "${sudo_lines[@]}"; do
+                printf '%s ALL=(root) NOPASSWD: %s\n' "${ai_user}" "${line}"
+            done
+        } > "${sudoers_file}"
+        chmod 440 "${sudoers_file}"
+        visudo -c -f "${sudoers_file}" || { rm -f "${sudoers_file}"; wiz::fail "visudo -c не прошёл / failed — файл откачен / reverted"; }
+        step_ok "sudoers записан и проверен / written and verified"
+    else
+        rm -f "${sudoers_file}"
+        step_ok "sudoers не требуется / no sudoers needed"
+    fi
+
+    # ---- лимиты / limits
+    local limits_file="/etc/security/limits.d/${ai_user}.conf"
+    if [[ "${lim}" != "2" ]]; then
+        step_go "запись лимитов / writing ${limits_file}"
+        cat > "${limits_file}" <<EOF
+# Managed by ai_user_wizard / создано визардом
+${ai_user} soft nproc ${nproc}
+${ai_user} hard nproc ${nproc}
+${ai_user} soft nofile ${nofile}
+${ai_user} hard nofile ${nofile}
+${ai_user} hard core 0
+${ai_user} soft core 0
+EOF
+        step_ok "лимиты записаны / limits written"
+    else
+        rm -f "${limits_file}"
+        step_ok "лимиты не заданы / no limits"
+    fi
+
+    # ---- systemd-сервис / service unit
+    if [[ "${svc}" != "2" ]]; then
+        step_go "запись unit / writing /etc/systemd/system/${service}.service"
+        local env_file="/srv/${ai_user}/opencode.env"
+        if is::not_empty "${ai_pass}"; then
+            umask 177
+            printf 'OPENCODE_SERVER_PASSWORD=%s\n' "${ai_pass}" > "${env_file}"
+            chown root:root "${env_file}"
+            chmod 600 "${env_file}"
+            step_ok "пароль в ${env_file} (root:root 600)"
+        else
+            rm -f "${env_file}"
+        fi
+
+        {
+            printf '[Unit]\n'
+            printf 'Description=opencode server for %s\n' "${ai_user}"
+            printf 'After=network.target\n\n'
+            printf '[Service]\n'
+            printf 'User=%s\n' "${ai_user}"
+            printf 'Group=%s\n' "${ai_user}"
+            printf 'WorkingDirectory=/srv/%s\n' "${ai_user}"
+            if is::not_empty "${ai_pass}"; then
+                printf 'EnvironmentFile=%s\n' "${env_file}"
+            fi
+            printf 'ExecStart=/usr/local/bin/opencode serve --hostname 0.0.0.0 --port %s\n' "${port}"
+            printf 'Restart=always\n'
+            if [[ "${sandbox}" == "y" ]]; then
+                printf '\n'
+                printf '# Песочница / Sandbox\n'
+                printf 'ProtectSystem=strict\n'
+                printf 'ProtectHome=read-only\n'
+                printf 'ReadWritePaths=/srv/%s /home/%s\n' "${ai_user}" "${ai_user}"
+                printf 'PrivateTmp=true\n'
+                printf 'LimitNOFILE=%s\n' "${nofile}"
+            fi
+        } > "/etc/systemd/system/${service}.service"
+        step_ok "unit записан / unit written"
+
+        systemctl daemon-reload
+        if [[ "${svc}" == "0" ]]; then
+            systemctl enable --now "${service}"
+            step_ok "сервис запущен / service started"
+        else
+            step_ok "сервис создан, не запущен / created, not started"
+        fi
+    else
+        step_ok "сервис не создаётся / service skipped"
+    fi
+
+    # ---- SELinux / контекст
+    if [[ "${selinux}" == "y" ]]; then
+        step_go "SELinux: fcontext + restorecon"
+        if command -v semanage >/dev/null 2>&1; then
+            semanage fcontext -a -t httpd_sys_rw_content_t "/srv/${ai_user}(/.*)?"
+            restorecon -Rv "/srv/${ai_user}"
+            step_ok "контекст применён / context applied"
+        else
+            step_go "semanage не найден — пропуск / not found, skipped"
+        fi
+    else
+        step_ok "SELinux не трогаем / SELinux untouched"
+    fi
+
+    # ==========================================
+    # ---- итог / final summary
+    # ==========================================
+    printf '\n\n'
+    local final
+    printf -v final "%s\n" \
+        "Готово! / Done!" \
+        "" \
+        "Пользователь / User:  ${ai_user} (вход запрещён / login locked)" \
+        "Каталог / Dir:        /srv/${ai_user}" \
+        "sudo:                 sudo -l -U ${ai_user}" \
+        "" \
+        "Контроль сервиса / Service control:" \
+        "  sudo systemctl status ${service}" \
+        "  sudo systemctl restart ${service}" \
+        "  sudo firewall-cmd --add-port=${port}/tcp --permanent && sudo firewall-cmd --reload" \
+        "" \
+        "Подключение / Connect: opencode attach http://<ip>:${port} -u opencode -p '<пароль>'"
+    wiz::__rule "${w}" '╭' '╮'
+    wiz::__title_row "${w}" "ИТОГ / RESULT"
+    wiz::__rule "${w}" '├' '┤'
+    wiz::__text "${w}" "${final}"
+    wiz::__rule "${w}" '╰' '╯'
+    printf '\n'
+}
+
+main "$@"
