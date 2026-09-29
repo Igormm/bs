@@ -49,15 +49,18 @@ wiz::__box_width() {
 }
 
 # @private Display width of a string (wide chars count as 2 cells).
-#   One `wc -m` call (chars) — the old per-char `printf|wc -c` loop forked
-#   once per character (~5-15 ms per row) and made arrow nav feel laggy.
-#   Box glyphs (▶ ○ ● ✓ ╭ ╰) are 3-byte, 1-cell chars, so chars == cells.
+#   Pure bash: ${#var} counts UTF-8 CHARACTERS (not bytes) with no fork at
+#   all — the earlier wc -m version still forked once per row, and the
+#   original per-char `printf|wc -c` loop forked per character (~5-15 ms
+#   per row). Box glyphs (▶ ○ ● ✓ ╭ ╰) are 3-byte, 1-cell chars, so
+#   chars == cells. Wide East-Asian chars would need a table lookup.
 # @private Ширина строки на экране (широкие символы — 2 клетки).
-#   Один вызов `wc -m` (символы): старый цикл `printf|wc -c` форкал процесс
-#   на каждый символ (~5-15 мс на строку) и тормозил навигацию стрелками.
-#   Символы рамки (▶ ○ ● ✓ ╭ ╰) — 3-байтные, 1 клетка: символы == клетки.
+#   Чистый bash: ${#var} считает UTF-8 СИМВОЛЫ (не байты) вообще без
+#   форков — wc -m всё ещё форкал раз на строку, а исходный цикл
+#   `printf|wc -c` — на каждый символ (~5-15 мс на строку). Символы рамки
+#   (▶ ○ ● ✓ ╭ ╰) — 3-байтные, 1 клетка: символы == клетки.
 wiz::__disp_width() {
-    printf '%s' "$1" | wc -m
+    printf '%d' "${#1}"
 }
 
 # @private Frame rule: ╭────╮ / ├────┤ / ╰────╯
@@ -77,23 +80,20 @@ wiz::__rule() {
 wiz::__row() {
     local -r inner="$1" content="$2" color="${3:-}"
     local text="${content}"
-    local w
-    w="$(wiz::__disp_width "${text}")"
-    if (( w > inner )); then
-        # Truncate by display width, keep the ANSI color intact.
-        # Обрезаем по дисплейной ширине, цвет ANSI сохраняем.
-        # wc -m once (chars == cells for box glyphs); no per-char forks.
-        local cut="${text:0:$((inner - 1))}"
-        text="${cut}…"
+    if (( ${#text} > inner )); then
+        # Truncate by char count (chars == cells for box glyphs).
+        # Обрезаем по числу символов (символы == клетки для глифов рамки).
+        text="${text:0:$((inner - 1))}…"
     fi
-    w="$(wiz::__disp_width "${text}")"
-    printf '\033[34m│\033[0m'
+    # One printf per row: frame edges, optional color, padding.
+    # Один printf на строку: края рамки, опциональный цвет, паддинг.
     if is::not_empty "${color}"; then
-        printf '\033[%sm%s\033[0m' "${color}" "${text}"
+        printf '\033[34m│\033[0m\033[%sm%s\033[0m%*s\033[34m│\033[0m\n' \
+            "${color}" "${text}" "$((inner - ${#text}))" ''
     else
-        printf '%s' "${text}"
+        printf '\033[34m│\033[0m%s%*s\033[34m│\033[0m\n' \
+            "${text}" "$((inner - ${#text}))" ''
     fi
-    printf '%*s\033[34m│\033[0m\n' "$((inner - w))" ''
 }
 
 # @private Multi-line text inside a frame.
