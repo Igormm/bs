@@ -21,10 +21,12 @@ fi
 export BS_NAME="BS (Bash Open Source Architecture) BOSA Framework"
 
 # @description Print version information / Вывести информацию о версии
+#   Version is read via bs::version::get (function), not the raw constant.
+#   Версия читается через bs::version::get (функцию), не напрямую константу.
 # @example
 #   bs::version::print
 bs::version::print() {
-    printf 'BS Framework version: %s\n' "${BS_VERSION}"
+    printf 'BS Framework version: %s\n' "$(bs::version::get)"
 }
 
 # @description Get version as string / Получить версию как строку
