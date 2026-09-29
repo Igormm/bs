@@ -148,7 +148,17 @@ def analyze(folder: str, max_lines: int) -> Dict[str, Any]:
             "pass": False,
             "detail": f"SKILL.md not found at {folder}",
         })
-        return {"folder": folder, "checks": findings, "passed": 0, "total": 1, "overall": "FAIL"}
+        return {
+            "folder": folder,
+            "max_lines_threshold": max_lines,
+            "skill_md": "",
+            "skill_md_lines": 0,
+            "reference_files": [],
+            "checks": findings,
+            "passed": 0,
+            "total": 1,
+            "overall": "FAIL",
+        }
     findings.append({
         "rule": "skill_md_present",
         "pass": True,
@@ -225,7 +235,7 @@ def render_text(r: Dict[str, Any]) -> str:
     lines.append("=" * 72)
     lines.append("SKILL STRUCTURE VALIDATOR")
     lines.append(f"Folder: {r['folder']}")
-    lines.append(f"Max-lines threshold: {r['max_lines_threshold']}")
+    lines.append(f"Max-lines threshold: {r.get('max_lines_threshold', DEFAULT_MAX_LINES)}")
     lines.append("=" * 72)
     lines.append("")
     lines.append(f"SKILL.md: {r.get('skill_md', '<missing>')}  ({r.get('skill_md_lines', 0)} lines)")
