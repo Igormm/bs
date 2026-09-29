@@ -97,8 +97,9 @@ do_uninstall() {
       printf "Удален пустой каталог: %s\n" "${LIB_DIR}"
     fi
     # Remove the PATH line added by the installer (exact match only)
-    remove_path_entry "${HOME}/.bashrc"
-    remove_path_entry "${HOME}/.zshrc"
+    # PATH-чистка не должна прерывать удаление при ошибке записи rc-файла
+    remove_path_entry "${HOME}/.bashrc" || true
+    remove_path_entry "${HOME}/.zshrc" || true
   fi
 
   printf "Готово.\n"

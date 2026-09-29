@@ -39,6 +39,7 @@ HELP
 # Дефолтные значения для параметров \ Parse arguments
 MODE="system"        # system|local
 ACTION="install"     # install|uninstall
+ACTION_EXPLICIT="0"  # 1 если действие задано явно
 FLAG_PATH="0"        # 0|1
 FLAG_UPDATE_PATH="0" # 0|1
 
@@ -54,7 +55,7 @@ while [[ $# -gt 0 ]]; do
     -h|--help)
       usage; exit 0 ;;
     install|uninstall|remove)
-      ACTION="$1"; shift ;;
+      ACTION="$1"; ACTION_EXPLICIT="1"; shift ;;
     *)
       printf "ERROR: Неизвестный аргумент: %s (см. --help)\n" "$1" >&2
       exit 1 ;;
@@ -78,6 +79,19 @@ fi
 # Final install locations
 TARGET_LIB="${LIB_DIR}/bs"  # BS libraries root
 TARGET_BIN="${BIN_DIR}/bs"  # wrapper executable
+
+# PATH flags are local-only (help: valid only with --local)
+# Флаги PATH работают только в local-режиме (help: только с --local)
+if [[ "${FLAG_PATH}" == "1" || "${FLAG_UPDATE_PATH}" == "1" ]]; then
+  if [[ "${MODE}" != "local" ]]; then
+    printf "ERROR: --path и --update-path работают только с --local (см. --help)\n" >&2
+    exit 1
+  fi
+  if [[ "${ACTION_EXPLICIT}" == "1" ]]; then
+    printf "ERROR: --path/--update-path — самостоятельные режимы и не сочетаются с действием %s (см. --help)\n" "${ACTION}" >&2
+    exit 1
+  fi
+fi
 
 # PATH flags (local only)
 if [[ "${MODE}" == "local" && "${FLAG_PATH}" == "1" ]]; then

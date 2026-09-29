@@ -188,6 +188,55 @@ test_update_path_flag() {
     testframework::assert_equal "1" "${count}" "second update-path does not duplicate line"
 }
 
+# PATH-флаги без --local: ошибка, а не тихий system-install
+# PATH flags without --local: error, not a silent system-install
+test_path_flags_require_local() {
+    local iso rc=0 out
+    iso="$(mk_isolated_home)"
+
+    rc=0
+    out="$(run_installer "${iso}" --path)" || rc=$?
+    testframework::assert_equal "1" "${rc}" "--path without --local exits 1"
+    testframework::assert_command "printf '%s' '${out}' | grep -q 'только с --local'" "--path without --local reports the flag error"
+
+    rc=0
+    out="$(run_installer "${iso}" --update-path)" || rc=$?
+    testframework::assert_equal "1" "${rc}" "--update-path without --local exits 1"
+    testframework::assert_command "printf '%s' '${out}' | grep -q 'только с --local'" "--update-path without --local reports the flag error"
+
+    # Флаги PATH — самостоятельные режимы и не сочетаются с явным действием
+    rc=0
+    out="$(run_installer "${iso}" --local --path install)" || rc=$?
+    testframework::assert_equal "1" "${rc}" "--path conflicts with explicit action"
+
+    rc=0
+    out="$(run_installer "${iso}" --local --update-path uninstall)" || rc=$?
+    testframework::assert_equal "1" "${rc}" "--update-path conflicts with explicit action"
+
+    # Ничего не установлено и не удалено
+    testframework::assert_true "! -d '${iso}/.local/lib/bs'" "no install happened on flag errors"
+}
+
+# PATH-чистка при неудачной записи rc-файла не прерывает uninstall
+# PATH cleanup on a read-only rc file must not abort uninstall
+test_uninstall_readonly_rc() {
+    local iso rc=0 out
+    iso="$(mk_isolated_home)"
+    run_installer "${iso}" --local >/dev/null 2>&1 || true
+
+    chmod 0444 "${iso}/.bashrc"
+
+    rc=0
+    out="$(run_installer "${iso}" --local uninstall)" || rc=$?
+    testframework::assert_equal "0" "${rc}" "uninstall exits 0 with read-only rc file"
+
+    if [[ -d "${iso}/.local/lib/bs" ]]; then
+        testframework::assert_true "false" "lib tree removed despite read-only rc"
+    else
+        testframework::assert_true "true" "lib tree removed despite read-only rc"
+    fi
+}
+
 test_uninstall_keeps_user_edits() {
     local iso rc=0
     iso="$(mk_isolated_home)"
@@ -299,6 +348,8 @@ main() {
     testframework::section "PATH helpers / Настройка PATH"
     test_path_flag
     test_update_path_flag
+    test_path_flags_require_local
+    test_uninstall_readonly_rc
 
     testframework::section "System mode / Системная установка"
     test_system_mode_requires_root

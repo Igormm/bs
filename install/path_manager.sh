@@ -71,8 +71,16 @@ remove_path_entry() {
   # (файл состоял лишь из этой строки) оставляем пустой файл.
   # utils::attempt сохраняет stdout — в отличие от utils::ignore.
   tmp_file="${rc_file}.bs.$$.tmp"
-  utils::attempt grep -Fvx "${line}" "${rc_file}" > "${tmp_file}"
-  mv "${tmp_file}" "${rc_file}"
+  if ! utils::attempt grep -Fvx "${line}" "${rc_file}" > "${tmp_file}"; then
+    rm -f "${tmp_file}"
+    printf "Не удалось прочитать %s\n" "${rc_file}" >&2
+    return 1
+  fi
+  if ! mv "${tmp_file}" "${rc_file}"; then
+    rm -f "${tmp_file}"
+    printf "Не удалось изменить %s (нет прав записи?)\n" "${rc_file}" >&2
+    return 1
+  fi
   printf "Удалена строка PATH из %s\nPath line removed from %s\n" "${rc_file}" "${rc_file}"
 }
 
