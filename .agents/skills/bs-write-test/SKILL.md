@@ -45,6 +45,25 @@ main() {
 main "$@"
 ```
 
+## Targeted coverage / Таргетированное покрытие
+
+For a module with many public functions, generate a skeleton test with one
+test function per public function (auto-extracts `@example` doc blocks as
+initial assertions):
+
+```bash
+bash .agents/skills/bs-write-test/scripts/gen_test_skeleton.sh core/lang.sh --write
+```
+
+- Generates `tests/unit/test<module>unit.sh`, one `test_<fn>()` per public
+  function (`ns::fn` → `test_ns_fn`), private `::__` functions are skipped.
+- Functions with a runnable `# @example` get a real `assert_equal` call;
+  the rest get a `assert_true "false"` TODO that fails until filled in.
+- `|| true` after each test call keeps the run alive so the summary shows
+  every TODO. The generated file is a RED skeleton — fill in inputs and
+  expected values, then re-run. Do not commit it unfilled.
+- Without `--write` the skeleton goes to stdout.
+
 ## Assert API (tests/testframework.sh)
 
 - `testframework::init` / `testframework::summary` — summary exits 1 on failures.
