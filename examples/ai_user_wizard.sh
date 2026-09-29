@@ -386,6 +386,7 @@ Creating a restricted user for an AI agent (opencode)"
     wiz::ask_input port "Порт сервера / Server port" "4096"
     [[ "${port}" == "q" ]] && exit 0
     [[ "${port}" =~ ^[0-9]+$ ]] || wiz::fail "Порт должен быть числом / Port must be a number: ${port}"
+    (( port >= 1 && port <= 65535 )) || wiz::fail "Порт вне диапазона 1-65535 / Port out of range 1-65535: ${port}"
 
     # ---- пароль / password mode
     local pass_mode ai_pass=""
@@ -407,8 +408,17 @@ Creating a restricted user for an AI agent (opencode)"
         "firewall-cmd * (открыть порт)" \
         "systemctl status * (любые юниты)"
     [[ "${sudo_pick}" == "q" ]] && exit 0
+    # Индексы храним как массив (Torvalds: никакого substring-матчинга
+    # цифр — "10" ложно матчит "1"). 
+    # Keep indices as an array (Torvalds: no digit-substring matching —
+    # "10" would falsely match "1").
+    local -a sudo_idx=()
+    local idx
+    for idx in ${sudo_pick}; do
+        sudo_idx+=("${idx}")
+    done
     local -a sudo_lines=()
-    if [[ "${sudo_pick}" == *"0"* ]]; then
+    if [[ " ${sudo_idx[*]} " == *" 0 "* ]]; then
         sudo_lines+=("systemctl daemon-reload")
         sudo_lines+=("systemctl enable ${service}.service")
         sudo_lines+=("systemctl start ${service}.service")
@@ -416,10 +426,10 @@ Creating a restricted user for an AI agent (opencode)"
         sudo_lines+=("systemctl restart ${service}.service")
         sudo_lines+=("systemctl status ${service}.service")
     fi
-    if [[ "${sudo_pick}" == *"1"* ]]; then
+    if [[ " ${sudo_idx[*]} " == *" 1 "* ]]; then
         sudo_lines+=("firewall-cmd *")
     fi
-    if [[ "${sudo_pick}" == *"2"* ]]; then
+    if [[ " ${sudo_idx[*]} " == *" 2 "* ]]; then
         sudo_lines+=("systemctl status *")
     fi
 
@@ -448,6 +458,17 @@ Creating a restricted user for an AI agent (opencode)"
         "Только создать / Create only" \
         "Не создавать / Do not create"
     [[ "${svc}" == "99" ]] && exit 0
+
+    # Путь к opencode берём из PATH, не хардкодим /usr/local/bin:
+    # сервис должен запускаться на этой машине, а не по догадке
+    # (Torvalds: никаких спец-кейсов с магическими путями).
+    # Resolve opencode from PATH, never hardcode /usr/local/bin:
+    # the service must run on THIS machine, not on a guess
+    # (Torvalds: no magic-path special cases).
+    local opencode_bin=""
+    if is::command opencode; then
+        opencode_bin="$(command -v opencode)"
+    fi
 
     # ---- сводка / summary
     local summary
@@ -483,17 +504,30 @@ Creating a restricted user for an AI agent (opencode)"
     wiz::__rule "${w}" '╰' '╯'
     printf '\n'
 
+    # passwd -l только для СОЗДАННОГО пользователя: блокировка пароля
+    # существующего реального пользователя = потеря доступа (Thompson:
+    # не трогай состояние, которое не создавал).
+    # passwd -l only for a user WE created: locking an existing real
+    # user's password is access loss (Thompson: never touch state you
+    # didn't create).
+    local user_existed=0
     if ! id "${ai_user}" >/dev/null 2>&1; then
         step_go "useradd -m -s /usr/sbin/nologin ${ai_user}"
         useradd -m -s /usr/sbin/nologin "${ai_user}"
         step_ok "пользователь создан / user created"
     else
+        user_existed=1
         step_ok "пользователь существует / user exists"
     fi
 
-    step_go "passwd -l ${ai_user}  (вход по паролю запрещён / password login locked)"
-    passwd -l "${ai_user}"
-    step_ok "пароль заблокирован / password locked"
+    if (( user_existed == 1 )); then
+        step_go "ПРЕДУПРЕЖДЕНИЕ: ${ai_user} уже существует — вход НЕ блокируем / login NOT locked"
+        step_ok "существующий пользователь оставлен как есть / existing user left untouched"
+    else
+        step_go "passwd -l ${ai_user}  (вход по паролю запрещён / password login locked)"
+        passwd -l "${ai_user}"
+        step_ok "пароль заблокирован / password locked"
+    fi
 
     step_go "usermod -aG systemd-journal ${ai_user}"
     usermod -aG systemd-journal "${ai_user}"
@@ -542,11 +576,20 @@ EOF
 
     # ---- systemd-сервис / service unit
     if [[ "${svc}" != "2" ]]; then
+        if is::empty "${opencode_bin}"; then
+            wiz::fail "opencode не найден в PATH / opencode not found in PATH — сервис не создан / service not created"
+        fi
         step_go "запись unit / writing /etc/systemd/system/${service}.service"
         local env_file="/srv/${ai_user}/opencode.env"
         if is::not_empty "${ai_pass}"; then
-            umask 177
-            printf 'OPENCODE_SERVER_PASSWORD=%s\n' "${ai_pass}" > "${env_file}"
+            # umask в subshell: не меняет umask остального скрипта
+            # (Thompson: состояние не должно протекать).
+            # umask inside a subshell so it never leaks into the rest
+            # of the script (Thompson: no state leakage).
+            (
+                umask 177
+                printf 'OPENCODE_SERVER_PASSWORD=%s\n' "${ai_pass}" > "${env_file}"
+            )
             chown root:root "${env_file}"
             chmod 600 "${env_file}"
             step_ok "пароль в ${env_file} (root:root 600)"
@@ -565,7 +608,7 @@ EOF
             if is::not_empty "${ai_pass}"; then
                 printf 'EnvironmentFile=%s\n' "${env_file}"
             fi
-            printf 'ExecStart=/usr/local/bin/opencode serve --hostname 0.0.0.0 --port %s\n' "${port}"
+            printf 'ExecStart=%s serve --hostname 0.0.0.0 --port %s\n' "${opencode_bin}" "${port}"
             printf 'Restart=always\n'
             if [[ "${sandbox}" == "y" ]]; then
                 printf '\n'
@@ -609,19 +652,46 @@ EOF
     # ==========================================
     printf '\n\n'
     local final
-    printf -v final "%s\n" \
-        "Готово! / Done!" \
-        "" \
-        "Пользователь / User:  ${ai_user} (вход запрещён / login locked)" \
-        "Каталог / Dir:        /srv/${ai_user}" \
-        "sudo:                 sudo -l -U ${ai_user}" \
-        "" \
-        "Контроль сервиса / Service control:" \
-        "  sudo systemctl status ${service}" \
-        "  sudo systemctl restart ${service}" \
-        "  sudo firewall-cmd --add-port=${port}/tcp --permanent && sudo firewall-cmd --reload" \
-        "" \
-        "Подключение / Connect: opencode attach http://<ip>:${port} -u opencode -p '<пароль>'"
+    if is::not_empty "${ai_pass}"; then
+        # Пароль показываем ОДИН раз в конце (Jobs: клиент должен мочь
+        # завершить сценарий; дальше он живёт только в env-файле root:600).
+        # Show the password ONCE at the end (Jobs: the customer must be
+        # able to finish the scenario; after this it lives only in the
+        # root:600 env file).
+        printf -v final "%s\n" \
+            "Готово! / Done!" \
+            "" \
+            "Пользователь / User:  ${ai_user} (вход запрещён / login locked)" \
+            "Каталог / Dir:        /srv/${ai_user}" \
+            "" \
+            "ПАРОЛЬ СЕРВЕРА / SERVER PASSWORD (показывается один раз / one-time):" \
+            "  ${ai_pass}" \
+            "  (также в /srv/${ai_user}/opencode.env, root:600)" \
+            "" \
+            "sudo:                 sudo -l -U ${ai_user}" \
+            "" \
+            "Контроль сервиса / Service control:" \
+            "  sudo systemctl status ${service}" \
+            "  sudo systemctl restart ${service}" \
+            "  sudo firewall-cmd --add-port=${port}/tcp --permanent && sudo firewall-cmd --reload" \
+            "" \
+            "Подключение / Connect: opencode attach http://<ip>:${port} -u opencode -p '${ai_pass}'"
+    else
+        printf -v final "%s\n" \
+            "Готово! / Done!" \
+            "" \
+            "Пользователь / User:  ${ai_user} (вход запрещён / login locked)" \
+            "Каталог / Dir:        /srv/${ai_user}" \
+            "" \
+            "sudo:                 sudo -l -U ${ai_user}" \
+            "" \
+            "Контроль сервиса / Service control:" \
+            "  sudo systemctl status ${service}" \
+            "  sudo systemctl restart ${service}" \
+            "  sudo firewall-cmd --add-port=${port}/tcp --permanent && sudo firewall-cmd --reload" \
+            "" \
+            "Подключение / Connect: opencode attach http://<ip>:${port}"
+    fi
     wiz::__rule "${w}" '╭' '╮'
     wiz::__title_row "${w}" "ИТОГ / RESULT"
     wiz::__rule "${w}" '├' '┤'
