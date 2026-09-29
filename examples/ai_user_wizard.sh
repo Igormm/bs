@@ -23,14 +23,25 @@ load "lib/ui/presentation"
 # @private Restore the terminal on any exit (panic-safe).
 # @private Восстановить терминал при любом выходе.
 wiz::__restore() {
-    printf '\033[?25h\033[0m\033[0;0H\033[2J'
+    printf '\033[?25h\033[0m\033[?1049l'
 }
 
-# @private Terminal width, clamped to the required box range.
-# @private Ширина терминала, ограниченная требуемым диапазоном рамки.
+# @private Enter the alternate screen buffer (clean full-screen redraws).
+# @private Войти в альтернативный буфер (чистая перерисовка на весь экран).
+wiz::__enter_alt() {
+    printf '\033[?1049h\033[?25l\033[2J'
+}
+
+# @private Terminal width from the real tty (ioctl), clamped to the box range.
+# @private Ширина терминала из реального tty (ioctl), ограничена диапазоном рамки.
 wiz::__box_width() {
-    local -i tw
-    tw="$(tput cols 2>/dev/null || echo 80)"
+    local -i tw=80
+    local size
+    if is::command stty && size="$(stty size 2>/dev/null)"; then
+        tw="${size##* }"
+    elif is::command tput; then
+        tw="$(tput cols 2>/dev/null || printf 80)"
+    fi
     (( tw = tw - 4 ))
     (( tw < 44 )) && tw=44
     (( tw > 76 )) && tw=76
@@ -58,18 +69,36 @@ wiz::__rule() {
     printf '\033[34m%s%s%s\033[0m\n' "${left}" "${line// /─}" "${right}"
 }
 
-# @private Frame row with padding (ANSI-aware width).
-# @private Строка рамки с паддингом (ширина с учётом ANSI).
+# @private Frame row with padding (ANSI-aware width). Content longer than the
+#   inner width is truncated with "…" so the frame never breaks.
+# @private Строка рамки с паддингом (ширина с учётом ANSI). Контент длиннее
+#   внутренней ширины обрезается с "…" — рамка никогда не рвётся.
 # @param $1 Inner width, $2 Content, $3 [optional] ANSI color code
 wiz::__row() {
     local -r inner="$1" content="$2" color="${3:-}"
+    local text="${content}"
     local w
-    w="$(wiz::__disp_width "${content}")"
+    w="$(wiz::__disp_width "${text}")"
+    if (( w > inner )); then
+        # Truncate by display width, keep the ANSI color intact.
+        # Обрезаем по дисплейной ширине, цвет ANSI сохраняем.
+        local cut=""
+        local i c blen
+        for ((i = 0; i < ${#text}; i++)); do
+            c="${text:i:1}"
+            blen=$(LC_ALL=C printf '%s' "$c" | wc -c)
+            (( blen >= 4 )) && w=2 || w=1
+            (( ${#cut} + w > inner - 1 )) && break
+            cut+="${c}"
+        done
+        text="${cut}…"
+    fi
+    w="$(wiz::__disp_width "${text}")"
     printf '\033[34m│\033[0m'
     if is::not_empty "${color}"; then
-        printf '\033[%sm%s\033[0m' "${color}" "${content}"
+        printf '\033[%sm%s\033[0m' "${color}" "${text}"
     else
-        printf '%s' "${content}"
+        printf '%s' "${text}"
     fi
     printf '%*s\033[34m│\033[0m\n' "$((inner - w))" ''
 }
@@ -136,7 +165,7 @@ wiz::menu() {
 
     local selected=0
     while true; do
-        printf '\033[H\033[J'
+        printf '\033[2J\033[H'
         wiz::__rule "${inner}" '╭' '╮'
         wiz::__title_row "${inner}" "${title}"
         wiz::__rule "${inner}" '├' '┤'
@@ -185,7 +214,7 @@ wiz::multi_menu() {
 
     local selected=0
     while true; do
-        printf '\033[H\033[J'
+        printf '\033[2J\033[H'
         wiz::__rule "${inner}" '╭' '╮'
         wiz::__title_row "${inner}" "${title}"
         wiz::__rule "${inner}" '├' '┤'
@@ -227,7 +256,7 @@ wiz::yn() {
     local -r inner="$(wiz::__box_width)"
 
     while true; do
-        printf '\033[H\033[J'
+        printf '\033[2J\033[H'
         wiz::__rule "${inner}" '╭' '╮'
         wiz::__title_row "${inner}" "${question}"
         wiz::__row "${inner}" "    Да / Yes"
@@ -254,7 +283,7 @@ wiz::ask_input() {
     local -r inner="$(wiz::__box_width)"
     local answer
 
-    printf '\033[H\033[J'
+    printf '\033[2J\033[H'
     wiz::__rule "${inner}" '╭' '╮'
     wiz::__title_row "${inner}" "${prompt}"
     wiz::__row "${inner}" ""
@@ -282,7 +311,7 @@ wiz::ask_pass() {
     local pass1 pass2
 
     while true; do
-        printf '\033[H\033[J'
+        printf '\033[2J\033[H'
         wiz::__rule "${inner}" '╭' '╮'
         wiz::__title_row "${inner}" "Пароль сервера / Server password"
         wiz::__row "${inner}" ""
@@ -325,7 +354,7 @@ step_ok() { printf '  \033[32m✓\033[0m %s\n' "$1"; }
 # @private Прервать с ошибкой в рамке.
 wiz::fail() {
     local -r inner="$(wiz::__box_width)" msg="$1"
-    printf '\033[H\033[J'
+    printf '\033[2J\033[H'
     wiz::__rule "${inner}" '╭' '╮'
     wiz::__title_row "${inner}" "Ошибка / Error"
     wiz::__text "${inner}" "${msg}"
@@ -344,7 +373,7 @@ main() {
   Run:        sudo bs run examples/ai_user_wizard.sh"
     fi
 
-    printf '\033[?25l\033[2J'
+    wiz::__enter_alt
     local -r inner="$(wiz::__box_width)"
     wiz::__rule "${inner}" '╭' '╮'
     wiz::__title_row "${inner}" "AI-пользователь / AI USER WIZARD"
@@ -437,7 +466,7 @@ Creating a restricted user for an AI agent (opencode)"
         "Лимиты:               nproc=${nproc}, nofile=${nofile}, core=0" \
         "Песочница:            ${sandbox}   SELinux: ${selinux}" \
         "systemd-сервис:       $(case ${svc} in 0) echo 'создать+запустить';; 1) echo 'только создать';; 2) echo 'не создавать';; esac)"
-    printf '\033[H\033[J'
+    printf '\033[2J\033[H'
     wiz::__rule "${inner}" '╭' '╮'
     wiz::__title_row "${inner}" "Сводка / SUMMARY"
     wiz::__rule "${inner}" '├' '┤'
@@ -454,7 +483,7 @@ Creating a restricted user for an AI agent (opencode)"
     # ==========================================
     # ---- применение / apply
     # ==========================================
-    printf '\033[H\033[J'
+    printf '\033[2J\033[H'
     local -r w="$(wiz::__box_width)"
     wiz::__rule "${w}" '╭' '╮'
     wiz::__title_row "${w}" "Применение / APPLYING"
