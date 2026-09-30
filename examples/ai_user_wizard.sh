@@ -307,17 +307,18 @@ wiz::ask_input() {
     local -r inner="$(wiz::__box_width)"
     local answer
 
-    printf '\033[2J\033[H'
+    wiz::__frame_begin $((inner + 2)) 8
     wiz::__rule "${inner}" '╭' '╮'
     wiz::__title_row "${inner}" "${prompt}"
     wiz::__row "${inner}" ""
-    wiz::__row "${inner}" "  [${default}]" "33"
+    wiz::__row "${inner}" "  Введите / Enter [${default}]: " "33"
     wiz::__row "${inner}" ""
-    wiz::__rule "${inner}" '╰' '╯'
-    wiz::__hint "${inner}" "  Enter — принять по умолчанию, q — отмена"
-    printf '\033[34m│\033[0m \033[33m'
+    # строка ввода — внутри рамки, до нижней границы / input line inside the frame
+    printf '\033[%dG\033[34m│\033[0m \033[33m' "$((__WIZ_COL + 1))"
     IFS= read -r answer || true
     printf '\033[0m\n'
+    wiz::__row "${inner}" "  Enter — принять по умолчанию · q — отмена" "90"
+    wiz::__rule "${inner}" '╰' '╯' 
 
     case "${answer}" in
         q|Q) __wiz_out="q" ;;
@@ -335,19 +336,19 @@ wiz::ask_pass() {
     local pass1 pass2
 
     while true; do
-        printf '\033[2J\033[H'
+        wiz::__frame_begin $((inner + 2)) 9
         wiz::__rule "${inner}" '╭' '╮'
         wiz::__title_row "${inner}" "Пароль сервера / Server password"
         wiz::__row "${inner}" ""
         wiz::__hint "${inner}" "  Ввод скрыт / Input is hidden"
         wiz::__row "${inner}" ""
-        wiz::__rule "${inner}" '╰' '╯'
-        printf '\033[34m│\033[0m \033[33m'
+        printf '\033[%dG\033[34m│\033[0m \033[33m' "$((__WIZ_COL + 1))"
         IFS= read -rs pass1 || true
         printf '\033[0m\n'
-        printf '\033[34m│\033[0m \033[33m'
+        printf '\033[%dG\033[34m│\033[0m \033[33m' "$((__WIZ_COL + 1))"
         IFS= read -rs -p '  Повторите / Repeat: ' pass2 || true
         printf '\033[0m\n'
+        wiz::__rule "${inner}" '╰' '╯' 
 
         if [[ "${pass1}" == "${pass2}" && -n "${pass1}" ]]; then
             __wiz_out="${pass1}"
@@ -364,6 +365,17 @@ wiz::ask_pass() {
 }
 
 # ==========================================
+# @private Generate a password / Сгенерировать пароль
+# @stdout password / пароль
+wiz::gen_pass() {
+    if is::command openssl; then
+        openssl rand -base64 18 | tr '+/' '_-'
+    else
+        tr -dc 'A-Za-z0-9_-' < /dev/urandom | head -c 18
+        printf '\n'
+    fi
+}
+
 # Progress indicators / Индикаторы прогресса
 # ==========================================
 
@@ -398,7 +410,20 @@ main() {
             printf 'заблокированный вход, точечные sudoers, лимиты ресурсов, песочница systemd.\n'
             printf 'Creates a restricted system user for an AI agent (opencode): locked\n'
             printf 'login, scoped sudoers, resource limits, optional systemd sandbox.\n\n'
-            printf 'Keys / Клавиши: ↑/↓, 1-9 — выбор · Space — отметить · Enter — OK · q — отмена\n'
+            printf 'Шаги визарда / Wizard steps (все параметры — с дефолтом):\n'
+            printf '  1. Имя пользователя / Username        (default: ai-agent)\n'
+            printf '  2. Порт сервера / Server port          (default: 4096)\n'
+            printf '  3. Пароль / Password                   сгенерировать / ввести свой / без пароля\n'
+            printf '  4. systemd-сервис / Service            создать+запустить / только создать / не создавать\n'
+            printf '  5. Усиление / Hardening                sudo для сервиса+firewall, песочница, SELinux\n'
+            printf '  6. Сводка / Summary → подтверждение → применение\n\n'
+            printf 'Что делает / What it does:\n'
+            printf '  • useradd -m -s /usr/sbin/nologin + passwd -l (вход по паролю запрещён)\n'
+            printf '  • /srv/<user> с правами пользователя; лимиты nproc=128 nofile=4096 core=0\n'
+            printf '  • sudoers (по выбору): systemctl сервиса + firewall-cmd\n'
+            printf '  • systemd-unit opencode serve (порт из шага 2), пароль в env root:600\n'
+            printf '  • песочница unit (ProtectSystem/PrivateTmp) и SELinux-контекст — по выбору\n\n'
+            printf 'Клавиши / Keys: ↑/↓, 1-9 — выбор · Space — отметить · Enter — OK · q — отмена\n'
             exit 0
             ;;
     esac
@@ -415,97 +440,75 @@ main() {
 
     wiz::__enter_alt
     local -r inner="$(wiz::__box_width)"
-    wiz::__frame_begin $((inner + 2)) 6
-    wiz::__rule "${inner}" '╭' '╮'
-    wiz::__title_row "${inner}" "AI-пользователь / AI USER WIZARD"
-    wiz::__text "${inner}" "
-Создание ограниченного пользователя для ИИ-агента (opencode)
-Creating a restricted user for an AI agent (opencode)"
-    wiz::__rule "${inner}" '╰' '╯'
-    wiz::__hint "${inner}" "  Enter — продолжить / to continue"
-    wiz::__read_key >/dev/null
 
-    # ---- базовые параметры / base parameters
+    # ---- 1-2. пользователь и порт / user and port
     local ai_user service port
-    wiz::ask_input ai_user "Имя пользователя / Username" "ai-agent"
+    wiz::ask_input ai_user "1/6 — Имя пользователя / Username" "ai-agent"
     [[ "${ai_user}" == "q" ]] && exit 0
-    wiz::ask_input service "Имя systemd-сервиса / Service name" "opencode"
-    [[ "${service}" == "q" ]] && exit 0
-    wiz::ask_input port "Порт сервера / Server port" "4096"
+    service="${ai_user}"   # сервис называется как пользователь / service named after the user
+    wiz::ask_input port "2/6 — Порт сервера / Server port" "4096"
     [[ "${port}" == "q" ]] && exit 0
     [[ "${port}" =~ ^[0-9]+$ ]] || wiz::fail "Порт должен быть числом / Port must be a number: ${port}"
     (( port >= 1 && port <= 65535 )) || wiz::fail "Порт вне диапазона 1-65535 / Port out of range 1-65535: ${port}"
 
-    # ---- пароль / password mode
+    # ---- 3. пароль / password
     local pass_mode ai_pass=""
-    wiz::menu pass_mode "Пароль сервера / Server password" \
+    wiz::menu pass_mode "3/6 — Пароль сервера / Server password" \
         "Сгенерировать / Generate" \
         "Ввести свой / Enter my own" \
         "Без пароля / No password"
     [[ "${pass_mode}" == "99" ]] && exit 0
     case "${pass_mode}" in
-        0) ai_pass="$(openssl rand -base64 18 | tr '+/' '_-')" ;;
+        0) ai_pass="$(wiz::gen_pass)" ;;
         1) wiz::ask_pass ai_pass; [[ "${ai_pass}" == "q" ]] && exit 0 ;;
         2) ai_pass="" ;;
     esac
 
-    # ---- sudo-права / sudo scopes (checkboxes)
-    local sudo_pick
-    wiz::multi_menu sudo_pick "sudo-права / Sudo scopes" \
-        "systemctl сервис: daemon-reload + enable/start/stop/restart/status" \
-        "firewall-cmd * (открыть порт)" \
-        "systemctl status * (любые юниты)"
-    [[ "${sudo_pick}" == "q" ]] && exit 0
-    # Индексы храним как массив (Torvalds: никакого substring-матчинга
-    # цифр — "10" ложно матчит "1"). 
-    # Keep indices as an array (Torvalds: no digit-substring matching —
-    # "10" would falsely match "1").
-    local -a sudo_idx=()
-    local idx
-    for idx in ${sudo_pick}; do
-        sudo_idx+=("${idx}")
-    done
-    local -a sudo_lines=()
-    if [[ " ${sudo_idx[*]} " == *" 0 "* ]]; then
-        sudo_lines+=("systemctl daemon-reload")
-        sudo_lines+=("systemctl enable ${service}.service")
-        sudo_lines+=("systemctl start ${service}.service")
-        sudo_lines+=("systemctl stop ${service}.service")
-        sudo_lines+=("systemctl restart ${service}.service")
-        sudo_lines+=("systemctl status ${service}.service")
-    fi
-    if [[ " ${sudo_idx[*]} " == *" 1 "* ]]; then
-        sudo_lines+=("firewall-cmd *")
-    fi
-    if [[ " ${sudo_idx[*]} " == *" 2 "* ]]; then
-        sudo_lines+=("systemctl status *")
-    fi
-
-    # ---- лимиты / limits
-    local lim
-    wiz::menu lim "Лимиты ресурсов / Resource limits" \
-        "Минимальный / Minimal (nproc=64, nofile=512)" \
-        "Средний / Medium (nproc=128, nofile=4096)" \
-        "Без лимитов / No limits"
-    [[ "${lim}" == "99" ]] && exit 0
-    local nproc nofile
-    case "${lim}" in
-        0) nproc=64;  nofile=512 ;;
-        1) nproc=128; nofile=4096 ;;
-        2) nproc=0;   nofile=0 ;;
-    esac
-
-    # ---- песочница / SELinux / сервис
-    local sandbox selinux svc
-    wiz::yn sandbox "Песочница systemd? / systemd sandbox?"
-    [[ "${sandbox}" == "q" ]] && exit 0
-    wiz::yn selinux "SELinux-контекст? / SELinux context?"
-    [[ "${selinux}" == "q" ]] && exit 0
-    wiz::menu svc "systemd-сервис / systemd service" \
+    # ---- 4. systemd-сервис / service
+    local svc
+    wiz::menu svc "4/6 — systemd-сервис / systemd service" \
         "Создать и запустить / Create and start" \
         "Только создать / Create only" \
         "Не создавать / Do not create"
     [[ "${svc}" == "99" ]] && exit 0
+
+    # ---- 5. усиление / hardening (checkboxes)
+    local hard_pick
+    wiz::multi_menu hard_pick "5/6 — Усиление / Hardening" \
+        "sudo: управление сервисом + firewall-cmd" \
+        "Песочница systemd / systemd sandbox" \
+        "SELinux-контекст / SELinux context"
+    [[ "${hard_pick}" == "q" ]] && exit 0
+    # Индексы храним как массив (Torvalds: никакого substring-матчинга
+    # цифр — "10" ложно матчит "1"). 
+    # Keep indices as an array (Torvalds: no digit-substring matching —
+    # "10" would falsely match "1").
+    local -a hard_idx=()
+    local idx
+    for idx in ${hard_pick}; do
+        hard_idx+=("${idx}")
+    done
+    local want_sudo=0 want_sandbox=0 want_selinux=0
+    [[ " ${hard_idx[*]} " == *" 0 "* ]] && want_sudo=1
+    [[ " ${hard_idx[*]} " == *" 1 "* ]] && want_sandbox=1
+    [[ " ${hard_idx[*]} " == *" 2 "* ]] && want_selinux=1
+
+    # sudoers: управление сервисом + firewall
+    local -a sudo_lines=()
+    if (( want_sudo == 1 )); then
+        if [[ "${svc}" != "2" ]]; then
+            sudo_lines+=("systemctl daemon-reload")
+            sudo_lines+=("systemctl enable ${service}.service")
+            sudo_lines+=("systemctl start ${service}.service")
+            sudo_lines+=("systemctl stop ${service}.service")
+            sudo_lines+=("systemctl restart ${service}.service")
+            sudo_lines+=("systemctl status ${service}.service")
+        fi
+        sudo_lines+=("firewall-cmd *")
+    fi
+
+    # лимиты: фиксированные средние / fixed medium defaults (no question)
+    local -r nproc=128 nofile=4096
 
     # Путь к opencode берём из PATH, не хардкодим /usr/local/bin:
     # сервис должен запускаться на этой машине, а не по догадке
@@ -526,7 +529,7 @@ Creating a restricted user for an AI agent (opencode)"
         "Пароль:               $([[ -n "${ai_pass}" ]] && echo 'сгенерирован / generated' || echo 'без пароля / none')" \
         "sudo-команд:          ${#sudo_lines[@]}" \
         "Лимиты:               nproc=${nproc}, nofile=${nofile}, core=0" \
-        "Песочница:            ${sandbox}   SELinux: ${selinux}" \
+        "Песочница:            $([[ ${want_sandbox} == 1 ]] && echo 'да / yes' || echo 'нет / no')   SELinux: $([[ ${want_selinux} == 1 ]] && echo 'да / yes' || echo 'нет / no')" \
         "systemd-сервис:       $(case ${svc} in 0) echo 'создать+запустить';; 1) echo 'только создать';; 2) echo 'не создавать';; esac)"
     local -i sum_lines=0
     while IFS= read -r _; do sum_lines=$((sum_lines + 1)); done <<< "${summary}"
@@ -605,10 +608,9 @@ Creating a restricted user for an AI agent (opencode)"
         step_ok "sudoers не требуется / no sudoers needed"
     fi
 
-    # ---- лимиты / limits
+    # ---- лимиты / limits (фиксированные средние / fixed medium defaults)
     local limits_file="/etc/security/limits.d/${ai_user}.conf"
-    if [[ "${lim}" != "2" ]]; then
-        step_go "запись лимитов / writing ${limits_file}"
+    step_go "запись лимитов / writing ${limits_file}"
         cat > "${limits_file}" <<EOF
 # Managed by ai_user_wizard / создано визардом
 ${ai_user} soft nproc ${nproc}
@@ -618,11 +620,7 @@ ${ai_user} hard nofile ${nofile}
 ${ai_user} hard core 0
 ${ai_user} soft core 0
 EOF
-        step_ok "лимиты записаны / limits written"
-    else
-        rm -f "${limits_file}"
-        step_ok "лимиты не заданы / no limits"
-    fi
+    step_ok "лимиты записаны / limits written"
 
     # ---- systemd-сервис / service unit
     if [[ "${svc}" != "2" ]]; then
@@ -660,7 +658,7 @@ EOF
             fi
             printf 'ExecStart=%s serve --hostname 0.0.0.0 --port %s\n' "${opencode_bin}" "${port}"
             printf 'Restart=always\n'
-            if [[ "${sandbox}" == "y" ]]; then
+            if (( want_sandbox == 1 )); then
                 printf '\n'
                 printf '# Песочница / Sandbox\n'
                 printf 'ProtectSystem=strict\n'
@@ -684,7 +682,7 @@ EOF
     fi
 
     # ---- SELinux / контекст
-    if [[ "${selinux}" == "y" ]]; then
+    if (( want_selinux == 1 )); then
         step_go "SELinux: fcontext + restorecon"
         if command -v semanage >/dev/null 2>&1; then
             semanage fcontext -a -t httpd_sys_rw_content_t "/srv/${ai_user}(/.*)?"
