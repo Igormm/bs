@@ -96,9 +96,13 @@ wiz::__esc() {
     printf '\033[%s' "${1}"
 }
 
-# @private SGR style on / SGR-стиль вкл (например / e.g. "34m" = blue/синий)
+# @private SGR style on / SGR-стиль вкл (например / e.g. "34" = blue/синий)
+#   'm' добавляем здесь — коды передаются БЕЗ суффикса, иначе терминал
+#   глотает следующие символы как параметры SGR.
+#   'm' is appended here — codes are passed WITHOUT the suffix, otherwise
+#   the terminal eats the following characters as SGR parameters.
 wiz::__sgr() {
-    wiz::__esc "${1}"
+    wiz::__esc "${1}m"
 }
 
 # @private Reset styles / Сброс стилей
@@ -118,7 +122,7 @@ wiz::__goto() {
 
 # @private Blue frame border "│" / Синий бордюр рамки "│"
 wiz::__border() {
-    wiz::__sgr 34m
+    wiz::__sgr 34
     printf '│'
     wiz::__sgr_reset
 }
@@ -128,7 +132,7 @@ wiz::__input_line() {
     wiz::__frame_col
     wiz::__border
     printf ' '
-    wiz::__sgr 33m
+    wiz::__sgr 33
 }
 
 # @private Display width of a string (wide chars count as 2 cells).
@@ -153,7 +157,7 @@ wiz::__rule() {
     local line
     printf -v line '%*s' "${inner}" ''
     wiz::__frame_col
-    wiz::__sgr 34m
+    wiz::__sgr 34
     printf '%s%s%s' "${left}" "${line// /─}" "${right}"
     wiz::__sgr_reset
     printf '\n'
@@ -443,14 +447,14 @@ wiz::gen_pass() {
 
 step_go() {
     printf '  '
-    wiz::__sgr 36m
+    wiz::__sgr 36
     printf '▶'
     wiz::__sgr_reset
     printf ' %s\n' "$1"
 }
 step_ok() {
     printf '  '
-    wiz::__sgr 32m
+    wiz::__sgr 32
     printf '✓'
     wiz::__sgr_reset
     printf ' %s\n' "$1"
@@ -459,6 +463,18 @@ step_ok() {
 # ==========================================
 # Application logic / Логика применения
 # ==========================================
+
+# @private Cancel: leave the alt screen and report the step.
+# @private Отмена: выйти из alt-экрана и сообщить, на каком шаге остановились.
+# @param $1 Step description / Описание шага
+wiz::cancel() {
+    wiz::__restore
+    printf '\n'
+    presentation::warning "Отменено / Cancelled"
+    presentation::info "Остановился на шаге / Stopped at step: ${1}"
+    presentation::info "Ничего не изменено / Nothing was changed"
+    exit 0
+}
 
 # @private Check required tools; abort framed on missing ones.
 # @private Проверить обязательные утилиты; при отсутствии — рамка ошибки.
@@ -536,10 +552,10 @@ main() {
     # ---- 1-2. пользователь и порт / user and port
     local ai_user service port
     wiz::ask_input ai_user "1/6 — Имя пользователя / Username" "ai-agent"
-    [[ "${ai_user}" == "q" ]] && exit 0
+    wiz::cancel "1/6 — имя пользователя / username"
     service="${ai_user}"   # сервис называется как пользователь / service named after the user
     wiz::ask_input port "2/6 — Порт сервера / Server port" "4096"
-    [[ "${port}" == "q" ]] && exit 0
+    wiz::cancel "2/6 — порт / port"
     [[ "${port}" =~ ^[0-9]+$ ]] || wiz::fail "Порт должен быть числом / Port must be a number: ${port}"
     (( port >= 1 && port <= 65535 )) || wiz::fail "Порт вне диапазона 1-65535 / Port out of range 1-65535: ${port}"
 
@@ -549,10 +565,10 @@ main() {
         "Сгенерировать / Generate" \
         "Ввести свой / Enter my own" \
         "Без пароля / No password"
-    [[ "${pass_mode}" == "99" ]] && exit 0
+    wiz::cancel "3/6 — пароль / password"
     case "${pass_mode}" in
         0) ai_pass="$(wiz::gen_pass)" ;;
-        1) wiz::ask_pass ai_pass; [[ "${ai_pass}" == "q" ]] && exit 0 ;;
+        1) wiz::ask_pass ai_pass; [[ "${ai_pass}" == "q" ]] && wiz::cancel "3/6 — пароль / password" ;;
         2) ai_pass="" ;;
     esac
 
@@ -562,7 +578,7 @@ main() {
         "Создать и запустить / Create and start" \
         "Только создать / Create only" \
         "Не создавать / Do not create"
-    [[ "${svc}" == "99" ]] && exit 0
+    wiz::cancel "4/6 — systemd-сервис / service"
 
     # ---- 5. усиление / hardening (checkboxes)
     local hard_pick
@@ -570,7 +586,7 @@ main() {
         "sudo: управление сервисом + firewall-cmd" \
         "Песочница systemd / systemd sandbox" \
         "SELinux-контекст / SELinux context"
-    [[ "${hard_pick}" == "q" ]] && exit 0
+    wiz::cancel "5/6 — усиление / hardening"
     # Индексы храним как массив (Torvalds: никакого substring-матчинга
     # цифр — "10" ложно матчит "1"). 
     # Keep indices as an array (Torvalds: no digit-substring matching —
@@ -641,7 +657,7 @@ main() {
     printf '\n'
     local apply
     wiz::yn apply "Применить настройки? / Apply settings?"
-    [[ "${apply}" == "q" ]] && exit 0
+    wiz::cancel "6/6 — сводка / summary"
     if [[ "${apply}" != "y" ]]; then
         wiz::fail "Отменено пользователем / Cancelled by user"
     fi
