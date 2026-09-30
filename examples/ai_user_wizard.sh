@@ -386,6 +386,26 @@ step_ok() { printf '  \033[32m✓\033[0m %s\n' "$1"; }
 # Application logic / Логика применения
 # ==========================================
 
+# @private Check required tools; abort framed on missing ones.
+# @private Проверить обязательные утилиты; при отсутствии — рамка ошибки.
+# @param $@ Tool names / Имена утилит
+wiz::__check_tools() {
+    local -a missing=()
+    local tool
+    for tool in "$@"; do
+        is::command "${tool}" || missing+=("${tool}")
+    done
+    if (( ${#missing[@]} > 0 )); then
+        local msg="Отсутствуют зависимости / Missing dependencies:"
+        local tool_name
+        for tool_name in "${missing[@]}"; do
+            msg+=$'\n  • '${tool_name}
+        done
+        msg+=$'\nУстановите пакеты и повторите / Install the packages and retry.'
+        wiz::fail "${msg}"
+    fi
+}
+
 # @private Abort with a framed error.
 # @private Прервать с ошибкой в рамке.
 wiz::fail() {
@@ -433,9 +453,7 @@ main() {
 
     # ---- root check / проверка прав
     if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
-        wiz::fail "Требуются права root / Root required.
-  Запустите: sudo bs run examples/ai_user_wizard.sh
-  Run:        sudo bs run examples/ai_user_wizard.sh"
+        wiz::fail $'Требуются права root / Root required.\n  Запустите: sudo bs run examples/ai_user_wizard.sh\n  Run:        sudo bs run examples/ai_user_wizard.sh' 
     fi
 
     wiz::__enter_alt
@@ -509,6 +527,13 @@ main() {
 
     # лимиты: фиксированные средние / fixed medium defaults (no question)
     local -r nproc=128 nofile=4096
+
+    # ---- проверка зависимостей / dependency check
+    local -a need=(id useradd passwd usermod mkdir chown)
+    (( ${#sudo_lines[@]} > 0 )) && need+=(visudo)
+    [[ "${svc}" != "2" ]] && need+=(systemctl)
+    (( want_selinux == 1 )) && need+=(semanage restorecon)
+    wiz::__check_tools "${need[@]}"
 
     # Путь к opencode берём из PATH, не хардкодим /usr/local/bin:
     # сервис должен запускаться на этой машине, а не по догадке
@@ -742,13 +767,27 @@ EOF
     fi
     local -i fin_lines=0
     while IFS= read -r _; do fin_lines=$((fin_lines + 1)); done <<< "${final}"
-    wiz::__frame_begin $((w + 2)) $((fin_lines + 4))
+    wiz::__frame_begin $((w + 2)) $((fin_lines + 5))
     wiz::__rule "${w}" '╭' '╮'
     wiz::__title_row "${w}" "ИТОГ / RESULT"
     wiz::__rule "${w}" '├' '┤'
     wiz::__text "${w}" "${final}"
     wiz::__rule "${w}" '╰' '╯'
-    printf '\n'
+    wiz::__hint "${w}" "  Enter — завершить / to finish"
+    wiz::__read_key >/dev/null
+
+    # Выход из alt-экрана: итог и следующие шаги остаются в терминале.
+    # Leave the alternate screen: the result and next steps stay visible.
+    wiz::__restore
+    printf '\n%s\n' "${final}"
+    printf '\nКак дальше / Next steps:\n'
+    if [[ "${svc}" != "2" ]]; then
+        printf '  sudo systemctl status %s\n' "${service}"
+        printf '  sudo systemctl restart %s\n' "${service}"
+        printf '  sudo systemctl stop %s   # остановить / to stop\n' "${service}"
+    fi
+    printf '  sudo firewall-cmd --add-port=%s/tcp --permanent && sudo firewall-cmd --reload\n' "${port}"
+    printf '  sudo -l -U %s   # какие sudo-права получил пользователь / granted sudo rules\n' "${ai_user}"
 }
 
 main "$@"
