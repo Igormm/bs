@@ -117,15 +117,22 @@ tui::detect_color() {
 }
 
 # @description Terminal size (fallback 80x24) / Размер терминала.
+#   stty size — ioctl по stdin (работает и без TERM); tput — только с TERM.
+#   stty size — ioctl on stdin (works without TERM); tput needs TERM.
 tui::size() {
-  local cols lines
-  if is::command tput; then
+  local cols lines size
+  if is::command stty && size="$(stty size 2>/dev/null)"; then
+    lines="${size%% *}"
+    cols="${size##* }"
+  elif is::command tput; then
     cols="$(tput cols 2>/dev/null || printf 80)"
     lines="$(tput lines 2>/dev/null || printf 24)"
   else
     cols=80
     lines=24
   fi
+  (( cols > 0 )) || cols=80
+  (( lines > 0 )) || lines=24
   TUI_COLS="${cols}"
   TUI_LINES="${lines}"
 }
