@@ -262,15 +262,13 @@ str::join_parts() {
 # ==========================================
 
 tui::buf::clear() {
+  # Пустой буфер: отсутствующие ячейки рендер трактует как пробелы
+  # (${TUI_BUF[${key}]:- }), поэтому нет смысла заполнять сетку 1920
+  # ячейками — это была основная стоимость кадра.
+  # Empty buffer: the render treats missing cells as spaces
+  # (${TUI_BUF[${key}]:- }), so filling the whole grid is pure overhead.
   TUI_BUF=()
   TUI_BUF_STYLE=()
-  local -i r c
-  for (( r = 0; r < TUI_LINES; r++ )); do
-    for (( c = 0; c < TUI_COLS; c++ )); do
-      TUI_BUF["${r},${c}"]=" "
-      TUI_BUF_STYLE["${r},${c}"]=""
-    done
-  done
 }
 
 # @description Put a styled string at (r,c).
