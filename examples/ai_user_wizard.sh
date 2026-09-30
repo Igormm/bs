@@ -556,10 +556,10 @@ main() {
     # ---- 1-2. пользователь и порт / user and port
     local ai_user service port
     wiz::ask_input ai_user "1/6 — Имя пользователя / Username" "ai-agent"
-    wiz::cancel "1/6 — имя пользователя / username"
+    [[ "${ai_user}" == "q" ]] && wiz::cancel "1/6 — имя пользователя / username"
     service="${ai_user}"   # сервис называется как пользователь / service named after the user
     wiz::ask_input port "2/6 — Порт сервера / Server port" "4096"
-    wiz::cancel "2/6 — порт / port"
+    [[ "${port}" == "q" ]] && wiz::cancel "2/6 — порт / port"
     [[ "${port}" =~ ^[0-9]+$ ]] || wiz::fail "Порт должен быть числом / Port must be a number: ${port}"
     (( port >= 1 && port <= 65535 )) || wiz::fail "Порт вне диапазона 1-65535 / Port out of range 1-65535: ${port}"
 
@@ -569,7 +569,7 @@ main() {
         "Сгенерировать / Generate" \
         "Ввести свой / Enter my own" \
         "Без пароля / No password"
-    wiz::cancel "3/6 — пароль / password"
+    [[ "${pass_mode}" == "99" ]] && wiz::cancel "3/6 — пароль / password"
     case "${pass_mode}" in
         0) ai_pass="$(wiz::gen_pass)" ;;
         1) wiz::ask_pass ai_pass; [[ "${ai_pass}" == "q" ]] && wiz::cancel "3/6 — пароль / password" ;;
@@ -582,7 +582,7 @@ main() {
         "Создать и запустить / Create and start" \
         "Только создать / Create only" \
         "Не создавать / Do not create"
-    wiz::cancel "4/6 — systemd-сервис / service"
+    [[ "${svc}" == "99" ]] && wiz::cancel "4/6 — systemd-сервис / service"
 
     # ---- 5. усиление / hardening (checkboxes)
     local hard_pick
@@ -590,7 +590,7 @@ main() {
         "sudo: управление сервисом + firewall-cmd" \
         "Песочница systemd / systemd sandbox" \
         "SELinux-контекст / SELinux context"
-    wiz::cancel "5/6 — усиление / hardening"
+    [[ "${hard_pick}" == "q" ]] && wiz::cancel "5/6 — усиление / hardening"
     # Индексы храним как массив (Torvalds: никакого substring-матчинга
     # цифр — "10" ложно матчит "1"). 
     # Keep indices as an array (Torvalds: no digit-substring matching —
@@ -661,7 +661,7 @@ main() {
     printf '\n'
     local apply
     wiz::yn apply "Применить настройки? / Apply settings?"
-    wiz::cancel "6/6 — сводка / summary"
+    [[ "${apply}" == "q" ]] && wiz::cancel "6/6 — сводка / summary"
     if [[ "${apply}" != "y" ]]; then
         wiz::fail "Отменено пользователем / Cancelled by user"
     fi
