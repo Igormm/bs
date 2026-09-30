@@ -26,14 +26,17 @@ Notes:
 HELP
 }
 
+# Load pre-kernel helpers first: they are dependency-free and bash-3.2-compatible.
+# Bash: BASH_SOURCE[0]; zsh: funcsourcetrace[1] (BASH_SOURCE is empty in zsh).
+__bs_init_file__="${BASH_SOURCE[0]:-${funcsourcetrace[1]%:*}}"
+if [[ -f "$(dirname -- "${__bs_init_file__}")/bs.sh" ]]; then
+  # shellcheck disable=SC1090
+  source "$(dirname -- "${__bs_init_file__}")/bs.sh"
+fi
+
 # If executed directly, warn and exit. We only support bash/zsh.
 # При прямом исполнении — предупредить и выйти. Поддерживаем только bash/zsh.
-# Рантайм-оболочку определяем здесь инлайн (BASH_VERSION/ZSH_VERSION), потому
-# что ядро ещё не загружено; канонические хелперы — bootstrap/bs.sh: bs::shell::*.
-# Runtime shell is detected inline here (BASH_VERSION/ZSH_VERSION) because the
-# kernel is not loaded yet; the canonical helpers live in bootstrap/bs.sh: bs::shell::*.
-if [[ -n "${ZSH_VERSION:-}" && "${ZSH_EVAL_CONTEXT}" == toplevel* ]] ||
-   [[ -n "${BASH_VERSION:-}" && "${BASH_SOURCE[0]}" == "$0" && "${#BASH_SOURCE[@]}" -eq 1 ]]; then
+if ! bs::shell::is_sourced; then
   printf 'ERROR: This script must be sourced, not executed.\n' >&2
   usage
   exit 1
@@ -50,9 +53,7 @@ fi
 if [[ -n "${BS_ROOT:-}" && -d "${BS_ROOT}" ]]; then
   [[ "${BS_DEBUG:-0}" == 1 ]] && printf 'DEBUG: BS_ROOT already set: %s\n' "${BS_ROOT}" >&2
 else
-  # Bash: BASH_SOURCE[0]; zsh: funcsourcetrace[1] (BASH_SOURCE у zsh пуст)
-  __bs_src__="${BASH_SOURCE[0]:-${funcsourcetrace[1]%:*}}"
-  readonly __BS_INIT_DIR__="$(cd -- "$(dirname -- "${__bs_src__}")" >/dev/null 2>&1 && pwd -P)"
+  readonly __BS_INIT_DIR__="$(cd -- "$(dirname -- "${__bs_init_file__}")" >/dev/null 2>&1 && pwd -P)"
   readonly __BS_ROOT_CANDIDATE__="$(cd -- "${__BS_INIT_DIR__}/.." >/dev/null 2>&1 && pwd -P)"
   if [[ -d "${__BS_ROOT_CANDIDATE__}" && -f "${__BS_ROOT_CANDIDATE__}/bs" ]]; then
     export BS_ROOT="${__BS_ROOT_CANDIDATE__}"
@@ -60,17 +61,6 @@ else
     printf 'ERROR: Unable to determine BS_ROOT. Set BS_ROOT environment variable.\n' >&2
     return 1
   fi
-fi
-
-# Pre-kernel root namespace: shell gate and PATH tweak must work BEFORE
-# the loader — bootstrap/bs.sh is dependency-free and bash-3.2-compatible.
-# Pre-kernel namespace: гейт оболочки и PATH-твик обязаны работать ДО
-# loader'а — bootstrap/bs.sh не имеет зависимостей и совместим с bash 3.2.
-if [[ -f "${BS_ROOT}/bootstrap/bs.sh" ]]; then
-  source "${BS_ROOT}/bootstrap/bs.sh"
-else
-  printf 'ERROR: bootstrap/bs.sh not found in BS_ROOT=%s\n' "${BS_ROOT}" >&2
-  return 1
 fi
 
 # Shell version gate before any kernel code runs: runtime detection via

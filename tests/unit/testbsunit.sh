@@ -28,7 +28,7 @@ test_guard() {
 # Test PATH tweak is idempotent / PATH-твик идемпотентен
 test_append_local_bin_to_path() {
     local path_after
-    path_after="$(PATH="/usr/bin:/bin" bs::append_local_bin_to_path; printf '%s' "${PATH}")"
+    path_after="$(PATH="/usr/bin:/bin"; bs::append_local_bin_to_path; printf '%s' "${PATH}")"
     testframework::assert_true "'${path_after}' =~ ^${HOME}/\.local/bin:" "~/.local/bin is prepended once"
 }
 
