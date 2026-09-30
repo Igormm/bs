@@ -190,18 +190,24 @@ load "core/args"
 args::level 1 deploy rollback status
 args::level 2 now later
 args::describe deploy "Deploy the application to servers"
-args::flag env value
-args::flag dry-run
+args::describe rollback "Roll back to the previous release"
+args::describe status "Show deployment status"
+args::describe now "Execute immediately"
+args::describe later "Schedule for the maintenance window"
+args::flag env value staging "enum:staging,prod"  # дефолт + тип / default + type
+args::flag dry-run                                # --dry-run (без значения / no value)
+args::flag retries value 3 number                 # дефолт 3, тип number
 args::flag_describe env "Target environment (staging, production)"
+args::flag_describe dry-run "Print the plan without executing"
+args::required 1
+args::level 3 server...   # server server server ...
 
 if ! args::parse "$@"; then
     bs::exit invalid
 fi
-[[ "${ARGS_HELP_REQUESTED}" == "1" ]] && bs::exit success
-
-action="${ARGS_PARAMS[0]:-status}"
-env="$(args::flag_get env || printf 'staging')"
-log::info "Action: ${action}, env: ${env}"
+if [[ "${ARGS_HELP_REQUESTED}" == "1" ]]; then
+    bs::exit success
+fi
 ```
 
 Run it:
