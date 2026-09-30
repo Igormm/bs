@@ -442,6 +442,18 @@ wz::step_confirm() {
 # ==========================================
 
 main() {
+    # -h/--help: справка без запуска визарда / usage without starting the wizard
+    case "${1:-}" in
+        -h|--help)
+            printf 'Usage: bs run examples/opencode_serve_wizard.sh\n'
+            printf '       ./examples/opencode_serve_wizard.sh\n\n'
+            printf 'Интерактивный визард запуска opencode-сервера (IP → порт → пароль → запуск).\n'
+            printf 'Interactive wizard for starting the opencode server (IP → port → password → run).\n\n'
+            printf 'Keys / Клавиши: ↑/↓ — выбор · Enter — OK · q — отмена/выход\n'
+            exit 0
+            ;;
+    esac
+
     tui::init
     tui::buf::clear
 
