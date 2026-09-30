@@ -48,6 +48,37 @@ wiz::__box_width() {
     printf '%d' "${tw}"
 }
 
+# @private Frame column (0-based) and terminal size (lines, cols).
+# @private Столбец рамки (с 0) и размер терминала (строки, колонки).
+declare -g __WIZ_COL=0 __WIZ_LINES=24 __WIZ_COLS=80
+
+wiz::__term_size() {
+    local size
+    __WIZ_LINES=24
+    __WIZ_COLS=80
+    if is::command stty && size="$(stty size 2>/dev/null)"; then
+        __WIZ_LINES="${size%% *}"
+        __WIZ_COLS="${size##* }"
+    elif is::command tput; then
+        __WIZ_COLS="$(tput cols 2>/dev/null || printf 80)"
+        __WIZ_LINES="$(tput lines 2>/dev/null || printf 24)"
+    fi
+}
+
+# @private Clear and position the cursor at the center of a frame.
+# @private Очистить экран и поставить курсор в центр рамки.
+# @param $1 Frame width / Ширина рамки
+# @param $2 Frame height / Высота рамки
+wiz::__frame_begin() {
+    local -r width="$1" height="$2"
+    wiz::__term_size
+    (( __WIZ_COL = (__WIZ_COLS - width) / 2 ))
+    (( __WIZ_COL < 0 )) && __WIZ_COL=0
+    local -i row=$(( (__WIZ_LINES - height) / 2 ))
+    (( row < 0 )) && row=0
+    printf '\033[2J\033[%d;%dH' "$((row + 1))" "$((__WIZ_COL + 1))"
+}
+
 # @private Display width of a string (wide chars count as 2 cells).
 #   Pure bash: ${#var} counts UTF-8 CHARACTERS (not bytes) with no fork at
 #   all — the earlier wc -m version still forked once per row, and the
@@ -69,7 +100,7 @@ wiz::__rule() {
     local -r inner="$1" left="$2" right="$3"
     local line
     printf -v line '%*s' "${inner}" ''
-    printf '\033[34m%s%s%s\033[0m\n' "${left}" "${line// /─}" "${right}"
+    printf '\033[%dG\033[34m%s%s%s\033[0m\n' "$((__WIZ_COL + 1))" "${left}" "${line// /─}" "${right}"
 }
 
 # @private Frame row with padding (ANSI-aware width). Content longer than the
@@ -88,11 +119,11 @@ wiz::__row() {
     # One printf per row: frame edges, optional color, padding.
     # Один printf на строку: края рамки, опциональный цвет, паддинг.
     if is::not_empty "${color}"; then
-        printf '\033[34m│\033[0m\033[%sm%s\033[0m%*s\033[34m│\033[0m\n' \
-            "${color}" "${text}" "$((inner - ${#text}))" ''
+        printf '\033[%dG\033[34m│\033[0m\033[%sm%s\033[0m%*s\033[34m│\033[0m\n' \
+            "$((__WIZ_COL + 1))" "${color}" "${text}" "$((inner - ${#text}))" ''
     else
-        printf '\033[34m│\033[0m%s%*s\033[34m│\033[0m\n' \
-            "${text}" "$((inner - ${#text}))" ''
+        printf '\033[%dG\033[34m│\033[0m%s%*s\033[34m│\033[0m\n' \
+            "$((__WIZ_COL + 1))" "${text}" "$((inner - ${#text}))" ''
     fi
 }
 
@@ -158,7 +189,7 @@ wiz::menu() {
 
     local selected=0
     while true; do
-        printf '\033[2J\033[H'
+        wiz::__frame_begin $((inner + 2)) $(( ${#items[@]} + 5 ))
         wiz::__rule "${inner}" '╭' '╮'
         wiz::__title_row "${inner}" "${title}"
         wiz::__rule "${inner}" '├' '┤'
@@ -175,8 +206,8 @@ wiz::menu() {
         local key
         key="$(wiz::__read_key)"
         case "${key}" in
-            up)   (( selected = (selected - 1 + ${#items[@]}) % ${#items[@]} )) ;;
-            down) (( selected = (selected + 1) % ${#items[@]} )) ;;
+            up)   selected=$(( (selected - 1 + ${#items[@]}) % ${#items[@]} )) ;;
+            down) selected=$(( (selected + 1) % ${#items[@]} )) ;;
             enter) break ;;
             q)    __wiz_out=99; return 0 ;;
             [1-9])
@@ -207,7 +238,7 @@ wiz::multi_menu() {
 
     local selected=0
     while true; do
-        printf '\033[2J\033[H'
+        wiz::__frame_begin $((inner + 2)) $(( ${#items[@]} + 5 ))
         wiz::__rule "${inner}" '╭' '╮'
         wiz::__title_row "${inner}" "${title}"
         wiz::__rule "${inner}" '├' '┤'
@@ -224,9 +255,9 @@ wiz::multi_menu() {
         wiz::__hint "${inner}" "  ↑/↓ — ход, Space — выбор, Enter — ОК, q — отмена"
 
         case "$(wiz::__read_key)" in
-            up)    (( selected = (selected - 1 + ${#items[@]}) % ${#items[@]} )) ;;
-            down)  (( selected = (selected + 1) % ${#items[@]} )) ;;
-            space) (( checked[selected] = 1 - checked[selected] )) ;;
+            up)    selected=$(( (selected - 1 + ${#items[@]}) % ${#items[@]} )) ;;
+            down)  selected=$(( (selected + 1) % ${#items[@]} )) ;;
+            space) checked[selected]=$(( 1 - checked[selected] )) ;;
             enter) break ;;
             q)     __wiz_out="q"; return 0 ;;
         esac
@@ -249,7 +280,7 @@ wiz::yn() {
     local -r inner="$(wiz::__box_width)"
 
     while true; do
-        printf '\033[2J\033[H'
+        wiz::__frame_begin $((inner + 2)) 6
         wiz::__rule "${inner}" '╭' '╮'
         wiz::__title_row "${inner}" "${question}"
         wiz::__row "${inner}" "    Да / Yes"
@@ -347,7 +378,9 @@ step_ok() { printf '  \033[32m✓\033[0m %s\n' "$1"; }
 # @private Прервать с ошибкой в рамке.
 wiz::fail() {
     local -r inner="$(wiz::__box_width)" msg="$1"
-    printf '\033[2J\033[H'
+    local -i msg_lines=0
+    while IFS= read -r _; do msg_lines=$((msg_lines + 1)); done <<< "${msg}"
+    wiz::__frame_begin $((inner + 2)) $((msg_lines + 4))
     wiz::__rule "${inner}" '╭' '╮'
     wiz::__title_row "${inner}" "Ошибка / Error"
     wiz::__text "${inner}" "${msg}"
@@ -356,6 +389,20 @@ wiz::fail() {
 }
 
 main() {
+    # -h/--help: справка без запуска визарда / usage without starting the wizard
+    case "${1:-}" in
+        -h|--help)
+            printf 'Usage: sudo bs run examples/ai_user_wizard.sh\n'
+            printf '       sudo ./examples/ai_user_wizard.sh\n\n'
+            printf 'Создаёт ограниченного системного пользователя для ИИ-агента (opencode):\n'
+            printf 'заблокированный вход, точечные sudoers, лимиты ресурсов, песочница systemd.\n'
+            printf 'Creates a restricted system user for an AI agent (opencode): locked\n'
+            printf 'login, scoped sudoers, resource limits, optional systemd sandbox.\n\n'
+            printf 'Keys / Клавиши: ↑/↓, 1-9 — выбор · Space — отметить · Enter — OK · q — отмена\n'
+            exit 0
+            ;;
+    esac
+
     signal::on EXIT wiz::__restore
     signal::on INT wiz::__restore
 
@@ -368,6 +415,7 @@ main() {
 
     wiz::__enter_alt
     local -r inner="$(wiz::__box_width)"
+    wiz::__frame_begin $((inner + 2)) 6
     wiz::__rule "${inner}" '╭' '╮'
     wiz::__title_row "${inner}" "AI-пользователь / AI USER WIZARD"
     wiz::__text "${inner}" "
@@ -480,7 +528,9 @@ Creating a restricted user for an AI agent (opencode)"
         "Лимиты:               nproc=${nproc}, nofile=${nofile}, core=0" \
         "Песочница:            ${sandbox}   SELinux: ${selinux}" \
         "systemd-сервис:       $(case ${svc} in 0) echo 'создать+запустить';; 1) echo 'только создать';; 2) echo 'не создавать';; esac)"
-    printf '\033[2J\033[H'
+    local -i sum_lines=0
+    while IFS= read -r _; do sum_lines=$((sum_lines + 1)); done <<< "${summary}"
+    wiz::__frame_begin $((inner + 2)) $((sum_lines + 4))
     wiz::__rule "${inner}" '╭' '╮'
     wiz::__title_row "${inner}" "Сводка / SUMMARY"
     wiz::__rule "${inner}" '├' '┤'
@@ -497,8 +547,8 @@ Creating a restricted user for an AI agent (opencode)"
     # ==========================================
     # ---- применение / apply
     # ==========================================
-    printf '\033[2J\033[H'
     local -r w="$(wiz::__box_width)"
+    wiz::__frame_begin $((w + 2)) 3
     wiz::__rule "${w}" '╭' '╮'
     wiz::__title_row "${w}" "Применение / APPLYING"
     wiz::__rule "${w}" '╰' '╯'
@@ -692,6 +742,9 @@ EOF
             "" \
             "Подключение / Connect: opencode attach http://<ip>:${port}"
     fi
+    local -i fin_lines=0
+    while IFS= read -r _; do fin_lines=$((fin_lines + 1)); done <<< "${final}"
+    wiz::__frame_begin $((w + 2)) $((fin_lines + 4))
     wiz::__rule "${w}" '╭' '╮'
     wiz::__title_row "${w}" "ИТОГ / RESULT"
     wiz::__rule "${w}" '├' '┤'
