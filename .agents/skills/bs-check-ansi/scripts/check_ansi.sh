@@ -91,6 +91,25 @@ else
     done
 fi
 
+# D1. Raw ANSI escapes in printf format strings of examples/ TUI scripts —
+#     must live ONLY in the engine's named primitives (wiz::__esc/__sgr/
+#     __sgr_reset/__frame_col/__goto bodies). C1 says the syntax is fine;
+#     D1 says the wizard code should not carry raw escapes outside the
+#     abstraction layer.
+# D1. Сырые ANSI-эскейпы в format-строках printf examples/-TUI-скриптов —
+#     допустимы ТОЛЬКО в именованных примитивах движка (тела wiz::__esc/
+#     __sgr/__sgr_reset/__frame_col/__goto). C1 — синтаксис корректен;
+#     D1 — вне слоя абстракций сырых эскейпов быть не должно.
+mapfile -t d1 < <(rg -n "printf ['\"]\\\\033" examples --glob '*.sh' 2>/dev/null \
+    | rg -v "\\\\033\[%s|\\\\033\[0m|\\\\033\[%dG|\\\\033\[%d;%dH" || true)
+if [[ ${#d1[@]} -eq 0 ]]; then
+    report OK "${GREEN}" "D1 raw escapes in examples/ printf formats: none (abstracted into engine primitives)"
+else
+    for hit in "${d1[@]}"; do
+        report WARN "${YELLOW}" "D1 ${hit%%:*} :${hit#*:} — raw ANSI in printf format outside the engine primitives; use wiz::__esc/__sgr/__frame_col/__goto (or lib/tui)"
+    done
+fi
+
 printf '\n'
 printf '%-9s %s\n' "CRITICAL" "${crit}"
 printf '%-9s %s\n' "WARN" "${warn}"

@@ -23,13 +23,17 @@ load "lib/ui/presentation"
 # @private Restore the terminal on any exit (panic-safe).
 # @private Восстановить терминал при любом выходе.
 wiz::__restore() {
-    printf '\033[?25h\033[0m\033[?1049l'
+    wiz::__sgr_reset
+    wiz::__esc '?25h'
+    wiz::__esc '?1049l'
 }
 
 # @private Enter the alternate screen buffer (clean full-screen redraws).
 # @private Войти в альтернативный буфер (чистая перерисовка на весь экран).
 wiz::__enter_alt() {
-    printf '\033[?1049h\033[?25l\033[2J'
+    wiz::__esc '?1049h'
+    wiz::__esc '?25l'
+    wiz::__esc '2J'
 }
 
 # @private Terminal width from the real tty (ioctl), clamped to the box range.
@@ -76,7 +80,55 @@ wiz::__frame_begin() {
     (( __WIZ_COL < 0 )) && __WIZ_COL=0
     local -i row=$(( (__WIZ_LINES - height) / 2 ))
     (( row < 0 )) && row=0
-    printf '\033[2J\033[%d;%dH' "$((row + 1))" "$((__WIZ_COL + 1))"
+    wiz::__esc '2J'
+    wiz::__goto "$((row + 1))" "$((__WIZ_COL + 1))"
+}
+
+# @private ANSI primitives / ANSI-примитивы
+#   Сырые эскейпы живут ТОЛЬКО здесь, в именованных помощниках; остальной
+#   код их не содержит (класс D1 в bs-check-ansi).
+#   Raw escapes live ONLY here, in named helpers; the rest of the code has
+#   none (class D1 in bs-check-ansi).
+
+# @private ANSI sequence builder / Сборка ANSI-последовательности
+# @param $1 Код без префикса ESC[ / code without the ESC[ prefix (напр. / e.g. "34m", "2J")
+wiz::__esc() {
+    printf '\033[%s' "${1}"
+}
+
+# @private SGR style on / SGR-стиль вкл (например / e.g. "34m" = blue/синий)
+wiz::__sgr() {
+    wiz::__esc "${1}"
+}
+
+# @private Reset styles / Сброс стилей
+wiz::__sgr_reset() {
+    printf '\033[0m'
+}
+
+# @private Jump to the frame column / Переход в столбец рамки
+wiz::__frame_col() {
+    printf '\033[%dG' "$((__WIZ_COL + 1))"
+}
+
+# @private Cursor to row/col (1-based) / Курсор к строке/столбцу (с 1)
+wiz::__goto() {
+    printf '\033[%d;%dH' "$1" "$2"
+}
+
+# @private Blue frame border "│" / Синий бордюр рамки "│"
+wiz::__border() {
+    wiz::__sgr 34m
+    printf '│'
+    wiz::__sgr_reset
+}
+
+# @private Input line inside the frame / Строка ввода внутри рамки
+wiz::__input_line() {
+    wiz::__frame_col
+    wiz::__border
+    printf ' '
+    wiz::__sgr 33m
 }
 
 # @private Display width of a string (wide chars count as 2 cells).
@@ -100,7 +152,11 @@ wiz::__rule() {
     local -r inner="$1" left="$2" right="$3"
     local line
     printf -v line '%*s' "${inner}" ''
-    printf '\033[%dG\033[34m%s%s%s\033[0m\n' "$((__WIZ_COL + 1))" "${left}" "${line// /─}" "${right}"
+    wiz::__frame_col
+    wiz::__sgr 34m
+    printf '%s%s%s' "${left}" "${line// /─}" "${right}"
+    wiz::__sgr_reset
+    printf '\n'
 }
 
 # @private Frame row with padding (ANSI-aware width). Content longer than the
@@ -116,15 +172,18 @@ wiz::__row() {
         # Обрезаем по числу символов (символы == клетки для глифов рамки).
         text="${text:0:$((inner - 1))}…"
     fi
-    # One printf per row: frame edges, optional color, padding.
-    # Один printf на строку: края рамки, опциональный цвет, паддинг.
+    wiz::__frame_col
+    wiz::__border
     if is::not_empty "${color}"; then
-        printf '\033[%dG\033[34m│\033[0m\033[%sm%s\033[0m%*s\033[34m│\033[0m\n' \
-            "$((__WIZ_COL + 1))" "${color}" "${text}" "$((inner - ${#text}))" ''
+        wiz::__sgr "${color}"
+        printf '%s' "${text}"
+        wiz::__sgr_reset
     else
-        printf '\033[%dG\033[34m│\033[0m%s%*s\033[34m│\033[0m\n' \
-            "$((__WIZ_COL + 1))" "${text}" "$((inner - ${#text}))" ''
+        printf '%s' "${text}"
     fi
+    printf '%*s' "$((inner - ${#text}))" ''
+    wiz::__border
+    printf '\n'
 }
 
 # @private Multi-line text inside a frame.
@@ -314,9 +373,10 @@ wiz::ask_input() {
     wiz::__row "${inner}" "  Введите / Enter [${default}]: " "33"
     wiz::__row "${inner}" ""
     # строка ввода — внутри рамки, до нижней границы / input line inside the frame
-    printf '\033[%dG\033[34m│\033[0m \033[33m' "$((__WIZ_COL + 1))"
+    wiz::__input_line
     IFS= read -r answer || true
-    printf '\033[0m\n'
+    wiz::__sgr_reset
+    printf '\n'
     wiz::__row "${inner}" "  Enter — принять по умолчанию · q — отмена" "90"
     wiz::__rule "${inner}" '╰' '╯' 
 
@@ -342,12 +402,14 @@ wiz::ask_pass() {
         wiz::__row "${inner}" ""
         wiz::__hint "${inner}" "  Ввод скрыт / Input is hidden"
         wiz::__row "${inner}" ""
-        printf '\033[%dG\033[34m│\033[0m \033[33m' "$((__WIZ_COL + 1))"
+        wiz::__input_line
         IFS= read -rs pass1 || true
-        printf '\033[0m\n'
-        printf '\033[%dG\033[34m│\033[0m \033[33m' "$((__WIZ_COL + 1))"
+        wiz::__sgr_reset
+        printf '\n'
+        wiz::__input_line
         IFS= read -rs -p '  Повторите / Repeat: ' pass2 || true
-        printf '\033[0m\n'
+        wiz::__sgr_reset
+        printf '\n'
         wiz::__rule "${inner}" '╰' '╯' 
 
         if [[ "${pass1}" == "${pass2}" && -n "${pass1}" ]]; then
@@ -379,8 +441,20 @@ wiz::gen_pass() {
 # Progress indicators / Индикаторы прогресса
 # ==========================================
 
-step_go() { printf '  \033[36m▶\033[0m %s\n' "$1"; }
-step_ok() { printf '  \033[32m✓\033[0m %s\n' "$1"; }
+step_go() {
+    printf '  '
+    wiz::__sgr 36m
+    printf '▶'
+    wiz::__sgr_reset
+    printf ' %s\n' "$1"
+}
+step_ok() {
+    printf '  '
+    wiz::__sgr 32m
+    printf '✓'
+    wiz::__sgr_reset
+    printf ' %s\n' "$1"
+}
 
 # ==========================================
 # Application logic / Логика применения

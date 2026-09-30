@@ -31,9 +31,17 @@ a printf format string `printf '\033[90m'`.
 | B1 | `echo -e "...'\033..."` | WARN — works but depends on `xpg_echo`; prefer `printf` |
 | C1 | `printf '\033[90m'` (escape in format string) | OK — printf interprets it |
 | C2 | `$'\033[90m'` (ANSI-C quoting) | OK — the project convention |
+| D1 | raw `\033` in `printf` format strings of `examples/` TUI scripts, outside the engine primitives | WARN — the wizard engine must own all escapes in named helpers (`wiz::__esc`/`__sgr`/`__sgr_reset`/`__frame_col`/`__goto` bodies) or use `lib/tui`; allowed escape bodies: `\033[%s`, `\033[0m`, `\033[%dG`, `\033[%d;%dH` |
 
 # Fixing rules
 
+- In `examples/` TUI scripts (wizards, demos): do NOT write raw `\033` into
+  `printf` format strings outside the abstraction layer. The engine owns all
+  escapes in named primitives — `wiz::__esc <code>` (builder), `wiz::__sgr`,
+  `wiz::__sgr_reset`, `wiz::__frame_col`, `wiz::__goto`, `wiz::__border`,
+  `wiz::__input_line` — or use `lib/tui` (`tui::put`/`tui::style`/`tui::cursor_to`).
+  The scanner's D1 class flags every raw `printf '\033...'` outside those
+  bodies (allowed bodies: `\033[%s`, `\033[0m`, `\033[%dG`, `\033[%d;%dH`).
 - Replace `'\033[...'` with `$'\033[...'` (ANSI-C quoting) — single-character change, works in bash 4+.
 - Or move the escape into the printf format string: `printf '\033[90m%s\033[0m\n' "text"`.
 - Never pass an escape as a `%s`/`%b` argument in plain quotes.
