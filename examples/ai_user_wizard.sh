@@ -46,7 +46,7 @@ wiz::__box_width() {
     elif is::command tput; then
         tw="$(tput cols 2>/dev/null || printf 80)"
     fi
-    (( tw = tw - 4 ))
+    tw=$(( tw - 4 ))
     (( tw < 44 )) && tw=44
     (( tw > 76 )) && tw=76
     printf '%d' "${tw}"
@@ -76,7 +76,7 @@ wiz::__term_size() {
 wiz::__frame_begin() {
     local -r width="$1" height="$2"
     wiz::__term_size
-    (( __WIZ_COL = (__WIZ_COLS - width) / 2 ))
+    __WIZ_COL=$(( (__WIZ_COLS - width) / 2 ))
     (( __WIZ_COL < 0 )) && __WIZ_COL=0
     local -i row=$(( (__WIZ_LINES - height) / 2 ))
     (( row < 0 )) && row=0
