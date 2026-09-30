@@ -58,7 +58,7 @@ wiz::__box_width() {
 
 # @private Frame column (0-based) and terminal size (lines, cols).
 # @private Столбец рамки (с 0) и размер терминала (строки, колонки).
-declare -g __WIZ_COL=0 __WIZ_LINES=24 __WIZ_COLS=80
+declare -g __WIZ_COL=0 __WIZ_ROW=0 __WIZ_LINES=24 __WIZ_COLS=80
 
 wiz::__term_size() {
     local size
@@ -84,6 +84,7 @@ wiz::__frame_begin() {
     (( __WIZ_COL < 0 )) && __WIZ_COL=0
     local -i row=$(( (__WIZ_LINES - height) / 2 ))
     (( row < 0 )) && row=0
+    __WIZ_ROW="${row}"
     wiz::__esc '2J'
     wiz::__goto "$((row + 1))" "$((__WIZ_COL + 1))"
 }
@@ -129,14 +130,6 @@ wiz::__border() {
     wiz::__sgr 34
     printf '│'
     wiz::__sgr_reset
-}
-
-# @private Input line inside the frame / Строка ввода внутри рамки
-wiz::__input_line() {
-    wiz::__frame_col
-    wiz::__border
-    printf ' '
-    wiz::__sgr 33
 }
 
 # @private Display width of a string (wide chars count as 2 cells).
@@ -380,13 +373,19 @@ wiz::ask_input() {
     wiz::__row "${inner}" ""
     wiz::__row "${inner}" "  Введите / Enter [${default}]: " "33"
     wiz::__row "${inner}" ""
-    # строка ввода — внутри рамки, до нижней границы / input line inside the frame
-    wiz::__input_line
+    # строка ввода + подсказка + нижняя граница рисуются СРАЗУ — рамка
+    # полная, пока пользователь печатает (иначе низ рамки отсутствует).
+    # input row + hint + bottom border are drawn UP FRONT — the frame is
+    # complete while the user types (otherwise the bottom is missing).
+    wiz::__row "${inner}" "  " "33"
+    wiz::__row "${inner}" "  Enter — принять по умолчанию · q — отмена" "90"
+    wiz::__rule "${inner}" '╰' '╯'
+    # курсор обратно на строку ввода / cursor back to the input row
+    wiz::__goto $((__WIZ_ROW + 6)) $((__WIZ_COL + 2))
+    wiz::__sgr 33m
     IFS= read -r answer || true
     wiz::__sgr_reset
-    printf '\n'
-    wiz::__row "${inner}" "  Enter — принять по умолчанию · q — отмена" "90"
-    wiz::__rule "${inner}" '╰' '╯' 
+    printf '\n' 
 
     case "${answer}" in
         q|Q) __wiz_out="q" ;;
@@ -410,15 +409,16 @@ wiz::ask_pass() {
         wiz::__row "${inner}" ""
         wiz::__hint "${inner}" "  Ввод скрыт / Input is hidden"
         wiz::__row "${inner}" ""
-        wiz::__input_line
+        wiz::__row "${inner}" "  Пароль / Password: " "33"
+        wiz::__row "${inner}" "  Повторите / Repeat: " "33"
+        wiz::__rule "${inner}" '╰' '╯'
+        # курсор на строку ввода пароля / cursor to the password row
+        wiz::__goto $((__WIZ_ROW + 6)) $((__WIZ_COL + 21))
         IFS= read -rs pass1 || true
+        wiz::__goto $((__WIZ_ROW + 7)) $((__WIZ_COL + 22))
+        IFS= read -rs pass2 || true
         wiz::__sgr_reset
-        printf '\n'
-        wiz::__input_line
-        IFS= read -rs -p '  Повторите / Repeat: ' pass2 || true
-        wiz::__sgr_reset
-        printf '\n'
-        wiz::__rule "${inner}" '╰' '╯' 
+        printf '\n' 
 
         if [[ "${pass1}" == "${pass2}" && -n "${pass1}" ]]; then
             __wiz_out="${pass1}"
