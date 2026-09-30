@@ -47,8 +47,12 @@ wiz::__box_width() {
         tw="$(tput cols 2>/dev/null || printf 80)"
     fi
     tw=$(( tw - 4 ))
-    (( tw < 44 )) && tw=44
     (( tw > 76 )) && tw=76
+    # Минимума 44 НЕТ: рамка (inner+2) должна влезать в терминал, иначе
+    # строки переносятся — правая сторона отваливается, низ плывёт.
+    # NO 44 floor: the frame (inner+2) must fit the terminal, otherwise
+    # lines wrap — the right side falls off and the bottom drifts.
+    (( tw < 4 )) && tw=4
     printf '%d' "${tw}"
 }
 
@@ -400,7 +404,7 @@ wiz::ask_pass() {
     local pass1 pass2
 
     while true; do
-        wiz::__frame_begin $((inner + 2)) 9
+        wiz::__frame_begin $((inner + 2)) 8
         wiz::__rule "${inner}" '╭' '╮'
         wiz::__title_row "${inner}" "Пароль сервера / Server password"
         wiz::__row "${inner}" ""
