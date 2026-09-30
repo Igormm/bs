@@ -588,6 +588,15 @@ main() {
     # passwd -l only for a user WE created: locking an existing real
     # user's password is access loss (Thompson: never touch state you
     # didn't create).
+    # Статусы для итоговой таблицы / state labels for the result table
+    local state_user="создан / created" state_sudoers="не требуется / none" \
+          state_limits="записаны / written" state_unit="не создан / skipped" \
+          state_svc="не создан / skipped" state_pass="без пароля / none"
+    case "${pass_mode}" in
+        0) state_pass="сгенерирован / generated" ;;
+        1) state_pass="введён / entered" ;;
+    esac
+
     local user_existed=0
     if ! id "${ai_user}" >/dev/null 2>&1; then
         step_go "useradd -m -s /usr/sbin/nologin ${ai_user}"
@@ -595,6 +604,7 @@ main() {
         step_ok "пользователь создан / user created"
     else
         user_existed=1
+        state_user="существовал / existed"
         step_ok "пользователь существует / user exists"
     fi
 
@@ -611,12 +621,25 @@ main() {
     usermod -aG systemd-journal "${ai_user}"
     step_ok "journal-группа / journal group"
 
+    local -i srv_existed=0
+    [[ -d "/srv/${ai_user}" ]] && srv_existed=1
     mkdir -p "/srv/${ai_user}" && chown "${ai_user}":"${ai_user}" "/srv/${ai_user}"
-    step_ok "/srv/${ai_user} готов / ready"
+    if (( srv_existed == 1 )); then
+        step_ok "/srv/${ai_user} уже существовал / already existed"
+    else
+        step_ok "/srv/${ai_user} готов / ready"
+    fi
 
     # ---- sudoers / sudo-права
     local sudoers_file="/etc/sudoers.d/${ai_user}"
     if (( ${#sudo_lines[@]} > 0 )); then
+        local -i sudoers_existed=0
+        [[ -f "${sudoers_file}" ]] && sudoers_existed=1
+        if (( sudoers_existed == 1 )); then
+            state_sudoers="перезаписан / rewritten"
+        else
+            state_sudoers="записан / written"
+        fi
         step_go "запись sudoers / writing ${sudoers_file}"
         {
             printf '# Managed by ai_user_wizard / создано визардом\n'
@@ -635,6 +658,11 @@ main() {
 
     # ---- лимиты / limits (фиксированные средние / fixed medium defaults)
     local limits_file="/etc/security/limits.d/${ai_user}.conf"
+    local -i limits_existed=0
+    [[ -f "${limits_file}" ]] && limits_existed=1
+    if (( limits_existed == 1 )); then
+        state_limits="уже были / existed"
+    fi
     step_go "запись лимитов / writing ${limits_file}"
         cat > "${limits_file}" <<EOF
 # Managed by ai_user_wizard / создано визардом
@@ -654,7 +682,16 @@ EOF
         fi
         step_go "запись unit / writing /etc/systemd/system/${service}.service"
         local env_file="/srv/${ai_user}/opencode.env"
+        local -i unit_existed=0
+        [[ -f "/etc/systemd/system/${service}.service" ]] && unit_existed=1
+        if (( unit_existed == 1 )); then
+            state_unit="перезаписан / rewritten"
+        else
+            state_unit="создан / created"
+        fi
         if is::not_empty "${ai_pass}"; then
+            local -i env_existed=0
+            [[ -f "${env_file}" ]] && env_existed=1
             # umask в subshell: не меняет umask остального скрипта
             # (Thompson: состояние не должно протекать).
             # umask inside a subshell so it never leaks into the rest
@@ -665,6 +702,10 @@ EOF
             )
             chown root:root "${env_file}"
             chmod 600 "${env_file}"
+            if (( env_existed == 1 )); then
+                state_pass="${state_pass} / ПЕРЕЗАПИСАН / REPLACED"
+                step_go "внимание: пароль ПЕРЕЗАПИСАН / note: password REPLACED (старый пароль недействителен / old password invalid)"
+            fi
             step_ok "пароль в ${env_file} (root:root 600)"
         else
             rm -f "${env_file}"
@@ -697,9 +738,16 @@ EOF
 
         systemctl daemon-reload
         if [[ "${svc}" == "0" ]]; then
-            systemctl enable --now "${service}"
-            step_ok "сервис запущен / service started"
+            if systemctl is-active --quiet "${service}" 2>/dev/null; then
+                state_svc="уже работал / was running"
+                step_ok "сервис уже запущен / service already running"
+            else
+                systemctl enable --now "${service}"
+                state_svc="запущен / started"
+                step_ok "сервис запущен / service started"
+            fi
         else
+            state_svc="создан, не запущен / created, not started"
             step_ok "сервис создан, не запущен / created, not started"
         fi
     else
@@ -779,15 +827,28 @@ EOF
     # Выход из alt-экрана: итог и следующие шаги остаются в терминале.
     # Leave the alternate screen: the result and next steps stay visible.
     wiz::__restore
-    printf '\n%s\n' "${final}"
-    printf '\nКак дальше / Next steps:\n'
+    printf '\n'
+    presentation::success "Готово! / Done! ${ai_user} создан / created"
+    printf '\n'
+    presentation::boxed "${final}" round
+    printf '\n'
+    presentation::table "Компонент / Item:Статус / Status" \
+        "пользователь / user:${state_user}" \
+        "sudoers:${state_sudoers}" \
+        "лимиты / limits:${state_limits}" \
+        "unit:${state_unit}" \
+        "сервис / service:${state_svc}" \
+        "пароль / password:${state_pass}"
+    printf '\n'
+    presentation::info "Как дальше / Next steps:"
     if [[ "${svc}" != "2" ]]; then
-        printf '  sudo systemctl status %s\n' "${service}"
-        printf '  sudo systemctl restart %s\n' "${service}"
-        printf '  sudo systemctl stop %s   # остановить / to stop\n' "${service}"
+        presentation::info "  sudo systemctl status ${service}   # статус / status"
+        presentation::info "  sudo systemctl restart ${service}  # перезапуск / restart"
+        presentation::info "  sudo systemctl stop ${service}     # остановить / to stop"
     fi
-    printf '  sudo firewall-cmd --add-port=%s/tcp --permanent && sudo firewall-cmd --reload\n' "${port}"
-    printf '  sudo -l -U %s   # какие sudo-права получил пользователь / granted sudo rules\n' "${ai_user}"
+    presentation::info "  sudo firewall-cmd --add-port=${port}/tcp --permanent && sudo firewall-cmd --reload"
+    presentation::info "  sudo -l -U ${ai_user}   # выданные sudo-права / granted sudo rules"
+    presentation::warning "Повторный запуск визарда перезапишет файлы и сгенерирует новый пароль / re-running the wizard rewrites files and generates a new password"
 }
 
 main "$@"
