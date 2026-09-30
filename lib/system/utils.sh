@@ -114,6 +114,16 @@ system::utils::get_ip_address() {
     hostname -I | awk '{print $1}'
 }
 
+# @description Get IP address of a specific interface / Получить IP адрес конкретного интерфейса
+# @param $1 Interface name / Имя интерфейса
+# @return IP address string, empty if interface not found / Строка IP адреса, пустая если интерфейс не найден
+# @example
+#   ip_addr=$(system::utils::get_ip_address_for_interface wlan0)
+system::utils::get_ip_address_for_interface() {
+    local -r iface="${1:?interface name required}"
+    ip -4 -o addr show "${iface}" 2>/dev/null | awk '{print $4}' | cut -d/ -f1
+}
+
 # @description Get public IP address / Получить публичный IP
 # @return Public IP address string / Строка публичного IP
 # @example
