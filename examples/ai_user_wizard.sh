@@ -15,6 +15,7 @@
 #   sudo ./examples/ai_user_wizard.sh
 
 load "lib/ui/presentation"
+load "lib/ui/steplog"
 
 # ==========================================
 # Wizard engine / Движок визарда
@@ -385,7 +386,11 @@ wiz::ask_input() {
     wiz::__sgr 33m
     IFS= read -r answer || true
     wiz::__sgr_reset
-    printf '\n' 
+    printf '\n'
+    # стрелки и управляющие последовательности не должны попадать в значение
+    # arrow/control sequences must not land in the value
+    local esc=$'\x1b'
+    answer="$(printf '%s' "${answer}" | sed -E "s/${esc}\[[0-9;]*[A-Za-z]//g")"
 
     case "${answer}" in
         q|Q) __wiz_out="q" ;;
@@ -455,6 +460,7 @@ step_go() {
     printf '▶'
     wiz::__sgr_reset
     printf ' %s\n' "$1"
+    steplog::step "$1"
 }
 step_ok() {
     printf '  '
@@ -462,6 +468,7 @@ step_ok() {
     printf '✓'
     wiz::__sgr_reset
     printf ' %s\n' "$1"
+    steplog::ok "$1"
 }
 
 # ==========================================
@@ -472,12 +479,27 @@ step_ok() {
 # @private Отмена: выйти из alt-экрана и сообщить, на каком шаге остановились.
 # @param $1 Step description / Описание шага
 wiz::cancel() {
+    steplog::warn "Отменено / Cancelled: ${1}"
     wiz::__restore
     printf '\n'
     presentation::warning "Отменено / Cancelled"
     presentation::info "Остановился на шаге / Stopped at step: ${1}"
     presentation::info "Ничего не изменено / Nothing was changed"
     exit 0
+}
+
+# @private Run an apply step; framed error with the command on failure.
+# @private Выполнить шаг применения; при ошибке — рамка с командой.
+# @param $1 Description / Описание
+# @param $@ Command / Команда
+wiz::__apply() {
+    local -r desc="$1"
+    shift
+    if ! "$@"; then
+        wiz::fail "Шаг не выполнен / Step failed: ${desc}
+  Команда / Command: $*
+  Журнал / Log: journalctl -xe"
+    fi
 }
 
 # @private Check required tools; abort framed on missing ones.
@@ -503,6 +525,7 @@ wiz::__check_tools() {
 # @private Abort with a framed error.
 # @private Прервать с ошибкой в рамке.
 wiz::fail() {
+    steplog::error "${1}"
     local -r inner="$(wiz::__box_width)" msg="$1"
     local -i msg_lines=0
     while IFS= read -r _; do msg_lines=$((msg_lines + 1)); done <<< "${msg}"
@@ -515,6 +538,18 @@ wiz::fail() {
 }
 
 main() {
+    # Флаг подробного журнала / verbose flag: --verbose или verbose (без --)
+    local verbose=0
+    case "${1:-}" in
+        --verbose|verbose)
+            verbose=1
+            shift
+            ;;
+    esac
+
+    # Журнал пишется при ЛЮБОМ завершении / the log is written on ANY exit
+    steplog::init "${TMPDIR:-/tmp}/ai_user_wizard.log" "${verbose}"
+
     # -h/--help: справка без запуска визарда / usage without starting the wizard
     case "${1:-}" in
         -h|--help)
@@ -538,11 +573,16 @@ main() {
             printf '  • systemd-unit opencode serve (порт из шага 2), пароль в env root:600\n'
             printf '  • песочница unit (ProtectSystem/PrivateTmp) и SELinux-контекст — по выбору\n\n'
             printf 'Клавиши / Keys: ↑/↓, 1-9 — выбор · Space — отметить · Enter — OK · q — отмена\n'
+            printf '\nПодробный журнал / Verbose log: --verbose (или / or: verbose)\n'
+            printf '  журнал всегда пишется в ${TMPDIR:-/tmp}/ai_user_wizard.log; --verbose\n'
+            printf '  дополнительно выводит строки лога в stderr / the log is always\n'
+            printf '  written to ${TMPDIR:-/tmp}/ai_user_wizard.log; --verbose also prints\n'
+            printf '  log lines to stderr.\n'
             exit 0
             ;;
     esac
 
-    signal::on EXIT wiz::__restore
+    steplog::on_exit wiz::__restore
     signal::on INT wiz::__restore
 
     # ---- root check / проверка прав
@@ -694,7 +734,7 @@ main() {
     local user_existed=0
     if ! id "${ai_user}" >/dev/null 2>&1; then
         step_go "useradd -m -s /usr/sbin/nologin ${ai_user}"
-        useradd -m -s /usr/sbin/nologin "${ai_user}"
+        wiz::__apply "useradd ${ai_user}" useradd -m -s /usr/sbin/nologin "${ai_user}"
         step_ok "пользователь создан / user created"
     else
         user_existed=1
@@ -707,17 +747,18 @@ main() {
         step_ok "существующий пользователь оставлен как есть / existing user left untouched"
     else
         step_go "passwd -l ${ai_user}  (вход по паролю запрещён / password login locked)"
-        passwd -l "${ai_user}"
+        wiz::__apply "passwd -l ${ai_user}" passwd -l "${ai_user}"
         step_ok "пароль заблокирован / password locked"
     fi
 
     step_go "usermod -aG systemd-journal ${ai_user}"
-    usermod -aG systemd-journal "${ai_user}"
+    wiz::__apply "usermod -aG systemd-journal ${ai_user}" usermod -aG systemd-journal "${ai_user}"
     step_ok "journal-группа / journal group"
 
     local -i srv_existed=0
     [[ -d "/srv/${ai_user}" ]] && srv_existed=1
-    mkdir -p "/srv/${ai_user}" && chown "${ai_user}":"${ai_user}" "/srv/${ai_user}"
+    wiz::__apply "mkdir -p /srv/${ai_user}" mkdir -p "/srv/${ai_user}"
+    wiz::__apply "chown /srv/${ai_user}" chown "${ai_user}":"${ai_user}" "/srv/${ai_user}"
     if (( srv_existed == 1 )); then
         step_ok "/srv/${ai_user} уже существовал / already existed"
     else
@@ -830,13 +871,13 @@ EOF
         } > "/etc/systemd/system/${service}.service"
         step_ok "unit записан / unit written"
 
-        systemctl daemon-reload
+        wiz::__apply "systemctl daemon-reload" systemctl daemon-reload
         if [[ "${svc}" == "0" ]]; then
             if systemctl is-active --quiet "${service}" 2>/dev/null; then
                 state_svc="уже работал / was running"
                 step_ok "сервис уже запущен / service already running"
             else
-                systemctl enable --now "${service}"
+                wiz::__apply "systemctl enable --now ${service}.service" systemctl enable --now "${service}"
                 state_svc="запущен / started"
                 step_ok "сервис запущен / service started"
             fi
@@ -852,8 +893,8 @@ EOF
     if (( want_selinux == 1 )); then
         step_go "SELinux: fcontext + restorecon"
         if command -v semanage >/dev/null 2>&1; then
-            semanage fcontext -a -t httpd_sys_rw_content_t "/srv/${ai_user}(/.*)?"
-            restorecon -Rv "/srv/${ai_user}"
+            wiz::__apply "semanage fcontext ${ai_user}" semanage fcontext -a -t httpd_sys_rw_content_t "/srv/${ai_user}(/.*)?"
+            wiz::__apply "restorecon /srv/${ai_user}" restorecon -Rv "/srv/${ai_user}"
             step_ok "контекст применён / context applied"
         else
             step_go "semanage не найден — пропуск / not found, skipped"
@@ -866,6 +907,9 @@ EOF
     # ---- итог / final summary
     # ==========================================
     printf '\n\n'
+    # реальный IP машины для строки подключения / the machine IP for the connect line
+    local -r machine_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+    is::empty "${machine_ip}" && local -r machine_ip="<ip>"
     local final
     if is::not_empty "${ai_pass}"; then
         # Пароль показываем ОДИН раз в конце (Jobs: клиент должен мочь
@@ -890,7 +934,7 @@ EOF
             "  sudo systemctl restart ${service}" \
             "  sudo firewall-cmd --add-port=${port}/tcp --permanent && sudo firewall-cmd --reload" \
             "" \
-            "Подключение / Connect: opencode attach http://<ip>:${port} -u opencode -p '${ai_pass}'"
+            "Подключение / Connect: opencode attach http://${machine_ip}:${port} -u opencode -p '${ai_pass}'"
     else
         printf -v final "%s\n" \
             "Готово! / Done!" \
@@ -905,7 +949,7 @@ EOF
             "  sudo systemctl restart ${service}" \
             "  sudo firewall-cmd --add-port=${port}/tcp --permanent && sudo firewall-cmd --reload" \
             "" \
-            "Подключение / Connect: opencode attach http://<ip>:${port}"
+            "Подключение / Connect: opencode attach http://${machine_ip}:${port}"
     fi
     local -i fin_lines=0
     while IFS= read -r _; do fin_lines=$((fin_lines + 1)); done <<< "${final}"
@@ -934,15 +978,23 @@ EOF
         "сервис / service:${state_svc}" \
         "пароль / password:${state_pass}"
     printf '\n'
-    presentation::info "Как дальше / Next steps:"
+    presentation::info "Что должно работать / What should work:"
     if [[ "${svc}" != "2" ]]; then
+        presentation::info "  opencode serve запущен как systemd-сервис / started as a systemd service"
         presentation::info "  sudo systemctl status ${service}   # статус / status"
         presentation::info "  sudo systemctl restart ${service}  # перезапуск / restart"
-        presentation::info "  sudo systemctl stop ${service}     # остановить / to stop"
+    else
+        presentation::info "  сервис не создан — запусти вручную / no service: run manually"
+        presentation::info "  opencode serve --hostname 0.0.0.0 --port ${port}"
+    fi
+    presentation::info "  Подключение / Connect: opencode attach http://${machine_ip}:${port}"
+    if is::not_empty "${ai_pass}"; then
+        presentation::info "  с паролем / with password: -u opencode -p '${ai_pass}'"
     fi
     presentation::info "  sudo firewall-cmd --add-port=${port}/tcp --permanent && sudo firewall-cmd --reload"
     presentation::info "  sudo -l -U ${ai_user}   # выданные sudo-права / granted sudo rules"
     presentation::warning "Повторный запуск визарда перезапишет файлы и сгенерирует новый пароль / re-running the wizard rewrites files and generates a new password"
+    presentation::info "Журнал / Log: ${STEPLOG_FILE}"
 }
 
 main "$@"
