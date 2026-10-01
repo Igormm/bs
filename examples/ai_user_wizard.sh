@@ -9,7 +9,7 @@
 # Создаёт системного пользователя с минимумом привилегий для ИИ-агента:
 # заблокированный вход, точечные sudoers, лимиты ресурсов, опциональная
 # песочница systemd и SELinux-контекст. Запуск от root. Чистый BS.
-
+#
 # Запуск / Run:
 #   sudo bs run examples/ai_user_wizard.sh
 #   sudo ./examples/ai_user_wizard.sh
@@ -18,534 +18,37 @@
 #   1. sudo bs run examples/ai_user_wizard.sh
 #   2. opencode attach http://<IP>:4096 -u opencode -p '<пароль>'
 #      (подключение с любого компьютера / connect from any machine)
+#
+# Структура / Structure:
+#   0. вступление / intro       — что делает визард, что получите в конце
+#   1. пользователь / username  — под этим пользователем работает сервер
+#   2. порт / port              — по нему подключаетесь: http://IP:порт
+#   3. пароль / password        — сгенерировать / ввести свой / без пароля
+#   4. systemd-сервис / service — юнит /etc/systemd/system/<user>.service
+#   5. усиление / hardening     — sudoers, песочница юнита, SELinux
+#   6. сводка / summary         — подтверждение (включая предупреждение,
+#                                 если юнит уже существует) → применение
+#                                 → итоговая рамка «Что дальше / NEXT»
+#
+# Компоненты фреймворка / Framework components (всё в lib/):
+#   lib/ui/wizard     — движок визарда: рамки, меню, чекбоксы, ввод
+#                       (wizard::menu/multi_menu/yn/ask_input/ask_pass/
+#                       intro/box/alert/fail) — общий для визардов BS
+#   lib/ui/steplog    — журнал шагов: пишется при ЛЮБОМ завершении
+#   lib/system/apply  — выполнение шагов с отчётом об ошибке (apply::run,
+#                       apply::check_tools)
+#   lib/system/user   — провижининг пользователя: useradd/passwd -l/
+#                       группы/лимиты/sudoers с visudo -c (user::*)
+#   lib/system/systemd— юниты: путь/наличие/запись/daemon-reload/
+#                       enable/start/stop/restart/status (systemd::*)
+#   lib/ui/presentation — финальные уведомления и таблица статусов
 
 load "lib/ui/presentation"
 load "lib/ui/steplog"
-
-# ==========================================
-# Wizard engine / Движок визарда
-# ==========================================
-
-# @private Restore the terminal on any exit (panic-safe).
-# @private Восстановить терминал при любом выходе.
-wiz::__restore() {
-    wiz::__sgr_reset
-    wiz::__esc '?25h'
-    wiz::__esc '?1049l'
-}
-
-# @private Enter the alternate screen buffer (clean full-screen redraws).
-# @private Войти в альтернативный буфер (чистая перерисовка на весь экран).
-wiz::__enter_alt() {
-    wiz::__esc '?1049h'
-    wiz::__esc '?25l'
-    wiz::__esc '2J'
-}
-
-# @private Terminal width from the real tty (ioctl), clamped to the box range.
-# @private Ширина терминала из реального tty (ioctl), ограничена диапазоном рамки.
-wiz::__box_width() {
-    local -i tw=80
-    local size
-    if is::command stty && size="$(stty size 2>/dev/null)"; then
-        tw="${size##* }"
-    elif is::command tput; then
-        tw="$(tput cols 2>/dev/null || printf 80)"
-    fi
-    tw=$(( tw - 4 ))
-    (( tw > 76 )) && tw=76
-    # Минимума 44 НЕТ: рамка (inner+2) должна влезать в терминал, иначе
-    # строки переносятся — правая сторона отваливается, низ плывёт.
-    # NO 44 floor: the frame (inner+2) must fit the terminal, otherwise
-    # lines wrap — the right side falls off and the bottom drifts.
-    (( tw < 4 )) && tw=4
-    printf '%d' "${tw}"
-}
-
-# @private Frame column (0-based) and terminal size (lines, cols).
-# @private Столбец рамки (с 0) и размер терминала (строки, колонки).
-declare -g __WIZ_COL=0 __WIZ_ROW=0 __WIZ_LINES=24 __WIZ_COLS=80
-
-wiz::__term_size() {
-    local size
-    __WIZ_LINES=24
-    __WIZ_COLS=80
-    if is::command stty && size="$(stty size 2>/dev/null)"; then
-        __WIZ_LINES="${size%% *}"
-        __WIZ_COLS="${size##* }"
-    elif is::command tput; then
-        __WIZ_COLS="$(tput cols 2>/dev/null || printf 80)"
-        __WIZ_LINES="$(tput lines 2>/dev/null || printf 24)"
-    fi
-}
-
-# @private Clear and position the cursor at the center of a frame.
-# @private Очистить экран и поставить курсор в центр рамки.
-# @param $1 Frame width / Ширина рамки
-# @param $2 Frame height / Высота рамки
-wiz::__frame_begin() {
-    local -r width="$1" height="$2"
-    wiz::__term_size
-    __WIZ_COL=$(( (__WIZ_COLS - width) / 2 ))
-    (( __WIZ_COL < 0 )) && __WIZ_COL=0
-    local -i row=$(( (__WIZ_LINES - height) / 2 ))
-    (( row < 0 )) && row=0
-    __WIZ_ROW="${row}"
-    wiz::__esc '2J'
-    wiz::__goto "$((row + 1))" "$((__WIZ_COL + 1))"
-}
-
-# @private ANSI primitives / ANSI-примитивы
-#   Сырые эскейпы живут ТОЛЬКО здесь, в именованных помощниках; остальной
-#   код их не содержит (класс D1 в bs-check-ansi).
-#   Raw escapes live ONLY here, in named helpers; the rest of the code has
-#   none (class D1 in bs-check-ansi).
-
-# @private ANSI sequence builder / Сборка ANSI-последовательности
-# @param $1 Код без префикса ESC[ / code without the ESC[ prefix (напр. / e.g. "34m", "2J")
-wiz::__esc() {
-    printf '\033[%s' "${1}"
-}
-
-# @private SGR style on / SGR-стиль вкл (например / e.g. "34" = blue/синий)
-#   'm' добавляем здесь — коды передаются БЕЗ суффикса, иначе терминал
-#   глотает следующие символы как параметры SGR.
-#   'm' is appended here — codes are passed WITHOUT the suffix, otherwise
-#   the terminal eats the following characters as SGR parameters.
-wiz::__sgr() {
-    wiz::__esc "${1}m"
-}
-
-# @private Reset styles / Сброс стилей
-wiz::__sgr_reset() {
-    printf '\033[0m'
-}
-
-# @private Jump to the frame column / Переход в столбец рамки
-wiz::__frame_col() {
-    printf '\033[%dG' "$((__WIZ_COL + 1))"
-}
-
-# @private Cursor to row/col (1-based) / Курсор к строке/столбцу (с 1)
-wiz::__goto() {
-    printf '\033[%d;%dH' "$1" "$2"
-}
-
-# @private Blue frame border "│" / Синий бордюр рамки "│"
-wiz::__border() {
-    wiz::__sgr 34
-    printf '│'
-    wiz::__sgr_reset
-}
-
-# @private Display width of a string (wide chars count as 2 cells).
-#   Pure bash: ${#var} counts UTF-8 CHARACTERS (not bytes) with no fork at
-#   all — the earlier wc -m version still forked once per row, and the
-#   original per-char `printf|wc -c` loop forked per character (~5-15 ms
-#   per row). Box glyphs (▶ ○ ● ✓ ╭ ╰) are 3-byte, 1-cell chars, so
-#   chars == cells. Wide East-Asian chars would need a table lookup.
-# @private Ширина строки на экране (широкие символы — 2 клетки).
-#   Чистый bash: ${#var} считает UTF-8 СИМВОЛЫ (не байты) вообще без
-#   форков — wc -m всё ещё форкал раз на строку, а исходный цикл
-#   `printf|wc -c` — на каждый символ (~5-15 мс на строку). Символы рамки
-#   (▶ ○ ● ✓ ╭ ╰) — 3-байтные, 1 клетка: символы == клетки.
-wiz::__disp_width() {
-    printf '%d' "${#1}"
-}
-
-# @private Frame rule: ╭────╮ / ├────┤ / ╰────╯
-# @private Линия рамки: ╭────╮ / ├────┤ / ╰────╯
-wiz::__rule() {
-    local -r inner="$1" left="$2" right="$3"
-    local line
-    printf -v line '%*s' "${inner}" ''
-    wiz::__frame_col
-    wiz::__sgr 34
-    printf '%s%s%s' "${left}" "${line// /─}" "${right}"
-    wiz::__sgr_reset
-    printf '\n'
-}
-
-# @private Frame row with padding (ANSI-aware width). Content longer than the
-#   inner width is truncated with "…" so the frame never breaks.
-# @private Строка рамки с паддингом (ширина с учётом ANSI). Контент длиннее
-#   внутренней ширины обрезается с "…" — рамка никогда не рвётся.
-# @param $1 Inner width, $2 Content, $3 [optional] ANSI color code
-wiz::__row() {
-    local -r inner="$1" content="$2" color="${3:-}"
-    local text="${content}"
-    if (( ${#text} > inner )); then
-        # Truncate by char count (chars == cells for box glyphs).
-        # Обрезаем по числу символов (символы == клетки для глифов рамки).
-        text="${text:0:$((inner - 1))}…"
-    fi
-    wiz::__frame_col
-    wiz::__border
-    if is::not_empty "${color}"; then
-        wiz::__sgr "${color}"
-        printf '%s' "${text}"
-        wiz::__sgr_reset
-    else
-        printf '%s' "${text}"
-    fi
-    printf '%*s' "$((inner - ${#text}))" ''
-    wiz::__border
-    printf '\n'
-}
-
-# @private Multi-line text inside a frame.
-# @private Многострочный текст внутри рамки.
-wiz::__text() {
-    local -r inner="$1"
-    local line
-    while IFS= read -r line; do
-        wiz::__row "${inner}" "${line}"
-    done <<< "${2}"
-}
-
-# @private Green title row.
-# @private Строка-заголовок зелёным.
-wiz::__title_row() {
-    local -r inner="$1" title="$2"
-    wiz::__row "${inner}" "${title}" "1;32"
-}
-
-# @private Dim hint row.
-# @private Затемнённая подсказка.
-wiz::__hint() {
-    wiz::__row "$1" "$2" "90"
-}
-
-# @private Read one key, decoding arrows + digits + q.
-# @private Прочитать клавишу: стрелки + цифры + q.
-# @stdout up|down|enter|space|q|1..9|other
-wiz::__read_key() {
-    local key
-    IFS= read -rsn1 key
-    if [[ "${key}" == $'\e' ]]; then
-        local seq
-        IFS= read -rsn2 -t 0.1 seq || true
-        case "${seq}" in
-            '[A') printf 'up' ;;
-            '[B') printf 'down' ;;
-            *) printf 'esc' ;;
-        esac
-        return
-    fi
-    case "${key}" in
-        '') printf 'enter' ;;
-        ' ') printf 'space' ;;
-        q|Q) printf 'q' ;;
-        [1-9]) printf '%s' "${key}" ;;
-        *) printf '%s' "${key}" ;;
-    esac
-}
-
-# @description Single-choice menu with arrows, digits 1-9, q to cancel.
-# @description Меню с одним выбором: стрелки, цифры 1-9, q — отмена.
-# @param $1 Output variable: selected index (0-based), 99 = cancelled
-# @param $2 Title / Заголовок
-# @param $3 [optional] Explanation row / Строка-пояснение
-# @param $@ Items / Пункты
-wiz::menu() {
-    local -n __wiz_out="${1:?output variable required}"
-    local -r title="${2:?title required}"
-    local -r desc="${3:-}"
-    shift 3
-    local -a items=("$@")
-    local -r inner="$(wiz::__box_width)"
-    local -i frame_h=$(( ${#items[@]} + 5 ))
-    is::not_empty "${desc}" && frame_h=$(( frame_h + 1 ))
-
-    local selected=0
-    while true; do
-        wiz::__frame_begin $((inner + 2)) ${frame_h}
-        wiz::__rule "${inner}" '╭' '╮'
-        wiz::__title_row "${inner}" "${title}"
-        if is::not_empty "${desc}"; then
-            wiz::__hint "${inner}" "${desc}"
-        fi
-        wiz::__rule "${inner}" '├' '┤'
-        for i in "${!items[@]}"; do
-            if (( i == selected )); then
-                wiz::__row "${inner}" "  ▶ ${items[i]}" "36"
-            else
-                wiz::__row "${inner}" "    ${items[i]}"
-            fi
-        done
-        wiz::__rule "${inner}" '╰' '╯'
-        wiz::__hint "${inner}" "  ↑/↓, 1-9 — выбор, Enter — OK, q — отмена"
-
-        local key
-        key="$(wiz::__read_key)"
-        case "${key}" in
-            up)   selected=$(( (selected - 1 + ${#items[@]}) % ${#items[@]} )) ;;
-            down) selected=$(( (selected + 1) % ${#items[@]} )) ;;
-            enter) break ;;
-            q)    __wiz_out=99; return 0 ;;
-            [1-9])
-                if (( key >= 1 && key <= ${#items[@]} )); then
-                    __wiz_out=$((key - 1)); return 0
-                fi
-                ;;
-        esac
-    done
-
-    __wiz_out=${selected}
-}
-
-# @description Multi-choice menu (checkboxes): Space toggles, Enter confirms.
-# @description Меню множественного выбора (чекбоксы): Space — выбор, Enter — ОК.
-# @param $1 Output variable: indices joined by space, "q" = cancelled
-# @param $2 Title / Заголовок
-# @param $3 [optional] Explanation row / Строка-пояснение
-# @param $@ Items / Пункты
-wiz::multi_menu() {
-    local -n __wiz_out="${1:?output variable required}"
-    local -r title="${2:?title required}"
-    local -r desc="${3:-}"
-    shift 3
-    local -a items=("$@")
-    local -a checked=()
-    local i
-    for i in "${!items[@]}"; do checked+=(0); done
-    local -r inner="$(wiz::__box_width)"
-    local -i frame_h=$(( ${#items[@]} + 5 ))
-    is::not_empty "${desc}" && frame_h=$(( frame_h + 1 ))
-
-    local selected=0
-    while true; do
-        wiz::__frame_begin $((inner + 2)) ${frame_h}
-        wiz::__rule "${inner}" '╭' '╮'
-        wiz::__title_row "${inner}" "${title}"
-        if is::not_empty "${desc}"; then
-            wiz::__hint "${inner}" "${desc}"
-        fi
-        wiz::__rule "${inner}" '├' '┤'
-        for i in "${!items[@]}"; do
-            local mark='○'
-            (( checked[i] == 1 )) && mark='●'
-            if (( i == selected )); then
-                wiz::__row "${inner}" "  ${mark} ${items[i]}" "36"
-            else
-                wiz::__row "${inner}" "  ${mark} ${items[i]}"
-            fi
-        done
-        wiz::__rule "${inner}" '╰' '╯'
-        wiz::__hint "${inner}" "  ↑/↓ — ход, Space — выбор, Enter — ОК, q — отмена"
-
-        case "$(wiz::__read_key)" in
-            up)    selected=$(( (selected - 1 + ${#items[@]}) % ${#items[@]} )) ;;
-            down)  selected=$(( (selected + 1) % ${#items[@]} )) ;;
-            space) checked[selected]=$(( 1 - checked[selected] )) ;;
-            enter) break ;;
-            q)     __wiz_out="q"; return 0 ;;
-        esac
-    done
-
-    local -a picked_idx=()
-    for i in "${!items[@]}"; do
-        (( checked[i] == 1 )) && picked_idx+=("${i}")
-    done
-    __wiz_out="${picked_idx[*]:-}"
-}
-
-# @description Yes/No question inside a frame.
-# @description Вопрос Да/Нет в рамке.
-# @param $1 Output variable: y|n|q
-# @param $2 Question / Вопрос
-wiz::yn() {
-    local -n __wiz_out="${1:?output variable required}"
-    local -r question="$2"
-    local -r inner="$(wiz::__box_width)"
-
-    while true; do
-        wiz::__frame_begin $((inner + 2)) 6
-        wiz::__rule "${inner}" '╭' '╮'
-        wiz::__title_row "${inner}" "${question}"
-        wiz::__row "${inner}" "    Да / Yes"
-        wiz::__row "${inner}" "    Нет / No"
-        wiz::__rule "${inner}" '╰' '╯'
-        wiz::__hint "${inner}" "  y/n или 1/2 — ответ, q — отмена"
-
-        case "$(wiz::__read_key)" in
-            y|Y|1) __wiz_out="y"; return 0 ;;
-            n|N|2) __wiz_out="n"; return 0 ;;
-            q)     __wiz_out="q"; return 0 ;;
-        esac
-    done
-}
-
-# @description Welcome screen: what the wizard does and what you get.
-# @description Вступление: что делает визард и что вы получите.
-# @return 0 start / начать, 1 cancelled / отмена
-wiz::intro() {
-    local -r inner="$(wiz::__box_width)"
-    local -a lines=(
-        "Этот визард запускает opencode-сервер на этой машине:"
-        "This wizard runs an opencode server on this machine:"
-        ""
-        "  • создаёт системного пользователя (вход по паролю запрещён)"
-        "    creates a system user (password login locked)"
-        "  • запускает opencode serve как systemd-сервис"
-        "    runs opencode serve as a systemd service"
-        "  • в конце выдаёт команду подключения — копируйте и работайте"
-        "    prints the connect command at the end — copy and go"
-        ""
-        "Всё по умолчанию — просто жмите Enter."
-        "All defaults — just press Enter."
-    )
-    while true; do
-        wiz::__frame_begin $((inner + 2)) $(( ${#lines[@]} + 4 ))
-        wiz::__rule "${inner}" '╭' '╮'
-        wiz::__title_row "${inner}" "Что это / WHAT THIS IS"
-        wiz::__rule "${inner}" '├' '┤'
-        local line
-        for line in "${lines[@]}"; do
-            wiz::__row "${inner}" "${line}"
-        done
-        wiz::__rule "${inner}" '╰' '╯'
-        wiz::__hint "${inner}" "  Enter — начать / to start · q — отмена / cancel"
-
-        case "$(wiz::__read_key)" in
-            enter|y|Y) return 0 ;;
-            q)         return 1 ;;
-        esac
-    done
-}
-
-# @description Text input with a default value.
-# @description Текстовый ввод со значением по умолчанию.
-# @param $1 Output variable / Выходная переменная
-# @param $2 Prompt / Приглашение
-# @param $3 Default / Значение по умолчанию
-# @param $4 [optional] Explanation row / Строка-пояснение
-wiz::ask_input() {
-    local -n __wiz_out="${1:?output variable required}"
-    local -r prompt="$2" default="${3:-}" desc="${4:-}"
-    local -r inner="$(wiz::__box_width)"
-    local -i frame_h=8
-    is::not_empty "${desc}" && frame_h=$(( frame_h + 1 ))
-    local answer
-    # строка ввода зависит от наличия пояснения / input row shifts with the desc
-    local -i input_row=6
-    is::not_empty "${desc}" && input_row=7
-
-    wiz::__frame_begin $((inner + 2)) ${frame_h}
-    wiz::__rule "${inner}" '╭' '╮'
-    wiz::__title_row "${inner}" "${prompt}"
-    if is::not_empty "${desc}"; then
-        wiz::__hint "${inner}" "${desc}"
-    fi
-    wiz::__row "${inner}" ""
-    wiz::__row "${inner}" "  Введите / Enter [${default}]: " "33"
-    wiz::__row "${inner}" ""
-    # строка ввода + подсказка + нижняя граница рисуются СРАЗУ — рамка
-    # полная, пока пользователь печатает (иначе низ рамки отсутствует).
-    # input row + hint + bottom border are drawn UP FRONT — the frame is
-    # complete while the user types (otherwise the bottom is missing).
-    wiz::__row "${inner}" "  " "33"
-    wiz::__row "${inner}" "  Enter — принять по умолчанию · q — отмена" "90"
-    wiz::__rule "${inner}" '╰' '╯'
-    # курсор обратно на строку ввода / cursor back to the input row
-    wiz::__goto $((__WIZ_ROW + input_row)) $((__WIZ_COL + 2))
-    wiz::__sgr 33m
-    IFS= read -r answer || true
-    wiz::__sgr_reset
-    printf '\n'
-    # стрелки и управляющие последовательности не должны попадать в значение
-    # arrow/control sequences must not land in the value
-    local esc=$'\x1b'
-    answer="$(printf '%s' "${answer}" | sed -E "s/${esc}\[[0-9;]*[A-Za-z]//g")"
-
-    case "${answer}" in
-        q|Q) __wiz_out="q" ;;
-        '')  __wiz_out="${default}" ;;
-        *)   __wiz_out="${answer}" ;;
-    esac
-}
-
-# @description Hidden password input with confirmation (retries until match).
-# @description Скрытый ввод пароля с подтверждением (до совпадения).
-# @param $1 Output variable / Выходная переменная
-# @param $2 [optional] Explanation row / Строка-пояснение
-wiz::ask_pass() {
-    local -n __wiz_out="${1:?output variable required}"
-    local -r desc="${2:-}"
-    local -r inner="$(wiz::__box_width)"
-    local -i frame_h=8
-    is::not_empty "${desc}" && frame_h=$(( frame_h + 1 ))
-    # строка ввода зависит от наличия пояснения / input row shifts with the desc
-    local -i pass_row=6
-    is::not_empty "${desc}" && pass_row=7
-    local pass1 pass2
-
-    while true; do
-        wiz::__frame_begin $((inner + 2)) ${frame_h}
-        wiz::__rule "${inner}" '╭' '╮'
-        wiz::__title_row "${inner}" "Пароль сервера / Server password"
-        if is::not_empty "${desc}"; then
-            wiz::__hint "${inner}" "${desc}"
-        fi
-        wiz::__row "${inner}" ""
-        wiz::__hint "${inner}" "  Ввод скрыт / Input is hidden"
-        wiz::__row "${inner}" ""
-        wiz::__row "${inner}" "  Пароль / Password: " "33"
-        wiz::__row "${inner}" "  Повторите / Repeat: " "33"
-        wiz::__rule "${inner}" '╰' '╯'
-        # курсор на строку ввода пароля / cursor to the password row
-        wiz::__goto $((__WIZ_ROW + pass_row)) $((__WIZ_COL + 21))
-        IFS= read -rs pass1 || true
-        wiz::__goto $((__WIZ_ROW + pass_row + 1)) $((__WIZ_COL + 22))
-        IFS= read -rs pass2 || true
-        wiz::__sgr_reset
-        printf '\n' 
-
-        if [[ "${pass1}" == "${pass2}" && -n "${pass1}" ]]; then
-            __wiz_out="${pass1}"
-            return 0
-        fi
-        if is::empty "${pass1}"; then
-            __wiz_out=""
-            return 0
-        fi
-        wiz::__row "${inner}" "  Пароли не совпали / Passwords do not match" "31"
-        wiz::__row "${inner}" "  Enter — повторить / to retry" "90"
-        IFS= read -rsn1 || true
-    done
-}
-
-# ==========================================
-# @private Generate a password / Сгенерировать пароль
-# @stdout password / пароль
-wiz::gen_pass() {
-    if is::command openssl; then
-        openssl rand -base64 18 | tr '+/' '_-'
-    else
-        tr -dc 'A-Za-z0-9_-' < /dev/urandom | head -c 18
-        printf '\n'
-    fi
-}
-
-# Progress indicators / Индикаторы прогресса
-# ==========================================
-
-step_go() {
-    printf '  '
-    wiz::__sgr 36
-    printf '▶'
-    wiz::__sgr_reset
-    printf ' %s\n' "$1"
-    steplog::step "$1"
-}
-step_ok() {
-    printf '  '
-    wiz::__sgr 32
-    printf '✓'
-    wiz::__sgr_reset
-    printf ' %s\n' "$1"
-    steplog::ok "$1"
-}
+load "lib/ui/wizard"
+load "lib/system/apply"
+load "lib/system/systemd"
+load "lib/system/user"
 
 # ==========================================
 # Application logic / Логика применения
@@ -554,9 +57,9 @@ step_ok() {
 # @private Cancel: leave the alt screen and report the step.
 # @private Отмена: выйти из alt-экрана и сообщить, на каком шаге остановились.
 # @param $1 Step description / Описание шага
-wiz::cancel() {
+aiw::cancel() {
     steplog::warn "Отменено / Cancelled: ${1}"
-    wiz::__restore
+    wizard::__restore
     printf '\n'
     presentation::warning "Отменено / Cancelled"
     presentation::info "Остановился на шаге / Stopped at step: ${1}"
@@ -565,14 +68,18 @@ wiz::cancel() {
 }
 
 # @private Run an apply step; framed error with the command on failure.
+#   Обёртка над apply::run (логирует шаг/команду/подсказку про журнал) —
+#   визуальная часть остаётся у визарда: рамка ошибки + exit 1.
 # @private Выполнить шаг применения; при ошибке — рамка с командой.
+#   Wraps apply::run (logs step/command/journal hint); the visual part stays
+#   with the wizard: an error frame + exit 1.
 # @param $1 Description / Описание
 # @param $@ Command / Команда
-wiz::__apply() {
+aiw::apply() {
     local -r desc="$1"
     shift
-    if ! "$@"; then
-        wiz::fail "Шаг не выполнен / Step failed: ${desc}
+    if ! apply::run "${desc}" "$@"; then
+        aiw::fail "Шаг не выполнен / Step failed: ${desc}
   Команда / Command: $*
   Журнал / Log: journalctl -xe"
     fi
@@ -581,36 +88,40 @@ wiz::__apply() {
 # @private Check required tools; abort framed on missing ones.
 # @private Проверить обязательные утилиты; при отсутствии — рамка ошибки.
 # @param $@ Tool names / Имена утилит
-wiz::__check_tools() {
-    local -a missing=()
-    local tool
-    for tool in "$@"; do
-        is::command "${tool}" || missing+=("${tool}")
-    done
-    if (( ${#missing[@]} > 0 )); then
-        local msg="Отсутствуют зависимости / Missing dependencies:"
-        local tool_name
-        for tool_name in "${missing[@]}"; do
-            msg+=$'\n  • '${tool_name}
-        done
-        msg+=$'\nУстановите пакеты и повторите / Install the packages and retry.'
-        wiz::fail "${msg}"
+aiw::check_tools() {
+    if ! apply::check_tools "$@"; then
+        aiw::fail "Отсутствуют зависимости / Missing dependencies.
+Установите пакеты и повторите / Install the packages and retry."
     fi
 }
 
-# @private Abort with a framed error.
-# @private Прервать с ошибкой в рамке.
-wiz::fail() {
+# @private Abort with a framed error (logged first).
+# @private Прервать с ошибкой в рамке (сначала — в журнал).
+aiw::fail() {
     steplog::error "${1}"
-    local -r inner="$(wiz::__box_width)" msg="$1"
-    local -i msg_lines=0
-    while IFS= read -r _; do msg_lines=$((msg_lines + 1)); done <<< "${msg}"
-    wiz::__frame_begin $((inner + 2)) $((msg_lines + 4))
-    wiz::__rule "${inner}" '╭' '╮'
-    wiz::__title_row "${inner}" "Ошибка / Error"
-    wiz::__text "${inner}" "${msg}"
-    wiz::__rule "${inner}" '╰' '╯'
-    exit 1
+    wizard::fail "${1}"
+}
+
+# ==========================================
+# Progress indicators / Индикаторы прогресса
+#   step_go/step_ok — вывод в терминал + запись в журнал шагов.
+# ==========================================
+
+step_go() {
+    printf '  '
+    wizard::__sgr 36
+    printf '▶'
+    wizard::__sgr_reset
+    printf ' %s\n' "$1"
+    steplog::step "$1"
+}
+step_ok() {
+    printf '  '
+    wizard::__sgr 32
+    printf '✓'
+    wizard::__sgr_reset
+    printf ' %s\n' "$1"
+    steplog::ok "$1"
 }
 
 main() {
@@ -652,6 +163,8 @@ main() {
             printf '  2. Порт сервера / Server port          (default: 4096)\n'
             printf '  3. Пароль / Password                   сгенерировать / ввести свой / без пароля\n'
             printf '  4. systemd-сервис / Service            создать+запустить / только создать / не создавать\n'
+            printf '     юнит: /etc/systemd/system/<user>.service; пароль — в /srv/<user>/opencode.env (root:600)\n'
+            printf '     unit: /etc/systemd/system/<user>.service; password — in /srv/<user>/opencode.env (root:600)\n'
             printf '  5. Усиление / Hardening                sudo для сервиса+firewall, песочница, SELinux\n'
             printf '  6. Сводка / Summary → подтверждение → применение\n\n'
             printf 'Что делает / What it does:\n'
@@ -660,6 +173,9 @@ main() {
             printf '  • sudoers (по выбору): systemctl сервиса + firewall-cmd\n'
             printf '  • systemd-unit opencode serve (порт из шага 2), пароль в env root:600\n'
             printf '  • песочница unit (ProtectSystem/PrivateTmp) и SELinux-контекст — по выбору\n\n'
+            printf 'Если юнит уже существует — визард предупредит и покажет его текущий\n'
+            printf 'ExecStart перед перезаписью / If the unit already exists the wizard\n'
+            printf 'warns and shows its current ExecStart before rewriting it.\n\n'
             printf 'Клавиши / Keys: ↑/↓, 1-9 — выбор · Space — отметить · Enter — OK · q — отмена\n'
             printf '\nПодробный журнал / Verbose log: --verbose (или / or: verbose)\n'
             printf '  журнал всегда пишется в ${TMPDIR:-/tmp}/ai_user_wizard.log; --verbose\n'
@@ -673,63 +189,108 @@ main() {
     # Журнал пишется при ЛЮБОМ завершении / the log is written on ANY exit
     steplog::init "${TMPDIR:-/tmp}/ai_user_wizard.log" "${verbose}"
 
-    steplog::on_exit wiz::__restore
-    signal::on INT wiz::__restore
+    # Терминал восстанавливается при любом выходе (хук steplog + SIGINT)
+    # The terminal is restored on ANY exit (steplog hook + SIGINT)
+    steplog::on_exit wizard::__restore
+    signal::on INT wizard::__restore
 
     # ---- root check / проверка прав
     if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
-        wiz::fail $'Требуются права root / Root required.\n  Запустите: sudo bs run examples/ai_user_wizard.sh\n  Run:        sudo bs run examples/ai_user_wizard.sh' 
+        aiw::fail $'Требуются права root / Root required.\n  Запустите: sudo bs run examples/ai_user_wizard.sh\n  Run:        sudo bs run examples/ai_user_wizard.sh'
     fi
 
-    wiz::__enter_alt
-    local -r inner="$(wiz::__box_width)"
-
     # ---- 0. вступление / intro: что это и что получится в конце
-    wiz::intro || wiz::cancel "0/6 — вступление / intro"
+    wizard::__enter_alt
+    local -a intro_lines=(
+        "Этот визард запускает opencode-сервер на этой машине:"
+        "This wizard runs an opencode server on this machine:"
+        ""
+        "  • создаёт системного пользователя (вход по паролю запрещён)"
+        "    creates a system user (password login locked)"
+        "  • запускает opencode serve как systemd-сервис"
+        "    runs opencode serve as a systemd service"
+        "  • в конце выдаёт команду подключения — копируйте и работайте"
+        "    prints the connect command at the end — copy and go"
+        ""
+        "Всё по умолчанию — просто жмите Enter."
+        "All defaults — just press Enter."
+    )
+    wizard::intro "Что это / WHAT THIS IS" "${intro_lines[@]}" || aiw::cancel "0/6 — вступление / intro"
 
     # ---- 1-2. пользователь и порт / user and port
+    # Пользователь: сервер будет работать ПОД этим пользователем; вход по
+    # паролю запрещён (nologin) — зайти «как он» нельзя, только sudo-правила
+    # из шага 5. Сервис systemd называется так же, как пользователь.
+    # Username: the server runs AS this user; password login is locked
+    # (nologin) — you cannot log in as them, only the sudo rules from step 5.
+    # The systemd service is named after the user.
     local ai_user service port
-    wiz::ask_input ai_user "1/6 — Имя пользователя / Username" "ai-agent" \
+    wizard::ask_input ai_user "1/6 — Имя пользователя / Username" "ai-agent" \
         "Под этим пользователем работает сервер / The server runs as this user"
-    [[ "${ai_user}" == "q" ]] && wiz::cancel "1/6 — имя пользователя / username"
+    [[ "${ai_user}" == "q" ]] && aiw::cancel "1/6 — имя пользователя / username"
     service="${ai_user}"   # сервис называется как пользователь / service named after the user
-    wiz::ask_input port "2/6 — Порт сервера / Server port" "4096" \
+
+    # Порт: по нему вы подключаетесь — http://IP:порт. Тот же порт попадает
+    # в ExecStart юнита и в правило firewall из шага 5.
+    # Port: you connect via http://IP:port. The same port goes into the unit
+    # ExecStart and the firewall rule from step 5.
+    wizard::ask_input port "2/6 — Порт сервера / Server port" "4096" \
         "По этому порту вы подключитесь: http://IP:порт / Connect via http://IP:port"
-    [[ "${port}" == "q" ]] && wiz::cancel "2/6 — порт / port"
-    [[ "${port}" =~ ^[0-9]+$ ]] || wiz::fail "Порт должен быть числом / Port must be a number: ${port}"
-    (( port >= 1 && port <= 65535 )) || wiz::fail "Порт вне диапазона 1-65535 / Port out of range 1-65535: ${port}"
+    [[ "${port}" == "q" ]] && aiw::cancel "2/6 — порт / port"
+    [[ "${port}" =~ ^[0-9]+$ ]] || aiw::fail "Порт должен быть числом / Port must be a number: ${port}"
+    (( port >= 1 && port <= 65535 )) || aiw::fail "Порт вне диапазона 1-65535 / Port out of range 1-65535: ${port}"
 
     # ---- 3. пароль / password
+    # Пароль защищает подключение к серверу (basic auth); без него
+    # подключиться сможет любой, кто дотянется до порта. Вариант «ввести
+    # свой» — ask_pass с подтверждением и маской; «без пароля» помечен
+    # НЕБЕЗОПАСНО. Пароль живёт в env-файле root:600 и показывается один раз.
+    # Password protects server connections (basic auth); without it anyone
+    # who can reach the port can connect. "Enter my own" — ask_pass with
+    # confirmation and masking; "No password" is marked UNSECURED. The
+    # password lives in a root:600 env file and is shown once.
     local pass_mode ai_pass=""
-    wiz::menu pass_mode "3/6 — Пароль сервера / Server password" \
+    wizard::menu pass_mode "3/6 — Пароль сервера / Server password" \
         "Пароль для подключения к серверу / Server access password" \
         "Сгенерировать / Generate" \
         "Ввести свой / Enter my own" \
         "Без пароля (НЕБЕЗОПАСНО / UNSECURED)"
-    [[ "${pass_mode}" == "99" ]] && wiz::cancel "3/6 — пароль / password"
+    [[ "${pass_mode}" == "99" ]] && aiw::cancel "3/6 — пароль / password"
     case "${pass_mode}" in
-        0) ai_pass="$(wiz::gen_pass)" ;;
-        1) wiz::ask_pass ai_pass "Пароль для подключения к серверу / Password used to connect to the server"; [[ "${ai_pass}" == "q" ]] && wiz::cancel "3/6 — пароль / password" ;;
+        0) ai_pass="$(wizard::gen_pass)" ;;
+        1) wizard::ask_pass ai_pass "Пароль для подключения к серверу / Password used to connect to the server"; [[ "${ai_pass}" == "q" ]] && aiw::cancel "3/6 — пароль / password" ;;
         2) ai_pass="" ;;
     esac
 
     # ---- 4. systemd-сервис / service
+    # Юнит /etc/systemd/system/<user>.service: systemd сам запускает сервер,
+    # в т.ч. после перезагрузки, и перезапускает при падении (Restart=always).
+    # Пароль передаётся через EnvironmentFile (root:600), а не в ExecStart.
+    # Unit /etc/systemd/system/<user>.service: systemd runs the server itself,
+    # also after reboot, and restarts it on crash (Restart=always). The
+    # password is passed via EnvironmentFile (root:600), not in ExecStart.
     local svc
-    wiz::menu svc "4/6 — systemd-сервис / systemd service" \
+    wizard::menu svc "4/6 — systemd-сервис / systemd service" \
         "systemd сам запускает сервер, в т.ч. после перезагрузки / systemd runs the server, also after reboot" \
         "Создать и запустить / Create and start" \
         "Только создать / Create only" \
         "Не создавать / Do not create"
-    [[ "${svc}" == "99" ]] && wiz::cancel "4/6 — systemd-сервис / service"
+    [[ "${svc}" == "99" ]] && aiw::cancel "4/6 — systemd-сервис / service"
 
     # ---- 5. усиление / hardening (checkboxes)
+    # Всё необязательно: (0) sudoers — пользователь сможет сам управлять
+    # сервисом и firewall-cmd без пароля; (1) песочница юнита — ProtectSystem/
+    # PrivateTmp, сервер видит только свои каталоги; (2) SELinux-контекст.
+    # All optional: (0) sudoers — the user can manage the service and
+    # firewall-cmd without a password; (1) unit sandbox — ProtectSystem/
+    # PrivateTmp, the server sees only its own dirs; (2) SELinux context.
     local hard_pick
-    wiz::multi_menu hard_pick "5/6 — Усиление / Hardening" \
+    wizard::multi_menu hard_pick "5/6 — Усиление / Hardening" \
         "Дополнительная защита — всё необязательно / Extra protection — all optional" \
         "sudo: управление сервисом + firewall-cmd" \
         "Песочница systemd / systemd sandbox" \
         "SELinux-контекст / SELinux context"
-    [[ "${hard_pick}" == "q" ]] && wiz::cancel "5/6 — усиление / hardening"
+    [[ "${hard_pick}" == "q" ]] && aiw::cancel "5/6 — усиление / hardening"
     # Индексы храним как массив (Torvalds: никакого substring-матчинга
     # цифр — "10" ложно матчит "1"). 
     # Keep indices as an array (Torvalds: no digit-substring matching —
@@ -745,6 +306,10 @@ main() {
     [[ " ${hard_idx[*]} " == *" 2 "* ]] && want_selinux=1
 
     # sudoers: управление сервисом + firewall
+    # Правила вида "<user> ALL=(root) NOPASSWD: <команда>" — пользователь
+    # может запускать ТОЛЬКО эти команды от root, и без пароля.
+    # Rules "<user> ALL=(root) NOPASSWD: <command>" — the user can run ONLY
+    # these commands as root, and without a password.
     local -a sudo_lines=()
     if (( want_sudo == 1 )); then
         if [[ "${svc}" != "2" ]]; then
@@ -762,11 +327,14 @@ main() {
     local -r nproc=128 nofile=4096
 
     # ---- проверка зависимостей / dependency check
+    # Проверяем ДО ввода пользователем — провал на середине применения
+    # оставил бы систему в полуготовом состоянии.
+    # Checked BEFORE apply — a mid-apply failure would leave a half-done state.
     local -a need=(id useradd passwd usermod mkdir chown)
     (( ${#sudo_lines[@]} > 0 )) && need+=(visudo)
     [[ "${svc}" != "2" ]] && need+=(systemctl)
     (( want_selinux == 1 )) && need+=(semanage restorecon)
-    wiz::__check_tools "${need[@]}"
+    aiw::check_tools "${need[@]}"
 
     # Путь к opencode берём из PATH, не хардкодим /usr/local/bin:
     # сервис должен запускаться на этой машине, а не по догадке
@@ -779,40 +347,54 @@ main() {
         opencode_bin="$(command -v opencode)"
     fi
 
-    # ---- сводка / summary
+    # ---- 6. сводка / summary
+    # Перед подтверждением — предупреждение, если юнит уже существует:
+    # пользователь должен ЗНАТЬ, что файл перезапишется и что в нём сейчас
+    # (текущий ExecStart) — иначе «перезаписал и забыл».
+    # Before confirmation — a warning if the unit already exists: the user
+    # must KNOW the file will be rewritten and what is in it now (current
+    # ExecStart) — otherwise "rewrote and forgot".
+    local -a unit_warn=()
+    if [[ "${svc}" != "2" ]] && systemd::unit_exists "${service}"; then
+        local -r unit_path="$(systemd::unit_path "${service}")"
+        local -r cur_exec="$(systemd::unit_execstart "${service}")"
+        unit_warn+=("${unit_path} уже существует / already exists")
+        if is::not_empty "${cur_exec}"; then
+            unit_warn+=("ExecStart сейчас / currently: ${cur_exec}")
+        fi
+        unit_warn+=("Файл будет ПЕРЕЗАПИСАН / the file will be REWRITTEN")
+        if ! wizard::alert "$(printf '%s\n' "${unit_warn[@]}")" "Внимание / ATTENTION"; then
+            aiw::cancel "6/6 — предупреждение о юните / unit warning"
+        fi
+    fi
+
+    # Сводка — всё, что будет создано/изменено, одним списком.
+    # The summary — everything that will be created/changed, in one list.
     local summary
     printf -v summary "%s\n" \
         "Пользователь / User:  ${ai_user}" \
         "Сервис / Service:     ${service}  (порт ${port})" \
+        "Юнит / Unit:          /etc/systemd/system/${service}.service" \
         "Пароль:               $([[ -n "${ai_pass}" ]] && echo 'сгенерирован / generated' || echo 'без пароля / none')" \
         "sudo-команд:          ${#sudo_lines[@]}" \
         "Лимиты:               nproc=${nproc}, nofile=${nofile}, core=0" \
         "Песочница:            $([[ ${want_sandbox} == 1 ]] && echo 'да / yes' || echo 'нет / no')   SELinux: $([[ ${want_selinux} == 1 ]] && echo 'да / yes' || echo 'нет / no')" \
         "systemd-сервис:       $(case ${svc} in 0) echo 'создать+запустить';; 1) echo 'только создать';; 2) echo 'не создавать';; esac)"
-    local -i sum_lines=0
-    while IFS= read -r _; do sum_lines=$((sum_lines + 1)); done <<< "${summary}"
-    wiz::__frame_begin $((inner + 2)) $((sum_lines + 4))
-    wiz::__rule "${inner}" '╭' '╮'
-    wiz::__title_row "${inner}" "Сводка / SUMMARY"
-    wiz::__rule "${inner}" '├' '┤'
-    wiz::__text "${inner}" "${summary}"
-    wiz::__rule "${inner}" '╰' '╯'
-    printf '\n'
     local apply
-    wiz::yn apply "Применить настройки? / Apply settings?"
-    [[ "${apply}" == "q" ]] && wiz::cancel "6/6 — сводка / summary"
+    wizard::yn apply "Применить настройки? / Apply settings?" "${summary}"
+    [[ "${apply}" == "q" ]] && aiw::cancel "6/6 — сводка / summary"
     if [[ "${apply}" != "y" ]]; then
-        wiz::fail "Отменено пользователем / Cancelled by user"
+        aiw::fail "Отменено пользователем / Cancelled by user"
     fi
 
     # ==========================================
     # ---- применение / apply
+    # Каждый шаг: step_go (▶ в терминал + журнал) → действие → step_ok (✓).
+    # Every step: step_go (▶ to the terminal + log) → action → step_ok (✓).
     # ==========================================
-    local -r w="$(wiz::__box_width)"
-    wiz::__frame_begin $((w + 2)) 3
-    wiz::__rule "${w}" '╭' '╮'
-    wiz::__title_row "${w}" "Применение / APPLYING"
-    wiz::__rule "${w}" '╰' '╯'
+    local -r w="$(wizard::__box_width)"
+    wizard::box "Применение / APPLYING" "Выполняется… / Running…
+Пароль будет показан один раз в конце / the password is shown once at the end."
     printf '\n'
 
     # passwd -l только для СОЗДАННОГО пользователя: блокировка пароля
@@ -830,10 +412,15 @@ main() {
         1) state_pass="введён / entered" ;;
     esac
 
+    # ---- пользователь / user
+    # useradd: системный пользователь с домашним каталогом и БЕЗ шелла
+    # (/usr/sbin/nologin) — вход по паролю невозможен в принципе.
+    # useradd: a system user with a home dir and NO shell (/usr/sbin/nologin)
+    # — password login is impossible by design.
     local user_existed=0
-    if ! id "${ai_user}" >/dev/null 2>&1; then
+    if ! user::exists "${ai_user}"; then
         step_go "useradd -m -s /usr/sbin/nologin ${ai_user}"
-        wiz::__apply "useradd ${ai_user}" useradd -m -s /usr/sbin/nologin "${ai_user}"
+        aiw::apply "useradd ${ai_user}" user::create "${ai_user}"
         step_ok "пользователь создан / user created"
     else
         user_existed=1
@@ -841,23 +428,29 @@ main() {
         step_ok "пользователь существует / user exists"
     fi
 
+    # Блокировка пароля только для созданного нами пользователя.
+    # Password locking only for the user WE created.
     if (( user_existed == 1 )); then
         step_go "ПРЕДУПРЕЖДЕНИЕ: ${ai_user} уже существует — вход НЕ блокируем / login NOT locked"
         step_ok "существующий пользователь оставлен как есть / existing user left untouched"
     else
         step_go "passwd -l ${ai_user}  (вход по паролю запрещён / password login locked)"
-        wiz::__apply "passwd -l ${ai_user}" passwd -l "${ai_user}"
+        aiw::apply "passwd -l ${ai_user}" user::lock_password "${ai_user}"
         step_ok "пароль заблокирован / password locked"
     fi
 
+    # Группа systemd-journal: сервер сможет читать свой журнал (journalctl -u).
+    # The systemd-journal group: the server can read its own journal.
     step_go "usermod -aG systemd-journal ${ai_user}"
-    wiz::__apply "usermod -aG systemd-journal ${ai_user}" usermod -aG systemd-journal "${ai_user}"
+    aiw::apply "usermod -aG systemd-journal ${ai_user}" user::add_group "${ai_user}" systemd-journal
     step_ok "journal-группа / journal group"
 
+    # Рабочий каталог сервера: /srv/<user> принадлежит пользователю.
+    # The server working dir: /srv/<user> owned by the user.
     local -i srv_existed=0
     [[ -d "/srv/${ai_user}" ]] && srv_existed=1
-    wiz::__apply "mkdir -p /srv/${ai_user}" mkdir -p "/srv/${ai_user}"
-    wiz::__apply "chown /srv/${ai_user}" chown "${ai_user}":"${ai_user}" "/srv/${ai_user}"
+    aiw::apply "mkdir -p /srv/${ai_user}" mkdir -p "/srv/${ai_user}"
+    aiw::apply "chown /srv/${ai_user}" chown "${ai_user}":"${ai_user}" "/srv/${ai_user}"
     if (( srv_existed == 1 )); then
         step_ok "/srv/${ai_user} уже существовал / already existed"
     else
@@ -865,7 +458,11 @@ main() {
     fi
 
     # ---- sudoers / sudo-права
-    local sudoers_file="/etc/sudoers.d/${ai_user}"
+    # Файл /etc/sudoers.d/<user> (chmod 440) проверяется visudo -c; при
+    # неудаче проверки модуль сам откатывает файл — sudo не сломается.
+    # /etc/sudoers.d/<user> (chmod 440) is verified with visudo -c; the
+    # user module reverts the file on failure — sudo will not break.
+    local sudoers_file="${BS_SUDOERS_DIR}/${ai_user}"
     if (( ${#sudo_lines[@]} > 0 )); then
         local -i sudoers_existed=0
         [[ -f "${sudoers_file}" ]] && sudoers_existed=1
@@ -875,15 +472,7 @@ main() {
             state_sudoers="записан / written"
         fi
         step_go "запись sudoers / writing ${sudoers_file}"
-        {
-            printf '# Managed by ai_user_wizard / создано визардом\n'
-            local line
-            for line in "${sudo_lines[@]}"; do
-                printf '%s ALL=(root) NOPASSWD: %s\n' "${ai_user}" "${line}"
-            done
-        } > "${sudoers_file}"
-        chmod 440 "${sudoers_file}"
-        visudo -c -f "${sudoers_file}" || { rm -f "${sudoers_file}"; wiz::fail "visudo -c не прошёл / failed — файл откачен / reverted"; }
+        aiw::apply "запись sudoers / writing" user::write_sudoers "${ai_user}" "${sudo_lines[@]}"
         step_ok "sudoers записан и проверен / written and verified"
     else
         rm -f "${sudoers_file}"
@@ -891,45 +480,49 @@ main() {
     fi
 
     # ---- лимиты / limits (фиксированные средние / fixed medium defaults)
-    local limits_file="/etc/security/limits.d/${ai_user}.conf"
+    # /etc/security/limits.d/<user>.conf: nproc=128, nofile=4096, core=0 —
+    # сервер не сможет исчерпать ресурсы машины.
+    # /etc/security/limits.d/<user>.conf: nproc=128, nofile=4096, core=0 —
+    # the server cannot exhaust the machine's resources.
+    local limits_file="${BS_LIMITS_DIR}/${ai_user}.conf"
     local -i limits_existed=0
     [[ -f "${limits_file}" ]] && limits_existed=1
     if (( limits_existed == 1 )); then
         state_limits="уже были / existed"
     fi
     step_go "запись лимитов / writing ${limits_file}"
-        cat > "${limits_file}" <<EOF
-# Managed by ai_user_wizard / создано визардом
-${ai_user} soft nproc ${nproc}
-${ai_user} hard nproc ${nproc}
-${ai_user} soft nofile ${nofile}
-${ai_user} hard nofile ${nofile}
-${ai_user} hard core 0
-${ai_user} soft core 0
-EOF
+        aiw::apply "запись лимитов / writing" user::write_limits "${ai_user}" "${nproc}" "${nofile}" >/dev/null
     step_ok "лимиты записаны / limits written"
 
     # ---- systemd-сервис / service unit
+    # Юнит: [Unit] — порядок запуска; [Service] — под кем и как запускать;
+    # песочница — отдельным блоком по выбору. ExecStart — opencode serve на
+    # порту из шага 2; пароль — через EnvironmentFile, НЕ в командной строке.
+    # Unit: [Unit] — boot ordering; [Service] — as whom and how to run; the
+    # sandbox is a separate optional block. ExecStart — opencode serve on the
+    # port from step 2; the password — via EnvironmentFile, NOT on the CLI.
     if [[ "${svc}" != "2" ]]; then
         if is::empty "${opencode_bin}"; then
-            wiz::fail "opencode не найден в PATH / opencode not found in PATH — сервис не создан / service not created"
+            aiw::fail "opencode не найден в PATH / opencode not found in PATH — сервис не создан / service not created"
         fi
-        step_go "запись unit / writing /etc/systemd/system/${service}.service"
         local env_file="/srv/${ai_user}/opencode.env"
         local -i unit_existed=0
-        [[ -f "/etc/systemd/system/${service}.service" ]] && unit_existed=1
+        [[ -f "${BS_SYSTEMD_UNIT_DIR}/${service}.service" ]] && unit_existed=1
         if (( unit_existed == 1 )); then
             state_unit="перезаписан / rewritten"
         else
             state_unit="создан / created"
         fi
+
+        # env-файл: umask в subshell — права 600, пароль не утечёт в другие
+        # процессы; владелец root (сервис читает его как root). Повторный
+        # запуск ПЕРЕЗАПИСЫВАЕТ пароль — старый перестаёт действовать.
+        # env file: umask in a subshell — mode 600, the password does not
+        # leak into other processes; owned by root (the service reads it as
+        # root). A re-run REPLACES the password — the old one stops working.
         if is::not_empty "${ai_pass}"; then
             local -i env_existed=0
             [[ -f "${env_file}" ]] && env_existed=1
-            # umask в subshell: не меняет umask остального скрипта
-            # (Thompson: состояние не должно протекать).
-            # umask inside a subshell so it never leaks into the rest
-            # of the script (Thompson: no state leakage).
             (
                 umask 177
                 printf 'OPENCODE_SERVER_PASSWORD=%s\n' "${ai_pass}" > "${env_file}"
@@ -945,38 +538,55 @@ EOF
             rm -f "${env_file}"
         fi
 
-        {
-            printf '[Unit]\n'
-            printf 'Description=opencode server for %s\n' "${ai_user}"
-            printf 'After=network.target\n\n'
-            printf '[Service]\n'
-            printf 'User=%s\n' "${ai_user}"
-            printf 'Group=%s\n' "${ai_user}"
-            printf 'WorkingDirectory=/srv/%s\n' "${ai_user}"
-            if is::not_empty "${ai_pass}"; then
-                printf 'EnvironmentFile=%s\n' "${env_file}"
-            fi
-            printf 'ExecStart=%s serve --hostname 0.0.0.0 --port %s\n' "${opencode_bin}" "${port}"
-            printf 'Restart=always\n'
-            if (( want_sandbox == 1 )); then
-                printf '\n'
-                printf '# Песочница / Sandbox\n'
-                printf 'ProtectSystem=strict\n'
-                printf 'ProtectHome=read-only\n'
-                printf 'ReadWritePaths=/srv/%s /home/%s\n' "${ai_user}" "${ai_user}"
-                printf 'PrivateTmp=true\n'
-                printf 'LimitNOFILE=%s\n' "${nofile}"
-            fi
-        } > "/etc/systemd/system/${service}.service"
+        # Сборка содержимого юнита (без пароля в командной строке).
+        # Unit content assembly (no password on the command line).
+        local -a unit_lines=(
+            '[Unit]'
+            "Description=opencode server for ${ai_user}"
+            'After=network.target'
+            ''
+            '[Service]'
+            "User=${ai_user}"
+            "Group=${ai_user}"
+            "WorkingDirectory=/srv/${ai_user}"
+        )
+        if is::not_empty "${ai_pass}"; then
+            unit_lines+=("EnvironmentFile=${env_file}")
+        fi
+        unit_lines+=("ExecStart=${opencode_bin} serve --hostname 0.0.0.0 --port ${port}")
+        unit_lines+=('Restart=always')
+        if (( want_sandbox == 1 )); then
+            # Песочница: сервер видит только /srv/<user> и /home/<user>,
+            # / — read-only, tmp — приватный.
+            # Sandbox: the server sees only /srv/<user> and /home/<user>,
+            # / is read-only, tmp is private.
+            unit_lines+=(
+                ''
+                '# Песочница / Sandbox'
+                'ProtectSystem=strict'
+                'ProtectHome=read-only'
+                "ReadWritePaths=/srv/${ai_user} /home/${ai_user}"
+                'PrivateTmp=true'
+                "LimitNOFILE=${nofile}"
+            )
+        fi
+        local unit
+        printf -v unit '%s\n' "${unit_lines[@]}"
+
+        step_go "запись unit / writing ${BS_SYSTEMD_UNIT_DIR}/${service}.service"
+        aiw::apply "запись unit / writing" systemd::unit_write "${service}" "${unit}"
         step_ok "unit записан / unit written"
 
-        wiz::__apply "systemctl daemon-reload" systemctl daemon-reload
+        # Перезагрузка конфигурации systemd — без неё новый юнит не виден.
+        # Reloading the systemd configuration — without it the new unit is
+        # not visible.
+        aiw::apply "systemctl daemon-reload" systemd::daemon_reload
         if [[ "${svc}" == "0" ]]; then
-            if systemctl is-active --quiet "${service}" 2>/dev/null; then
+            if systemd::unit_running "${service}"; then
                 state_svc="уже работал / was running"
                 step_ok "сервис уже запущен / service already running"
             else
-                wiz::__apply "systemctl enable --now ${service}.service" systemctl enable --now "${service}"
+                aiw::apply "systemctl enable --now ${service}.service" systemd::unit_enable_now "${service}"
                 state_svc="запущен / started"
                 step_ok "сервис запущен / service started"
             fi
@@ -989,11 +599,17 @@ EOF
     fi
 
     # ---- SELinux / контекст
+    # fcontext + restorecon: каталог /srv/<user> получает контекст, в котором
+    # серверу разрешено писать (httpd_sys_rw_content_t — де-факто стандарт
+    # для веб/серверных каталогов в SELinux).
+    # fcontext + restorecon: /srv/<user> gets a context the server is
+    # allowed to write (httpd_sys_rw_content_t — the de-facto standard for
+    # web/server dirs under SELinux).
     if (( want_selinux == 1 )); then
         step_go "SELinux: fcontext + restorecon"
         if command -v semanage >/dev/null 2>&1; then
-            wiz::__apply "semanage fcontext ${ai_user}" semanage fcontext -a -t httpd_sys_rw_content_t "/srv/${ai_user}(/.*)?"
-            wiz::__apply "restorecon /srv/${ai_user}" restorecon -Rv "/srv/${ai_user}"
+            aiw::apply "semanage fcontext ${ai_user}" semanage fcontext -a -t httpd_sys_rw_content_t "/srv/${ai_user}(/.*)?"
+            aiw::apply "restorecon /srv/${ai_user}" restorecon -Rv "/srv/${ai_user}"
             step_ok "контекст применён / context applied"
         else
             step_go "semanage не найден — пропуск / not found, skipped"
@@ -1004,67 +620,92 @@ EOF
 
     # ==========================================
     # ---- итог / final summary
+    # Рамка «Что дальше / NEXT»: подключение первым, затем управление
+    # сервисом и файлы. Пароль — один раз, отдельной строкой (не обрезается
+    # рамкой).
+    # The "NEXT" frame: connect first, then service control and files. The
+    # password — once, on its own line (never clipped by the frame).
     # ==========================================
     printf '\n\n'
     # реальный IP машины для строки подключения / the machine IP for the connect line
     local -r machine_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
     is::empty "${machine_ip}" && local -r machine_ip="<ip>"
-    local final
+
+    local -a final_lines=(
+        "Готово! Сервер запущен / Done! The server is running"
+        ""
+        "Что дальше / NEXT — с любого компьютера / from any machine:"
+        "  Подключение / Connect:"
+    )
+    if is::not_empty "${ai_pass}"; then
+        final_lines+=(
+            "    opencode attach http://${machine_ip}:${port} -u opencode"
+            "      -p '${ai_pass}'"
+        )
+    else
+        final_lines+=("    opencode attach http://${machine_ip}:${port}")
+    fi
+
+    if [[ "${svc}" != "2" ]]; then
+        # Управление: все команды — от root (sudo) или по sudoers из шага 5.
+        # Control: all commands as root (sudo) or via the step-5 sudoers.
+        final_lines+=(
+            ""
+            "  Управление / Control (sudo):"
+            "    systemctl status ${service}      # статус / status"
+            "    systemctl restart ${service}     # перезапуск / restart"
+            "    systemctl stop ${service}        # остановить / stop"
+            "    systemctl start ${service}       # запустить / start"
+            "    journalctl -u ${service} -f      # логи сервиса / service logs"
+            ""
+            "  Файлы / Files:"
+            "    /etc/systemd/system/${service}.service   # юнит / unit"
+        )
+        if is::not_empty "${ai_pass}"; then
+            final_lines+=("    ${env_file}                 # пароль root:600 / password")
+        fi
+    else
+        final_lines+=(
+            ""
+            "  Сервис не создан — запустите вручную / no service: run manually:"
+            "    opencode serve --hostname 0.0.0.0 --port ${port}"
+        )
+    fi
+    if (( ${#sudo_lines[@]} > 0 )); then
+        final_lines+=("    ${sudoers_file}            # sudo-права / sudo rules")
+    fi
+    final_lines+=("    ${limits_file}       # лимиты / limits")
+
+    final_lines+=(
+        ""
+        "Пользователь / User:  ${ai_user} (вход запрещён / login locked)"
+        "Каталог / Dir:        /srv/${ai_user}"
+    )
     if is::not_empty "${ai_pass}"; then
         # Пароль показываем ОДИН раз в конце (Jobs: клиент должен мочь
         # завершить сценарий; дальше он живёт только в env-файле root:600).
         # Show the password ONCE at the end (Jobs: the customer must be
         # able to finish the scenario; after this it lives only in the
         # root:600 env file).
-        printf -v final "%s\n" \
-            "Готово! Сервер запущен / Done! The server is running" \
-            "" \
-            "Что дальше / NEXT — с любого компьютера / from any machine:" \
-            "  Подключение / Connect:" \
-            "    opencode attach http://${machine_ip}:${port} -u opencode" \
-            "      -p '${ai_pass}'" \
-            "" \
-            "  Проверка / Check:     sudo systemctl status ${service}" \
-            "  Перезапуск / Restart: sudo systemctl restart ${service}" \
-            "" \
-            "Пользователь / User:  ${ai_user} (вход запрещён / login locked)" \
-            "Каталог / Dir:        /srv/${ai_user}" \
-            "" \
-            "ПАРОЛЬ / PASSWORD (показывается один раз / one-time):" \
-            "  ${ai_pass}" \
-            "  (также в /srv/${ai_user}/opencode.env, root:600)" \
-            "" \
-            "sudo:  sudo -l -U ${ai_user}   # выданные права / granted rules"
-    else
-        printf -v final "%s\n" \
-            "Готово! Сервер запущен / Done! The server is running" \
-            "" \
-            "Что дальше / NEXT — с любого компьютера / from any machine:" \
-            "  Подключение / Connect:" \
-            "    opencode attach http://${machine_ip}:${port}" \
-            "" \
-            "  Проверка / Check:     sudo systemctl status ${service}" \
-            "  Перезапуск / Restart: sudo systemctl restart ${service}" \
-            "" \
-            "Пользователь / User:  ${ai_user} (вход запрещён / login locked)" \
-            "Каталог / Dir:        /srv/${ai_user}" \
-            "" \
-            "sudo:  sudo -l -U ${ai_user}   # выданные права / granted rules"
+        final_lines+=(
+            ""
+            "ПАРОЛЬ / PASSWORD (показывается один раз / one-time):"
+            "  ${ai_pass}"
+            "  (также в /srv/${ai_user}/opencode.env, root:600)"
+        )
     fi
+    final_lines+=("" "sudo:  sudo -l -U ${ai_user}   # выданные права / granted rules")
+
+    local final
+    printf -v final '%s\n' "${final_lines[@]}"
     local -i fin_lines=0
     while IFS= read -r _; do fin_lines=$((fin_lines + 1)); done <<< "${final}"
-    wiz::__frame_begin $((w + 2)) $((fin_lines + 5))
-    wiz::__rule "${w}" '╭' '╮'
-    wiz::__title_row "${w}" "ИТОГ / RESULT"
-    wiz::__rule "${w}" '├' '┤'
-    wiz::__text "${w}" "${final}"
-    wiz::__rule "${w}" '╰' '╯'
-    wiz::__hint "${w}" "  Enter — завершить / to finish"
-    wiz::__read_key >/dev/null
+    wizard::box "ИТОГ / RESULT" "${final}" "  Enter — завершить / to finish"
+    wizard::__read_key >/dev/null
 
     # Выход из alt-экрана: итог и следующие шаги остаются в терминале.
     # Leave the alternate screen: the result and next steps stay visible.
-    wiz::__restore
+    wizard::__restore
     printf '\n'
     presentation::success "Готово! / Done! ${ai_user} создан / created"
     printf '\n'
@@ -1088,13 +729,27 @@ EOF
     if [[ "${svc}" != "2" ]]; then
         presentation::info "     sudo systemctl status ${service}   # статус / status"
         presentation::info "     sudo systemctl restart ${service}  # перезапуск / restart"
+        presentation::info "     sudo systemctl stop ${service}     # остановить / stop"
+        presentation::info "     sudo systemctl start ${service}    # запустить / start"
+        presentation::info "     journalctl -u ${service} -f         # логи / logs"
     else
         presentation::info "     сервис не создан — запустите вручную / no service: run manually"
         presentation::info "     opencode serve --hostname 0.0.0.0 --port ${port}"
     fi
-    presentation::info "  3. Файрвол (если нужно) / Firewall (if needed):"
+    presentation::info "  3. Файлы / Files:"
+    if [[ "${svc}" != "2" ]]; then
+        presentation::info "     /etc/systemd/system/${service}.service   # юнит / unit"
+        if is::not_empty "${ai_pass}"; then
+            presentation::info "     ${env_file}  # пароль root:600 / password"
+        fi
+    fi
+    if (( ${#sudo_lines[@]} > 0 )); then
+        presentation::info "     ${sudoers_file}  # sudo-права / sudo rules"
+    fi
+    presentation::info "     ${limits_file}  # лимиты / limits"
+    presentation::info "  4. Файрвол (если нужно) / Firewall (if needed):"
     presentation::info "     sudo firewall-cmd --add-port=${port}/tcp --permanent && sudo firewall-cmd --reload"
-    presentation::info "  4. Выданные права / Granted rules: sudo -l -U ${ai_user}"
+    presentation::info "  5. Выданные права / Granted rules: sudo -l -U ${ai_user}"
     presentation::warning "Повторный запуск визарда перезапишет файлы и сгенерирует новый пароль / re-running the wizard rewrites files and generates a new password"
     presentation::info "Журнал / Log: ${STEPLOG_FILE}"
 }
