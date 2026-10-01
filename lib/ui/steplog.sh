@@ -45,7 +45,20 @@ steplog::init() {
     STEPLOG_VERBOSE="${2:-0}"
     STEPLOG_BUF=()
     STEPLOG_HOOKS=()
-    : > "${STEPLOG_FILE}" 2>/dev/null || true
+    # Пробуем писать в подшелле: ( : > file ) 2>/dev/null гасит и ошибку
+    # редиректа шелла, и проверку. При неудаче — запасной журнал по UID:
+    # чужой root-файл в /tmp не должен ронять визард или печатать сырую
+    # ошибку bash («Отказано в доступе»).
+    # Probe writability in a subshell: ( : > file ) 2>/dev/null silences
+    # both the shell's redirect error and the check. On failure — fall back
+    # to a per-UID log: a foreign root-owned file in /tmp must not crash the
+    # wizard or print a raw bash error.
+    if ! ( : > "${STEPLOG_FILE}" ) 2>/dev/null; then
+        local fallback="${TMPDIR:-/tmp}/steplog.${UID:-$(id -u)}.log"
+        printf 'steplog: %s не доступен для записи / not writable — журнал / log: %s\n' "${STEPLOG_FILE}" "${fallback}" >&2
+        STEPLOG_FILE="${fallback}"
+        ( : > "${STEPLOG_FILE}" ) 2>/dev/null || true
+    fi
     # EXIT-trap принадлежит steplog: хуки (восстановление терминала и т.п.)
     # выполняются до сброса журнала. The EXIT trap is owned by steplog:
     # hooks (terminal restore etc.) run before the log flush.

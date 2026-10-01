@@ -623,10 +623,12 @@ main() {
             ;;
     esac
 
-    # Журнал пишется при ЛЮБОМ завершении / the log is written on ANY exit
-    steplog::init "${TMPDIR:-/tmp}/ai_user_wizard.log" "${verbose}"
-
-    # -h/--help: справка без запуска визарда / usage without starting the wizard
+    # -h/--help: справка без запуска визарда и БЕЗ создания журнала
+    # (help не должен трогать /tmp/ai_user_wizard.log, оставшийся от
+    # чужого запуска под root).
+    # -h/--help: usage without starting the wizard and WITHOUT touching
+    # the log (help must not poke /tmp/ai_user_wizard.log left by a
+    # foreign root run).
     case "${1:-}" in
         -h|--help)
             printf 'Usage: sudo bs run examples/ai_user_wizard.sh\n'
@@ -667,6 +669,9 @@ main() {
             exit 0
             ;;
     esac
+
+    # Журнал пишется при ЛЮБОМ завершении / the log is written on ANY exit
+    steplog::init "${TMPDIR:-/tmp}/ai_user_wizard.log" "${verbose}"
 
     steplog::on_exit wiz::__restore
     signal::on INT wiz::__restore
