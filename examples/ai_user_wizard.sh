@@ -19,6 +19,12 @@
 #   2. opencode attach http://<IP>:4096 -u opencode -p '<пароль>'
 #      (подключение с любого компьютера / connect from any machine)
 #
+# Локальная установка opencode (вне root-PATH) / User-local opencode
+# (outside the root PATH):
+#   sudo env PATH="$PATH" bs run examples/ai_user_wizard.sh
+#   # передать PATH текущего пользователя в sudo-сессию
+#   # pass the current user's PATH into the sudo session
+#
 # Структура / Structure:
 #   0. вступление / intro       — что делает визард, что получите в конце
 #   1. пользователь / username  — под этим пользователем работает сервер
@@ -158,6 +164,14 @@ main() {
             printf '  1. sudo bs run examples/ai_user_wizard.sh   # Enter Enter ... Enter\n'
             printf '  2. opencode attach http://<IP>:4096 -u opencode -p '\''<пароль>'\''\n'
             printf '     # подключение с любого компьютера / connect from any machine\n\n'
+            printf 'Локальная установка opencode (вне root-PATH) / User-local opencode\n'
+            printf '(outside the root PATH):\n'
+            printf '  sudo env PATH="$PATH" bs run examples/ai_user_wizard.sh\n'
+            printf '  # env передаёт переменные в sudo-сессию / env passes variables\n'
+            printf '  # into the sudo session; визард также сам ищет opencode в\n'
+            printf '  # ~/.opencode/bin и ~/.local/bin всех пользователей\n'
+            printf '  # (the wizard also probes ~/.opencode/bin and ~/.local/bin\n'
+            printf '  # of every user on its own)\n\n'
             printf 'Шаги визарда / Wizard steps (все параметры — с дефолтом):\n'
             printf '  1. Имя пользователя / Username        (default: ai-agent)\n'
             printf '  2. Порт сервера / Server port          (default: 4096)\n'
@@ -336,15 +350,45 @@ main() {
     (( want_selinux == 1 )) && need+=(semanage restorecon)
     aiw::check_tools "${need[@]}"
 
-    # Путь к opencode берём из PATH, не хардкодим /usr/local/bin:
-    # сервис должен запускаться на этой машине, а не по догадке
-    # (Torvalds: никаких спец-кейсов с магическими путями).
-    # Resolve opencode from PATH, never hardcode /usr/local/bin:
-    # the service must run on THIS machine, not on a guess
-    # (Torvalds: no magic-path special cases).
+    # Путь к opencode: сначала PATH (системные установки), затем известные
+    # пользовательские места — ~/.opencode/bin, ~/.local/bin и их аналоги у
+    # реальных пользователей. Под sudo HOME=/root, а установка обычно живёт
+    # в /home/<user>/.opencode/bin — поэтому пробуем и их (никаких магических
+    # путей, только проверка существующих файлов; Torvalds: никаких
+    # спец-кейсов с догадками).
+    # opencode resolution: PATH first (system-wide installs), then known
+    # user-local locations — ~/.opencode/bin, ~/.local/bin, and the same
+    # for real users. Under sudo HOME=/root while the install usually lives
+    # in /home/<user>/.opencode/bin — so those are probed too (no magic
+    # paths, only existing files are checked; Torvalds: no guesswork).
     local opencode_bin=""
-    if is::command opencode; then
-        opencode_bin="$(command -v opencode)"
+    local oc
+    for oc in "$(command -v opencode 2>/dev/null || true)" \
+        "${HOME}/.opencode/bin/opencode" "${HOME}/.local/bin/opencode" \
+        /home/*/.opencode/bin/opencode /home/*/.local/bin/opencode; do
+        if is::not_empty "${oc}" && [[ -x "${oc}" ]]; then
+            opencode_bin="${oc}"
+            break
+        fi
+    done
+
+    # Доступность для сервисного пользователя: бинарь из пользовательского
+    # каталога может быть недостижим — домашние каталоги обычно 700, и юнит
+    # упадёт с Permission denied. Проверяем бит x для «other» на каждом
+    # компоненте пути (stat %a — восьмеричные права).
+    # Reachability for the service user: a binary in a user-local dir may be
+    # unreachable — home dirs are usually 700, the unit dies with Permission
+    # denied. Check the other-x bit on every path component (stat %a — octal
+    # mode).
+    local opencode_reachable=1
+    if is::not_empty "${opencode_bin}"; then
+        local oc_dir="${opencode_bin}"
+        while [[ "${oc_dir}" != "/" ]]; do
+            local oc_mode
+            oc_mode="$(stat -c '%a' "${oc_dir}" 2>/dev/null || printf '0')"
+            (( (10#${oc_mode} & 1) == 1 )) || { opencode_reachable=0; break; }
+            oc_dir="${oc_dir%/*}"
+        done
     fi
 
     # ---- 6. сводка / summary
@@ -380,6 +424,13 @@ main() {
         "Лимиты:               nproc=${nproc}, nofile=${nofile}, core=0" \
         "Песочница:            $([[ ${want_sandbox} == 1 ]] && echo 'да / yes' || echo 'нет / no')   SELinux: $([[ ${want_selinux} == 1 ]] && echo 'да / yes' || echo 'нет / no')" \
         "systemd-сервис:       $(case ${svc} in 0) echo 'создать+запустить';; 1) echo 'только создать';; 2) echo 'не создавать';; esac)"
+    # Бинарь найден в приватном каталоге — сервис может не запуститься
+    # (Permission denied). Показываем в сводке ДО подтверждения.
+    # The binary lives in a private dir — the service may fail to start
+    # (Permission denied). Shown in the summary BEFORE confirmation.
+    if (( opencode_reachable == 0 )); then
+        summary+=$'\n'"! opencode: ${opencode_bin}"$'\n'"  каталог недоступен сервисному пользователю — установите opencode глобально / dir not reachable by the service user — install opencode system-wide"
+    fi
     local apply
     wizard::yn apply "Применить настройки? / Apply settings?" "${summary}"
     [[ "${apply}" == "q" ]] && aiw::cancel "6/6 — сводка / summary"
@@ -750,6 +801,9 @@ main() {
     presentation::info "  4. Файрвол (если нужно) / Firewall (if needed):"
     presentation::info "     sudo firewall-cmd --add-port=${port}/tcp --permanent && sudo firewall-cmd --reload"
     presentation::info "  5. Выданные права / Granted rules: sudo -l -U ${ai_user}"
+    if (( opencode_reachable == 0 )); then
+        presentation::warning "opencode в приватном каталоге ${opencode_bin} — если сервис не стартует, установите opencode глобально / if the service fails to start, install opencode system-wide"
+    fi
     presentation::warning "Повторный запуск визарда перезапишет файлы и сгенерирует новый пароль / re-running the wizard rewrites files and generates a new password"
     presentation::info "Журнал / Log: ${STEPLOG_FILE}"
 }
