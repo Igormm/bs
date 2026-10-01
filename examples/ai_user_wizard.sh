@@ -13,6 +13,11 @@
 # Запуск / Run:
 #   sudo bs run examples/ai_user_wizard.sh
 #   sudo ./examples/ai_user_wizard.sh
+#
+# Главный сценарий / Main scenario (все дефолты — просто Enter):
+#   1. sudo bs run examples/ai_user_wizard.sh
+#   2. opencode attach http://<IP>:4096 -u opencode -p '<пароль>'
+#      (подключение с любого компьютера / connect from any machine)
 
 load "lib/ui/presentation"
 load "lib/ui/steplog"
@@ -240,19 +245,26 @@ wiz::__read_key() {
 # @description Меню с одним выбором: стрелки, цифры 1-9, q — отмена.
 # @param $1 Output variable: selected index (0-based), 99 = cancelled
 # @param $2 Title / Заголовок
+# @param $3 [optional] Explanation row / Строка-пояснение
 # @param $@ Items / Пункты
 wiz::menu() {
     local -n __wiz_out="${1:?output variable required}"
     local -r title="${2:?title required}"
-    shift 2
+    local -r desc="${3:-}"
+    shift 3
     local -a items=("$@")
     local -r inner="$(wiz::__box_width)"
+    local -i frame_h=$(( ${#items[@]} + 5 ))
+    is::not_empty "${desc}" && frame_h=$(( frame_h + 1 ))
 
     local selected=0
     while true; do
-        wiz::__frame_begin $((inner + 2)) $(( ${#items[@]} + 5 ))
+        wiz::__frame_begin $((inner + 2)) ${frame_h}
         wiz::__rule "${inner}" '╭' '╮'
         wiz::__title_row "${inner}" "${title}"
+        if is::not_empty "${desc}"; then
+            wiz::__hint "${inner}" "${desc}"
+        fi
         wiz::__rule "${inner}" '├' '┤'
         for i in "${!items[@]}"; do
             if (( i == selected )); then
@@ -286,22 +298,29 @@ wiz::menu() {
 # @description Меню множественного выбора (чекбоксы): Space — выбор, Enter — ОК.
 # @param $1 Output variable: indices joined by space, "q" = cancelled
 # @param $2 Title / Заголовок
+# @param $3 [optional] Explanation row / Строка-пояснение
 # @param $@ Items / Пункты
 wiz::multi_menu() {
     local -n __wiz_out="${1:?output variable required}"
     local -r title="${2:?title required}"
-    shift 2
+    local -r desc="${3:-}"
+    shift 3
     local -a items=("$@")
     local -a checked=()
     local i
     for i in "${!items[@]}"; do checked+=(0); done
     local -r inner="$(wiz::__box_width)"
+    local -i frame_h=$(( ${#items[@]} + 5 ))
+    is::not_empty "${desc}" && frame_h=$(( frame_h + 1 ))
 
     local selected=0
     while true; do
-        wiz::__frame_begin $((inner + 2)) $(( ${#items[@]} + 5 ))
+        wiz::__frame_begin $((inner + 2)) ${frame_h}
         wiz::__rule "${inner}" '╭' '╮'
         wiz::__title_row "${inner}" "${title}"
+        if is::not_empty "${desc}"; then
+            wiz::__hint "${inner}" "${desc}"
+        fi
         wiz::__rule "${inner}" '├' '┤'
         for i in "${!items[@]}"; do
             local mark='○'
@@ -357,20 +376,67 @@ wiz::yn() {
     done
 }
 
+# @description Welcome screen: what the wizard does and what you get.
+# @description Вступление: что делает визард и что вы получите.
+# @return 0 start / начать, 1 cancelled / отмена
+wiz::intro() {
+    local -r inner="$(wiz::__box_width)"
+    local -a lines=(
+        "Этот визард запускает opencode-сервер на этой машине:"
+        "This wizard runs an opencode server on this machine:"
+        ""
+        "  • создаёт системного пользователя (вход по паролю запрещён)"
+        "    creates a system user (password login locked)"
+        "  • запускает opencode serve как systemd-сервис"
+        "    runs opencode serve as a systemd service"
+        "  • в конце выдаёт команду подключения — копируйте и работайте"
+        "    prints the connect command at the end — copy and go"
+        ""
+        "Всё по умолчанию — просто жмите Enter."
+        "All defaults — just press Enter."
+    )
+    while true; do
+        wiz::__frame_begin $((inner + 2)) $(( ${#lines[@]} + 4 ))
+        wiz::__rule "${inner}" '╭' '╮'
+        wiz::__title_row "${inner}" "Что это / WHAT THIS IS"
+        wiz::__rule "${inner}" '├' '┤'
+        local line
+        for line in "${lines[@]}"; do
+            wiz::__row "${inner}" "${line}"
+        done
+        wiz::__rule "${inner}" '╰' '╯'
+        wiz::__hint "${inner}" "  Enter — начать / to start · q — отмена / cancel"
+
+        case "$(wiz::__read_key)" in
+            enter|y|Y) return 0 ;;
+            q)         return 1 ;;
+        esac
+    done
+}
+
 # @description Text input with a default value.
 # @description Текстовый ввод со значением по умолчанию.
 # @param $1 Output variable / Выходная переменная
 # @param $2 Prompt / Приглашение
 # @param $3 Default / Значение по умолчанию
+# @param $4 [optional] Explanation row / Строка-пояснение
 wiz::ask_input() {
     local -n __wiz_out="${1:?output variable required}"
-    local -r prompt="$2" default="${3:-}"
+    local -r prompt="$2" default="${3:-}" desc="${4:-}"
     local -r inner="$(wiz::__box_width)"
+    local -i frame_h=8
+    is::not_empty "${desc}" && frame_h=$(( frame_h + 1 ))
     local answer
+    # строка ввода зависит от наличия пояснения / input row shifts with the desc
+    local -i input_row=6
+    is::not_empty "${desc}" && input_row=7
 
-    wiz::__frame_begin $((inner + 2)) 8
+    wiz::__frame_begin $((inner + 2)) ${frame_h}
     wiz::__rule "${inner}" '╭' '╮'
     wiz::__title_row "${inner}" "${prompt}"
+    if is::not_empty "${desc}"; then
+        wiz::__hint "${inner}" "${desc}"
+    fi
     wiz::__row "${inner}" ""
     wiz::__row "${inner}" "  Введите / Enter [${default}]: " "33"
     wiz::__row "${inner}" ""
@@ -382,7 +448,7 @@ wiz::ask_input() {
     wiz::__row "${inner}" "  Enter — принять по умолчанию · q — отмена" "90"
     wiz::__rule "${inner}" '╰' '╯'
     # курсор обратно на строку ввода / cursor back to the input row
-    wiz::__goto $((__WIZ_ROW + 6)) $((__WIZ_COL + 2))
+    wiz::__goto $((__WIZ_ROW + input_row)) $((__WIZ_COL + 2))
     wiz::__sgr 33m
     IFS= read -r answer || true
     wiz::__sgr_reset
@@ -402,15 +468,25 @@ wiz::ask_input() {
 # @description Hidden password input with confirmation (retries until match).
 # @description Скрытый ввод пароля с подтверждением (до совпадения).
 # @param $1 Output variable / Выходная переменная
+# @param $2 [optional] Explanation row / Строка-пояснение
 wiz::ask_pass() {
     local -n __wiz_out="${1:?output variable required}"
+    local -r desc="${2:-}"
     local -r inner="$(wiz::__box_width)"
+    local -i frame_h=8
+    is::not_empty "${desc}" && frame_h=$(( frame_h + 1 ))
+    # строка ввода зависит от наличия пояснения / input row shifts with the desc
+    local -i pass_row=6
+    is::not_empty "${desc}" && pass_row=7
     local pass1 pass2
 
     while true; do
-        wiz::__frame_begin $((inner + 2)) 8
+        wiz::__frame_begin $((inner + 2)) ${frame_h}
         wiz::__rule "${inner}" '╭' '╮'
         wiz::__title_row "${inner}" "Пароль сервера / Server password"
+        if is::not_empty "${desc}"; then
+            wiz::__hint "${inner}" "${desc}"
+        fi
         wiz::__row "${inner}" ""
         wiz::__hint "${inner}" "  Ввод скрыт / Input is hidden"
         wiz::__row "${inner}" ""
@@ -418,9 +494,9 @@ wiz::ask_pass() {
         wiz::__row "${inner}" "  Повторите / Repeat: " "33"
         wiz::__rule "${inner}" '╰' '╯'
         # курсор на строку ввода пароля / cursor to the password row
-        wiz::__goto $((__WIZ_ROW + 6)) $((__WIZ_COL + 21))
+        wiz::__goto $((__WIZ_ROW + pass_row)) $((__WIZ_COL + 21))
         IFS= read -rs pass1 || true
-        wiz::__goto $((__WIZ_ROW + 7)) $((__WIZ_COL + 22))
+        wiz::__goto $((__WIZ_ROW + pass_row + 1)) $((__WIZ_COL + 22))
         IFS= read -rs pass2 || true
         wiz::__sgr_reset
         printf '\n' 
@@ -555,10 +631,20 @@ main() {
         -h|--help)
             printf 'Usage: sudo bs run examples/ai_user_wizard.sh\n'
             printf '       sudo ./examples/ai_user_wizard.sh\n\n'
-            printf 'Создаёт ограниченного системного пользователя для ИИ-агента (opencode):\n'
-            printf 'заблокированный вход, точечные sudoers, лимиты ресурсов, песочница systemd.\n'
-            printf 'Creates a restricted system user for an AI agent (opencode): locked\n'
-            printf 'login, scoped sudoers, resource limits, optional systemd sandbox.\n\n'
+            printf 'Что это / What is this:\n'
+            printf '  Запускает opencode-сервер на этой машине в песочнице:\n'
+            printf '  создаёт ограниченного системного пользователя (вход по паролю\n'
+            printf '  запрещён) и запускает `opencode serve` как systemd-сервис.\n'
+            printf '  В конце выдаёт команду подключения — вы подключаетесь к серверу\n'
+            printf '  с любого компьютера.\n'
+            printf '  Runs an opencode server on this machine in a sandbox: creates a\n'
+            printf '  restricted system user (password login locked) and runs\n'
+            printf '  `opencode serve` as a systemd service. The end prints the connect\n'
+            printf '  command — you attach to the server from any machine.\n\n'
+            printf 'Главный сценарий / Main scenario (все дефолты / all defaults):\n'
+            printf '  1. sudo bs run examples/ai_user_wizard.sh   # Enter Enter ... Enter\n'
+            printf '  2. opencode attach http://<IP>:4096 -u opencode -p '\''<пароль>'\''\n'
+            printf '     # подключение с любого компьютера / connect from any machine\n\n'
             printf 'Шаги визарда / Wizard steps (все параметры — с дефолтом):\n'
             printf '  1. Имя пользователя / Username        (default: ai-agent)\n'
             printf '  2. Порт сервера / Server port          (default: 4096)\n'
@@ -593,12 +679,17 @@ main() {
     wiz::__enter_alt
     local -r inner="$(wiz::__box_width)"
 
+    # ---- 0. вступление / intro: что это и что получится в конце
+    wiz::intro || wiz::cancel "0/6 — вступление / intro"
+
     # ---- 1-2. пользователь и порт / user and port
     local ai_user service port
-    wiz::ask_input ai_user "1/6 — Имя пользователя / Username" "ai-agent"
+    wiz::ask_input ai_user "1/6 — Имя пользователя / Username" "ai-agent" \
+        "Под этим пользователем работает сервер / The server runs as this user"
     [[ "${ai_user}" == "q" ]] && wiz::cancel "1/6 — имя пользователя / username"
     service="${ai_user}"   # сервис называется как пользователь / service named after the user
-    wiz::ask_input port "2/6 — Порт сервера / Server port" "4096"
+    wiz::ask_input port "2/6 — Порт сервера / Server port" "4096" \
+        "По этому порту вы подключитесь: http://IP:порт / Connect via http://IP:port"
     [[ "${port}" == "q" ]] && wiz::cancel "2/6 — порт / port"
     [[ "${port}" =~ ^[0-9]+$ ]] || wiz::fail "Порт должен быть числом / Port must be a number: ${port}"
     (( port >= 1 && port <= 65535 )) || wiz::fail "Порт вне диапазона 1-65535 / Port out of range 1-65535: ${port}"
@@ -606,19 +697,21 @@ main() {
     # ---- 3. пароль / password
     local pass_mode ai_pass=""
     wiz::menu pass_mode "3/6 — Пароль сервера / Server password" \
+        "Пароль для подключения к серверу / Server access password" \
         "Сгенерировать / Generate" \
         "Ввести свой / Enter my own" \
-        "Без пароля / No password"
+        "Без пароля (НЕБЕЗОПАСНО / UNSECURED)"
     [[ "${pass_mode}" == "99" ]] && wiz::cancel "3/6 — пароль / password"
     case "${pass_mode}" in
         0) ai_pass="$(wiz::gen_pass)" ;;
-        1) wiz::ask_pass ai_pass; [[ "${ai_pass}" == "q" ]] && wiz::cancel "3/6 — пароль / password" ;;
+        1) wiz::ask_pass ai_pass "Пароль для подключения к серверу / Password used to connect to the server"; [[ "${ai_pass}" == "q" ]] && wiz::cancel "3/6 — пароль / password" ;;
         2) ai_pass="" ;;
     esac
 
     # ---- 4. systemd-сервис / service
     local svc
     wiz::menu svc "4/6 — systemd-сервис / systemd service" \
+        "systemd сам запускает сервер, в т.ч. после перезагрузки / systemd runs the server, also after reboot" \
         "Создать и запустить / Create and start" \
         "Только создать / Create only" \
         "Не создавать / Do not create"
@@ -627,6 +720,7 @@ main() {
     # ---- 5. усиление / hardening (checkboxes)
     local hard_pick
     wiz::multi_menu hard_pick "5/6 — Усиление / Hardening" \
+        "Дополнительная защита — всё необязательно / Extra protection — all optional" \
         "sudo: управление сервисом + firewall-cmd" \
         "Песочница systemd / systemd sandbox" \
         "SELinux-контекст / SELinux context"
@@ -918,38 +1012,39 @@ EOF
         # able to finish the scenario; after this it lives only in the
         # root:600 env file).
         printf -v final "%s\n" \
-            "Готово! / Done!" \
+            "Готово! Сервер запущен / Done! The server is running" \
+            "" \
+            "Что дальше / NEXT — с любого компьютера / from any machine:" \
+            "  Подключение / Connect:" \
+            "    opencode attach http://${machine_ip}:${port} -u opencode" \
+            "      -p '${ai_pass}'" \
+            "" \
+            "  Проверка / Check:     sudo systemctl status ${service}" \
+            "  Перезапуск / Restart: sudo systemctl restart ${service}" \
             "" \
             "Пользователь / User:  ${ai_user} (вход запрещён / login locked)" \
             "Каталог / Dir:        /srv/${ai_user}" \
             "" \
-            "ПАРОЛЬ СЕРВЕРА / SERVER PASSWORD (показывается один раз / one-time):" \
+            "ПАРОЛЬ / PASSWORD (показывается один раз / one-time):" \
             "  ${ai_pass}" \
             "  (также в /srv/${ai_user}/opencode.env, root:600)" \
             "" \
-            "sudo:                 sudo -l -U ${ai_user}" \
-            "" \
-            "Контроль сервиса / Service control:" \
-            "  sudo systemctl status ${service}" \
-            "  sudo systemctl restart ${service}" \
-            "  sudo firewall-cmd --add-port=${port}/tcp --permanent && sudo firewall-cmd --reload" \
-            "" \
-            "Подключение / Connect: opencode attach http://${machine_ip}:${port} -u opencode -p '${ai_pass}'"
+            "sudo:  sudo -l -U ${ai_user}   # выданные права / granted rules"
     else
         printf -v final "%s\n" \
-            "Готово! / Done!" \
+            "Готово! Сервер запущен / Done! The server is running" \
+            "" \
+            "Что дальше / NEXT — с любого компьютера / from any machine:" \
+            "  Подключение / Connect:" \
+            "    opencode attach http://${machine_ip}:${port}" \
+            "" \
+            "  Проверка / Check:     sudo systemctl status ${service}" \
+            "  Перезапуск / Restart: sudo systemctl restart ${service}" \
             "" \
             "Пользователь / User:  ${ai_user} (вход запрещён / login locked)" \
             "Каталог / Dir:        /srv/${ai_user}" \
             "" \
-            "sudo:                 sudo -l -U ${ai_user}" \
-            "" \
-            "Контроль сервиса / Service control:" \
-            "  sudo systemctl status ${service}" \
-            "  sudo systemctl restart ${service}" \
-            "  sudo firewall-cmd --add-port=${port}/tcp --permanent && sudo firewall-cmd --reload" \
-            "" \
-            "Подключение / Connect: opencode attach http://${machine_ip}:${port}"
+            "sudo:  sudo -l -U ${ai_user}   # выданные права / granted rules"
     fi
     local -i fin_lines=0
     while IFS= read -r _; do fin_lines=$((fin_lines + 1)); done <<< "${final}"
@@ -978,21 +1073,23 @@ EOF
         "сервис / service:${state_svc}" \
         "пароль / password:${state_pass}"
     printf '\n'
-    presentation::info "Что должно работать / What should work:"
-    if [[ "${svc}" != "2" ]]; then
-        presentation::info "  opencode serve запущен как systemd-сервис / started as a systemd service"
-        presentation::info "  sudo systemctl status ${service}   # статус / status"
-        presentation::info "  sudo systemctl restart ${service}  # перезапуск / restart"
-    else
-        presentation::info "  сервис не создан — запусти вручную / no service: run manually"
-        presentation::info "  opencode serve --hostname 0.0.0.0 --port ${port}"
-    fi
-    presentation::info "  Подключение / Connect: opencode attach http://${machine_ip}:${port}"
+    presentation::info "Что дальше / NEXT — с любого компьютера / from any machine:"
+    presentation::info "  1. Подключитесь / Connect:"
+    presentation::info "     opencode attach http://${machine_ip}:${port}"
     if is::not_empty "${ai_pass}"; then
-        presentation::info "  с паролем / with password: -u opencode -p '${ai_pass}'"
+        presentation::info "         -u opencode -p '${ai_pass}'"
     fi
-    presentation::info "  sudo firewall-cmd --add-port=${port}/tcp --permanent && sudo firewall-cmd --reload"
-    presentation::info "  sudo -l -U ${ai_user}   # выданные sudo-права / granted sudo rules"
+    presentation::info "  2. Управление / Manage:"
+    if [[ "${svc}" != "2" ]]; then
+        presentation::info "     sudo systemctl status ${service}   # статус / status"
+        presentation::info "     sudo systemctl restart ${service}  # перезапуск / restart"
+    else
+        presentation::info "     сервис не создан — запустите вручную / no service: run manually"
+        presentation::info "     opencode serve --hostname 0.0.0.0 --port ${port}"
+    fi
+    presentation::info "  3. Файрвол (если нужно) / Firewall (if needed):"
+    presentation::info "     sudo firewall-cmd --add-port=${port}/tcp --permanent && sudo firewall-cmd --reload"
+    presentation::info "  4. Выданные права / Granted rules: sudo -l -U ${ai_user}"
     presentation::warning "Повторный запуск визарда перезапишет файлы и сгенерирует новый пароль / re-running the wizard rewrites files and generates a new password"
     presentation::info "Журнал / Log: ${STEPLOG_FILE}"
 }
