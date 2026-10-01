@@ -677,6 +677,56 @@ EOF
 # bs update: применить изменения репозитория к установленным копиям
 # ==========================================
 
+# @private Boxed notice printed WITHOUT log prefixes — timestamps would
+# break the frame (log::header suffers from this in timestamped output).
+# Рамка-уведомление БЕЗ лог-префиксов — таймстампы ломают рамку
+# (log::header страдает этим при включённых таймстампах).
+# @param $1 Title / Заголовок
+# @param $@ Body lines, hard-wrapped at inner width / Строки тела с переносом
+update_box() {
+  local -r title="$1"
+  shift
+  local -r inner=58
+  local -a body=()
+  local text
+  for text in "$@"; do
+    while (( ${#text} > inner )); do
+      body+=("${text:0:inner}")
+      text="${text:inner}"
+    done
+    body+=("${text}")
+  done
+
+  local color_b='' color_reset=''
+  if log::__is_color_enabled 1; then
+    color_b=$'\033[34m'
+    color_reset=$'\033[0m'
+  fi
+  local rule
+  printf -v rule '%*s' "${inner}" ''
+  rule="${rule// /─}"
+  local title_row
+  printf -v title_row '%*s' "$(( (inner - ${#title}) / 2 ))" ''
+  title_row+="${title}"
+
+  # Паддинг вручную по символам: bash printf '%-*s' считает ширину в БАЙТАХ,
+  # с кириллицей рамка разъезжается. ${#x} считает символы (= клетки для
+  # кириллицы и глифов рамки).
+  # Pad by CHARACTERS: bash printf '%-*s' measures width in BYTES, which
+  # breaks the frame with Cyrillic. ${#x} counts chars (= cells here).
+  local n
+  (( n = inner - ${#title_row} )) && (( n > 0 )) && printf -v title_row '%s%*s' "${title_row}" "${n}" ''
+  printf '%s╭%s╮%s\n' "${color_b}" "${rule}" "${color_reset}"
+  printf '%s│%s│%s\n' "${color_b}" "${title_row}" "${color_reset}"
+  printf '%s├%s┤%s\n' "${color_b}" "${rule}" "${color_reset}"
+  local line
+  for line in "${body[@]}"; do
+    (( n = inner - ${#line} )) && (( n > 0 )) && printf -v line '%s%*s' "${line}" "${n}" ''
+    printf '%s│%s│%s\n' "${color_b}" "${line}" "${color_reset}"
+  done
+  printf '%s╰%s╯%s\n' "${color_b}" "${rule}" "${color_reset}"
+}
+
 update_cmd() {
   local from="${BS_ROOT}"
   local -a targets=()
@@ -744,20 +794,27 @@ update_cmd() {
   fi
   is::dir "${from}/core" || die "update: source is not a BS repo: ${from}"
 
-  local target item ok=0 skipped=0
+  local target ok=0 skipped=0
+  local -a same_paths=() miss_paths=() ro_paths=()
   for target in "${targets[@]}"; do
     if ! is::dir "${target}"; then
       log::warn "update: target not found, skipping: ${target}"
+      miss_paths+=("${target}")
       (( skipped += 1 ))
       continue
     fi
     if [[ "${from}" == "${target}" ]]; then
-      log::warn "update: source is the same as target: ${target} (running from an installed copy). Run from the repo: ./bs update, or pass --from <repo-path>"
+      # В финальную рамку, а не WARN в цикле: «ничего не обновлено» — это
+      # не ошибка, а приглашение запустить update из репозитория.
+      # Collected for the final box, not a per-target WARN: "nothing updated"
+      # is not an error but an invitation to run update from the repo.
+      same_paths+=("${target}")
       (( skipped += 1 ))
       continue
     fi
     if ! [[ -w "${target}" ]]; then
       log::warn "update: target not writable: ${target} (try: sudo bs update --system)"
+      ro_paths+=("${target}")
       (( skipped += 1 ))
       continue
     fi
@@ -791,10 +848,34 @@ update_cmd() {
     log::success "sync done — changes are live without reinstalling"
     return 0
   fi
-  if (( skipped > 0 )); then
-    die "update: nothing to update — every target was skipped (not found / not writable / same as source). See messages above"
+
+  # Итоговая рамка вместо сырого ERROR: понятно, что случилось и что делать.
+  # A framed summary instead of a raw ERROR: clear what happened and what to do.
+  local -a reasons=()
+  local p
+  for p in "${same_paths[@]}"; do
+    reasons+=("• ${p} — вы запустили bs из установленной копии: источник совпадает с целью / running from an installed copy: source equals target")
+  done
+  for p in "${miss_paths[@]}"; do
+    reasons+=("• ${p} — каталог не найден / directory not found")
+  done
+  for p in "${ro_paths[@]}"; do
+    reasons+=("• ${p} — нет прав на запись / not writable (try: sudo bs update --system)")
+  done
+  if (( ${#same_paths[@]} > 0 )); then
+    reasons+=("")
+    reasons+=("Запустите из каталога репозитория / Run from the repo directory:")
+    reasons+=("  cd <repo> && ./bs update")
+    reasons+=("или укажите источник / or pass the source:")
+    reasons+=("  bs update --from <repo-path>")
   fi
-  die "update: nothing to update — source is not a BS repo or equals target (see messages above)"
+  update_box "ОБНОВЛЕНИЙ НЕТ / NO UPDATES" "${reasons[@]}"
+  # Только «источник == цель» — это не ошибка, а отказ от работы / a
+  # same-as-source skip alone is not a failure.
+  if (( ${#same_paths[@]} > 0 && ${#miss_paths[@]} == 0 && ${#ro_paths[@]} == 0 )); then
+    return 0
+  fi
+  exit 1
 }
 
 # ==========================================
