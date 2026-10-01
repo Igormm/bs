@@ -794,13 +794,12 @@ update_cmd() {
   fi
   is::dir "${from}/core" || die "update: source is not a BS repo: ${from}"
 
-  local target ok=0 skipped=0
-  local -a same_paths=() miss_paths=() ro_paths=()
+  local target ok=0
+  local -a same_paths=() miss_paths=() ro_paths=() uptodate_paths=()
   for target in "${targets[@]}"; do
     if ! is::dir "${target}"; then
       log::warn "update: target not found, skipping: ${target}"
       miss_paths+=("${target}")
-      (( skipped += 1 ))
       continue
     fi
     if [[ "${from}" == "${target}" ]]; then
@@ -809,13 +808,22 @@ update_cmd() {
       # Collected for the final box, not a per-target WARN: "nothing updated"
       # is not an error but an invitation to run update from the repo.
       same_paths+=("${target}")
-      (( skipped += 1 ))
       continue
     fi
     if ! [[ -w "${target}" ]]; then
       log::warn "update: target not writable: ${target} (try: sudo bs update --system)"
       ro_paths+=("${target}")
-      (( skipped += 1 ))
+      continue
+    fi
+    # Уже актуально: содержимое совпадает — копировать нечего (повторный
+    # запуск update не должен давать «UPDATE COMPLETE»).
+    # Already up to date: identical content — nothing to copy (a re-run of
+    # update must not claim "UPDATE COMPLETE").
+    if cmp -s "${from}/bs" "${target}/bs" \
+       && diff -rq "${from}/bootstrap" "${target}/bootstrap" >/dev/null 2>&1 \
+       && diff -rq "${from}/core" "${target}/core" >/dev/null 2>&1 \
+       && diff -rq "${from}/lib" "${target}/lib" >/dev/null 2>&1; then
+      uptodate_paths+=("${target}")
       continue
     fi
     log::info "syncing ${from} -> ${target}"
@@ -829,7 +837,6 @@ update_cmd() {
     if ! cp -a "${from}/bootstrap" "${from}/core" "${from}/lib" "${from}/bs" "${tmp_dir}/"; then
       rm -rf -- "${tmp_dir}"
       log::error "update: copy failed for ${target} (source files intact)"
-      (( skipped += 1 ))
       continue
     fi
     mv -f -- "${tmp_dir}/bs" "${target}/bs"
@@ -862,6 +869,9 @@ update_cmd() {
   for p in "${ro_paths[@]}"; do
     reasons+=("• ${p} — нет прав на запись / not writable (try: sudo bs update --system)")
   done
+  for p in "${uptodate_paths[@]}"; do
+    reasons+=("• ${p} — уже актуально / already up to date")
+  done
   if (( ${#same_paths[@]} > 0 )); then
     reasons+=("")
     reasons+=("Запустите из каталога репозитория / Run from the repo directory:")
@@ -870,9 +880,11 @@ update_cmd() {
     reasons+=("  bs update --from <repo-path>")
   fi
   update_box "ОБНОВЛЕНИЙ НЕТ / NO UPDATES" "${reasons[@]}"
-  # Только «источник == цель» — это не ошибка, а отказ от работы / a
-  # same-as-source skip alone is not a failure.
-  if (( ${#same_paths[@]} > 0 && ${#miss_paths[@]} == 0 && ${#ro_paths[@]} == 0 )); then
+  # Пропуск «источник == цель» или «уже актуально» — это не ошибка, а отказ
+  # от работы; ошибка — только не найденная/недоступная цель.
+  # same-as-source and up-to-date skips are not failures; a missing or
+  # non-writable target is.
+  if (( ${#miss_paths[@]} == 0 && ${#ro_paths[@]} == 0 )); then
     return 0
   fi
   exit 1
