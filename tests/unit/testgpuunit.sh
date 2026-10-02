@@ -222,6 +222,104 @@ test_stress_tool_selection() {
     testframework::assert_equal "${LIB_ERROR_DEPENDENCY_MISSING}" "${rc}" "no tools in PATH → dependency code"
 }
 
+test_tools_catalog() {
+    local out count=0
+    out="$(gpu::tools)"
+    printf '%s\n' "${out}" | grep -q $'^1\tlspci\tpciutils\t' && count=$(( count + 1 ))
+    printf '%s\n' "${out}" | grep -q $'^3\tglmark2\tglmark2\t' && count=$(( count + 1 ))
+    printf '%s\n' "${out}" | grep -q $'^4\tvulkan-memtest\tvulkan-memtest\t' && count=$(( count + 1 ))
+    testframework::assert_equal "3" "${count}" "catalog has tiers 1/3/4 rows"
+
+    count=0
+    out="$(gpu::tools 1)"
+    while IFS= read -r line; do
+        [[ "${line}" == 1* ]] && count=$(( count + 1 ))
+    done <<< "${out}"
+    testframework::assert_equal "4" "${count}" "tier 1 has 4 tools"
+
+    testframework::assert_equal "" "$(gpu::tools 9)" "unknown tier filter yields nothing"
+}
+
+test_tools_availability_and_check() {
+    local -r root="$(mktemp -d)"
+    mkdir -p "${root}/bin"
+    for t in lspci glxinfo vulkaninfo; do
+        cat > "${root}/bin/${t}" <<EOF
+#!/bin/bash
+echo "${t}-out"
+EOF
+        chmod +x "${root}/bin/${t}"
+    done
+    local out rc=0
+
+    out="$(PATH="${root}/bin:/usr/bin:/bin" gpu::tools_available)"
+    testframework::assert_true '"${out}" == *"1	lspci"*' "available lists installed tool"
+    testframework::assert_false "printf '%s' '${out}' | grep -q glmark2" "available excludes missing tool"
+
+    rc=0
+    out="$(PATH="${root}/bin:/usr/bin:/bin" gpu::check_dependencies 1 2>&1)" || rc=$?
+    testframework::assert_equal "${LIB_ERROR_DEPENDENCY_MISSING}" "${rc}" "tier 1 missing nvidia-smi → dependency code"
+    testframework::assert_true "'${out}' =~ \[MISS\]" "check reports MISS lines"
+    testframework::assert_true "'${out}' =~ nvidia-smi" "check names the missing tool"
+    rm -rf "${root}"
+}
+
+test_run_tools() {
+    local -r root="$(mktemp -d)"
+    mkdir -p "${root}/bin"
+    cat > "${root}/bin/glxinfo" <<'EOF'
+#!/bin/bash
+echo 'OpenGL renderer string: Fake GPU'
+EOF
+    chmod +x "${root}/bin/glxinfo"
+    local out rc=0
+
+    out="$(PATH="${root}/bin:/usr/bin:/bin" gpu::glxinfo 2>/dev/null)" || rc=$?
+    testframework::assert_equal "OpenGL renderer string: Fake GPU" "${out}" "glxinfo wrapper runs tool"
+
+    out="$(PATH="${root}/bin:/usr/bin:/bin" gpu::run glxinfo --extra 2>/dev/null)" || rc=$?
+    testframework::assert_equal "OpenGL renderer string: Fake GPU" "${out}" "gpu::run passes arguments"
+
+    rc=0
+    PATH="${root}/bin:/usr/bin:/bin" gpu::run nvtop >/dev/null 2>&1 || rc=$?
+    testframework::assert_equal "${LIB_ERROR_DEPENDENCY_MISSING}" "${rc}" "run missing tool → dependency code"
+    rm -rf "${root}"
+}
+
+test_install_dependencies() {
+    local -r root="$(mktemp -d)"
+    local rc=0
+
+    local -a fake_all=(lspci nvidia-smi glxinfo vulkaninfo nvtop radeontop amdgpu_top intel_gpu_top rocm-smi glmark2 vkcube glxgears gpu-burn vkmark vulkan-memtest)
+    local -a FAKE_TOOLS=("${fake_all[@]}")
+    local -r saved_has="$(declare -f utils::has)"
+    utils::has() { [[ " ${FAKE_TOOLS[*]} " == *" ${1} "* ]]; }
+
+    local capture="${root}/captured"
+    system::packages::install() { printf '%s\n' "$*" > "${capture}"; return 0; }
+
+    # отсутствует только nvidia-smi → ставится ровно nvidia-utils
+    FAKE_TOOLS=("${fake_all[@]/nvidia-smi/}")
+    gpu::install_dependencies >/dev/null 2>&1 || rc=$?
+    testframework::assert_equal "nvidia-utils" "$(cat "${capture}")" "install only missing package"
+
+    # отсутствуют vulkaninfo и vkcube → vulkan-tools один раз (дедупликация)
+    FAKE_TOOLS=("${fake_all[@]/vulkaninfo/}")
+    FAKE_TOOLS=("${FAKE_TOOLS[@]/vkcube/}")
+    gpu::install_dependencies >/dev/null 2>&1 || rc=$?
+    testframework::assert_equal "vulkan-tools" "$(cat "${capture}")" "packages de-duplicated across tools"
+
+    # всё на месте → установка не вызывается
+    FAKE_TOOLS=("${fake_all[@]}")
+    printf 'sentinel\n' > "${capture}"
+    rc=0
+    gpu::install_dependencies >/dev/null 2>&1 || rc=$?
+    testframework::assert_equal "sentinel" "$(cat "${capture}")" "nothing to install when all present"
+
+    eval "${saved_has}"
+    rm -rf "${root}"
+}
+
 test_info_and_check() {
     local -r root="$(mktemp -d)"
     __make_lspci_fake "${root}"
@@ -278,6 +376,12 @@ main() {
 
     testframework::section "Reports / Отчёты"
     test_info_and_check
+
+    testframework::section "Tools catalog / Каталог инструментов"
+    test_tools_catalog
+    test_tools_availability_and_check
+    test_run_tools
+    test_install_dependencies
 
     testframework::section "Real host graceful degradation / Деградация на реальном хосте"
     test_real_host_graceful

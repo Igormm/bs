@@ -82,6 +82,34 @@ gpu::info             # k=v summary: vendor/name/driver/vram/temperature/utiliza
 `LIB_ERROR_FILE_NOT_FOUND` (no GPU found). `gpu::info` returns
 `LIB_ERROR_FILE_NOT_FOUND` when there is no GPU.
 
+## Tools catalog
+
+A catalog of GPU diagnostic/test programs with tiers
+(`GPU_TOOLS[tool]="tier|package|description"`):
+
+| Tier | Purpose | Tools |
+|---|---|---|
+| 1 | basic | `lspci`, `nvidia-smi`, `glxinfo`, `vulkaninfo` |
+| 2 | monitoring | `nvtop`, `radeontop`, `amdgpu_top`, `intel_gpu_top`, `rocm-smi` |
+| 3 | stress/benchmark | `glmark2`, `vkcube`, `glxgears`, `gpu-burn`, `vkmark` |
+| 4 | memory test | `vulkan-memtest` |
+
+```bash
+gpu::tools 1                       # catalog, tier filter: "tier<TAB>tool<TAB>pkg<TAB>desc"
+gpu::tools_available               # only installed ones
+gpu::check_dependencies [tier]     # [OK]/[MISS] per tool; E_SUCCESS / LIB_ERROR_DEPENDENCY_MISSING
+gpu::install_dependencies [tier]   # install missing via system::packages::install (dedup)
+gpu::run glxinfo -B                # run a tool; missing → LIB_ERROR_DEPENDENCY_MISSING
+gpu::glxinfo                       # wrapper: glxinfo -B (brief OpenGL info)
+gpu::vulkaninfo                    # wrapper: vulkaninfo --summary
+gpu::radeontop                     # wrapper: radeontop -d - (one-shot AMD snapshot)
+gpu::rocm_smi                      # wrapper: rocm-smi --showtemp --showuse
+gpu::nvtop / gpu::amdgpu_top / gpu::intel_gpu_top
+gpu::glmark2 / gpu::vkcube / gpu::glxgears / gpu::gpu_burn / gpu::vkmark
+gpu::vulkan_memtest                # VRAM test for bad cells
+```
+
 ## Related
 
-- `examples/gpu_diag.sh` — CLI entry point: `--list`, `--check`, `--stress N`.
+- `examples/gpu_diag.sh` — CLI entry point: `--list`, `--check`, `--stress N`,
+  `--tools`, `--run <tool>`, `--deps [tier]`.

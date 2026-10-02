@@ -7,13 +7,13 @@
 # Деградация: определённые E_*/LIB_ERROR_* коды при отсутствии GPU, доступа
 # или инструментов; никогда не молчаливый успех.
 #
-# @depends core/const, core/logger, core/utils
+# @depends core/const, core/logger, core/utils, core/deps, lib/system/packages
 
 # Source Guard / Защита от повторной загрузки
 bs::guard "SYSTEM_GPU" || return 0
 
 # Dependencies / Зависимости
-bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/deps.sh" "../system/packages.sh"
 
 # @global SYSTEM_GPU_VERSION — Module version (category: module-flag)
 # @global SYSTEM_GPU_VERSION — Версия модуля (категория: module-flag)
@@ -319,6 +319,222 @@ gpu::stress() {
     printf 'stress: tool=%s duration=%ss temp_min=%s temp_max=%s temp_avg=%s\n' \
         "${tool}" "${seconds}" "${t_min:-n/a}" "${t_max:-n/a}" "${avg}"
     return "${E_SUCCESS}"
+}
+
+# ==========================================
+# Каталог инструментов / Tools catalog
+# ==========================================
+
+# @global GPU_TOOLS — Tools catalog: tier|package|description (category: constant)
+# @global GPU_TOOLS — Каталог инструментов: тир|пакет|описание (категория: constant)
+#   Тиры / tiers: 1 — базовые (diagnostics), 2 — мониторинг (monitoring),
+#   3 — стресс/бенчмарки (stress/benchmark), 4 — тест памяти (VRAM test).
+declare -gA GPU_TOOLS=(
+    [lspci]="1|pciutils|PCI bus enumeration / шина PCI"
+    [nvidia-smi]="1|nvidia-utils|NVIDIA diagnostics (temp/VRAM/utilization)"
+    [glxinfo]="1|mesa-utils|OpenGL renderer and version info"
+    [vulkaninfo]="1|vulkan-tools|Vulkan devices and extensions"
+    [nvtop]="2|nvtop|Unified GPU monitor (NVIDIA/AMD/Intel)"
+    [radeontop]="2|radeontop|AMD Radeon utilization monitor"
+    [amdgpu_top]="2|amdgpu_top|AMD GPU top (modern radeontop replacement)"
+    [intel_gpu_top]="2|intel-gpu-tools|Intel GPU utilization monitor"
+    [rocm-smi]="2|rocm-smi-lib|AMD ROCm system management"
+    [glmark2]="3|glmark2|OpenGL 2.0 benchmark"
+    [vkcube]="3|vulkan-tools|Vulkan smoke/load demo"
+    [glxgears]="3|mesa-utils|OpenGL load demo (FPS)"
+    [gpu-burn]="3|gpu-burn|CUDA compute stress test"
+    [vkmark]="3|vkmark|Vulkan benchmark"
+    [vulkan-memtest]="4|vulkan-memtest|VRAM memory test (bad cells)"
+)
+
+# @description Каталог инструментов / Tools catalog
+# @param $1 [optional] Фильтр по тиру 1|2|3|4 / Tier filter
+# @stdout "tier<TAB>tool<TAB>package<TAB>description" по строке на инструмент
+# @return E_SUCCESS
+# @example
+#   gpu::tools 1          # только базовые / only tier 1
+gpu::tools() {
+    local -r tier_filter="${1:-}"
+    local tool spec tier pkg desc
+    for tool in "${!GPU_TOOLS[@]}"; do
+        spec="${GPU_TOOLS[${tool}]}"
+        tier="${spec%%|*}"
+        if is::not_empty "${tier_filter}" && [[ "${tier}" != "${tier_filter}" ]]; then
+            continue
+        fi
+        pkg="${spec#*|}"
+        desc="${pkg#*|}"
+        pkg="${pkg%%|*}"
+        printf '%s\t%s\t%s\t%s\n' "${tier}" "${tool}" "${pkg}" "${desc}"
+    done | sort
+    return "${E_SUCCESS}"
+}
+
+# @description Установленные инструменты каталога / Installed catalog tools
+# @param $1 [optional] Фильтр по тиру 1|2|3|4 / Tier filter
+# @stdout "tier<TAB>tool" по строке на инструмент
+# @return E_SUCCESS
+gpu::tools_available() {
+    local -r tier_filter="${1:-}"
+    local tool spec tier
+    for tool in "${!GPU_TOOLS[@]}"; do
+        spec="${GPU_TOOLS[${tool}]}"
+        tier="${spec%%|*}"
+        if is::not_empty "${tier_filter}" && [[ "${tier}" != "${tier_filter}" ]]; then
+            continue
+        fi
+        if is::command "${tool}"; then
+            printf '%s\t%s\n' "${tier}" "${tool}"
+        fi
+    done | sort
+    return "${E_SUCCESS}"
+}
+
+# @description Проверить наличие инструментов каталога / Check catalog tools presence
+# @param $1 [optional] Фильтр по тиру 1|2|3|4 / Tier filter
+# @stdout строки "[OK]"/"[MISS]" с тиром и пакетом
+# @return E_SUCCESS все на месте; LIB_ERROR_DEPENDENCY_MISSING чего-то нет
+gpu::check_dependencies() {
+    local -r tier_filter="${1:-}"
+    local tool spec tier pkg missing=0
+    for tool in "${!GPU_TOOLS[@]}"; do
+        spec="${GPU_TOOLS[${tool}]}"
+        tier="${spec%%|*}"
+        if is::not_empty "${tier_filter}" && [[ "${tier}" != "${tier_filter}" ]]; then
+            continue
+        fi
+        pkg="${spec#*|}"
+        pkg="${pkg%%|*}"
+        if is::command "${tool}"; then
+            printf '[OK]   tier=%s %-16s package=%s\n' "${tier}" "${tool}" "${pkg}"
+        else
+            printf '[MISS] tier=%s %-16s package=%s\n' "${tier}" "${tool}" "${pkg}"
+            missing=1
+        fi
+    done
+    if (( missing == 0 )); then
+        return "${E_SUCCESS}"
+    fi
+    return "${LIB_ERROR_DEPENDENCY_MISSING}"
+}
+
+# @description Доустановить недостающие инструменты каталога / Install missing tools
+# @param $1 [optional] Фильтр по тиру 1|2|3|4 / Tier filter
+# @return E_SUCCESS установлены/нечего ставить; код ошибки установки
+gpu::install_dependencies() {
+    local -r tier_filter="${1:-}"
+    local -a missing=()
+    local tool spec tier pkg
+    for tool in "${!GPU_TOOLS[@]}"; do
+        spec="${GPU_TOOLS[${tool}]}"
+        tier="${spec%%|*}"
+        if is::not_empty "${tier_filter}" && [[ "${tier}" != "${tier_filter}" ]]; then
+            continue
+        fi
+        if ! is::command "${tool}"; then
+            pkg="${spec#*|}"
+            pkg="${pkg%%|*}"
+            missing+=("${pkg}")
+        fi
+    done
+    if (( ${#missing[@]} == 0 )); then
+        log::info "gpu: all catalog tools already installed"
+        return "${E_SUCCESS}"
+    fi
+    local -a uniq=()
+    for pkg in "${missing[@]}"; do
+        [[ " ${uniq[*]} " == *" ${pkg} "* ]] || uniq+=("${pkg}")
+    done
+    log::info "gpu: installing missing tools: ${uniq[*]}"
+    system::packages::install "${uniq[@]}"
+}
+
+# @description Запустить инструмент каталога / Run a catalog tool
+# @param $1 Имя инструмента / Tool name
+# @param $@ [optional] Аргументы / Arguments
+# @stdout вывод инструмента / tool output
+# @return код инструмента; LIB_ERROR_DEPENDENCY_MISSING не установлен
+# @example
+#   gpu::run vulkaninfo --summary
+gpu::run() {
+    local -r tool="${1:?tool name required}"
+    shift
+    if ! is::command "${tool}"; then
+        local hint=""
+        if [[ -v GPU_TOOLS["${tool}"] ]]; then
+            hint="${GPU_TOOLS[${tool}]}"
+            hint="${hint#*|}"
+            hint="${hint%%|*}"
+        fi
+        log::error "gpu::run: ${tool} not installed${hint:+ (package: ${hint})}"
+        return "${LIB_ERROR_DEPENDENCY_MISSING}"
+    fi
+    "${tool}" "$@"
+}
+
+# @description OpenGL info (glxinfo -B) / Информация OpenGL
+gpu::glxinfo() {
+    gpu::run glxinfo -B
+}
+
+# @description Vulkan info (vulkaninfo --summary) / Информация Vulkan
+gpu::vulkaninfo() {
+    gpu::run vulkaninfo --summary
+}
+
+# @description AMD utilization snapshot (radeontop -d -) / Утилизация AMD
+gpu::radeontop() {
+    gpu::run radeontop -d -
+}
+
+# @description Unified GPU monitor (nvtop) / Монитор GPU
+gpu::nvtop() {
+    gpu::run nvtop
+}
+
+# @description AMD GPU top (amdgpu_top) / Монитор AMD
+gpu::amdgpu_top() {
+    gpu::run amdgpu_top
+}
+
+# @description Intel GPU monitor (intel_gpu_top) / Монитор Intel
+gpu::intel_gpu_top() {
+    gpu::run intel_gpu_top
+}
+
+# @description AMD ROCm info (rocm-smi) / Информация ROCm
+gpu::rocm_smi() {
+    gpu::run rocm-smi --showtemp --showuse
+}
+
+# @description OpenGL benchmark (glmark2) / Бенчмарк OpenGL
+gpu::glmark2() {
+    gpu::run glmark2
+}
+
+# @description Vulkan smoke test (vkcube) / Смоук-тест Vulkan
+gpu::vkcube() {
+    gpu::run vkcube
+}
+
+# @description OpenGL FPS demo (glxgears) / Демо FPS
+gpu::glxgears() {
+    gpu::run glxgears
+}
+
+# @description CUDA compute stress (gpu-burn) / Стресс CUDA
+gpu::gpu_burn() {
+    gpu::run gpu-burn
+}
+
+# @description Vulkan benchmark (vkmark) / Бенчмарк Vulkan
+gpu::vkmark() {
+    gpu::run vkmark
+}
+
+# @description VRAM memory test (vulkan-memtest) / Тест памяти VRAM
+gpu::vulkan_memtest() {
+    gpu::run vulkan-memtest
 }
 
 # ==========================================

@@ -83,6 +83,34 @@ gpu::info             # сводка k=v: vendor/name/driver/vram/temperature/ut
 `LIB_ERROR_FILE_NOT_FOUND` (GPU не найдена). `gpu::info` — код
 `LIB_ERROR_FILE_NOT_FOUND` при отсутствии GPU.
 
+## Каталог инструментов
+
+Каталог специализированных программ диагностики и тестирования GPU с тирами
+(`GPU_TOOLS[tool]="tier|package|description"`):
+
+| Tier | Назначение | Инструменты |
+|---|---|---|
+| 1 | базовые | `lspci`, `nvidia-smi`, `glxinfo`, `vulkaninfo` |
+| 2 | мониторинг | `nvtop`, `radeontop`, `amdgpu_top`, `intel_gpu_top`, `rocm-smi` |
+| 3 | стресс/бенчмарк | `glmark2`, `vkcube`, `glxgears`, `gpu-burn`, `vkmark` |
+| 4 | тест памяти | `vulkan-memtest` |
+
+```bash
+gpu::tools 1                       # каталог, фильтр по тиру: "tier<TAB>tool<TAB>pkg<TAB>desc"
+gpu::tools_available               # только установленные
+gpu::check_dependencies [tier]     # отчёт [OK]/[MISS] по каждому; E_SUCCESS / LIB_ERROR_DEPENDENCY_MISSING
+gpu::install_dependencies [tier]   # доустановка недостающих через system::packages::install (дедупликация пакетов)
+gpu::run glxinfo -B                # запуск тула; нет тула → LIB_ERROR_DEPENDENCY_MISSING
+gpu::glxinfo                       # обёртка: glxinfo -B (краткая инфа OpenGL)
+gpu::vulkaninfo                    # обёртка: vulkaninfo --summary
+gpu::radeontop                     # обёртка: radeontop -d - (одноразовый снимок AMD)
+gpu::rocm_smi                      # обёртка: rocm-smi --showtemp --showuse
+gpu::nvtop / gpu::amdgpu_top / gpu::intel_gpu_top
+gpu::glmark2 / gpu::vkcube / gpu::glxgears / gpu::gpu_burn / gpu::vkmark
+gpu::vulkan_memtest                # тест VRAM на битые ячейки
+```
+
 ## Связанное
 
-- `examples/gpu_diag.sh` — CLI-точка: `--list`, `--check`, `--stress N`.
+- `examples/gpu_diag.sh` — CLI-точка: `--list`, `--check`, `--stress N`,
+  `--tools`, `--run <tool>`, `--deps [tier]`.
