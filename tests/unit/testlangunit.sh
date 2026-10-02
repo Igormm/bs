@@ -590,6 +590,18 @@ test_is_predicates() {
     rm -f "${tmp_file}" "${tmp_link}"
 }
 
+# Test bs::eval evaluates code and reports failures
+test_eval() {
+    local v=""
+    bs::eval 'v="ok"'
+    testframework::assert_equal "ok" "${v}" "bs::eval sets variables in caller"
+
+    testframework::assert_equal "14" "$(bs::eval 'printf "%s" "$(( 2 * 7 ))"')" "bs::eval computes expressions"
+
+    testframework::assert_false "bs::eval 'false'" "bs::eval reports failure status"
+    testframework::assert_false "bs::eval 'return 3'" "bs::eval propagates nonzero status"
+}
+
 main() {
     print_header "Core Lang Unit Tests / Модульные тесты core/lang"
 
@@ -599,6 +611,9 @@ main() {
     test_func_name
     test_call_stack
     test_type_predicates
+
+    testframework::section "Eval / Выполнение"
+    test_eval
 
     testframework::section "Strings / Строки"
     test_strings

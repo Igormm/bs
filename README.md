@@ -16,6 +16,9 @@ consistent code style and with zero external dependencies.
   скрипты не требуют bootstrap-бойлерплейта
 - **Интерактивный REPL `bs repl`** — сессия с загруженным ядром: `load`,
   eval-выражения, история команд, интроспекция (`:list`, `:doc`, `:info`)
+- **RPN-калькулятор `bs calc`** — обратная польская нотация на `dc`:
+  однострочный (`bs calc '2 3 4 * +'`) и интерактивный режим (стек живёт
+  между строками)
 - **Standalone-сборка `bs build`** — превращает скрипт в один
   самодостаточный файл (фреймворк внутри, извлекается в кэш при первом
   запуске): работает в любом дистрибутиве без установки BS
@@ -59,6 +62,9 @@ consistent code style and with zero external dependencies.
 
 # Интерактивная консоль / Interactive shell
 ./bs repl
+
+# RPN-калькулятор / RPN calculator
+./bs calc '2 3 4 * +'
 
 # Список модулей / List modules
 ./bs list

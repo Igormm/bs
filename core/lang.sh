@@ -1618,6 +1618,24 @@ bs::expect() {
   printf '%s\n' "${__unw_val}"
 }
 
+# @description Evaluate a string of Bash code; on failure report the caller's
+#   file and line. Replaces a bare `eval` where error context is wanted.
+# @description Выполнить строку Bash-кода; при сбое указать файл и строку
+#   вызывающего. Заменяет голый `eval` там, где нужен контекст ошибки.
+# @param $1 {string} Code to evaluate / Выполняемый код
+# @return exit status of the evaluated code / код возврата кода
+# @example
+#   if bs::eval 'x=42'; then printf '%s\n' "${x}"; fi
+bs::eval() {
+  local -r code="${1:?code required}"
+  if ! eval "${code}"; then
+    printf 'bs::eval: code failed (%s:%s): %s\n' \
+      "${BASH_SOURCE[1]:-unknown}" "${BASH_LINENO[0]:-0}" "${code}" >&2
+    return 1
+  fi
+  return 0
+}
+
 # ==========================================
 # is:: — predicates for humans / предикаты для людей
 #

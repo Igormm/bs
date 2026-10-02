@@ -90,6 +90,7 @@ Commands:
   run <script> [args] Execute script inside BS environment
   build <script>      Assemble a standalone self-extracting script
   repl                Interactive REPL (BS shell / интерактивная консоль)
+  calc                RPN calculator on dc (обратная польская нотация)
   update              Apply repo changes to installed copies (no reinstall)
   uninstall           Remove installed BS copies (wrapper + lib tree)
   init-shell          Print snippet for ~/.bashrc or ~/.zshrc
@@ -308,7 +309,7 @@ doctor_cmd() {
   # (bootstrap/bs.sh::bs::shell::ensure_version) — повторная проверка не нужна.
 
   # Required core files / Обязательные файлы ядра
-  local req=(bootstrap/init.sh bootstrap/loader.sh bootstrap/bs.sh core/prereq.sh core/lang.sh core/const.sh core/logger.sh core/errorhandler.sh core/version.sh core/utils.sh core/config.sh core/deps.sh core/repl.sh)
+  local req=(bootstrap/init.sh bootstrap/loader.sh bootstrap/bs.sh core/prereq.sh core/lang.sh core/const.sh core/logger.sh core/errorhandler.sh core/version.sh core/utils.sh core/config.sh core/deps.sh core/repl.sh core/calc.sh)
   local f
   for f in "${req[@]}"; do
     if is::file "${BS_ROOT}/${f}"; then
@@ -1050,7 +1051,7 @@ ts_cmd() {
 # первый аргумент — путь к существующему скрипту, а не команда.
 if [[ $# -ge 1 && -f "$1" ]]; then
   case "$1" in
-    help|-h|--help|version|env|list|lang-doc|lsp|chat|sync|rfc|api|ts|audit|doctor|run|build|repl|init-shell|update|uninstall) : ;;
+    help|-h|--help|version|env|list|lang-doc|lsp|chat|sync|rfc|api|ts|audit|doctor|run|build|repl|calc|init-shell|update|uninstall) : ;;
     *) BS_SHEBANG=1 ;;
   esac
 fi
@@ -1084,6 +1085,11 @@ case "${1:-help}" in
                     die "repl: core/repl.sh not found"
                   fi
                   repl::main "$@" ;;
+  calc)           shift
+                  if ! source -- "${BS_ROOT}/core/calc.sh"; then
+                    die "calc: core/calc.sh not found"
+                  fi
+                  calc::main "$@" ;;
   init-shell)     init_shell_cmd ;;
   *)              die "unknown command: $1" ;;
 esac

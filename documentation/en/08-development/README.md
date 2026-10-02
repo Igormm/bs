@@ -241,3 +241,22 @@ overrides it). Prompts: `BS_REPL_PROMPT1` / `BS_REPL_PROMPT2`.
 Line continuation with a trailing backslash. Implementation:
 `core/repl.sh` ([repl.sh](../../../core/repl.sh)), tests:
 `tests/integration/testrepl.sh`.
+
+## bs calc — RPN calculator
+
+`bs calc` evaluates reverse Polish notation on `dc`: numbers go on the
+stack, operators pop them and push the result. The top of the stack is
+printed automatically unless the expression ends with a print command
+(`p`, `n`, `P`, `f`) or contains a `#` comment:
+
+```bash
+bs calc '2 3 4 * +'        # → 14
+bs calc '10k 355 113 /'    # → 3.1415929203 (scale 10)
+bs calc                    # interactive mode: the stack persists
+dc> 2 3 +
+dc> 4 *                    # → 5, then 20
+```
+
+Exit interactive mode with `:q` or Ctrl-D. Implementation:
+`core/calc.sh` ([calc.sh](../../../core/calc.sh)), tests:
+`tests/integration/testcalc.sh`.
