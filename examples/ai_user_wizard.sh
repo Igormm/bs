@@ -52,6 +52,7 @@
 load "lib/ui/presentation"
 load "lib/ui/steplog"
 load "lib/ui/wizard"
+load "lib/network/avahi"
 load "lib/system/apply"
 load "lib/system/systemd"
 load "lib/system/user"
@@ -681,6 +682,9 @@ main() {
     # реальный IP машины для строки подключения / the machine IP for the connect line
     local -r machine_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
     is::empty "${machine_ip}" && local -r machine_ip="<ip>"
+    # mDNS .local имя хоста для подключения без запоминания IP
+    # mDNS .local hostname for connecting without memorizing the IP
+    local -r avahi_host="$(network::avahi::hostname_local)"
 
     local -a final_lines=(
         "Готово! Сервер запущен / Done! The server is running"
@@ -692,9 +696,14 @@ main() {
         final_lines+=(
             "    opencode attach http://${machine_ip}:${port} -u opencode"
             "      -p '${ai_pass}'"
+            "    opencode attach http://${avahi_host}:${port} -u opencode"
+            "      -p '${ai_pass}'  (mDNS / .local)"
         )
     else
-        final_lines+=("    opencode attach http://${machine_ip}:${port}")
+        final_lines+=(
+            "    opencode attach http://${machine_ip}:${port}"
+            "    opencode attach http://${avahi_host}:${port}  (mDNS / .local)"
+        )
     fi
 
     if [[ "${svc}" != "2" ]]; then
@@ -775,6 +784,10 @@ main() {
     presentation::info "     opencode attach http://${machine_ip}:${port}"
     if is::not_empty "${ai_pass}"; then
         presentation::info "         -u opencode -p '${ai_pass}'"
+    fi
+    presentation::info "     opencode attach http://${avahi_host}:${port}"
+    if is::not_empty "${ai_pass}"; then
+        presentation::info "         -u opencode -p '${ai_pass}'  (mDNS / .local)"
     fi
     presentation::info "  2. Управление / Manage:"
     if [[ "${svc}" != "2" ]]; then
