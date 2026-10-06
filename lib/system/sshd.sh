@@ -479,3 +479,40 @@ sshd::revert() {
     cp -f -- "${latest}" "${target}" || return "${LIB_ERROR_FILE_OPERATION}"
     printf '%s\n' "${latest}"
 }
+
+# @description Install a rendered config as a managed block inside the main
+# config: strip any previous block between the markers, append the new one,
+# validate with sshd -t, and roll back on failure.
+# @description Установить конфиг управляемым блоком в основной конфиг:
+# удалить прежний блок между маркерами, добавить новый, проверить sshd -t и
+# откатиться при неудаче.
+# @param $1 Source file (with markers) / Файл-источник (с маркерами)
+# @return E_SUCCESS / LIB_ERROR_*
+sshd::install_main() {
+    local -r src="${1:?source file required}"
+    is::file "${src}" || return "${LIB_ERROR_FILE_NOT_FOUND}"
+    if (( BS_SSHD_DRY_RUN == 1 )); then
+        printf 'dry-run: install main block %s -> %s\n' "${src}" "${BS_SSHD_MAIN}" >&2
+        return "${E_SUCCESS}"
+    fi
+    is::writable "$(dirname -- "${BS_SSHD_MAIN}")" || return "${LIB_ERROR_PERMISSION_DENIED}"
+    local backup=""
+    if is::file "${BS_SSHD_MAIN}"; then
+        backup="$(sshd::backup "${BS_SSHD_MAIN}")" || return $?
+    fi
+    local -r tmp="${BS_SSHD_MAIN}.bs.tmp"
+    awk -v b="${SSHD_MARK_BEGIN}" -v e="${SSHD_MARK_END}" '
+        $0 == b {skip=1; next}
+        $0 == e {skip=0; next}
+        !skip   {print}
+    ' "${BS_SSHD_MAIN}" 2>/dev/null > "${tmp}"
+    printf '\n' >> "${tmp}"
+    cat -- "${src}" >> "${tmp}"
+    if ! sshd::test "${tmp}" >/dev/null 2>&1; then
+        rm -f -- "${tmp}"
+        return "${LIB_ERROR_INVALID_INPUT}"
+    fi
+    mv -f -- "${tmp}" "${BS_SSHD_MAIN}" || return "${LIB_ERROR_FILE_OPERATION}"
+    sshd::reload || printf 'warning: reload %s failed / не удалось\n' "${BS_SSHD_SERVICE}" >&2
+    return "${E_SUCCESS}"
+}

@@ -183,6 +183,28 @@ EOF
 
     rm -rf "${tmp}"
 
+    testframework::section "install_main / managed block"
+    local mt; mt="$(mktemp -d)"
+    export BS_SSHD_MAIN="${mt}/sshd_config"
+    export BS_SSHD_BIN="${mt}/sshd-fake"
+    cat > "${BS_SSHD_BIN}" <<'EOF'
+#!/bin/bash
+file="${!#}"
+grep -q BAD "${file}" && exit 1
+exit 0
+EOF
+    chmod +x "${BS_SSHD_BIN}"
+    printf 'Include /etc/ssh/sshd_config.d/*.conf\n' > "${BS_SSHD_MAIN}"
+    printf '%s\nPort 2222\n%s\n' "${SSHD_MARK_BEGIN}" "${SSHD_MARK_END}" > "${mt}/block.conf"
+    local mrc=0; sshd::install_main "${mt}/block.conf" || mrc=$?
+    testframework::assert_equal "0" "${mrc}" "install_main ok"
+    testframework::assert_command "grep -q '^Include ' '${BS_SSHD_MAIN}'" "preexisting line preserved"
+    testframework::assert_command "grep -q '^Port 2222$' '${BS_SSHD_MAIN}'" "block content inserted"
+    testframework::assert_equal "1" "$(grep -cF "${SSHD_MARK_BEGIN}" "${BS_SSHD_MAIN}")" "single begin marker"
+    sshd::install_main "${mt}/block.conf" || true
+    testframework::assert_equal "1" "$(grep -cF "${SSHD_MARK_BEGIN}" "${BS_SSHD_MAIN}")" "no duplicate block"
+    rm -rf "${mt}"
+
     testframework::summary
 }
 

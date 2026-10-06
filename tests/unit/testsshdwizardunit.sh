@@ -70,6 +70,14 @@ main() {
     testframework::assert_equal "2222" "${SSHD_WZ_VALUES[Port]}" "valid value stored"
     testframework::assert_equal "" "$(tui::modal::top)" "modal closed on commit"
 
+    testframework::section "render/apply / рендер и применение"
+    SSHD_WZ_VALUES[Port]="2222"
+    local cfg; cfg="$(sshd_wz::render_config)"
+    testframework::assert_command "printf '%s' '${cfg}' | grep -q '^Port 2222$'" "render_config includes Port"
+    SSHD_WZ_TARGET="print"; SSHD_WZ_VIEW="params"
+    sshd_wz::apply
+    testframework::assert_equal "preview" "${SSHD_WZ_VIEW}" "print target switches to preview"
+
     testframework::summary
 }
 

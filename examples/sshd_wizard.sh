@@ -269,7 +269,23 @@ sshd_wz::draw_desc() {
 }
 
 sshd_wz::draw_status() {
-    tui::statusbar "  ←→ секция · ↑↓ параметр · Enter правка · Space toggle · P профиль · V preview · A apply · ? справка · q выход" "$(tui::style bg_black white)"
+    tui::statusbar "  ←→ секция · ↑↓ параметр · Enter правка · P профиль · M match · V preview · A apply · ? справка · q выход" "$(tui::style bg_black white)"
+}
+
+sshd_wz::draw_help() {
+    local -i w=70 h=12
+    tui::center "${w}" "${h}"
+    local -i bx="${TUI_CENTER_X}" by="${TUI_CENTER_Y}"
+    tui::box "${by}" "${bx}" "${w}" "${h}" "Справка / Help" "$(tui::style bold cyan)"
+    tui::put $(( by + 2 )) $(( bx + 2 )) "←→  секция / section" ""
+    tui::put $(( by + 3 )) $(( bx + 2 )) "↑↓  параметр / param" ""
+    tui::put $(( by + 4 )) $(( bx + 2 )) "Enter/Space — правка значения / edit value" ""
+    tui::put $(( by + 5 )) $(( bx + 2 )) "P — профиль (basic/strict/paranoid/custom)" ""
+    tui::put $(( by + 6 )) $(( bx + 2 )) "M — секция Match/chroot" ""
+    tui::put $(( by + 7 )) $(( bx + 2 )) "V — предпросмотр / preview" ""
+    tui::put $(( by + 8 )) $(( bx + 2 )) "A — применить / apply" ""
+    tui::put $(( by + 9 )) $(( bx + 2 )) "q — выход / quit" ""
+    tui::put $(( by + 10 )) $(( bx + 2 )) "Enter/Esc — закрыть / close" "$(tui::style dim)"
 }
 
 sshd_wz::draw() {
@@ -279,6 +295,88 @@ sshd_wz::draw() {
     sshd_wz::draw_params
     sshd_wz::draw_desc
     sshd_wz::draw_status
+}
+
+# ==========================================
+# Preview / Apply / Просмотр и применение
+# ==========================================
+
+# @private Render current values as config text / Отрендерить текущие значения
+sshd_wz::render_config() {
+    local name value
+    for name in "${SSHD_PARAM_ORDER[@]}"; do
+        value="${SSHD_WZ_VALUES[$name]:-}"
+        is::not_empty "${value}" || continue
+        printf '%s=%s\n' "${name}" "${value}"
+    done | sshd::render
+}
+
+sshd_wz::draw_preview() {
+    local text; text="$(sshd_wz::render_config)"
+    local -i w=$(( TUI_COLS - 4 )) h=$(( TUI_LINES - 2 ))
+    tui::box 1 1 "${w}" "${h}" "Предпросмотр / Preview" "$(tui::style bold green)"
+    local -a lines=(); mapfile -t lines <<< "${text}"
+    local -i i
+    for (( i = 0; i < h - 2 && i < ${#lines[@]}; i++ )); do
+        tui::put $(( 2 + i )) 3 "${lines[$i]:0:$(( w - 4 ))}" ""
+    done
+}
+
+sshd_wz::open_preview() {
+    tui::modal::open preview sshd_wz::draw_preview
+}
+
+sshd_wz::modal_result_draw() {
+    local -i w=64 h=6
+    tui::center "${w}" "${h}"
+    tui::box "${TUI_CENTER_Y}" "${TUI_CENTER_X}" "${w}" "${h}" "Результат / Result" "$(tui::style bold cyan)"
+    tui::put $(( TUI_CENTER_Y + 2 )) $(( TUI_CENTER_X + 2 )) "${SSHD_WZ_STATUS:0:$(( w - 4 ))}" ""
+    tui::put $(( TUI_CENTER_Y + 4 )) $(( TUI_CENTER_X + 2 )) "Enter — закрыть / close" "$(tui::style dim)"
+}
+
+sshd_wz::apply() {
+    case "${SSHD_WZ_TARGET}" in
+        dropin|main)
+            local -r tmpf="${TMPDIR:-/tmp}/bs-sshd-wizard.conf"
+            sshd_wz::render_config > "${tmpf}"
+            local rc=0
+            if [[ "${SSHD_WZ_TARGET}" == "dropin" ]]; then
+                sshd::install "${tmpf}" || rc=$?
+            else
+                sshd::install_main "${tmpf}" || rc=$?
+            fi
+            if (( rc == 0 )); then
+                SSHD_WZ_STATUS="Установлено / Installed (${SSHD_WZ_TARGET})"
+            else
+                SSHD_WZ_STATUS="Ошибка / Error: ${rc}"
+            fi
+            tui::modal::open result sshd_wz::modal_result_draw
+            ;;
+        print) SSHD_WZ_VIEW="preview" ;;
+    esac
+    return 0
+}
+
+sshd_wz::cycle_profile() {
+    case "${SSHD_WZ_PROFILE}" in
+        custom)   sshd_wz::apply_profile basic ;;
+        basic)    sshd_wz::apply_profile strict ;;
+        strict)   sshd_wz::apply_profile paranoid ;;
+        paranoid) sshd_wz::apply_profile custom ;;
+        *)        sshd_wz::apply_profile basic ;;
+    esac
+    return 0
+}
+
+sshd_wz::jump_match() {
+    local i
+    for i in "${!SSHD_WZ_SECTIONS[@]}"; do
+        if [[ "${SSHD_WZ_SECTIONS[$i]}" == "Match" ]]; then
+            SSHD_WZ_SECTION=$i; SSHD_WZ_SELECT=0; sshd_wz::load_names
+            break
+        fi
+    done
+    return 0
 }
 
 # ==========================================
@@ -326,11 +424,21 @@ main() {
         tui::render
         tui::key_read
         top="$(tui::modal::top)"
-        if is::not_empty "${top}"; then
+        if [[ "${top}" == "edit" ]]; then
             sshd_wz::handle_edit_key
+        elif is::not_empty "${top}"; then
+            case "${TUI_KEY}" in
+                ENTER|ESC|q|Q) tui::modal::close ;;
+                *) : ;;
+            esac
         else
             case "${TUI_KEY}" in
                 ENTER|SPACE) sshd_wz::begin_edit ;;
+                V|v) sshd_wz::open_preview ;;
+                A|a) sshd_wz::apply ;;
+                P|p) sshd_wz::cycle_profile ;;
+                M|m) sshd_wz::jump_match ;;
+                '?') tui::modal::open help sshd_wz::draw_help ;;
                 *) sshd_wz::handle_view_key || running=0 ;;
             esac
         fi
