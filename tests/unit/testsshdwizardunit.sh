@@ -45,6 +45,31 @@ main() {
     sshd_wz::apply_profile strict
     testframework::assert_equal "no" "${SSHD_WZ_VALUES[PasswordAuthentication]:-}" "strict fills PasswordAuthentication=no"
 
+    testframework::section "edit modal / модалка правки"
+    SSHD_WZ_SECTION=0; sshd_wz::load_names
+    local idx=-1 i
+    for (( i = 0; i < ${#SSHD_WZ_NAMES[@]}; i++ )); do
+        [[ "${SSHD_WZ_NAMES[$i]}" == "Port" ]] && idx=$i
+    done
+    testframework::assert_true "idx -ge 0" "Port is in Network"
+    SSHD_WZ_SELECT="${idx}"
+    SSHD_WZ_VALUES[Port]="22"
+    sshd_wz::begin_edit
+    testframework::assert_equal "edit" "$(tui::modal::top)" "port opens edit modal"
+    testframework::assert_equal "input" "${SSHD_WZ_EDIT_MODE}" "port uses input mode"
+    testframework::assert_equal "22" "${SSHD_WZ_EDIT_VALUE}" "input seeded with current value"
+    tui::modal::close
+
+    SSHD_WZ_EDIT_VALUE="70000"
+    SSHD_WZ_EDIT_SEL=0
+    sshd_wz::commit_edit
+    testframework::assert_true "-n '${SSHD_WZ_EDIT_ERR}'" "invalid value sets error"
+
+    SSHD_WZ_EDIT_VALUE="2222"
+    sshd_wz::commit_edit
+    testframework::assert_equal "2222" "${SSHD_WZ_VALUES[Port]}" "valid value stored"
+    testframework::assert_equal "" "$(tui::modal::top)" "modal closed on commit"
+
     testframework::summary
 }
 
