@@ -16,8 +16,14 @@
 #   ./examples/sshd_wizard.sh [--dry-run] [--help]
 #
 # Keys / Клавиши:
-#   ←→ секция · ↑↓ параметр · Enter правка · Space toggle · P профиль ·
-#   V preview · A apply · r сброс · ? справка · q выход
+#   ← — фокус в левое меню секций · → — назад к параметрам · ↑↓ — выбор в
+#   панели под фокусом · Enter — правка (в меню — вход в параметры) ·
+#   T цель · P профиль · M match · C критерии · V preview · A apply ·
+#   ? справка · q выход
+#   ← — focus the left sections menu · → — back to parameters · ↑↓ — move in
+#   the focused pane · Enter — edit (in the menu — enter parameters) ·
+#   T target · P profile · M match · C criteria · V preview · A apply ·
+#   ? help · q quit
 
 load "lib/system/sshd"
 load "lib/tui/tui"
@@ -86,6 +92,56 @@ declare -gi SSHD_WZ_MATCH_CURSOR=0
 # @global SSHD_WZ_CONFIRM_SEL — Sshd wizard: confirm selection (category: state)
 # @global SSHD_WZ_CONFIRM_SEL — Визард sshd: выбор подтверждения (категория: state)
 declare -gi SSHD_WZ_CONFIRM_SEL=0
+# @global SSHD_WZ_FOCUS — Sshd wizard: focused pane menu|params (category: state)
+# @global SSHD_WZ_FOCUS — Визард sshd: панель под фокусом menu|params (категория: state)
+declare -g SSHD_WZ_FOCUS="params"
+# @global SSHD_WZ_PARAMS_PAINTED — Sshd wizard: param rows currently painted (category: state)
+# @global SSHD_WZ_PARAMS_PAINTED — Визард sshd: сколько строк параметров нарисовано (категория: state)
+declare -gi SSHD_WZ_PARAMS_PAINTED=0
+# @global SSHD_WZ_PAD — Sshd wizard: padding scratch buffer (category: state)
+# @global SSHD_WZ_PAD — Визард sshd: буфер выравнивания (категория: state)
+declare -g SSHD_WZ_PAD=""
+# @global SSHD_WZ_SEC_LEN — Sshd wizard: painted section text lengths (category: state)
+# @global SSHD_WZ_SEC_LEN — Визард sshd: длины нарисованных секций (категория: state)
+declare -gA SSHD_WZ_SEC_LEN=()
+# @global SSHD_WZ_PAR_LEN — Sshd wizard: painted param text lengths (category: state)
+# @global SSHD_WZ_PAR_LEN — Визард sshd: длины нарисованных параметров (категория: state)
+declare -gA SSHD_WZ_PAR_LEN=()
+# @global SSHD_WZ_DESC_LEN — Sshd wizard: painted desc text lengths (category: state)
+# @global SSHD_WZ_DESC_LEN — Визард sshd: длины нарисованной подсказки (категория: state)
+declare -gA SSHD_WZ_DESC_LEN=()
+# Cached SGR styles (set once per frame; $(tui::style) forks a subshell).
+# Кеш SGR-стилей (заполняется раз за кадр; $(tui::style) форкает подшелл).
+# @global SSHD_WZ_ST_TITLE — Sshd wizard: title style (category: state)
+# @global SSHD_WZ_ST_TITLE — Визард sshd: стиль заголовка (категория: state)
+declare -g SSHD_WZ_ST_TITLE=""
+# @global SSHD_WZ_ST_SEC — Sshd wizard: sections box style (category: state)
+# @global SSHD_WZ_ST_SEC — Визард sshd: стиль рамки секций (категория: state)
+declare -g SSHD_WZ_ST_SEC=""
+# @global SSHD_WZ_ST_PAR — Sshd wizard: params box style (category: state)
+# @global SSHD_WZ_ST_PAR — Визард sshd: стиль рамки параметров (категория: state)
+declare -g SSHD_WZ_ST_PAR=""
+# @global SSHD_WZ_ST_DESC — Sshd wizard: desc box style (category: state)
+# @global SSHD_WZ_ST_DESC — Визард sshd: стиль рамки подсказки (категория: state)
+declare -g SSHD_WZ_ST_DESC=""
+# @global SSHD_WZ_ST_OK — Sshd wizard: set-value style (category: state)
+# @global SSHD_WZ_ST_OK — Визард sshd: стиль заданного значения (категория: state)
+declare -g SSHD_WZ_ST_OK=""
+# @global SSHD_WZ_ST_DIM — Sshd wizard: dim style (category: state)
+# @global SSHD_WZ_ST_DIM — Визард sshd: приглушённый стиль (категория: state)
+declare -g SSHD_WZ_ST_DIM=""
+# @global SSHD_WZ_ST_SEL — Sshd wizard: focused selection style (category: state)
+# @global SSHD_WZ_ST_SEL — Визард sshd: стиль выбора в фокусе (категория: state)
+declare -g SSHD_WZ_ST_SEL=""
+# @global SSHD_WZ_ST_SEL_OFF — Sshd wizard: unfocused selection style (category: state)
+# @global SSHD_WZ_ST_SEL_OFF — Визард sshd: стиль выбора без фокуса (категория: state)
+declare -g SSHD_WZ_ST_SEL_OFF=""
+# @global SSHD_WZ_ST_STATUS — Sshd wizard: statusbar style (category: state)
+# @global SSHD_WZ_ST_STATUS — Визард sshd: стиль статус-бара (категория: state)
+declare -g SSHD_WZ_ST_STATUS=""
+# @global SSHD_WZ_ST_RED — Sshd wizard: error style (category: state)
+# @global SSHD_WZ_ST_RED — Визард sshd: стиль ошибки (категория: state)
+declare -g SSHD_WZ_ST_RED=""
 
 # @private Fill SSHD_WZ_SECTIONS from the catalog / Заполнить секции из каталога
 sshd_wz::load_sections() {
@@ -230,59 +286,157 @@ sshd_wz::handle_edit_key() {
 # Draw / Отрисовка
 # ==========================================
 
+# @private Cache SGR style strings once per frame / Заполнить стили раз за кадр
+sshd_wz::cache_styles() {
+    SSHD_WZ_ST_TITLE="$(tui::style bold bg_blue white)"
+    SSHD_WZ_ST_SEC="$(tui::style bold magenta)"
+    SSHD_WZ_ST_PAR="$(tui::style bold cyan)"
+    SSHD_WZ_ST_DESC="$(tui::style bold yellow)"
+    SSHD_WZ_ST_OK="$(tui::style green)"
+    SSHD_WZ_ST_DIM="$(tui::style dim)"
+    SSHD_WZ_ST_SEL="$(tui::style bold reverse cyan)"
+    SSHD_WZ_ST_SEL_OFF="$(tui::style reverse black)"
+    SSHD_WZ_ST_STATUS="$(tui::style bg_black white)"
+    SSHD_WZ_ST_RED="$(tui::style bold red)"
+    return 0
+}
+
 sshd_wz::draw_title() {
-    tui::titlebar "  BS sshd wizard  •  профиль/profile: ${SSHD_WZ_PROFILE}  •  цель/target: ${SSHD_WZ_TARGET}" "$(tui::style bold bg_blue white)"
+    tui::titlebar "  BS sshd wizard  •  профиль/profile: ${SSHD_WZ_PROFILE}  •  цель/target: ${SSHD_WZ_TARGET}" "${SSHD_WZ_ST_TITLE}"
+}
+
+# @private Put a row and erase the tail left over from a longer previous text
+# @private Нарисовать строку и стереть хвост от более длинного прежнего текста
+# @param $1 row, $2 col, $3 text, $4 style, $5 length-map name, $6 key
+sshd_wz::put_row() {
+    local -i r="$1" c="$2"
+    local text="$3" st="$4"
+    local -n __lenmap="$5"
+    local key="$6"
+    local -i prev="${__lenmap[${key}]:-0}" len=${#text}
+    tui::put "${r}" "${c}" "${text}" "${st}"
+    if (( prev > len )); then
+        printf -v SSHD_WZ_PAD '%*s' $(( prev - len )) ''
+        tui::put "${r}" $(( c + len )) "${SSHD_WZ_PAD}" ""
+    fi
+    __lenmap["${key}"]="${len}"
+    return 0
+}
+
+# @private Paint one section row / Нарисовать одну строку секций
+sshd_wz::paint_section_row() {
+    local -i i="$1" row=$(( 3 + i ))
+    local name="${SSHD_WZ_SECTIONS[$i]:-}"
+    local text="  ${name}" st=""
+    if (( i == SSHD_WZ_SECTION )); then
+        text="▸ ${name}"
+        if [[ "${SSHD_WZ_FOCUS}" == "menu" ]]; then st="${SSHD_WZ_ST_SEL}"; else st="${SSHD_WZ_ST_SEL_OFF}"; fi
+    fi
+    sshd_wz::put_row "${row}" 3 "${text}" "${st}" SSHD_WZ_SEC_LEN "${i}"
 }
 
 sshd_wz::draw_sections() {
-    tui::box 2 1 26 "${TUI_LINES_MINUS}" "Секции / Sections" "$(tui::style bold magenta)"
+    tui::box 2 1 26 "${TUI_LINES_MINUS}" "Секции / Sections" "${SSHD_WZ_ST_SEC}"
     local -i i
     for (( i = 0; i < ${#SSHD_WZ_SECTIONS[@]}; i++ )); do
-        if (( i == SSHD_WZ_SECTION )); then
-            tui::put $(( 3 + i )) 3 "▸ ${SSHD_WZ_SECTIONS[$i]}" "$(tui::style bold reverse white)"
-        else
-            tui::put $(( 3 + i )) 3 "  ${SSHD_WZ_SECTIONS[$i]}" ""
-        fi
+        sshd_wz::paint_section_row "${i}"
     done
+}
+
+# @private Paint one parameter row (blank if the index is past the list)
+# @private Нарисовать одну строку параметра (пусто, если индекс за списком)
+sshd_wz::paint_param_row() {
+    local -i i="$1" row=$(( 3 + i ))
+    local name="${SSHD_WZ_NAMES[$i]:-}"
+    local text="" st=""
+    if is::not_empty "${name}"; then
+        local value="${SSHD_WZ_VALUES[$name]:-}"
+        text="${name} = ${value}"
+        if (( i == SSHD_WZ_SELECT )); then
+            if [[ "${SSHD_WZ_FOCUS}" == "params" ]]; then st="${SSHD_WZ_ST_SEL}"; else st="${SSHD_WZ_ST_SEL_OFF}"; fi
+        elif is::not_empty "${value}"; then
+            st="${SSHD_WZ_ST_OK}"
+        else
+            st="${SSHD_WZ_ST_DIM}"
+        fi
+    fi
+    sshd_wz::put_row "${row}" 30 "${text}" "${st}" SSHD_WZ_PAR_LEN "${i}"
+}
+
+# @private Repaint param rows only (box borders are static)
+# @private Перерисовать только строки параметров (рамка статична)
+sshd_wz::paint_params_rows() {
+    local -i n=${#SSHD_WZ_NAMES[@]}
+    local -i total=$(( n > SSHD_WZ_PARAMS_PAINTED ? n : SSHD_WZ_PARAMS_PAINTED ))
+    local -i i
+    for (( i = 0; i < total; i++ )); do
+        sshd_wz::paint_param_row "${i}"
+    done
+    SSHD_WZ_PARAMS_PAINTED=$n
+    return 0
 }
 
 sshd_wz::draw_params() {
     local -i top=2 left=28
     local -i width=$(( TUI_COLS - left - 1 ))
     local -i height=$(( TUI_LINES - 8 ))
-    tui::box "${top}" "${left}" "${width}" "${height}" "Параметры / Parameters" "$(tui::style bold cyan)"
-    local -i i row
-    for (( i = 0; i < ${#SSHD_WZ_NAMES[@]}; i++ )); do
-        row=$(( top + 1 + i ))
-        (( row >= top + height - 1 )) && break
-        local name="${SSHD_WZ_NAMES[$i]}"
-        local value="${SSHD_WZ_VALUES[$name]:-}"
-        local line="${name} = ${value}"
-        if (( i == SSHD_WZ_SELECT )); then
-            tui::put "${row}" $(( left + 2 )) "${line}" "$(tui::style bold reverse cyan)"
-        elif is::not_empty "${value}"; then
-            tui::put "${row}" $(( left + 2 )) "${line}" "$(tui::style green)"
-        else
-            tui::put "${row}" $(( left + 2 )) "${line}" "$(tui::style dim)"
-        fi
-    done
+    tui::box "${top}" "${left}" "${width}" "${height}" "Параметры / Parameters" "${SSHD_WZ_ST_PAR}"
+    sshd_wz::paint_params_rows
+}
+
+# @private Repaint the three desc text rows (the desc box is static)
+# @private Перерисовать три текстовые строки подсказки (рамка статична)
+sshd_wz::paint_desc_rows() {
+    local -i top=$(( TUI_LINES - 5 ))
+    local name="${SSHD_WZ_NAMES[$SSHD_WZ_SELECT]:-}"
+    local tip=""
+    is::not_empty "${name}" && tip="${SSHD_TIPS[$name]:-}"
+    local -a lines=()
+    mapfile -t lines <<< "${tip}"
+    sshd_wz::put_row $(( top + 1 )) 3 "Параметр: ${name}" "${SSHD_WZ_ST_DIM}" SSHD_WZ_DESC_LEN 0
+    sshd_wz::put_row $(( top + 2 )) 3 "${lines[0]:-}" "" SSHD_WZ_DESC_LEN 1
+    sshd_wz::put_row $(( top + 3 )) 3 "${lines[1]:-}" "${SSHD_WZ_ST_DIM}" SSHD_WZ_DESC_LEN 2
+    return 0
 }
 
 sshd_wz::draw_desc() {
     local -i top=$(( TUI_LINES - 5 ))
-    local name="${SSHD_WZ_NAMES[$SSHD_WZ_SELECT]:-}"
-    local desc=""
-    is::not_empty "${name}" && desc="$(sshd::param_desc "${name}" 2>/dev/null || true)"
-    tui::box "${top}" 1 "${TUI_COLS}" 5 "Подсказка / Tip: ${name}" "$(tui::style bold yellow)"
-    local -a lines=()
-    mapfile -t lines <<< "${desc}"
-    tui::put $(( top + 1 )) 3 "${lines[0]:-}" ""
-    tui::put $(( top + 2 )) 3 "${lines[1]:-}" "$(tui::style dim)"
+    tui::box "${top}" 1 "${TUI_COLS}" 5 "Подсказка / Tip" "${SSHD_WZ_ST_DESC}"
+    sshd_wz::paint_desc_rows
 }
 
+sshd_wz::update_desc() { sshd_wz::paint_desc_rows; }
+
 sshd_wz::draw_status() {
-    tui::statusbar "  ←→ секция · ↑↓ параметр · Enter правка · T цель · P профиль · M match · C критерии · V preview · A apply · ? справка · q выход" "$(tui::style bg_black white)"
+    local hint
+    if [[ "${SSHD_WZ_FOCUS}" == "menu" ]]; then
+        hint="  ↑↓ секция · → параметры · P профиль · V preview · A apply · ? справка · q выход"
+    else
+        hint="  ↑↓ параметр · ← меню · Enter правка · T цель · V preview · A apply · ? справка · q выход"
+    fi
+    tui::statusbar "${hint}" "${SSHD_WZ_ST_STATUS}"
 }
+
+# @private Full repaint: clear + styles + whole frame (start/resize/modal/section)
+# @private Полная перерисовка: очистка, стили, весь кадр (старт/resize/модалка/секция)
+sshd_wz::paint_all() {
+    TUI_LINES_MINUS=$(( TUI_LINES - 7 ))
+    tui::border::set single
+    sshd_wz::cache_styles
+    tui::buf::clear
+    SSHD_WZ_PARAMS_PAINTED=0
+    SSHD_WZ_SEC_LEN=()
+    SSHD_WZ_PAR_LEN=()
+    SSHD_WZ_DESC_LEN=()
+    sshd_wz::draw_title
+    sshd_wz::draw_sections
+    sshd_wz::draw_params
+    sshd_wz::draw_desc
+    sshd_wz::draw_status
+}
+
+# Legacy alias used by tests / Алиас для тестов
+sshd_wz::draw() { sshd_wz::paint_all; }
 
 sshd_wz::draw_help() {
     local -i w=70 h=12
@@ -298,15 +452,6 @@ sshd_wz::draw_help() {
     tui::put $(( by + 8 )) $(( bx + 2 )) "A — применить / apply" ""
     tui::put $(( by + 9 )) $(( bx + 2 )) "q — выход / quit" ""
     tui::put $(( by + 10 )) $(( bx + 2 )) "Enter/Esc — закрыть / close" "$(tui::style dim)"
-}
-
-sshd_wz::draw() {
-    TUI_LINES_MINUS=$(( TUI_LINES - 7 ))
-    sshd_wz::draw_title
-    sshd_wz::draw_sections
-    sshd_wz::draw_params
-    sshd_wz::draw_desc
-    sshd_wz::draw_status
 }
 
 # ==========================================
@@ -470,10 +615,14 @@ sshd_wz::cycle_profile() {
 }
 
 sshd_wz::jump_match() {
-    local i
+    local -i old="${SSHD_WZ_SECTION}" i
     for i in "${!SSHD_WZ_SECTIONS[@]}"; do
-        if [[ "${SSHD_WZ_SECTIONS[$i]}" == "Match" ]]; then
+        if [[ "${SSHD_WZ_SECTIONS[$i]}" == "Match" && i != old ]]; then
             SSHD_WZ_SECTION=$i; SSHD_WZ_SELECT=0; sshd_wz::load_names
+            sshd_wz::paint_section_row "$old"
+            sshd_wz::paint_section_row "$i"
+            sshd_wz::paint_params_rows
+            sshd_wz::update_desc
             break
         fi
     done
@@ -484,13 +633,68 @@ sshd_wz::jump_match() {
 # Keys / Клавиши
 # ==========================================
 
+# @private Repaint the selected rows of both panes (focus style change)
+# @private Перерисовать выбранные строки обеих панелей (смена фокуса)
+sshd_wz::repaint_selection() {
+    sshd_wz::paint_section_row "${SSHD_WZ_SECTION}"
+    sshd_wz::paint_param_row "${SSHD_WZ_SELECT}"
+}
+
+# @private Move the selection in the focused pane / Двигать выбор в панели под фокусом
+sshd_wz::move_selection() {
+    local -i d="$1"
+    if [[ "${SSHD_WZ_FOCUS}" == "menu" ]]; then
+        local -i old="${SSHD_WZ_SECTION}" n=${#SSHD_WZ_SECTIONS[@]} new=$(( SSHD_WZ_SECTION + d ))
+        (( new < 0 || new >= n )) && return 0
+        SSHD_WZ_SECTION=$new; SSHD_WZ_SELECT=0
+        sshd_wz::load_names
+        sshd_wz::paint_section_row "$old"
+        sshd_wz::paint_section_row "$new"
+        sshd_wz::paint_params_rows
+        sshd_wz::update_desc
+    else
+        local -i old="${SSHD_WZ_SELECT}" n=${#SSHD_WZ_NAMES[@]} new=$(( SSHD_WZ_SELECT + d ))
+        (( new < 0 || new >= n )) && return 0
+        SSHD_WZ_SELECT=$new
+        sshd_wz::paint_param_row "$old"
+        sshd_wz::paint_param_row "$new"
+        sshd_wz::update_desc
+    fi
+    return 0
+}
+
+# @private Switch focus between the menu and the params pane
+# @private Переключить фокус между меню и панелью параметров
+sshd_wz::set_focus() {
+    local -r f="$1"
+    [[ "${f}" == "${SSHD_WZ_FOCUS}" ]] && return 0
+    SSHD_WZ_FOCUS="${f}"
+    sshd_wz::repaint_selection
+    sshd_wz::draw_status
+    return 0
+}
+
 sshd_wz::handle_view_key() {
     case "${TUI_KEY}" in
         q|Q|й|Й) return 1 ;;
-        LEFT)  (( SSHD_WZ_SECTION > 0 )) && { SSHD_WZ_SECTION=$(( SSHD_WZ_SECTION - 1 )); SSHD_WZ_SELECT=0; sshd_wz::load_names; } ;;
-        RIGHT) (( SSHD_WZ_SECTION < ${#SSHD_WZ_SECTIONS[@]} - 1 )) && { SSHD_WZ_SECTION=$(( SSHD_WZ_SECTION + 1 )); SSHD_WZ_SELECT=0; sshd_wz::load_names; } ;;
-        UP|k|K|о|О)   (( SSHD_WZ_SELECT > 0 )) && SSHD_WZ_SELECT=$(( SSHD_WZ_SELECT - 1 )) ;;
-        DOWN|j|J|л|Л) (( SSHD_WZ_SELECT < ${#SSHD_WZ_NAMES[@]} - 1 )) && SSHD_WZ_SELECT=$(( SSHD_WZ_SELECT + 1 )) ;;
+        LEFT)  sshd_wz::set_focus menu ;;
+        RIGHT) sshd_wz::set_focus params ;;
+        UP|k|K|о|О)   sshd_wz::move_selection -1 ;;
+        DOWN|j|J|л|Л) sshd_wz::move_selection 1 ;;
+        ENTER)
+            if [[ "${SSHD_WZ_FOCUS}" == "menu" ]]; then
+                sshd_wz::set_focus params
+            else
+                sshd_wz::begin_edit
+            fi
+            ;;
+        V|v) sshd_wz::open_preview ;;
+        A|a) sshd_wz::apply ;;
+        P|p) sshd_wz::cycle_profile; sshd_wz::draw_title; sshd_wz::paint_params_rows; sshd_wz::update_desc ;;
+        T|t) sshd_wz::cycle_target; sshd_wz::draw_title ;;
+        M|m) sshd_wz::jump_match ;;
+        C|c) sshd_wz::begin_match_edit ;;
+        '?') tui::modal::open help sshd_wz::draw_help ;;
         *) : ;;
     esac
     return 0
@@ -506,7 +710,7 @@ main() {
         case "${arg}" in
             --help)
                 printf 'BS sshd wizard — собирает sshd_config (drop-in или main).\n'
-                printf 'Клавиши: ←→ ↑↓ Enter Space P V A ? q\n'
+                printf 'Клавиши: ← меню · → параметры · ↑↓ выбор · Enter правка · T цель · P профиль · M match · C критерии · V preview · A apply · ? справка · q выход\n'
                 return 0
                 ;;
             --dry-run) BS_SSHD_DRY_RUN=1 ;;
@@ -516,38 +720,39 @@ main() {
     sshd_wz::load_sections
     sshd_wz::load_names
     tui::init
-    local running=1 top
+    sshd_wz::paint_all
+    local running=1 top top_before
     while (( running )); do
-        tui::handle_resize
-        tui::buf::clear
-        sshd_wz::draw
+        if (( TUI_RESIZED == 1 )); then
+            tui::handle_resize
+            sshd_wz::paint_all
+        fi
         tui::modal::draw_all
         tui::render
         tui::key_read
-        top="$(tui::modal::top)"
-        if [[ "${top}" == "edit" ]]; then
+
+        top_before="$(tui::modal::top)"
+        if [[ "${top_before}" == "edit" ]]; then
             sshd_wz::handle_edit_key
-        elif [[ "${top}" == "confirm" ]]; then
+        elif [[ "${top_before}" == "confirm" ]]; then
             sshd_wz::handle_confirm_key
-        elif [[ "${top}" == "matchcrit" ]]; then
+        elif [[ "${top_before}" == "matchcrit" ]]; then
             sshd_wz::handle_match_key
-        elif is::not_empty "${top}"; then
+        elif is::not_empty "${top_before}"; then
             case "${TUI_KEY}" in
                 ENTER|ESC|q|Q) tui::modal::close ;;
                 *) : ;;
             esac
         else
-            case "${TUI_KEY}" in
-                ENTER) sshd_wz::begin_edit ;;
-                V|v) sshd_wz::open_preview ;;
-                A|a) sshd_wz::apply ;;
-                P|p) sshd_wz::cycle_profile ;;
-                T|t) sshd_wz::cycle_target ;;
-                M|m) sshd_wz::jump_match ;;
-                C|c) sshd_wz::begin_match_edit ;;
-                '?') tui::modal::open help sshd_wz::draw_help ;;
-                *) sshd_wz::handle_view_key || running=0 ;;
-            esac
+            sshd_wz::handle_view_key || running=0
+        fi
+        top="$(tui::modal::top)"
+        # Полная перерисовка нужна только когда модалка ЗАКРЫЛАСЬ: её пиксели
+        # надо стереть. При открытии база цела — модалка рисуется поверх.
+        # A full repaint is needed only when a modal CLOSED: its pixels must be
+        # erased. On open the base is intact — the modal draws over it.
+        if [[ "${top_before}" != "${top}" && -n "${top_before}" ]]; then
+            sshd_wz::paint_all
         fi
     done
     tui::quit

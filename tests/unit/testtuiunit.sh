@@ -90,6 +90,23 @@ test_render_diff_noncontiguous() {
     testframework::assert_command "printf '%s' '${out}' | grep -q $'\e\[1;6HY'" "render jumps to Y at (0,5)"
 }
 
+test_render_dirty() {
+    TUI_COLS=20
+    TUI_LINES=5
+    tui::buf::clear
+    tui::put 2 2 "hello" "$(tui::style green)"
+    tui::render >/dev/null
+    # после полного кадра меняем одну клетку — рендер обязан вывести только её
+    # after a full frame, change one cell — the render must emit only it
+    tui::put 2 2 "H" "$(tui::style green)"
+    local out
+    out="$(tui::render)"
+    testframework::assert_command "printf '%s' '${out}' | grep -q $'\e\[2;2H'" "dirty render positions the cell"
+    testframework::assert_command "printf '%s' '${out}' | grep -q 'H'" "dirty render has the new char"
+    testframework::assert_command "! printf '%s' '${out}' | grep -q 'ello'" "dirty render does not resend the row"
+    testframework::assert_true "${#out} -lt 40" "dirty render emits only changes, not the row"
+}
+
 test_mouse_sgr() {
     tui::key_read < <(printf '\e[<0;23;5M')
     testframework::assert_equal "MOUSE" "${TUI_KEY}" "SGR mouse key"
@@ -176,6 +193,7 @@ main() {
 
     testframework::section "Diff render / Diff-рендер"
     test_render_diff_noncontiguous
+    test_render_dirty
 
     testframework::section "Mouse / Мышь"
     test_mouse_sgr

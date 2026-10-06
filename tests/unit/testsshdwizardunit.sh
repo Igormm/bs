@@ -104,6 +104,27 @@ main() {
     tui::modal::close
     rm -rf "${aftmp}"
 
+    testframework::section "focus / фокус панелей"
+    SSHD_WZ_FOCUS="params"
+    TUI_KEY="LEFT"; sshd_wz::handle_view_key
+    testframework::assert_equal "menu" "${SSHD_WZ_FOCUS}" "LEFT focuses menu"
+    TUI_KEY="RIGHT"; sshd_wz::handle_view_key
+    testframework::assert_equal "params" "${SSHD_WZ_FOCUS}" "RIGHT focuses params"
+
+    testframework::section "menu navigation / навигация меню"
+    SSHD_WZ_FOCUS="menu"
+    SSHD_WZ_SECTION=0; sshd_wz::load_names
+    TUI_KEY="DOWN"; sshd_wz::handle_view_key
+    testframework::assert_equal "1" "${SSHD_WZ_SECTION}" "menu DOWN moves section"
+    testframework::assert_equal "PermitRootLogin" "${SSHD_WZ_NAMES[0]}" "params reloaded for new section"
+
+    testframework::section "single border / одинарная рамка"
+    sshd_wz::draw
+    testframework::assert_equal "┌" "${TUI_BORDER_TL}" "single border set"
+    local has_double=0 key2
+    for key2 in "${!TUI_BUF[@]}"; do [[ "${TUI_BUF[$key2]}" == "╔" ]] && has_double=1; done
+    testframework::assert_equal "0" "${has_double}" "no double border chars"
+
     testframework::summary
 }
 

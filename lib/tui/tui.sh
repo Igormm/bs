@@ -86,6 +86,12 @@ declare -gA TUI_LAST=()
 # @global TUI_LAST_STYLE — Tui: last frame styles map (category: constant)
 # @global TUI_LAST_STYLE — Tui: стили последнего кадра (категория: constant)
 declare -gA TUI_LAST_STYLE=()
+# @global TUI_DIRTY — Tui: cells written since last render (category: constant)
+# @global TUI_DIRTY — Tui: клетки, записанные с прошлого рендера (категория: constant)
+declare -gA TUI_DIRTY=()
+# @global TUI_FULL — Tui: 1 = next render scans the whole buffer (category: constant)
+# @global TUI_FULL — Tui: 1 = следующий рендер сканирует весь буфер (категория: constant)
+declare -gi TUI_FULL=1
 
 # @global TUI_MODAL_DRAW — Tui: modal draw map (category: constant)
 # @global TUI_MODAL_DRAW — Tui: карта отрисовки модалок (категория: constant)
@@ -172,6 +178,8 @@ tui::handle_resize() {
     TUI_BUF_STYLE=()
     TUI_LAST=()
     TUI_LAST_STYLE=()
+    TUI_DIRTY=()
+    TUI_FULL=1
     TUI_RESIZED=0
   fi
 }
@@ -249,7 +257,16 @@ tui::style() {
     esac
   done
   if (( ${#parts[@]} > 0 )); then
-    printf '\e[%sm' "$(str::join_parts "${parts[@]}")"
+    # Склейка в процессе без $(...) — каждый форк подшелла стоил ~3 мс,
+    # а tui::style вызывается десятки раз за кадр.
+    # In-process join without $(...) — each subshell fork cost ~3ms and
+    # tui::style is called dozens of times per frame.
+    local out="" p
+    for p in "${parts[@]}"; do
+      is::empty "${out}" || out+=";"
+      out+="${p}"
+    done
+    printf '\e[%sm' "${out}"
   fi
 }
 
@@ -276,6 +293,10 @@ tui::buf::clear() {
   # (${TUI_BUF[${key}]:- }), so filling the whole grid is pure overhead.
   TUI_BUF=()
   TUI_BUF_STYLE=()
+  TUI_DIRTY=()
+  # полный кадр: рендер обязан стереть старые клетки, которых нет в буфере
+  # full frame: the render must erase old cells missing from the buffer
+  TUI_FULL=1
 }
 
 # @description Put a styled string at (r,c).
@@ -284,12 +305,14 @@ tui::buf::clear() {
 tui::put() {
   local -r r="$1" c="$2" text="$3" style="${4-}"
   local -i i rr=$(( r - 1 )) cc=$(( c - 1 ))
-  local ch
+  local ch key
   for (( i = 0; i < ${#text}; i++ )); do
     (( cc >= TUI_COLS )) && break
     ch="${text:i:1}"
-    TUI_BUF["${rr},${cc}"]="${ch}"
-    TUI_BUF_STYLE["${rr},${cc}"]="${style}"
+    key="${rr},${cc}"
+    TUI_BUF["${key}"]="${ch}"
+    TUI_BUF_STYLE["${key}"]="${style}"
+    TUI_DIRTY["${key}"]=1
     cc=$(( cc + 1 ))
   done
 }
@@ -307,41 +330,62 @@ tui::fill() {
 # @description Diff-render: emit only changed cells.
 # @description Diff-рендер: выводить только изменившиеся клетки.
 tui::render() {
-  local -i r c
-  local key new old newst oldst
-  for (( r = 0; r < TUI_LINES; r++ )); do
-    local row_out="" cur_style="" has_change=0
-    # последняя выведенная колонка: несмежные изменения требуют перепозиции
-    # last emitted column: non-contiguous changes need a new cursor jump
-    local -i out_col=-2
-    for (( c = 0; c < TUI_COLS; c++ )); do
-      key="${r},${c}"
-      new="${TUI_BUF[${key}]:- }"
-      old="${TUI_LAST[${key}]:- }"
-      newst="${TUI_BUF_STYLE[${key}]:-}"
-      oldst="${TUI_LAST_STYLE[${key}]:-}"
-      if [[ "${new}" != "${old}" || "${newst}" != "${oldst}" ]]; then
-        if (( out_col != c - 1 )); then
-          row_out+=$'\e['"$(( r + 1 ))"';'$(( c + 1 ))'H'
-          has_change=1
-        fi
-        if [[ "${newst}" != "${cur_style}" ]]; then
-          row_out+=$'\e[0m'"${newst}"
-          cur_style="${newst}"
-        fi
-        row_out+="${new}"
-        out_col="${c}"
+  # Выводим только изменённое. После tui::buf::clear (TUI_FULL=1) — обход
+  # объединения прошлого и текущего буфера (нужно стереть исчезнувшие клетки).
+  # Иначе — обход только TUI_DIRTY (клеток, записанных с прошлого рендера),
+  # что делает кадр damage-redraw дешёвым.
+  # Emit only changes. After tui::buf::clear (TUI_FULL=1) — scan the union of
+  # the previous and current buffers (erasing vanished cells). Otherwise scan
+  # only TUI_DIRTY (cells written since the last render), making a damage
+  # redraw frame cheap.
+  local key new old newst oldst out="" cur_style=""
+  local -i rr cc
+  if (( TUI_FULL == 1 )); then
+    local -A keys=()
+    for key in "${!TUI_BUF[@]}"; do keys["${key}"]=1; done
+    for key in "${!TUI_LAST[@]}"; do keys["${key}"]=1; done
+    for key in "${!keys[@]}"; do
+      new="${TUI_BUF[$key]:- }"
+      old="${TUI_LAST[$key]:- }"
+      newst="${TUI_BUF_STYLE[$key]:-}"
+      oldst="${TUI_LAST_STYLE[$key]:-}"
+      [[ "${new}" == "${old}" && "${newst}" == "${oldst}" ]] && continue
+      rr=$(( ${key%,*} + 1 )); cc=$(( ${key#*,} + 1 ))
+      out+=$'\e['"${rr};${cc}H"
+      if [[ "${newst}" != "${cur_style}" ]]; then
+        out+=$'\e[0m'"${newst}"
+        cur_style="${newst}"
       fi
+      out+="${new}"
     done
-    (( has_change == 1 )) && printf '%s' "${row_out}"
-  done
-  # копия в last / snapshot
-  TUI_LAST=()
-  TUI_LAST_STYLE=()
-  for key in "${!TUI_BUF[@]}"; do
-    TUI_LAST["${key}"]="${TUI_BUF[${key}]}"
-    TUI_LAST_STYLE["${key}"]="${TUI_BUF_STYLE[${key}]}"
-  done
+    TUI_LAST=()
+    TUI_LAST_STYLE=()
+    for key in "${!TUI_BUF[@]}"; do
+      TUI_LAST["${key}"]="${TUI_BUF[$key]}"
+      TUI_LAST_STYLE["${key}"]="${TUI_BUF_STYLE[$key]:-}"
+    done
+    TUI_DIRTY=()
+    TUI_FULL=0
+  else
+    for key in "${!TUI_DIRTY[@]}"; do
+      new="${TUI_BUF[$key]:- }"
+      old="${TUI_LAST[$key]:- }"
+      newst="${TUI_BUF_STYLE[$key]:-}"
+      oldst="${TUI_LAST_STYLE[$key]:-}"
+      TUI_LAST["${key}"]="${new}"
+      TUI_LAST_STYLE["${key}"]="${newst}"
+      [[ "${new}" == "${old}" && "${newst}" == "${oldst}" ]] && continue
+      rr=$(( ${key%,*} + 1 )); cc=$(( ${key#*,} + 1 ))
+      out+=$'\e['"${rr};${cc}H"
+      if [[ "${newst}" != "${cur_style}" ]]; then
+        out+=$'\e[0m'"${newst}"
+        cur_style="${newst}"
+      fi
+      out+="${new}"
+    done
+    TUI_DIRTY=()
+  fi
+  printf '%s' "${out}"
 }
 
 # ==========================================
