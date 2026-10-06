@@ -51,6 +51,44 @@ main() {
     testframework::assert_equal "22" "$(sshd::param_default Port)" "Port default 22"
     testframework::assert_equal "no" "$(sshd::param_recommended PasswordAuthentication)" "pw recommended no"
 
+    testframework::section "validate / валидация значений"
+    local vrc=0
+    sshd::validate PasswordAuthentication yes || vrc=$?
+    testframework::assert_equal "0" "${vrc}" "bool yes ok"
+    vrc=0; sshd::validate PasswordAuthentication maybe || vrc=$?
+    testframework::assert_equal "${LIB_ERROR_INVALID_INPUT}" "${vrc}" "bool maybe rejected"
+
+    vrc=0; sshd::validate Port 65535 || vrc=$?
+    testframework::assert_equal "0" "${vrc}" "port 65535 ok"
+    vrc=0; sshd::validate Port 70000 || vrc=$?
+    testframework::assert_equal "${LIB_ERROR_INVALID_INPUT}" "${vrc}" "port 70000 rejected"
+    vrc=0; sshd::validate Port "22;rm -rf /" || vrc=$?
+    testframework::assert_equal "${LIB_ERROR_INVALID_INPUT}" "${vrc}" "port injection rejected"
+
+    vrc=0; sshd::validate PermitRootLogin prohibit-password || vrc=$?
+    testframework::assert_equal "0" "${vrc}" "enum ok"
+    vrc=0; sshd::validate PermitRootLogin root || vrc=$?
+    testframework::assert_equal "${LIB_ERROR_INVALID_INPUT}" "${vrc}" "enum bad rejected"
+
+    vrc=0; sshd::validate AllowUsers "alice,bob" || vrc=$?
+    testframework::assert_equal "0" "${vrc}" "userlist ok"
+    vrc=0; sshd::validate AllowUsers "alice root" || vrc=$?
+    testframework::assert_equal "${LIB_ERROR_INVALID_INPUT}" "${vrc}" "userlist space rejected"
+
+    vrc=0; sshd::validate Ciphers "aes256-ctr,chacha20-poly1305@openssh.com" || vrc=$?
+    testframework::assert_equal "0" "${vrc}" "ciphers ok"
+    vrc=0; sshd::validate Ciphers "aes256-ctr,"$'\n'"PermitRootLogin yes" || vrc=$?
+    testframework::assert_equal "${LIB_ERROR_INVALID_INPUT}" "${vrc}" "newline injection rejected"
+
+    vrc=0; sshd::validate Subsystem internal-sftp || vrc=$?
+    testframework::assert_equal "0" "${vrc}" "path internal-sftp ok"
+    vrc=0; sshd::validate ChrootDirectory "%h" || vrc=$?
+    testframework::assert_equal "0" "${vrc}" "string %h ok"
+    vrc=0; sshd::validate LoginGraceTime 30 || vrc=$?
+    testframework::assert_equal "0" "${vrc}" "time 30 ok"
+    vrc=0; sshd::validate LoginGraceTime "1h30" || vrc=$?
+    testframework::assert_equal "${LIB_ERROR_INVALID_INPUT}" "${vrc}" "time bad rejected"
+
     testframework::summary
 }
 

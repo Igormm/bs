@@ -167,3 +167,71 @@ sshd::param_recommended() {
     is::empty "${meta}" && return "${LIB_ERROR_INVALID_ARGS}"
     printf '%s\n' "${meta##*|}"
 }
+
+# @description Validate a value for a catalog parameter by its type.
+# @description Проверить значение параметра каталога по его типу.
+#   Rejects control characters and shell/space input: a value can never
+#   inject a new directive into the rendered config.
+#   Отклоняет управляющие символы и пробелы: значение не может внедрить
+#   новую директиву в отрендеренный конфиг.
+# @param $1 Param name / Имя параметра
+# @param $2 Value / Значение
+# @return E_SUCCESS or LIB_ERROR_INVALID_INPUT / LIB_ERROR_INVALID_ARGS
+sshd::validate() {
+    local -r name="${1:?param name required}" value="${2-}"
+    local type
+    type="$(sshd::param_type "${name}")" || return $?
+    if [[ "${value}" == *$'\n'* || "${value}" == *$'\r'* || "${value}" == *$'\t'* ]]; then
+        return "${LIB_ERROR_INVALID_INPUT}"
+    fi
+    local entry
+    case "${type}" in
+        bool)
+            [[ "${value}" == "yes" || "${value}" == "no" ]] || return "${LIB_ERROR_INVALID_INPUT}"
+            ;;
+        int)
+            [[ "${value}" =~ ^[0-9]+$ ]] || return "${LIB_ERROR_INVALID_INPUT}"
+            ;;
+        port)
+            [[ "${value}" =~ ^[0-9]{1,5}$ ]] || return "${LIB_ERROR_INVALID_INPUT}"
+            (( value >= 1 && value <= 65535 )) || return "${LIB_ERROR_INVALID_INPUT}"
+            ;;
+        enum:*)
+            [[ ",${type#enum:}," == *",${value},"* ]] || return "${LIB_ERROR_INVALID_INPUT}"
+            ;;
+        string)
+            [[ -n "${value}" && "${value}" =~ ^[A-Za-z0-9._@%/-]+$ ]] || return "${LIB_ERROR_INVALID_INPUT}"
+            ;;
+        userlist|grouplist)
+            local IFS=','
+            local -a parts=()
+            read -ra parts <<< "${value}"
+            (( ${#parts[@]} > 0 )) || return "${LIB_ERROR_INVALID_INPUT}"
+            for entry in "${parts[@]}"; do
+                [[ "${entry}" =~ ^[A-Za-z_][A-Za-z0-9_.@-]*$ ]] || return "${LIB_ERROR_INVALID_INPUT}"
+            done
+            ;;
+        csv)
+            [[ -n "${value}" ]] || return "${LIB_ERROR_INVALID_INPUT}"
+            local IFS=','
+            local -a toks=()
+            read -ra toks <<< "${value}"
+            for entry in "${toks[@]}"; do
+                [[ "${entry}" =~ ^[A-Za-z0-9@._+-]+$ ]] || return "${LIB_ERROR_INVALID_INPUT}"
+            done
+            ;;
+        path)
+            [[ "${value}" =~ ^/[^[:space:]]*$ || "${value}" == "internal-sftp" ]] || return "${LIB_ERROR_INVALID_INPUT}"
+            ;;
+        addr)
+            [[ "${value}" == "*" || "${value}" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ || "${value}" =~ ^[0-9A-Fa-f:]+$ ]] || return "${LIB_ERROR_INVALID_INPUT}"
+            ;;
+        time)
+            [[ "${value}" =~ ^[0-9]+[smhd]?$ ]] || return "${LIB_ERROR_INVALID_INPUT}"
+            ;;
+        *)
+            return "${LIB_ERROR_INVALID_ARGS}"
+            ;;
+    esac
+    return "${E_SUCCESS}"
+}
