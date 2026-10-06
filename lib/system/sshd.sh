@@ -48,7 +48,7 @@ declare -gA SSHD_PARAMS=(
     [PubkeyAuthentication]='Authentication|bool|yes|yes'
     [PermitEmptyPasswords]='Authentication|bool|no|no'
     [KbdInteractiveAuthentication]='Authentication|bool|yes|no'
-    [AuthenticationMethods]='Authentication|string||publickey'
+    [AuthenticationMethods]='Authentication|csv||publickey'
     [MaxAuthTries]='Authentication|int|6|3'
     [MaxSessions]='Authentication|int|10|5'
     [AllowUsers]='Access Control|userlist||'
@@ -332,7 +332,11 @@ sshd::render() {
             printf '\n# --- %s ---\n' "${section}"
             last_section="${section}"
         fi
-        printf '%s %s\n' "${name}" "${value}"
+        if [[ "${name}" == "Subsystem" ]]; then
+            printf 'Subsystem sftp %s\n' "${value}"
+        else
+            printf '%s %s\n' "${name}" "${value}"
+        fi
     done
     if (( ${#blocks[@]} > 0 )); then
         printf '\n'
@@ -423,6 +427,7 @@ sshd::install() {
         printf 'dry-run: install %s -> %s\n' "${src}" "${target}" >&2
         return "${E_SUCCESS}"
     fi
+    is::command "${BS_SSHD_BIN}" || return "${LIB_ERROR_DEPENDENCY_MISSING}"
     local -r dir="$(dirname -- "${target}")"
     if ! is::dir "${dir}"; then
         mkdir -p -- "${dir}" 2>/dev/null || return "${LIB_ERROR_PERMISSION_DENIED}"
@@ -495,6 +500,7 @@ sshd::install_main() {
         printf 'dry-run: install main block %s -> %s\n' "${src}" "${BS_SSHD_MAIN}" >&2
         return "${E_SUCCESS}"
     fi
+    is::command "${BS_SSHD_BIN}" || return "${LIB_ERROR_DEPENDENCY_MISSING}"
     is::writable "$(dirname -- "${BS_SSHD_MAIN}")" || return "${LIB_ERROR_PERMISSION_DENIED}"
     local backup=""
     if is::file "${BS_SSHD_MAIN}"; then

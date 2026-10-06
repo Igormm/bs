@@ -74,6 +74,18 @@ declare -g SSHD_WZ_EDIT_ERR=""
 # @global SSHD_WZ_EDIT_MODE — Sshd wizard: input|choice (category: state)
 # @global SSHD_WZ_EDIT_MODE — Визард sshd: input|choice (категория: state)
 declare -g SSHD_WZ_EDIT_MODE=""
+# @global SSHD_WZ_MATCH_CRITERIA — Sshd wizard: Match criteria (category: state)
+# @global SSHD_WZ_MATCH_CRITERIA — Визард sshd: критерии Match (категория: state)
+declare -g SSHD_WZ_MATCH_CRITERIA="Group sftponly"
+# @global SSHD_WZ_MATCH_VALUE — Sshd wizard: Match criteria input buffer (category: state)
+# @global SSHD_WZ_MATCH_VALUE — Визард sshd: буфер ввода критериев Match (категория: state)
+declare -g SSHD_WZ_MATCH_VALUE=""
+# @global SSHD_WZ_MATCH_CURSOR — Sshd wizard: Match criteria cursor (category: state)
+# @global SSHD_WZ_MATCH_CURSOR — Визард sshd: курсор ввода критериев Match (категория: state)
+declare -gi SSHD_WZ_MATCH_CURSOR=0
+# @global SSHD_WZ_CONFIRM_SEL — Sshd wizard: confirm selection (category: state)
+# @global SSHD_WZ_CONFIRM_SEL — Визард sshd: выбор подтверждения (категория: state)
+declare -gi SSHD_WZ_CONFIRM_SEL=0
 
 # @private Fill SSHD_WZ_SECTIONS from the catalog / Заполнить секции из каталога
 sshd_wz::load_sections() {
@@ -269,7 +281,7 @@ sshd_wz::draw_desc() {
 }
 
 sshd_wz::draw_status() {
-    tui::statusbar "  ←→ секция · ↑↓ параметр · Enter правка · P профиль · M match · V preview · A apply · ? справка · q выход" "$(tui::style bg_black white)"
+    tui::statusbar "  ←→ секция · ↑↓ параметр · Enter правка · T цель · P профиль · M match · C критерии · V preview · A apply · ? справка · q выход" "$(tui::style bg_black white)"
 }
 
 sshd_wz::draw_help() {
@@ -279,10 +291,10 @@ sshd_wz::draw_help() {
     tui::box "${by}" "${bx}" "${w}" "${h}" "Справка / Help" "$(tui::style bold cyan)"
     tui::put $(( by + 2 )) $(( bx + 2 )) "←→  секция / section" ""
     tui::put $(( by + 3 )) $(( bx + 2 )) "↑↓  параметр / param" ""
-    tui::put $(( by + 4 )) $(( bx + 2 )) "Enter/Space — правка значения / edit value" ""
-    tui::put $(( by + 5 )) $(( bx + 2 )) "P — профиль (basic/strict/paranoid/custom)" ""
-    tui::put $(( by + 6 )) $(( bx + 2 )) "M — секция Match/chroot" ""
-    tui::put $(( by + 7 )) $(( bx + 2 )) "V — предпросмотр / preview" ""
+    tui::put $(( by + 4 )) $(( bx + 2 )) "Enter — правка значения / edit value" ""
+    tui::put $(( by + 5 )) $(( bx + 2 )) "T — цель (dropin/main/print) · C — критерии Match" ""
+    tui::put $(( by + 6 )) $(( bx + 2 )) "P — профиль (basic/strict/paranoid/custom)" ""
+    tui::put $(( by + 7 )) $(( bx + 2 )) "M — секция Match/chroot · V — предпросмотр" ""
     tui::put $(( by + 8 )) $(( bx + 2 )) "A — применить / apply" ""
     tui::put $(( by + 9 )) $(( bx + 2 )) "q — выход / quit" ""
     tui::put $(( by + 10 )) $(( bx + 2 )) "Enter/Esc — закрыть / close" "$(tui::style dim)"
@@ -304,11 +316,26 @@ sshd_wz::draw() {
 # @private Render current values as config text / Отрендерить текущие значения
 sshd_wz::render_config() {
     local name value
-    for name in "${SSHD_PARAM_ORDER[@]}"; do
-        value="${SSHD_WZ_VALUES[$name]:-}"
-        is::not_empty "${value}" || continue
-        printf '%s=%s\n' "${name}" "${value}"
-    done | sshd::render
+    {
+        for name in "${SSHD_PARAM_ORDER[@]}"; do
+            value="${SSHD_WZ_VALUES[$name]:-}"
+            is::not_empty "${value}" || continue
+            [[ "${SSHD_PARAMS[$name]%%|*}" == "Match" ]] && continue
+            printf '%s=%s\n' "${name}" "${value}"
+        done
+        local -a mparams=()
+        for name in "${SSHD_PARAM_ORDER[@]}"; do
+            value="${SSHD_WZ_VALUES[$name]:-}"
+            is::not_empty "${value}" || continue
+            [[ "${SSHD_PARAMS[$name]%%|*}" == "Match" ]] || continue
+            mparams+=("${name}=${value}")
+        done
+        if (( ${#mparams[@]} > 0 )); then
+            printf '@match %s\n' "${SSHD_WZ_MATCH_CRITERIA}"
+            printf '%s\n' "${mparams[@]}"
+            printf '\n'
+        fi
+    } | sshd::render
 }
 
 sshd_wz::draw_preview() {
@@ -335,24 +362,98 @@ sshd_wz::modal_result_draw() {
 }
 
 sshd_wz::apply() {
+    if [[ "${SSHD_WZ_TARGET}" == "print" ]]; then
+        SSHD_WZ_VIEW="preview"
+        sshd_wz::open_preview
+        return 0
+    fi
+    SSHD_WZ_CONFIRM_SEL=0
+    tui::modal::open confirm sshd_wz::modal_confirm_draw
+    return 0
+}
+
+sshd_wz::modal_confirm_draw() {
+    tui::confirm "Применить / Apply" "Записать в ${SSHD_WZ_TARGET} и reload? / write and reload?" "${SSHD_WZ_CONFIRM_SEL}"
+}
+
+sshd_wz::do_apply() {
+    local -r tmpf="$(mktemp "${TMPDIR:-/tmp}/bs-sshd-wizard.XXXXXX.conf")"
+    sshd_wz::render_config > "${tmpf}"
+    local rc=0
+    if [[ "${SSHD_WZ_TARGET}" == "main" ]]; then
+        sshd::install_main "${tmpf}" || rc=$?
+    else
+        sshd::install "${tmpf}" || rc=$?
+    fi
+    rm -f -- "${tmpf}"
+    if (( rc == 0 )); then
+        SSHD_WZ_STATUS="Установлено / Installed (${SSHD_WZ_TARGET})"
+    else
+        SSHD_WZ_STATUS="Ошибка / Error: ${rc}"
+    fi
+    tui::modal::open result sshd_wz::modal_result_draw
+    return 0
+}
+
+sshd_wz::handle_confirm_key() {
+    case "${TUI_KEY}" in
+        ENTER) tui::modal::close; (( SSHD_WZ_CONFIRM_SEL == 0 )) && sshd_wz::do_apply ;;
+        ESC|n|N|н|Н) tui::modal::close ;;
+        LEFT|RIGHT|TAB) SSHD_WZ_CONFIRM_SEL=$(( 1 - SSHD_WZ_CONFIRM_SEL )) ;;
+        y|Y|д|Д) tui::modal::close; sshd_wz::do_apply ;;
+        *) : ;;
+    esac
+    return 0
+}
+
+sshd_wz::cycle_target() {
     case "${SSHD_WZ_TARGET}" in
-        dropin|main)
-            local -r tmpf="${TMPDIR:-/tmp}/bs-sshd-wizard.conf"
-            sshd_wz::render_config > "${tmpf}"
-            local rc=0
-            if [[ "${SSHD_WZ_TARGET}" == "dropin" ]]; then
-                sshd::install "${tmpf}" || rc=$?
-            else
-                sshd::install_main "${tmpf}" || rc=$?
+        dropin) SSHD_WZ_TARGET="main" ;;
+        main)   SSHD_WZ_TARGET="print" ;;
+        *)      SSHD_WZ_TARGET="dropin" ;;
+    esac
+    return 0
+}
+
+sshd_wz::begin_match_edit() {
+    SSHD_WZ_MATCH_VALUE="${SSHD_WZ_MATCH_CRITERIA}"
+    SSHD_WZ_MATCH_CURSOR=${#SSHD_WZ_MATCH_VALUE}
+    tui::modal::open matchcrit sshd_wz::modal_match_draw
+    return 0
+}
+
+sshd_wz::modal_match_draw() {
+    local -i w=64 h=6
+    tui::center "${w}" "${h}"
+    local -i bx="${TUI_CENTER_X}" by="${TUI_CENTER_Y}"
+    tui::box "${by}" "${bx}" "${w}" "${h}" "Match критерии / criteria" "$(tui::style bold cyan)"
+    tui::put $(( by + 1 )) $(( bx + 2 )) "напр. / e.g. User alice · Group sftponly · Address 10.0.0.0/8" "$(tui::style dim)"
+    tui::input $(( by + 2 )) $(( bx + 2 )) $(( w - 4 )) "${SSHD_WZ_MATCH_VALUE}" "${SSHD_WZ_MATCH_CURSOR}"
+    tui::put $(( by + h - 1 )) $(( bx + 2 )) "Enter — OK · Esc — назад / back" "$(tui::style dim)"
+}
+
+sshd_wz::handle_match_key() {
+    case "${TUI_KEY}" in
+        ENTER)
+            if is::not_empty "${SSHD_WZ_MATCH_VALUE}"; then
+                SSHD_WZ_MATCH_CRITERIA="${SSHD_WZ_MATCH_VALUE}"
             fi
-            if (( rc == 0 )); then
-                SSHD_WZ_STATUS="Установлено / Installed (${SSHD_WZ_TARGET})"
-            else
-                SSHD_WZ_STATUS="Ошибка / Error: ${rc}"
-            fi
-            tui::modal::open result sshd_wz::modal_result_draw
+            tui::modal::close
             ;;
-        print) SSHD_WZ_VIEW="preview" ;;
+        ESC) tui::modal::close ;;
+        BACKSPACE)
+            (( SSHD_WZ_MATCH_CURSOR > 0 )) || return 0
+            SSHD_WZ_MATCH_VALUE="${SSHD_WZ_MATCH_VALUE:0:SSHD_WZ_MATCH_CURSOR-1}${SSHD_WZ_MATCH_VALUE:SSHD_WZ_MATCH_CURSOR}"
+            SSHD_WZ_MATCH_CURSOR=$(( SSHD_WZ_MATCH_CURSOR - 1 ))
+            ;;
+        LEFT)  (( SSHD_WZ_MATCH_CURSOR > 0 )) && SSHD_WZ_MATCH_CURSOR=$(( SSHD_WZ_MATCH_CURSOR - 1 )) ;;
+        RIGHT) (( SSHD_WZ_MATCH_CURSOR < ${#SSHD_WZ_MATCH_VALUE} )) && SSHD_WZ_MATCH_CURSOR=$(( SSHD_WZ_MATCH_CURSOR + 1 )) ;;
+        *)
+            if [[ "${TUI_KEY}" =~ ^[[:print:]]+$ && ${#TUI_KEY} -eq 1 ]]; then
+                SSHD_WZ_MATCH_VALUE="${SSHD_WZ_MATCH_VALUE:0:SSHD_WZ_MATCH_CURSOR}${TUI_KEY}${SSHD_WZ_MATCH_VALUE:SSHD_WZ_MATCH_CURSOR}"
+                SSHD_WZ_MATCH_CURSOR=$(( SSHD_WZ_MATCH_CURSOR + 1 ))
+            fi
+            ;;
     esac
     return 0
 }
@@ -426,6 +527,10 @@ main() {
         top="$(tui::modal::top)"
         if [[ "${top}" == "edit" ]]; then
             sshd_wz::handle_edit_key
+        elif [[ "${top}" == "confirm" ]]; then
+            sshd_wz::handle_confirm_key
+        elif [[ "${top}" == "matchcrit" ]]; then
+            sshd_wz::handle_match_key
         elif is::not_empty "${top}"; then
             case "${TUI_KEY}" in
                 ENTER|ESC|q|Q) tui::modal::close ;;
@@ -433,11 +538,13 @@ main() {
             esac
         else
             case "${TUI_KEY}" in
-                ENTER|SPACE) sshd_wz::begin_edit ;;
+                ENTER) sshd_wz::begin_edit ;;
                 V|v) sshd_wz::open_preview ;;
                 A|a) sshd_wz::apply ;;
                 P|p) sshd_wz::cycle_profile ;;
+                T|t) sshd_wz::cycle_target ;;
                 M|m) sshd_wz::jump_match ;;
+                C|c) sshd_wz::begin_match_edit ;;
                 '?') tui::modal::open help sshd_wz::draw_help ;;
                 *) sshd_wz::handle_view_key || running=0 ;;
             esac

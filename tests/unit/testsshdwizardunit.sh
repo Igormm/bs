@@ -77,6 +77,32 @@ main() {
     SSHD_WZ_TARGET="print"; SSHD_WZ_VIEW="params"
     sshd_wz::apply
     testframework::assert_equal "preview" "${SSHD_WZ_VIEW}" "print target switches to preview"
+    tui::modal::close
+
+    testframework::section "match render / match в конфиге"
+    SSHD_WZ_VALUES[ChrootDirectory]="%h"
+    SSHD_WZ_VALUES[ForceCommand]="internal-sftp"
+    cfg="$(sshd_wz::render_config)"
+    testframework::assert_command "printf '%s' '${cfg}' | grep -q '^Match '" "match header rendered"
+    testframework::assert_command "printf '%s' '${cfg}' | grep -q '^    ChrootDirectory %h$'" "chroot inside match"
+
+    testframework::section "target/confirm / цель и подтверждение"
+    SSHD_WZ_TARGET="dropin"
+    sshd_wz::cycle_target
+    testframework::assert_equal "main" "${SSHD_WZ_TARGET}" "cycle dropin→main"
+    sshd_wz::cycle_target
+    testframework::assert_equal "print" "${SSHD_WZ_TARGET}" "cycle main→print"
+    sshd_wz::cycle_target
+    testframework::assert_equal "dropin" "${SSHD_WZ_TARGET}" "cycle print→dropin"
+
+    local aftmp; aftmp="$(mktemp -d)"
+    export BS_SSHD_DIR="${aftmp}" BS_SSHD_DROPIN="99-bs.conf" BS_SSHD_BIN="/bin/true"
+    SSHD_WZ_TARGET="dropin"
+    sshd_wz::apply
+    testframework::assert_equal "confirm" "$(tui::modal::top)" "apply opens confirm modal"
+    testframework::assert_true "! -f '${aftmp}/99-bs.conf'" "nothing written before confirm"
+    tui::modal::close
+    rm -rf "${aftmp}"
 
     testframework::summary
 }

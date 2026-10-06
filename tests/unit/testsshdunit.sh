@@ -115,6 +115,10 @@ main() {
     pw_line="$(printf '%s\n' "${rendered}" | grep -n '^PasswordAuthentication ' | cut -d: -f1)"
     testframework::assert_true "port_line -lt pw_line" "catalog order (Port before Password…)"
 
+    testframework::assert_command "printf 'Subsystem=internal-sftp\n' | sshd::render | grep -q '^Subsystem sftp internal-sftp$'" "Subsystem rendered as 'Subsystem sftp …'"
+    vrc=0; sshd::validate AuthenticationMethods publickey,password || vrc=$?
+    testframework::assert_equal "0" "${vrc}" "AuthenticationMethods accepts comma list"
+
     rendered="$(printf 'AllowUsers=\nPort=22\n' | sshd::render)"
     testframework::assert_command "! printf '%s' '${rendered}' | grep -q 'AllowUsers '" "empty value skipped"
 
@@ -146,10 +150,13 @@ EOF
     local old_bin="${BS_SSHD_BIN}"; BS_SSHD_BIN="no-such-sshd-xyz"
     trc=0; sshd::test "${tmp}/good.conf" 2>/dev/null || trc=$?
     testframework::assert_equal "${LIB_ERROR_DEPENDENCY_MISSING}" "${trc}" "missing sshd → dependency missing"
-    BS_SSHD_BIN="${old_bin}"
 
     local irc=0
-    sshd::install "${tmp}/good.conf" || irc=$?
+    irc=0; sshd::install "${tmp}/good.conf" 2>/dev/null || irc=$?
+    testframework::assert_equal "${LIB_ERROR_DEPENDENCY_MISSING}" "${irc}" "install with missing sshd → dependency missing"
+    BS_SSHD_BIN="${old_bin}"
+
+    irc=0; sshd::install "${tmp}/good.conf" || irc=$?
     testframework::assert_equal "0" "${irc}" "install good ok"
     testframework::assert_file_exists "${tmp}/99-bs.conf" "target written"
     testframework::assert_command "grep -q '^Port 2222$' '${tmp}/99-bs.conf'" "installed content"
