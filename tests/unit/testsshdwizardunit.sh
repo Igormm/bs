@@ -125,6 +125,21 @@ main() {
     for key2 in "${!TUI_BUF[@]}"; do [[ "${TUI_BUF[$key2]}" == "╔" ]] && has_double=1; done
     testframework::assert_equal "0" "${has_double}" "no double border chars"
 
+    testframework::section "set -u isolation / изоляция set -u"
+    local iso
+    iso="$(bash -c '
+        unset BASH_EXECUTION_STRING BS_INITIALIZED
+        source "$1/bootstrap/init.sh"
+        bs::strict
+        export BS_HOME="$1"
+        source "$1/examples/sshd_wizard.sh"
+        TUI_COLS=100 TUI_LINES=30
+        sshd_wz::load_sections; sshd_wz::load_names; sshd_wz::paint_all
+        for k in LEFT RIGHT UP DOWN; do TUI_KEY="$k"; sshd_wz::handle_view_key || exit 7; done
+        printf ok
+    ' bash "${BS_PROJECT_ROOT}" 2>&1)"
+    testframework::assert_equal "ok" "${iso}" "handler survives set -u without a caller-local i"
+
     testframework::summary
 }
 

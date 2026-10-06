@@ -325,7 +325,8 @@ sshd_wz::put_row() {
 
 # @private Paint one section row / Нарисовать одну строку секций
 sshd_wz::paint_section_row() {
-    local -i i="$1" row=$(( 3 + i ))
+    local -i i="$1"
+    local -i row=$(( 3 + i ))
     local name="${SSHD_WZ_SECTIONS[$i]:-}"
     local text="  ${name}" st=""
     if (( i == SSHD_WZ_SECTION )); then
@@ -346,7 +347,8 @@ sshd_wz::draw_sections() {
 # @private Paint one parameter row (blank if the index is past the list)
 # @private Нарисовать одну строку параметра (пусто, если индекс за списком)
 sshd_wz::paint_param_row() {
-    local -i i="$1" row=$(( 3 + i ))
+    local -i i="$1"
+    local -i row=$(( 3 + i ))
     local name="${SSHD_WZ_NAMES[$i]:-}"
     local text="" st=""
     if is::not_empty "${name}"; then
