@@ -122,6 +122,67 @@ main() {
     testframework::assert_command "printf '%s' '${rendered}' | grep -q '^Match Group sftponly$'" "match header"
     testframework::assert_command "printf '%s' '${rendered}' | grep -q '^    ChrootDirectory %h$'" "match indented directive"
 
+    testframework::section "test/backup/install/revert / установка"
+    local tmp; tmp="$(mktemp -d)"
+    export BS_SSHD_DIR="${tmp}" BS_SSHD_DROPIN="99-bs.conf"
+    export BS_SSHD_BIN="${tmp}/sshd-fake" BS_SSHD_SERVICE="sshd"
+
+    cat > "${BS_SSHD_BIN}" <<'EOF'
+#!/bin/bash
+file="${!#}"
+if grep -q BAD "${file}"; then echo "bad config" >&2; exit 1; fi
+exit 0
+EOF
+    chmod +x "${BS_SSHD_BIN}"
+
+    printf 'Port 2222\n' > "${tmp}/good.conf"
+    local trc=0; sshd::test "${tmp}/good.conf" || trc=$?
+    testframework::assert_equal "0" "${trc}" "fake sshd accepts good"
+
+    printf 'BAD directive\n' > "${tmp}/bad.conf"
+    trc=0; sshd::test "${tmp}/bad.conf" || trc=$?
+    testframework::assert_equal "1" "${trc}" "fake sshd rejects bad"
+
+    local old_bin="${BS_SSHD_BIN}"; BS_SSHD_BIN="no-such-sshd-xyz"
+    trc=0; sshd::test "${tmp}/good.conf" 2>/dev/null || trc=$?
+    testframework::assert_equal "${LIB_ERROR_DEPENDENCY_MISSING}" "${trc}" "missing sshd → dependency missing"
+    BS_SSHD_BIN="${old_bin}"
+
+    local irc=0
+    sshd::install "${tmp}/good.conf" || irc=$?
+    testframework::assert_equal "0" "${irc}" "install good ok"
+    testframework::assert_file_exists "${tmp}/99-bs.conf" "target written"
+    testframework::assert_command "grep -q '^Port 2222$' '${tmp}/99-bs.conf'" "installed content"
+
+    printf 'Port 2200\n' > "${tmp}/good2.conf"
+    sshd::install "${tmp}/good2.conf" || irc=$?
+    testframework::assert_command "ls '${tmp}/99-bs.conf.bak.'* >/dev/null 2>&1" "backup created on overwrite"
+
+    irc=0; sshd::install "${tmp}/bad.conf" 2>/dev/null || irc=$?
+    testframework::assert_equal "${LIB_ERROR_INVALID_INPUT}" "${irc}" "bad source rejected"
+    testframework::assert_command "grep -q '^Port 2200$' '${tmp}/99-bs.conf'" "target unchanged after bad source"
+
+    local rrc=0; sshd::revert "${tmp}/99-bs.conf" >/dev/null || rrc=$?
+    testframework::assert_equal "0" "${rrc}" "revert ok"
+
+    rrc=0; sshd::revert "${tmp}/never-existed.conf" 2>/dev/null || rrc=$?
+    testframework::assert_equal "${LIB_ERROR_FILE_NOT_FOUND}" "${rrc}" "revert without backup → file not found"
+
+    rm -f "${tmp}/99-bs.conf"
+    export BS_SSHD_DRY_RUN=1
+    sshd::install "${tmp}/good.conf" || irc=$?
+    testframework::assert_true "! -f '${tmp}/99-bs.conf'" "dry-run writes nothing"
+    export BS_SSHD_DRY_RUN=0
+
+    if (( EUID != 0 )); then
+        local ro="${tmp}/ro"; mkdir -p "${ro}"; chmod 500 "${ro}"
+        irc=0; sshd::install "${tmp}/good.conf" "${ro}/99-bs.conf" 2>/dev/null || irc=$?
+        testframework::assert_equal "${LIB_ERROR_PERMISSION_DENIED}" "${irc}" "non-writable dir → permission denied"
+        chmod 700 "${ro}"
+    fi
+
+    rm -rf "${tmp}"
+
     testframework::summary
 }
 

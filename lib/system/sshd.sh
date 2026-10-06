@@ -341,3 +341,141 @@ sshd::render() {
     fi
     printf '%s\n' "${SSHD_MARK_END}"
 }
+
+# @global BS_SSHD_DIR — Sshd: drop-in config dir (category: hook)
+# @global BS_SSHD_DIR — Sshd: каталог drop-in конфигов (категория: hook)
+declare -g BS_SSHD_DIR="/etc/ssh/sshd_config.d"
+# @global BS_SSHD_MAIN — Sshd: main sshd config path (category: hook)
+# @global BS_SSHD_MAIN — Sshd: путь к основному конфигу sshd (категория: hook)
+declare -g BS_SSHD_MAIN="/etc/ssh/sshd_config"
+# @global BS_SSHD_BIN — Sshd: sshd binary or test mock (category: hook)
+# @global BS_SSHD_BIN — Sshd: бинарник sshd или мок для тестов (категория: hook)
+declare -g BS_SSHD_BIN="sshd"
+# @global BS_SSHD_SERVICE — Sshd: systemd service name (category: hook)
+# @global BS_SSHD_SERVICE — Sshd: имя systemd-сервиса (категория: hook)
+declare -g BS_SSHD_SERVICE="sshd"
+# @global BS_SSHD_DRY_RUN — Sshd: 1 = no writes/reload (category: hook)
+# @global BS_SSHD_DRY_RUN — Sshd: 1 = без записи и reload (категория: hook)
+declare -g BS_SSHD_DRY_RUN=0
+# @global BS_SSHD_DROPIN — Sshd: drop-in file name (category: hook)
+# @global BS_SSHD_DROPIN — Sshd: имя drop-in файла (категория: hook)
+declare -g BS_SSHD_DROPIN="99-bs.conf"
+
+# @description Report missing optional runtime pieces (never fails).
+# @description Сообщить об отсутствующих необязательных частях (не падает).
+sshd::init() {
+    is::command "${BS_SSHD_BIN}" || printf 'sshd не найден / not found: %s\n' "${BS_SSHD_BIN}" >&2
+    is::dir "${BS_SSHD_DIR}" || printf 'каталог / dir отсутствует / missing: %s\n' "${BS_SSHD_DIR}" >&2
+    return "${E_SUCCESS}"
+}
+
+# @description Validate a config file with `sshd -t`.
+# @description Проверить конфиг через `sshd -t`.
+# @param $1 Config file / Файл конфига
+# @return sshd exit code; LIB_ERROR_DEPENDENCY_MISSING if sshd absent
+sshd::test() {
+    local -r file="${1:?config file required}"
+    is::file "${file}" || return "${LIB_ERROR_FILE_NOT_FOUND}"
+    if ! is::command "${BS_SSHD_BIN}"; then
+        return "${LIB_ERROR_DEPENDENCY_MISSING}"
+    fi
+    "${BS_SSHD_BIN}" -t -f "${file}"
+}
+
+# @description Copy a file to `<file>.bak.<timestamp>`; print the backup path.
+# @description Скопировать файл в `<file>.bak.<timestamp>`; вывести путь копии.
+# @param $1 File / Файл
+# @stdout Backup path / Путь копии
+sshd::backup() {
+    local -r file="${1:?file required}"
+    is::file "${file}" || return "${LIB_ERROR_FILE_NOT_FOUND}"
+    local -r dest="${file}.bak.$(date +%Y%m%d%H%M%S)"
+    cp -a -- "${file}" "${dest}" || return "${LIB_ERROR_FILE_OPERATION}"
+    printf '%s\n' "${dest}"
+}
+
+# @description Reload the sshd service (systemctl), honoring dry-run.
+# @description Перезагрузить сервис sshd (systemctl), с учётом dry-run.
+# @return 0 ok; LIB_ERROR_DEPENDENCY_MISSING if systemctl absent
+sshd::reload() {
+    if (( BS_SSHD_DRY_RUN == 1 )); then
+        printf 'dry-run: systemctl reload %s\n' "${BS_SSHD_SERVICE}" >&2
+        return "${E_SUCCESS}"
+    fi
+    is::command systemctl || return "${LIB_ERROR_DEPENDENCY_MISSING}"
+    systemctl reload "${BS_SSHD_SERVICE}" >/dev/null 2>&1
+}
+
+# @description Install a rendered config as a drop-in: ensure dir, back up an
+# existing target, validate, atomically replace, validate again, reload; on
+# any validation failure restore the backup (or remove the new file).
+# @description Установить конфиг как drop-in: каталог, backup существующего,
+# валидация, атомарная замена, повторная валидация, reload; при провале —
+# восстановить backup (или удалить новый файл).
+# @param $1 Source file / Файл-источник
+# @param $2 [optional] Target / Цель (default dir/dropin)
+# @return E_SUCCESS / LIB_ERROR_*
+sshd::install() {
+    local -r src="${1:?source file required}"
+    local -r target="${2:-${BS_SSHD_DIR}/${BS_SSHD_DROPIN}}"
+    is::file "${src}" || return "${LIB_ERROR_FILE_NOT_FOUND}"
+    if (( BS_SSHD_DRY_RUN == 1 )); then
+        printf 'dry-run: install %s -> %s\n' "${src}" "${target}" >&2
+        return "${E_SUCCESS}"
+    fi
+    local -r dir="$(dirname -- "${target}")"
+    if ! is::dir "${dir}"; then
+        mkdir -p -- "${dir}" 2>/dev/null || return "${LIB_ERROR_PERMISSION_DENIED}"
+    fi
+    is::writable "${dir}" || return "${LIB_ERROR_PERMISSION_DENIED}"
+
+    local backup=""
+    if is::file "${target}"; then
+        backup="$(sshd::backup "${target}")" || return $?
+    fi
+
+    if ! sshd::test "${src}" >/dev/null 2>&1; then
+        printf 'sshd -t отклонил / rejected: %s\n' "${src}" >&2
+        return "${LIB_ERROR_INVALID_INPUT}"
+    fi
+
+    if ! cp -f -- "${src}" "${target}.tmp" || ! mv -f -- "${target}.tmp" "${target}"; then
+        rm -f -- "${target}.tmp"
+        return "${LIB_ERROR_FILE_OPERATION}"
+    fi
+
+    if ! sshd::test "${target}" >/dev/null 2>&1; then
+        printf 'sshd -t отклонил / rejected after install: %s\n' "${target}" >&2
+        if is::not_empty "${backup}"; then
+            cp -f -- "${backup}" "${target}"
+        else
+            rm -f -- "${target}"
+        fi
+        return "${LIB_ERROR_INVALID_INPUT}"
+    fi
+
+    sshd::reload || printf 'warning: reload %s failed / не удалось\n' "${BS_SSHD_SERVICE}" >&2
+    return "${E_SUCCESS}"
+}
+
+# @description Restore the newest `<target>.bak.*` over the target.
+# @description Восстановить новейший `<target>.bak.*` поверх цели.
+# @param $1 Target / Цель
+# @stdout Restored backup path / Путь восстановленной копии
+sshd::revert() {
+    local -r target="${1:?target required}"
+    local -a baks=()
+    local f
+    shopt -s nullglob
+    for f in "${target}".bak.*; do baks+=("${f}"); done
+    shopt -u nullglob
+    if (( ${#baks[@]} == 0 )); then
+        return "${LIB_ERROR_FILE_NOT_FOUND}"
+    fi
+    local latest="${baks[0]}"
+    for f in "${baks[@]}"; do
+        [[ "${f}" > "${latest}" ]] && latest="${f}"
+    done
+    cp -f -- "${latest}" "${target}" || return "${LIB_ERROR_FILE_OPERATION}"
+    printf '%s\n' "${latest}"
+}
