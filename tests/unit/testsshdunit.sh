@@ -103,6 +103,25 @@ main() {
     local prc=0; sshd::profile no_such >/dev/null 2>&1 || prc=$?
     testframework::assert_equal "${LIB_ERROR_INVALID_ARGS}" "${prc}" "unknown profile rejected"
 
+    testframework::section "render / рендер конфига"
+    local rendered
+    rendered="$(printf 'PasswordAuthentication=no\nPort=2222\n' | sshd::render)"
+    testframework::assert_command "printf '%s' '${rendered}' | grep -qF '${SSHD_MARK_BEGIN}'" "begin marker"
+    testframework::assert_command "printf '%s' '${rendered}' | grep -qF '${SSHD_MARK_END}'" "end marker"
+    testframework::assert_command "printf '%s' '${rendered}' | grep -q '^Port 2222$'" "port rendered"
+    testframework::assert_command "printf '%s' '${rendered}' | grep -q '^PasswordAuthentication no$'" "pw rendered"
+    local port_line pw_line
+    port_line="$(printf '%s\n' "${rendered}" | grep -n '^Port ' | cut -d: -f1)"
+    pw_line="$(printf '%s\n' "${rendered}" | grep -n '^PasswordAuthentication ' | cut -d: -f1)"
+    testframework::assert_true "port_line -lt pw_line" "catalog order (Port before Password…)"
+
+    rendered="$(printf 'AllowUsers=\nPort=22\n' | sshd::render)"
+    testframework::assert_command "! printf '%s' '${rendered}' | grep -q 'AllowUsers '" "empty value skipped"
+
+    rendered="$(printf '@match Group sftponly\nChrootDirectory=%%h\nForceCommand=internal-sftp\n\n' | sshd::render)"
+    testframework::assert_command "printf '%s' '${rendered}' | grep -q '^Match Group sftponly$'" "match header"
+    testframework::assert_command "printf '%s' '${rendered}' | grep -q '^    ChrootDirectory %h$'" "match indented directive"
+
     testframework::summary
 }
 

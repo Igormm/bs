@@ -287,3 +287,57 @@ EOF
             ;;
     esac
 }
+
+# @description Render a config from stdin; parameters are ordered by the
+# catalog, Match blocks are emitted verbatim and indented.
+# @description Отрендерить конфиг из stdin; параметры упорядочены по
+# каталогу, Match-блоки выводятся дословно с отступом.
+#   Grammar / Грамматика:
+#     name=value        main parameter / основной параметр
+#     @match C          open Match block with criteria C / открыть Match-блок
+#     <blank>           close the current Match block / закрыть Match-блок
+# @stdin name=value lines / строки name=value
+# @stdout config text / текст конфига
+sshd::render() {
+    local -A main=()
+    local -a blocks=()
+    local -i in_match=0
+    local line
+    while IFS= read -r line || is::not_empty "${line}"; do
+        if [[ "${line}" == "@match "* ]]; then
+            in_match=1
+            blocks+=("Match ${line#@match }")
+            continue
+        fi
+        if is::empty "${line}"; then
+            if (( in_match )); then blocks+=(""); in_match=0; fi
+            continue
+        fi
+        if (( in_match )); then
+            blocks+=("    ${line/=/ }")
+        else
+            main["${line%%=*}"]="${line#*=}"
+        fi
+    done
+
+    printf '%s\n' "# Managed by BS sshd wizard / Сгенерировано визардом BS"
+    printf '%s\n' "${SSHD_MARK_BEGIN}"
+    local name value section last_section=""
+    for name in "${SSHD_PARAM_ORDER[@]}"; do
+        value="${main[$name]:-}"
+        is::empty "${value}" && continue
+        section="${SSHD_PARAMS[$name]%%|*}"
+        [[ "${section}" == "Match" ]] && continue
+        if [[ "${section}" != "${last_section}" ]]; then
+            printf '\n# --- %s ---\n' "${section}"
+            last_section="${section}"
+        fi
+        printf '%s %s\n' "${name}" "${value}"
+    done
+    if (( ${#blocks[@]} > 0 )); then
+        printf '\n'
+        local b
+        for b in "${blocks[@]}"; do printf '%s\n' "${b}"; done
+    fi
+    printf '%s\n' "${SSHD_MARK_END}"
+}
