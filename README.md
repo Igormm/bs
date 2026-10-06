@@ -227,6 +227,17 @@ main() {
 
 Клавиши / Keys: `↑↓` выбор, `Enter` toggle, `a` add, `e` edit, `d` delete, `q` выход.
 
+### 2.1. Визард sshd-конфига / SSHd config wizard
+
+`examples/sshd_wizard.sh` — полноэкранный TUI на `lib/tui/tui` поверх модуля
+`lib/system/sshd`: профили `basic`/`strict`/`paranoid`, настройка параметров
+по секциям (с русской подсказкой на каждый), `Match`/chroot, предпросмотр и
+безопасное применение (backup → `sshd -t` → запись → reload).
+
+```bash
+./bs run examples/sshd_wizard.sh --dry-run
+```
+
 ## 3. Пульс машины / Host pulse
 
 Вектор возможностей: тир, userland, пробы `grep -P`/`sed -z`, SHA-цепочка,
