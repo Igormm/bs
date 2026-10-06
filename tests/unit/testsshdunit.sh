@@ -89,6 +89,20 @@ main() {
     vrc=0; sshd::validate LoginGraceTime "1h30" || vrc=$?
     testframework::assert_equal "${LIB_ERROR_INVALID_INPUT}" "${vrc}" "time bad rejected"
 
+    testframework::section "profiles / профили"
+    local out
+    out="$(sshd::profile basic)"
+    testframework::assert_command "printf '%s' '${out}' | grep -q '^PubkeyAuthentication=yes$'" "basic pubkey"
+    testframework::assert_command "printf '%s' '${out}' | grep -q '^PasswordAuthentication=no$'" "basic no password"
+    out="$(sshd::profile strict)"
+    testframework::assert_command "printf '%s' '${out}' | grep -q '^PermitRootLogin=no$'" "strict root no"
+    testframework::assert_command "printf '%s' '${out}' | grep -q '^AllowTcpForwarding=no$'" "strict no tcp fwd"
+    out="$(sshd::profile paranoid)"
+    testframework::assert_command "printf '%s' '${out}' | grep -q '^AddressFamily=inet$'" "paranoid inet"
+    testframework::assert_command "printf '%s' '${out}' | grep -q '^Ciphers='" "paranoid ciphers"
+    local prc=0; sshd::profile no_such >/dev/null 2>&1 || prc=$?
+    testframework::assert_equal "${LIB_ERROR_INVALID_ARGS}" "${prc}" "unknown profile rejected"
+
     testframework::summary
 }
 

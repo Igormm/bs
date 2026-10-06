@@ -235,3 +235,55 @@ sshd::validate() {
     esac
     return "${E_SUCCESS}"
 }
+
+# @description Hardening profile as name=value lines. strict extends basic,
+# paranoid extends strict (later lines win on consume).
+# @description Профиль ужесточения как строки name=value. strict включает
+# basic, paranoid включает strict (при потреблении побеждают поздние строки).
+# @param $1 Profile name / Имя профиля
+# @stdout name=value lines / строки name=value
+sshd::profile() {
+    local -r name="${1:?profile name required}"
+    case "${name}" in
+        basic)
+            cat <<'EOF'
+PubkeyAuthentication=yes
+PasswordAuthentication=no
+PermitRootLogin=prohibit-password
+X11Forwarding=no
+MaxAuthTries=5
+LoginGraceTime=60
+EOF
+            ;;
+        strict)
+            sshd::profile basic
+            cat <<'EOF'
+PermitRootLogin=no
+AllowTcpForwarding=no
+AllowAgentForwarding=no
+PermitEmptyPasswords=no
+KbdInteractiveAuthentication=no
+MaxAuthTries=3
+LoginGraceTime=30
+LogLevel=VERBOSE
+AuthenticationMethods=publickey
+EOF
+            ;;
+        paranoid)
+            sshd::profile strict
+            cat <<'EOF'
+AddressFamily=inet
+GatewayPorts=no
+PermitTunnel=no
+MaxSessions=3
+SyslogFacility=AUTHPRIV
+Ciphers=chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr
+MACs=hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,umac-64-etm@openssh.com
+KexAlgorithms=curve25519-sha256,curve25519-sha256@libssh.org,diffie-hellman-group-exchange-sha256
+EOF
+            ;;
+        *)
+            return "${LIB_ERROR_INVALID_ARGS}"
+            ;;
+    esac
+}
