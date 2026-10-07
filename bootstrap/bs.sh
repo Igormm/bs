@@ -115,11 +115,11 @@ bs::shell::version() {
   return 0
 }
 
-# @description Capability gate: bash 4+ = full kernel (0/1).
-# @description Гейт возможностей: bash 4+ = полное ядро (0/1).
-# @stdout 1 bash 4+, 0 otherwise / 1 для bash 4+, 0 иначе
+# @description Capability gate: bash 4.2+ = full kernel (0/1).
+# @description Гейт возможностей: bash 4.2+ = полное ядро (0/1).
+# @stdout 1 bash 4.2+, 0 otherwise / 1 для bash 4.2+, 0 иначе
 bs::shell::ok() {
-  if [[ -n "${BASH_VERSION:-}" ]] && (( BASH_VERSINFO[0] >= 4 )); then
+  if [[ -n "${BASH_VERSION:-}" ]] && (( BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 2) )); then
     printf '1\n'
   else
     printf '0\n'
@@ -145,27 +145,38 @@ bs::shell::is_sourced() {
   return $?
 }
 
-# @description Gate: ensure the runtime shell meets a major version requirement.
+# @description Gate: ensure the runtime shell meets a version requirement.
 # @description Гейт: проверить, что текущая оболочка не старше требуемой версии.
 # @description Runtime detection via BASH_VERSION/ZSH_VERSION (NOT $SHELL);
 # @description Рантайм-детект через BASH_VERSION/ZSH_VERSION (не $SHELL);
 # @description silent on success, error to stderr on failure, never exits.
 # @description молчит при успехе, ошибка в stderr при провале, не вызывает exit.
 # @arg $1 int Required major version, default 4.
+# @arg $2 int Required minor version, default 2 (framework needs bash 4.2+).
 # @arg $1 int Требуемая старшая версия, по умолчанию 4.
+# @arg $2 int Требуемая младшая версия, по умолчанию 2 (фреймворку нужен bash 4.2+).
 # @exitcode 0 version ok / версия подходит
 # @exitcode 1 too old or undetectable / старая или не определена
 bs::shell::ensure_version() {
-  local -r required="${1:-4}"
-  if ! [[ "${required}" =~ ^[0-9]+$ ]]; then
-    printf 'ERROR: ensure_version: required version must be a number, got %s\n' "${required}" >&2
+  local -r required_major="${1:-4}"
+  local -r required_minor="${2:-2}"
+  if ! [[ "${required_major}" =~ ^[0-9]+$ ]] || ! [[ "${required_minor}" =~ ^[0-9]+$ ]]; then
+    printf 'ERROR: ensure_version: required version must be numbers, got %s.%s\n' "${required_major}" "${required_minor}" >&2
     return 1
   fi
-  local name major
+  local name major minor
   name="$(bs::shell::name)"
   major="$(bs::shell::version)"
-  if [[ "${name}" == "unknown" || "${major}" -lt "${required}" ]]; then
-    printf 'ERROR: %s %s+ required, found %s\n' "${name}" "${required}" "${major}" >&2
+  minor="0"
+  if [[ "${name}" == "bash" ]]; then
+    minor="${BASH_VERSINFO[1]:-0}"
+  elif [[ "${name}" == "zsh" ]]; then
+    local zsh_rest
+    zsh_rest="${ZSH_VERSION#*.}"
+    minor="${zsh_rest%%.*}"
+  fi
+  if [[ "${name}" == "unknown" || "${major}" -lt "${required_major}" || ( "${major}" -eq "${required_major}" && "${minor}" -lt "${required_minor}" ) ]]; then
+    printf 'ERROR: %s %s.%s+ required, found %s.%s\n' "${name}" "${required_major}" "${required_minor}" "${major}" "${minor}" >&2
     return 1
   fi
   return 0

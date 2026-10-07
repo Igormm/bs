@@ -62,10 +62,10 @@ check_shell_environment() {
     fi
 
     # Проверяем поддерживаемость и версии
-    # Версия bash 4+ уже проверена гейтом bootstrap/bs.sh::bs::shell::ensure_version
+    # Версия bash 4.2+ уже проверена гейтом bootstrap/bs.sh::bs::shell::ensure_version
     # (install.sh source'ит bootstrap/init.sh до check_shell_environment), поэтому
     # здесь только диспетчер интерпретаторов и целостность детекта.
-    # Bash 4+ is already gated by bootstrap/bs.sh::bs::shell::ensure_version
+    # Bash 4.2+ is already gated by bootstrap/bs.sh::bs::shell::ensure_version
     # (install.sh sources bootstrap/init.sh before check_shell_environment),
     # so only the interpreter dispatch and detection integrity remain.
     case "$shell_name" in

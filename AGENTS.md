@@ -4,7 +4,7 @@
 
 ## What is BS?
 
-BS is a modular Bash 4+ framework and standard library. It provides:
+BS is a modular Bash 4.2+ framework and standard library. It provides:
 
 - `bs` — shebang interpreter and CLI (`#!/usr/bin/env bs`)
 - `bootstrap/loader.sh` — module loader with dependency resolution (`load "lib/io/streams"`)
@@ -15,7 +15,7 @@ BS is a modular Bash 4+ framework and standard library. It provides:
 - `lib/` — standard library: `io/streams`, `io/files`, `io/process`, `system/*`, `integration/*`, `ui/*`, etc.
 - `tests/` — custom test framework, ShellCheck validation, syntax validation
 
-All modules are Bash 4+ scripts. No external dependencies are required at runtime.
+All modules are Bash 4.2+ scripts. No external dependencies are required at runtime.
 
 ## How AI should work with this framework
 

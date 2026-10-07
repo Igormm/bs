@@ -1,11 +1,11 @@
 # BS Framework
 
-**BS** — модульный фреймворк и стандартная библиотека для Bash 4+:
+**BS** — модульный фреймворк и стандартная библиотека для Bash 4.2+:
 загрузчик модулей, логирование, обработка ошибок, декларативные параметры
 скриптов, абстракция потоков ввода/вывода и набор системных модулей —
 всё в едином code style и без единой внешней зависимости.
 
-**BS** is a modular framework and standard library for Bash 4+:
+**BS** is a modular framework and standard library for Bash 4.2+:
 a module loader, logging, error handling, declarative script parameters,
 an I/O streams abstraction and a set of system modules — all in a
 consistent code style and with zero external dependencies.
@@ -335,8 +335,8 @@ ubuntu, debian:stable, almalinux:9, almalinux:8 — см. `.github/workflows/ci.
 
 ## Ценности / Values
 
-- **Вездесущность** — Bash 4+ есть везде: ноль установки, ноль внешних
-  зависимостей в рантайме. / **Ubiquity** — Bash 4+ ships everywhere:
+- **Вездесущность** — Bash 4.2+ есть везде: ноль установки, ноль внешних
+  зависимостей в рантайме. / **Ubiquity** — Bash 4.2+ ships everywhere:
   zero install, zero external runtime dependencies.
 - **Совместимость важнее новизны** — BS это bash + конвенции, а не новый
   язык: вся экосистема bash открыта. / **Compatibility over novelty** —
