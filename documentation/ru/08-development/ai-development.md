@@ -37,7 +37,7 @@ BS — это Bash-фреймворк с чёткими соглашениями
 - Защита от повторной загрузки через bs::guard
 - Зависимости через bs::source_relative
 - Публичные функции в namespace group::module::function
-- Без внешних зависимостей, только Bash 4+ и стандартные Unix-утилиты
+- Без внешних зависимостей, только Bash 4.2+ и стандартные Unix-утилиты
 - Добавь unit-тест в tests/unit/test<module>unit.sh
 - Проверь через validatesyntax.sh, validateshellcheck.sh, runalltests.sh
 

@@ -76,7 +76,7 @@ An entry script then loads the module with:
 
 ```bash
 #!/usr/bin/env bs
-load "lib/system/foo"
+load "lib/system/utils"
 ```
 
 Do not `source lib/...` paths by hand in user scripts — `load` tracks loaded

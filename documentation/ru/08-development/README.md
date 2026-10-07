@@ -77,7 +77,7 @@ source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
 
 ```bash
 #!/usr/bin/env bs
-load "lib/system/foo"
+load "lib/system/utils"
 ```
 
 Не подключайте `lib/...` вручную через `source` в пользовательских скриптах —

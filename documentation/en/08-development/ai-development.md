@@ -37,7 +37,7 @@ Requirements:
 - Idempotency via bs::guard
 - Dependencies via bs::source_relative
 - Public functions use namespace group::module::function
-- No external dependencies; Bash 4+ and standard Unix tools only
+- No external dependencies; Bash 4.2+ and standard Unix tools only
 - Add a unit test in tests/unit/test<module>unit.sh
 - Validate with validatesyntax.sh, validateshellcheck.sh, runalltests.sh
 
