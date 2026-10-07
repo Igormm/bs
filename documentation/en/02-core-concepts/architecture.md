@@ -2,7 +2,7 @@
 
 # Architecture
 
-BS is a thin runtime layer over bash 4+. It consists of two entry scripts
+BS is a thin runtime layer over bash 4.2+. It consists of two entry scripts
 (`boot.sh`, `bs`), a bootstrapper (`bootstrap/init.sh`), a module loader
 (`bootstrap/loader.sh`), the always-loaded `core/` modules and the on-demand
 `lib/` modules. This document describes how the pieces fit together and what
@@ -82,7 +82,7 @@ The [bs](../../../bs) script is the unified entry point. It runs under
 `set -euo pipefail` with `IFS=$'\n\t'` and performs the following:
 
 - Resolves its own directory, sources `bootstrap/bs.sh` (pre-kernel namespace)
-  and runs `bs::shell::ensure_version 4`, so the bash 4+ gate runs before
+  and runs `bs::shell::ensure_version 4`, so the bash 4.2+ gate runs before
   anything else is loaded.
 - Defines `readonly BS_VERSION` (currently `0.6.0`).
 - Resolves `BS_ROOT` if it is not already set: first the script's own
