@@ -93,7 +93,7 @@ export PATH="$HOME/.local/bin:$PATH"
   - `system` (по умолчанию): `/usr/local/lib/bs`;
   - `local` (`--local`): `~/.local/lib/bs`;
   - произвольный: значения `PREFIX`, `BIN_DIR`, `LIB_DIR`.
-- Требуется bash 4.0+; гейт версии выполняется в bootstrap
+- Требуется bash 4.2+; гейт версии выполняется в bootstrap
   (`bs::shell::ensure_version`, по реальному интерпретатору, а не по
   `$SHELL`), который установщик подключает до всего остального.
   `check_shell_environment` занимается только диспетчером интерпретаторов

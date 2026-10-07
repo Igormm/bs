@@ -93,7 +93,7 @@ Rules: `~/.bashrc` is updated if it exists, or if there is no `~/.zshrc`; `~/.zs
   - `system` (default): `/usr/local/lib/bs`;
   - `local` (`--local`): `~/.local/lib/bs`;
   - custom: values of `PREFIX`, `BIN_DIR`, `LIB_DIR`.
-- bash 4.0+ is required; the version gate runs in the bootstrap
+- bash 4.2+ is required; the version gate runs in the bootstrap
   (`bs::shell::ensure_version`, based on the real interpreter, not `$SHELL`),
   which the installer sources before anything else. `check_shell_environment`
   handles the interpreter dispatch (bash/zsh/ksh/dash/fish) only.
