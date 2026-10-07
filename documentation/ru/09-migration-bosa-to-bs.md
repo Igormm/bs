@@ -29,11 +29,10 @@
 | `logger::` | `log::` |
 
 ```bash
-# Было:
-logger::info "Message"
-logger::debug "Debug info"
+# Было (BOSA): logger::info "Message"
+# Было (BOSA): logger::debug "Debug info"
 
-# Стало:
+# Стало (BS):
 log::info "Message"
 log::debug "Debug info"
 ```
