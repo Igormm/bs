@@ -141,15 +141,13 @@ setup_ps1_professional
 
 ### Using in Scripts
 ```bash
-#!/usr/bin/env bash
-source "/path/to/bosa/boot.sh"
-bosa::init
+#!/usr/bin/env bs
 
-# Load example functions
-source "/path/to/bosa/examples/ps1_configuration_example.sh"
+# Load the framework module instead of sourcing it by hand
+load "lib/ui/ps1config"
 
-# Use example functions
-setup_ps1_basic
+# Apply a prompt theme
+ps1config::set_theme powerline
 ```
 
 ## Creating New Examples
@@ -173,16 +171,15 @@ When adding new examples:
 
 ## Integration with Other Modules
 
-Examples can use any BOSA modules:
+Examples can use any framework modules:
 ```bash
 # Load multiple modules
 load "lib/ui/ps1config"
-load "lib/system/utils"
-load "lib/integration/telegramintegration"
+load "lib/system/info"
 
 # Use together
-setup_ps1_professional
-system::utils::get_hostname | telegramintegration::send_message "$CHAT_ID"
+ps1config::set_theme powerline
+system::info::hostname
 ```
 
 ## Testing Examples

@@ -28,11 +28,13 @@
 |--------|-------|
 | `logger::` | `log::` |
 
-```bash
+```text
 # Было:
 logger::info "Message"
 logger::debug "Debug info"
+```
 
+```bash
 # Стало:
 log::info "Message"
 log::debug "Debug info"

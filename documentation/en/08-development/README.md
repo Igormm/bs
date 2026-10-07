@@ -76,7 +76,7 @@ An entry script then loads the module with:
 
 ```bash
 #!/usr/bin/env bs
-load "lib/system/foo"
+load "lib/system/info"
 ```
 
 Do not `source lib/...` paths by hand in user scripts — `load` tracks loaded
@@ -180,7 +180,7 @@ for entry points that prefer a function call over the raw `set` line.
        testframework::init
 
        testframework::section "Load"
-       testframework::assert_command 'load "lib/system/foo"' "Load lib/system/foo"
+       testframework::assert_command 'load "lib/system/info"' "Load lib/system/info"
        testframework::assert_true "true" "example assertion"
 
        testframework::summary

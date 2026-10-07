@@ -27,11 +27,13 @@ Notes on current state:
 |-----|-----|
 | `logger::` | `log::` |
 
-```bash
+```text
 # Was:
 logger::info "Message"
 logger::debug "Debug info"
+```
 
+```bash
 # Now:
 log::info "Message"
 log::debug "Debug info"

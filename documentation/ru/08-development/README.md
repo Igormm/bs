@@ -77,7 +77,7 @@ source "$(dirname -- "${BASH_SOURCE[0]}")/../../core/utils.sh"
 
 ```bash
 #!/usr/bin/env bs
-load "lib/system/foo"
+load "lib/system/info"
 ```
 
 Не подключайте `lib/...` вручную через `source` в пользовательских скриптах —
@@ -182,7 +182,7 @@ fi
        testframework::init
 
        testframework::section "Load"
-       testframework::assert_command 'load "lib/system/foo"' "Load lib/system/foo"
+       testframework::assert_command 'load "lib/system/info"' "Load lib/system/info"
        testframework::assert_true "true" "example assertion"
 
        testframework::summary
