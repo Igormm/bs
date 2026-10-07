@@ -39,6 +39,13 @@ do_install() {
   cp -a "${SOURCE_ROOT}/bs"        "${TARGET_LIB}/"   # main launcher
   cp -a "${SOURCE_ROOT}/lib"       "${TARGET_LIB}/"
 
+  # Install bash completion if available
+  if [[ -f "${SOURCE_ROOT}/share/bash-completion/completions/bs" ]]; then
+    mkdir -p "$(dirname -- "${TARGET_COMPLETION}")"
+    cp -a "${SOURCE_ROOT}/share/bash-completion/completions/bs" "${TARGET_COMPLETION}"
+    printf "Установлено bash-completion: %s\n" "${TARGET_COMPLETION}"
+  fi
+
   # Create wrapper with real paths from the chosen PREFIX
   # Создать wrapper с реальными путями из выбранного PREFIX
   cat >"${TARGET_BIN}" <<WRAP
@@ -69,6 +76,12 @@ do_uninstall() {
   printf "Удаление BS (%s)\n" "${MODE}"
   printf "  TARGET_BIN: %s\n" "${TARGET_BIN}"
   printf "  TARGET_LIB: %s\n" "${TARGET_LIB}"
+
+  # Remove bash completion
+  if is::file "${TARGET_COMPLETION}"; then
+    rm -f "${TARGET_COMPLETION}"
+    printf "Удален: %s\n" "${TARGET_COMPLETION}"
+  fi
 
   # Remove wrapper
   if is::file "${TARGET_BIN}"; then

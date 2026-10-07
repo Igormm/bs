@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# Bash completion for the BS framework CLI.
+# Source this file or install it as /usr/share/bash-completion/completions/bs
+
+_bs_complete() {
+    local cur prev words cword
+    _init_completion || return
+
+    local commands=(
+        help version env doctor
+        list lang-doc lsp
+        run build repl calc rfc api ts audit chat
+        update uninstall init-shell
+    )
+
+    local cmd=""
+    local i
+    for ((i = 1; i < cword; i++)); do
+        case "${words[i]}" in
+            -h|--help) return ;;
+            help|version|env|doctor|list|lang-doc|lsp|run|build|repl|calc|rfc|api|ts|audit|chat|update|uninstall|init-shell)
+                cmd="${words[i]}"
+                break
+                ;;
+        esac
+    done
+
+    if [[ -z "${cmd}" ]]; then
+        # First level: complete commands
+        if [[ "${cur}" == -* ]]; then
+            COMPREPLY=( $(compgen -W "--help -h" -- "${cur}") )
+        else
+            COMPREPLY=( $(compgen -W "${commands[*]}" -- "${cur}") )
+        fi
+        return
+    fi
+
+    case "${cmd}" in
+        help)
+            COMPREPLY=( $(compgen -W "${commands[*]}" -- "${cur}") )
+            ;;
+        run|build)
+            # Complete shell script files
+            local IFS=$'\n'
+            COMPREPLY=( $(compgen -f -- "${cur}") )
+            local j
+            for ((j = 0; j < ${#COMPREPLY[@]}; j++)); do
+                [[ -d "${COMPREPLY[j]}" ]] && COMPREPLY[j]+="/"
+            done
+            ;;
+        rfc)
+            COMPREPLY=( $(compgen -W "list 1925 3986 4122 4180" -- "${cur}") )
+            ;;
+        api)
+            COMPREPLY=( $(compgen -W "load list info paths call drop" -- "${cur}") )
+            ;;
+        ts)
+            COMPREPLY=( $(compgen -W "doctor validate port-free init up down status logs" -- "${cur}") )
+            ;;
+        update|uninstall)
+            COMPREPLY=( $(compgen -W "--local --system --lib --from -v --verbose -h --help" -- "${cur}") )
+            ;;
+        chat)
+            COMPREPLY=( $(compgen -W "--provider --model --system --one-shot --history --url --api-key --show-raw -h --help" -- "${cur}") )
+            ;;
+        doctor)
+            COMPREPLY=( $(compgen -W "--capabilities -h --help" -- "${cur}") )
+            ;;
+        *)
+            ;;
+    esac
+}
+
+complete -F _bs_complete bs

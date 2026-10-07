@@ -80,6 +80,13 @@ fi
 TARGET_LIB="${LIB_DIR}/bs"  # BS libraries root
 TARGET_BIN="${BIN_DIR}/bs"  # wrapper executable
 
+# Bash completion location
+if [[ "${MODE}" == "local" ]]; then
+  TARGET_COMPLETION="${HOME}/.local/share/bash-completion/completions/bs"
+else
+  TARGET_COMPLETION="/usr/share/bash-completion/completions/bs"
+fi
+
 # PATH flags are local-only (help: valid only with --local)
 # Флаги PATH работают только в local-режиме (help: только с --local)
 if [[ "${FLAG_PATH}" == "1" || "${FLAG_UPDATE_PATH}" == "1" ]]; then

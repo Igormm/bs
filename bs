@@ -75,25 +75,35 @@ help() {
   cat <<HELP
 BS Framework ${BS_VERSION} – command launcher & shebang interpreter
 Usage: bs [command] [args...]
+       bs help <command>   Show detailed help for a command
 
-Commands:
-  help, -h, --help    Show this help
-  version             Print framework version
-  env                 Show environment (BS_ROOT, PATH)
-  list                List available modules (core/, lib/)
-  lang-doc            Emit a JSON index of function docs (LSP metadata)
-  lsp                 Run the language server (stdin/stdout, JSON-RPC)
-  chat                Interactive LLM chat (openai/ollama, --url for custom)
-  api                 OpenAPI 3.x client (load spec, list paths, call operations)
-  ts                  TypeScript toolchain + local mini stack (thriller)
-  doctor              Check framework integrity
-  run <script> [args] Execute script inside BS environment
-  build <script>      Assemble a standalone self-extracting script
-  repl                Interactive REPL (BS shell / интерактивная консоль)
-  calc                RPN calculator on dc (обратная польская нотация)
-  update              Apply repo changes to installed copies (no reinstall)
-  uninstall           Remove installed BS copies (wrapper + lib tree)
-  init-shell          Print snippet for ~/.bashrc or ~/.zshrc
+Info / Информация:
+  help, -h, --help    Show this help / показать эту справку
+  help <command>      Show detailed help for a command / справка по команде
+  version             Print framework version / версия фреймворка
+  env                 Show environment (BS_ROOT, PATH) / окружение
+  doctor              Check framework integrity / проверка целостности
+
+Modules / Модули:
+  list                List available modules (core/, lib/) / список модулей
+  lang-doc            JSON index of function docs (LSP metadata) / индекс функций
+  lsp                 Run language server (JSON-RPC over stdin/stdout) / LSP
+
+Development / Разработка:
+  run <script> [args] Execute script inside BS environment / запуск скрипта
+  build <script>      Assemble a standalone self-extracting script / сборка
+  repl                Interactive REPL (BS shell) / интерактивная консоль
+  calc                RPN calculator / калькулятор ОПН
+  rfc [number]        RFC helpers (1925, 3986, 4122, 4180) / RFC
+  api <sub> [args]    OpenAPI 3.x client / OpenAPI-клиент
+  ts <command>        TypeScript toolchain / TS-тулчейн
+  audit [roots]       GNU-only tool audit / аудит GNU-зависимостей
+  chat [opts]         Interactive LLM chat / чат с LLM
+
+Maintenance / Обслуживание:
+  update [opts]       Apply repo changes to installed copies / обновление
+  uninstall [opts]    Remove installed BS copies / удаление
+  init-shell          Print snippet for ~/.bashrc or ~/.zshrc / snippet для shell
 
 Shebang mode:
   #!/usr/bin/env bs
@@ -101,9 +111,43 @@ Shebang mode:
 
 Examples:
   bs doctor
+  bs help build
   bs run ./examples/deploy.sh --prod
   bs list | grep system
 HELP
+}
+
+# @description Show detailed help for a single command by calling its --help.
+# @description Показать подробную справку по одной команде через её --help.
+# @param $1 Command name / имя команды
+help_cmd() {
+  local cmd="${1:-}"
+  if is::empty "${cmd}"; then
+    help
+    return 0
+  fi
+  case "${cmd}" in
+    help|-h|--help) help ;;
+    version)        printf 'Usage: bs version\n\nPrint framework version.\n' ;;
+    env)            printf 'Usage: bs env\n\nShow BS_ROOT and PATH.\n' ;;
+    list)           list_cmd --help ;;
+    lang-doc)       lang_doc_cmd --help ;;
+    lsp)            lsp_cmd --help ;;
+    chat)           chat_cmd --help ;;
+    api)            api_cmd --help ;;
+    ts)             ts_cmd --help ;;
+    audit)          audit_cmd --help ;;
+    doctor)         doctor_cmd --help ;;
+    run)            printf 'Usage: bs run <script> [args...]\n\nExecute a script inside the BS environment.\n' ;;
+    build)          build_cmd --help ;;
+    repl)           printf 'Usage: bs repl\n\nInteractive REPL (BS shell).\n' ;;
+    calc)           printf 'Usage: bs calc [expression]\n\nRPN calculator on dc.\n' ;;
+    update|sync)    update_cmd --help ;;
+    uninstall)      uninstall_cmd --help ;;
+    init-shell)     printf 'Usage: bs init-shell\n\nPrint snippet for ~/.bashrc or ~/.zshrc.\n' ;;
+    rfc)            rfc_cmd --help ;;
+    *)              die "help: unknown command: ${cmd}" ;;
+  esac
 }
 
 version() { bs::version::print; }
@@ -1063,7 +1107,14 @@ fi
 
 # 8. Обычный CLI-диспетчер
 case "${1:-help}" in
-  help|-h|--help) help ;;
+  help|-h|--help)
+    shift || true
+    if [[ $# -ge 1 ]]; then
+      help_cmd "$1"
+    else
+      help
+    fi
+    ;;
   version)        version ;;
   env)            env_cmd ;;
   list)           list_cmd ;;
