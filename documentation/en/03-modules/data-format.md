@@ -7,7 +7,7 @@ parameter. Methods emit data once as canonical `key=value` records; the format
 layer turns them into the requested representation. Dependency-free (pure Bash);
 no `jq`/`python3` required.
 
-Tier: **portable** (pure Bash 4+).
+Tier: **portable** (pure Bash 4.2+).
 
 Source: [lib/data/format.sh](../../../lib/data/format.sh)
 
