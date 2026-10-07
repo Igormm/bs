@@ -3,7 +3,7 @@
 # errorhandler.sh — единый EXIT-хендлер и cleanup-хуки / unified EXIT handler and cleanup
 # hooks
 #
-# @depends core/const, core/logger
+# @depends core/const, core/logger, core/lang
 #
 # Идея / Idea:
 # - любой модуль/скрипт может добавить очистку / any module/script can add cleanup:
@@ -23,6 +23,10 @@ bs::source_relative "const.sh" "logger.sh"
 # @global BS_CLEANUP_STACK — Errorhandler: cleanup action stack (LIFO) (category: env)
 # @global BS_CLEANUP_STACK — Errorhandler: стек действий очистки (LIFO) (категория: env)
 declare -ga BS_CLEANUP_STACK=()
+
+# @global __ERROR_HANDLERS — Errorhandler: registered code → handler function map (category: state)
+# @global __ERROR_HANDLERS — Errorhandler: карта зарегистрированных code → функция-обработчик (категория: state)
+declare -gA __ERROR_HANDLERS=()
 
 # @description Add cleanup function to stack / Добавить функцию очистки в стек
 # @param $1 Function name to add to cleanup / Имя функции для добавления в очистку
@@ -222,12 +226,13 @@ error::exit_with_backtrace() {
 error::handle() {
     local -r error_code="${1}"
     local -r message="${2}"
-    
+
     log::error "Error ${error_code}: ${message}"
-    
-    # Execute custom error handler if defined
-    if function_exists "error::handler::${error_code}"; then
-        "error::handler::${error_code}" "${message}"
+
+    # Execute custom error handler if registered
+    local handler="${__ERROR_HANDLERS["${error_code}"]:-}"
+    if is::not_empty "${handler}"; then
+        "${handler}" "${message}"
     else
         # Default error handling
         error::exit "${message}" "${error_code}"
@@ -240,7 +245,7 @@ error::handle() {
 # случае
 function_exists() {
     local -r fn="${1}"
-    declare -F "${fn}" >/dev/null 2>&1
+    declare -F -- "${fn}" >/dev/null 2>&1
 }
 
 # @description Set custom error handler for specific error code / Установить
@@ -252,15 +257,19 @@ function_exists() {
 error::set_handler() {
     local -r error_code="${1}"
     local -r handler="${2}"
-    
-    if function_exists "${handler}"; then
-        # Create a named handler function
-        eval "error::handler::${error_code}() { ${handler} \"\$@\"; }"
-        log::debug "Set custom handler for error ${error_code}: ${handler}"
-    else
+
+    if is::empty "${error_code}"; then
+        log::warn "error::set_handler: error code is required"
+        return "${E_INVALID:-2}"
+    fi
+
+    if ! function_exists "${handler}"; then
         log::warn "Handler function does not exist: ${handler}"
         return "${E_ERROR:-1}"
     fi
+
+    __ERROR_HANDLERS["${error_code}"]="${handler}"
+    log::debug "Set custom handler for error ${error_code}: ${handler}"
 }
 
 # @description Reset error handler for specific error code / Сбросить обработчик для
@@ -270,8 +279,8 @@ error::set_handler() {
 #   error::reset_handler 127
 error::reset_handler() {
     local -r error_code="${1}"
-    
-    unset -f "error::handler::${error_code}" 2>/dev/null
+
+    unset '__ERROR_HANDLERS["${error_code}"]'
     log::debug "Reset handler for error ${error_code}"
 }
 
@@ -291,20 +300,39 @@ error::try() {
     return 0
 }
 
-# @description Execute command with error handling and fallback / Выполнить команду с
-# обработкой ошибок и запасным вариантом
-# @param $1 Command to try / Команда для попытки
-# @param $2 Fallback command / Запасная команда
+# @description Execute primary function with fallback on failure / Выполнить основную
+# функцию с запасным вариантом при ошибке
+# @param $1 Primary function name / Имя основной функции
+# @param $2 Fallback function name / Имя запасной функции
+# @param $@ Arguments passed to both functions / Аргументы, передаваемые обеим функциям
 # @example
-#   error::try_with_fallback "critical_command" "fallback_command"
+#   error::try_with_fallback primary_func fallback_func "arg1" "arg2"
 error::try_with_fallback() {
-    local primary_cmd="${1}"
-    local fallback_cmd="${2}"
-    
-    if ! error::try eval "${primary_cmd}"; then
-        log::warn "Primary command failed, trying fallback: ${fallback_cmd}"
-        eval "${fallback_cmd}"
+    local primary_fn="${1}"
+    local fallback_fn="${2}"
+    shift 2
+
+    if is::empty "${primary_fn}" || is::empty "${fallback_fn}"; then
+        log::warn "error::try_with_fallback: primary and fallback function names are required"
+        return "${E_INVALID:-2}"
     fi
+
+    if ! function_exists "${primary_fn}"; then
+        log::warn "error::try_with_fallback: primary function not found: ${primary_fn}"
+        return "${E_ERROR:-1}"
+    fi
+
+    if ! function_exists "${fallback_fn}"; then
+        log::warn "error::try_with_fallback: fallback function not found: ${fallback_fn}"
+        return "${E_ERROR:-1}"
+    fi
+
+    if "${primary_fn}" "$@"; then
+        return 0
+    fi
+
+    log::warn "Primary function '${primary_fn}' failed, trying fallback: ${fallback_fn}"
+    "${fallback_fn}" "$@"
 }
 
 # @description Execute command with retry logic / Выполнить команду с логикой повтора
@@ -391,31 +419,51 @@ error::log() {
 }
 
 # @description Handle error conditionally / Условная обработка ошибки
-# @param $1 Condition command / Команда условия
+# @param $1 Predicate function name / Имя функции-предиката
 # @param $2 Error message / Сообщение об ошибке
 # @param $3 Exit code (default: 1) / Код выхода (по умолчанию 1)
 # @example
-#   error::conditional "command -v nonexistent >/dev/null 2>&1" "Command not found" 127
+#   error::conditional command_exists "Command not found" 127
 error::conditional() {
-    local -r condition="${1}"
+    local predicate="${1}"
     local -r message="${2}"
     local -r exit_code="${3:-${E_ERROR:-1}}"
-    
-    if eval "${condition}"; then
+
+    if is::empty "${predicate}"; then
+        log::warn "error::conditional: predicate function name is required"
+        return "${E_INVALID:-2}"
+    fi
+
+    if ! function_exists "${predicate}"; then
+        log::warn "error::conditional: predicate function not found: ${predicate}"
+        return "${E_ERROR:-1}"
+    fi
+
+    if "${predicate}"; then
         error::exit "${message}" "${exit_code}"
     fi
 }
 
 # @description Handle warning conditionally / Условная обработка предупреждения
-# @param $1 Condition command / Команда условия
+# @param $1 Predicate function name / Имя функции-предиката
 # @param $2 Warning message / Сообщение предупреждения
 # @example
-#   error::conditional_warning "check_deprecated_feature" "Feature is deprecated"
+#   error::conditional_warning check_deprecated_feature "Feature is deprecated"
 error::conditional_warning() {
-    local -r condition="${1}"
+    local predicate="${1}"
     local -r message="${2}"
-    
-    if eval "${condition}"; then
+
+    if is::empty "${predicate}"; then
+        log::warn "error::conditional_warning: predicate function name is required"
+        return "${E_INVALID:-2}"
+    fi
+
+    if ! function_exists "${predicate}"; then
+        log::warn "error::conditional_warning: predicate function not found: ${predicate}"
+        return "${E_ERROR:-1}"
+    fi
+
+    if "${predicate}"; then
         log::warn "${message}"
     fi
 }

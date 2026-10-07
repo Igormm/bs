@@ -166,7 +166,92 @@ main() {
     rc=0
     ( bs::exit bogus_name 2>/dev/null ) || rc=$?
     testframework::assert_equal "1" "${rc}" "bs::exit falls back to E_ERROR on unknown name"
-    
+
+    # Тест 8: error::set_handler / handle / reset_handler без eval
+    testframework::section "Custom Error Handlers / Пользовательские обработчики ошибок"
+
+    test_handler_captured=""
+    test::my_handler() {
+        test_handler_captured="${1}"
+    }
+
+    error::set_handler 42 test::my_handler
+    error::handle 42 "custom error message"
+    testframework::assert_equal "custom error message" "${test_handler_captured}" "handle dispatches registered handler"
+
+    test_handler_captured=""
+    error::reset_handler 42
+    rc=0
+    ( error::handle 42 "default again" 2>/dev/null ) || rc=$?
+    testframework::assert_equal "42" "${rc}" "reset handler falls back to default exit with original code"
+
+    rc=0
+    utils::quiet_err error::set_handler 42 nonexistent_function || rc=$?
+    testframework::assert_equal "${E_ERROR}" "${rc}" "set_handler rejects missing function"
+
+    unset -f test::my_handler
+    unset test_handler_captured
+
+    # Тест 9: error::try_with_fallback — function-based, без eval
+    testframework::section "Try With Fallback / Попытка с fallback"
+
+    test::primary_ok() { printf 'primary\n'; return 0; }
+    test::primary_fail() { return 1; }
+    test::fallback_ok() { printf 'fallback\n'; return 0; }
+    test::fallback_fail() { return 2; }
+
+    local twf_out
+    twf_out=$(error::try_with_fallback test::primary_ok test::fallback_ok)
+    testframework::assert_equal "primary" "${twf_out}" "primary success skips fallback"
+
+    twf_out=$(error::try_with_fallback test::primary_fail test::fallback_ok)
+    testframework::assert_equal "fallback" "${twf_out}" "primary failure runs fallback"
+
+    rc=0
+    utils::quiet_err error::try_with_fallback test::primary_fail test::fallback_fail || rc=$?
+    testframework::assert_equal "2" "${rc}" "fallback failure returns its code"
+
+    rc=0
+    utils::quiet_err error::try_with_fallback nonexistent_primary test::fallback_ok || rc=$?
+    testframework::assert_equal "${E_ERROR}" "${rc}" "missing primary function rejected"
+
+    unset -f test::primary_ok test::primary_fail test::fallback_ok test::fallback_fail
+
+    # Тест 10: error::conditional / conditional_warning — function-based, без eval
+    testframework::section "Conditional Error/Warning / Условные ошибка и предупреждение"
+
+    test::always_true() { return 0; }
+    test::always_false() { return 1; }
+
+    rc=0
+    ( error::conditional test::always_true "conditional error" 5 2>/dev/null ) || rc=$?
+    testframework::assert_equal "5" "${rc}" "conditional exits when predicate true"
+
+    rc=0
+    error::conditional test::always_false "should not run" 5 || rc=$?
+    testframework::assert_equal "0" "${rc}" "conditional no-op when predicate false"
+
+    local warn_out
+    warn_out=$(error::conditional_warning test::always_true "conditional warning" 2>&1)
+    if echo "${warn_out}" | grep -q "conditional warning"; then
+        testframework::assert_true "true" "conditional_warning prints warning when true"
+    else
+        testframework::assert_true "false" "conditional_warning prints warning when true"
+    fi
+
+    warn_out=$(error::conditional_warning test::always_false "no warning" 2>&1)
+    if echo "${warn_out}" | grep -q "no warning"; then
+        testframework::assert_true "false" "conditional_warning silent when false"
+    else
+        testframework::assert_true "true" "conditional_warning silent when false"
+    fi
+
+    rc=0
+    utils::quiet_err error::conditional nonexistent_predicate "msg" || rc=$?
+    testframework::assert_equal "${E_ERROR}" "${rc}" "conditional rejects missing predicate"
+
+    unset -f test::always_true test::always_false
+
     # Вывод сводки
     testframework::summary
 }
