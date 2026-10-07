@@ -63,7 +63,7 @@ See the [Code Style Guide](code-style-guide.md) for details.
 - **Module loader**: declare dependencies in a `# @depends core/const, core/logger`
   comment; the loader detects cycles via `BS_LOAD_STACK` and deduplicates loads
   via `BS_LOADED_MODULES`.
-- **Centralized shell checks**: validate Bash 4+ through a single helper
+- **Centralized shell checks**: validate Bash 4.2+ through a single helper
   (`bootstrap/bs.sh::bs::shell::ensure_version`, available before the loader
   and used by entry points; `utils::ensure_shell_version` is deprecated).
   Do not scatter ad-hoc `BASH_VERSINFO` checks across files.
@@ -95,7 +95,7 @@ See the [Code Style Guide](code-style-guide.md) for details.
 
 ## Tools & dependencies
 
-- **Shell**: Bash 4+ is required for associative arrays and the loader.
+- **Shell**: Bash 4.2+ is required for associative arrays and the loader.
   zsh may invoke the CLI, but execution always happens in Bash.
 - **Core tools** (module-dependent): `jq`, `curl`, `openssl`, `coreutils`
   (`base64`).
