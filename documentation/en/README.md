@@ -1,6 +1,6 @@
 # BS Documentation
 
-**BS** is a modular framework and standard library for Bash 4+:
+**BS** is a modular framework and standard library for Bash 4.2+:
 a module loader, logging, error handling, declarative script arguments,
 an I/O streams abstraction and a set of system modules.
 
