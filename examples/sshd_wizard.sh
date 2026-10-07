@@ -295,7 +295,11 @@ sshd_wz::cache_styles() {
     SSHD_WZ_ST_OK="$(tui::style green)"
     SSHD_WZ_ST_DIM="$(tui::style dim)"
     SSHD_WZ_ST_SEL="$(tui::style bold reverse cyan)"
-    SSHD_WZ_ST_SEL_OFF="$(tui::style reverse black)"
+    # reverse без явных цветов: инверсия дефолтных (reverse black давал
+    # чёрное-на-чёрном на чёрном фоне терминала).
+    # reverse with default colors: inverts the terminal defaults (reverse
+    # black rendered black-on-black on a black-background terminal).
+    SSHD_WZ_ST_SEL_OFF="$(tui::style reverse)"
     SSHD_WZ_ST_STATUS="$(tui::style bg_black white)"
     SSHD_WZ_ST_RED="$(tui::style bold red)"
     return 0
@@ -514,7 +518,9 @@ sshd_wz::apply() {
         sshd_wz::open_preview
         return 0
     fi
-    SSHD_WZ_CONFIRM_SEL=0
+    # Умолчание — No: запись в /etc/ssh и reload требуют осознанного выбора /
+    # default is No: writing /etc/ssh + reload must be a deliberate choice
+    SSHD_WZ_CONFIRM_SEL=1
     tui::modal::open confirm sshd_wz::modal_confirm_draw
     return 0
 }
@@ -524,13 +530,22 @@ sshd_wz::modal_confirm_draw() {
 }
 
 sshd_wz::do_apply() {
-    local -r tmpf="$(mktemp "${TMPDIR:-/tmp}/bs-sshd-wizard.XXXXXX.conf")"
-    sshd_wz::render_config > "${tmpf}"
+    # local + присваивание раздельно: иначе статус mktemp маскируется / split
+    # local and assignment: otherwise mktemp's exit status is masked
+    local tmpf
+    if ! tmpf="$(mktemp "${TMPDIR:-/tmp}/bs-sshd-wizard.XXXXXX.conf")"; then
+        SSHD_WZ_STATUS="Ошибка / Error: mktemp"
+        tui::modal::open result sshd_wz::modal_result_draw
+        return 0
+    fi
     local rc=0
-    if [[ "${SSHD_WZ_TARGET}" == "main" ]]; then
-        sshd::install_main "${tmpf}" || rc=$?
-    else
-        sshd::install "${tmpf}" || rc=$?
+    sshd_wz::render_config > "${tmpf}" || rc=$?
+    if (( rc == 0 )); then
+        if [[ "${SSHD_WZ_TARGET}" == "main" ]]; then
+            sshd::install_main "${tmpf}" || rc=$?
+        else
+            sshd::install "${tmpf}" || rc=$?
+        fi
     fi
     rm -f -- "${tmpf}"
     if (( rc == 0 )); then
@@ -619,7 +634,7 @@ sshd_wz::cycle_profile() {
 sshd_wz::jump_match() {
     local -i old="${SSHD_WZ_SECTION}" i
     for i in "${!SSHD_WZ_SECTIONS[@]}"; do
-        if [[ "${SSHD_WZ_SECTIONS[$i]}" == "Match" && i != old ]]; then
+        if [[ "${SSHD_WZ_SECTIONS[$i]}" == "Match" && i -ne old ]]; then
             SSHD_WZ_SECTION=$i; SSHD_WZ_SELECT=0; sshd_wz::load_names
             sshd_wz::paint_section_row "$old"
             sshd_wz::paint_section_row "$i"
