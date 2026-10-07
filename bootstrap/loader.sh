@@ -69,33 +69,44 @@ load::__check_circular_dependency() {
 load::__load_dependencies() {
     local module_path="${1:?Missing module path}"
     local module_file="${BS_ROOT}/${module_path}.sh"
-    # Список зависимостей разбирается по пробелам независимо от IFS вызывающего
-    # Dependency list is split on spaces regardless of the caller's IFS
-    local IFS=' '
-    
+
+    if [[ ! -f "${module_file}" ]]; then
+        echo "BS: error: module file not found: ${module_file}" >&2
+        return 1
+    fi
+
     # Парсим комментарии вида: # @depends core/logger, lib/system/utils
     # Parse comments like: # @depends core/logger, lib/system/utils
-    local depends_line
-    depends_line=$(grep -m1 "^[[:space:]]*#.*@depends" "${module_file}" 2>/dev/null || echo "")
-    
+    local depends_line=""
+    local line
+    while IFS= read -r line || [[ -n "${line}" ]]; do
+        if [[ "${line}" =~ ^[[:space:]]*#.*@depends[[:space:]]+(.+) ]]; then
+            depends_line="${BASH_REMATCH[1]}"
+            # Отрезаем trailing-комментарий (всё после очередного #)
+            # Strip any trailing comment after another #
+            depends_line="${depends_line%%#*}"
+            depends_line="${depends_line#"${depends_line%%[![:space:]]*}"}"
+            depends_line="${depends_line%"${depends_line##*[![:space:]]}"}"
+            break
+        fi
+    done < "${module_file}"
+
     if [[ -z "${depends_line}" ]]; then
         return 0  # Нет зависимостей / No dependencies
     fi
-    
-    # Извлекаем список зависимостей
-    # Extract dependency list
-    local deps
-    deps=$(echo "${depends_line}" | sed 's/.*@depends[[:space:]]*//; s/[[:space:]]*$//')
-    
+
     # Загружаем каждую зависимость
     # Load each dependency
+    local -a deps
+    local IFS=','
+    read -ra deps <<< "${depends_line}"
+
     local dep
-    for dep in ${deps//,/ }; do
-        dep=$(echo "${dep}" | xargs)  # Trim whitespace
-        if [[ -z "${dep}" ]]; then
-            continue
-        fi
-        
+    for dep in "${deps[@]}"; do
+        dep="${dep#"${dep%%[![:space:]]*}"}"
+        dep="${dep%"${dep##*[![:space:]]}"}"
+        [[ -z "${dep}" ]] && continue
+
         if [[ -z "${BS_LOADED_MODULES["${dep}"]:-}" ]]; then
             if ! load "${dep}"; then
                 echo "BS: error: failed to load dependency '${dep}' for module '${module_path}'" >&2
@@ -103,7 +114,7 @@ load::__load_dependencies() {
             fi
         fi
     done
-    
+
     return 0
 }
 

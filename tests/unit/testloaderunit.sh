@@ -74,7 +74,38 @@ main() {
     rc=0
     utils::quiet_err load "lib/nonexistent/module" || rc=$?
     testframework::assert_true "$rc -ne 0" "Retry still fails with error"
-    
+
+    # Тест 6: Зависимости с пробелами после запятой корректно парсятся
+    testframework::section "Dependency Parsing / Парсинг зависимостей"
+
+    local test_mod_dir="${BS_PROJECT_ROOT}/lib/loader_test_space"
+    local space_mod_dir="${BS_PROJECT_ROOT}/lib/loader test space"
+    mkdir -p "${test_mod_dir}" "${space_mod_dir}"
+
+    cat > "${test_mod_dir}/space_dep.sh" <<'EOF'
+#!/usr/bin/env bs
+# shellcheck shell=bash
+# @depends core/const, core/logger
+bs::guard "LOADER_TEST_SPACE_DEP" || return 0
+loader_test_space_dep::loaded() { :; }
+EOF
+
+    cat > "${space_mod_dir}/space_mod.sh" <<'EOF'
+#!/usr/bin/env bs
+# shellcheck shell=bash
+# @depends lib/loader_test_space/space_dep
+bs::guard "LOADER_TEST_SPACE_MOD" || return 0
+loader_test_space_mod::loaded() { :; }
+EOF
+
+    testframework::assert_command 'load "lib/loader_test_space/space_dep"' "Load module with spaced @depends list"
+    testframework::assert_true "${BS_LOADED_MODULES[lib/loader_test_space/space_dep]:-}" "Spaced-depends module marked loaded"
+
+    testframework::assert_command 'load "lib/loader test space/space_mod"' "Load module with space in path"
+    testframework::assert_true "${BS_LOADED_MODULES[lib/loader test space/space_mod]:-}" "Space-path module marked loaded"
+
+    rm -rf "${test_mod_dir}" "${space_mod_dir}"
+
     # Вывод сводки
     testframework::summary
 }
