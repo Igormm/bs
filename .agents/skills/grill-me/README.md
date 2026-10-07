@@ -10,7 +10,7 @@ Relentless plan-and-design interrogator. Walks the decision tree one branch at a
 
 | Addition | Where | Why |
 |---|---|---|
-| **3 stdlib Python tools** | `skills/grill-me/scripts/` | Extract decision branches from a plan doc, generate forcing questions, track session state across turns |
+| **3 Bash tools** | `skills/grill-me/scripts/` | Extract decision branches from a plan doc, generate forcing questions, track session state across turns |
 | **3 in-depth references** (5+ sources each) | `skills/grill-me/references/` | Forcing-question patterns · Decision-tree completeness · When to stop grilling |
 | **cs-grill-master persona agent** | `agents/cs-grill-master.md` | One-question-at-a-time enforcer with state tracking |
 | **`/cs:grill-me` slash command** | `commands/cs-grill-me.md` | Activation + session start |
@@ -23,13 +23,13 @@ Relentless plan-and-design interrogator. Walks the decision tree one branch at a
 
 ```bash
 # Extract decision branches from a plan
-python skills/grill-me/scripts/decision_tree_extractor.py path/to/plan.md
+bash skills/grill-me/scripts/decision_tree_extractor.sh path/to/plan.md
 
 # Generate forcing questions from a plan
-python skills/grill-me/scripts/question_generator.py path/to/plan.md
+bash skills/grill-me/scripts/question_generator.sh path/to/plan.md
 
 # Track grill session state across turns
-python skills/grill-me/scripts/grill_session_tracker.py --session NAME --action start
+bash skills/grill-me/scripts/grill_session_tracker.sh --session NAME --action start
 ```
 
 ## License

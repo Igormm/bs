@@ -2,7 +2,7 @@
 
 This reference answers exactly one decision: **which skills should the handoff recommend for the next session, based on what's in the handoff content?**
 
-Pair with `scripts/skill_recommender.py` for automated pattern-match recommendations.
+Pair with `scripts/skill_recommender.sh` for automated pattern-match recommendations.
 
 ## Matt Pocock's Implicit Rule
 
@@ -73,11 +73,13 @@ The recommender's failure modes:
 When a new skill is added to the repo:
 
 1. Identify 2-3 keywords that signal the skill is relevant
-2. Add to `SKILL_SIGNALS` in `skill_recommender.py`:
-   ```python
-   (re.compile(r"\b(keyword1|keyword2)\b", re.IGNORECASE),
-    "new-skill-name",
-    "Rationale why this skill matters when keyword detected."),
+2. Add one entry at the same index of each of the three parallel arrays in
+   `skill_recommender.sh` (`SKILL_PATTERNS` / `SKILL_NAMES` / `SKILL_RATIONALES`):
+   ```bash
+   # SKILL_PATTERNS entry — GNU grep ERE, matched case-insensitively:
+   '\b(keyword1|keyword2)\b'
+   # SKILL_NAMES entry:      "new-skill-name"
+   # SKILL_RATIONALES entry: "Rationale why this skill matters when keyword detected."
    ```
 3. Run the recommender against a known-good handoff to verify expected matches
 

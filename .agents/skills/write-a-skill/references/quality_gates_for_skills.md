@@ -2,7 +2,7 @@
 
 This reference answers exactly one decision: **what checks must pass before a new skill enters the library, and why?**
 
-Pair with `scripts/skill_review_checklist_runner.py` for the automated gate.
+Pair with `scripts/skill_review_checklist_runner.sh` for the automated gate.
 
 ## The Six Mandatory Gates (per Matt Pocock's checklist)
 
@@ -22,7 +22,7 @@ Manual review of these 6 items:
 - Slows PR cadence (every reviewer re-reads every skill against every check)
 - Misses regressions (a skill once compliant can drift across updates)
 
-Programmatic gate (the `skill_review_checklist_runner.py` tool):
+Programmatic gate (the `skill_review_checklist_runner.sh` tool):
 - Same verdict regardless of reviewer
 - Runs in CI in seconds
 - Catches regressions automatically
@@ -88,7 +88,7 @@ jobs:
       - name: Run review checklist
         run: |
           for skill in $(find . -name "SKILL.md" -type f); do
-            python engineering/write-a-skill/skills/write-a-skill/scripts/skill_review_checklist_runner.py "$(dirname $skill)"
+            bash engineering/write-a-skill/skills/write-a-skill/scripts/skill_review_checklist_runner.sh "$(dirname $skill)"
           done
       - name: Run karpathy gate
         run: python engineering/karpathy-coder/skills/karpathy-coder/scripts/complexity_checker.py .

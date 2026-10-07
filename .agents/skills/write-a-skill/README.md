@@ -10,7 +10,7 @@ Skill-author skill: create new agent skills with proper structure, progressive d
 
 | Addition | Where | Why |
 |---|---|---|
-| **3 stdlib Python validation tools** | `skills/write-a-skill/scripts/` | Operationalize Matt's review checklist (description validator, structure validator, review-checklist runner). Catches the common mistakes Matt names. |
+| **3 Bash validation tools** | `skills/write-a-skill/scripts/` | Operationalize Matt's review checklist (description validator, structure validator, review-checklist runner). Catches the common mistakes Matt names. |
 | **3 in-depth references** (5+ sources each) | `skills/write-a-skill/references/` | Progressive disclosure principles · Description design patterns · Quality gates for skills. Cites Anthropic skill docs + community precedent + research. |
 | **cs-skill-author persona agent** | `agents/cs-skill-author.md` | Surface skill-authoring as a forcing-question interrogation matching our cs-* persona pattern. |
 | **`/cs:write-a-skill` slash command** | `commands/cs-write-a-skill.md` | 6-question forcing interrogation that runs Matt's review checklist programmatically. |
@@ -28,13 +28,13 @@ Skill-author skill: create new agent skills with proper structure, progressive d
 
 ```bash
 # Run Matt's review checklist on an existing skill
-python skills/write-a-skill/scripts/skill_review_checklist_runner.py path/to/SKILL.md
+bash skills/write-a-skill/scripts/skill_review_checklist_runner.sh path/to/SKILL.md
 
 # Validate description meets Matt's criteria (≤1024 chars, third person, "Use when" trigger)
-python skills/write-a-skill/scripts/skill_description_validator.py path/to/SKILL.md
+bash skills/write-a-skill/scripts/skill_description_validator.sh path/to/SKILL.md
 
 # Validate skill folder structure
-python skills/write-a-skill/scripts/skill_structure_validator.py path/to/skill-folder/
+bash skills/write-a-skill/scripts/skill_structure_validator.sh path/to/skill-folder/
 ```
 
 All three tools run with embedded samples if no path provided.

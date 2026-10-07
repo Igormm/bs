@@ -28,7 +28,7 @@ chore(infra): bump base Docker image
 ```bash
 # Generate changelog for 'payments' package only
 git log v1.3.0..HEAD --pretty=format:'%s' | grep '^[a-z]*\(payments\)' | \
-  python3 scripts/generate_changelog.py --next-version v1.4.0 --format markdown
+  bash scripts/generate_changelog.sh --next-version v1.4.0 --format markdown
 ```
 
 ## Ownership Model

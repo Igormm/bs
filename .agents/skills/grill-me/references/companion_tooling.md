@@ -2,22 +2,22 @@
 
 Interrogation tools + cs-* wrapper layered on top of Matt's grill-me skill.
 
-## Validation Tools (stdlib Python)
+## Validation Tools (Bash)
 
 | Tool | Purpose | Run when |
 |---|---|---|
-| `scripts/decision_tree_extractor.py` | Scan a plan doc for decision branches (intent / choice / open / tradeoff / dependency / question) | Starting a grill session — see what's there to interrogate |
-| `scripts/question_generator.py` | Generate forcing questions from extracted branches with recommended answers + dependency-aware ordering | Producing the question list for a grill session |
-| `scripts/grill_session_tracker.py` | JSON-backed session storage in `~/.grill_sessions/` — track answers across turns, resume sessions | Running a multi-turn grill (most real grills) |
+| `scripts/decision_tree_extractor.sh` | Scan a plan doc for decision branches (intent / choice / open / tradeoff / dependency / question) | Starting a grill session — see what's there to interrogate |
+| `scripts/question_generator.sh` | Generate forcing questions from extracted branches with recommended answers + dependency-aware ordering | Producing the question list for a grill session |
+| `scripts/grill_session_tracker.sh` | JSON-backed session storage in `~/.grill_sessions/` — track answers across turns, resume sessions | Running a multi-turn grill (most real grills) |
 
 All three:
-- Stdlib-only
+- Bash 4+ with BS bootstrap (grep/sed/awk only; no Python)
 - Run with embedded sample if no input provided
 - Output text or JSON (`--output json`)
 
 ## Session Storage
 
-`grill_session_tracker.py` persists state to `~/.grill_sessions/<name>.json`. This enables:
+`grill_session_tracker.sh` persists state to `~/.grill_sessions/<name>.json`. This enables:
 - Resume a grill across days
 - Switch between concurrent grills (e.g., per project)
 - Audit which decisions were resolved when

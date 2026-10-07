@@ -2,7 +2,7 @@
 
 This reference answers exactly one decision: **how do we write a skill description that an agent actually picks correctly when faced with a long skill list?**
 
-Pair with `scripts/skill_description_validator.py` for automated enforcement.
+Pair with `scripts/skill_description_validator.sh` for automated enforcement.
 
 ## Matt Pocock's Foundational Rule
 
@@ -114,7 +114,7 @@ Where complexity demands more chars, prioritize:
 Run before every skill PR:
 
 ```bash
-python scripts/skill_description_validator.py path/to/SKILL.md
+bash scripts/skill_description_validator.sh path/to/SKILL.md
 ```
 
 If validator returns FAIL, fix before merging. If WARN, justify and document the trade-off.

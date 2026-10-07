@@ -2,7 +2,7 @@
 
 This reference answers exactly one decision: **what makes a question "forcing" vs "soft", and how do we ask forcing questions that resolve decisions?**
 
-Pair with `scripts/question_generator.py` for templated forcing questions.
+Pair with `scripts/question_generator.sh` for templated forcing questions.
 
 ## What Makes a Question "Forcing"
 
@@ -119,7 +119,7 @@ When to ask anyway:
 5. **Yes/no questions** without follow-up — wastes the turn
 6. **Stacking questions** — bundles violate one-at-a-time rule
 
-## How `question_generator.py` Implements This
+## How `question_generator.sh` Implements This
 
 The tool's question templates map each detected branch kind to a forcing-question pattern:
 

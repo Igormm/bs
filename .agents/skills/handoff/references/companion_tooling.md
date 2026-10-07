@@ -2,16 +2,16 @@
 
 Handoff-generation tools + cs-* wrapper layered on top of Matt's handoff skill.
 
-## Validation Tools (stdlib Python)
+## Validation Tools (BS-native Bash)
 
 | Tool | Purpose | Run when |
 |---|---|---|
-| `scripts/handoff_template_generator.py` | Generate a markdown scaffold tailored to next-session focus. Supports `--mktemp` for the path pattern Matt named | Starting a handoff document |
-| `scripts/artifact_deduplicator.py` | Detect PRD/ADR/issue/commit content that should be replaced with a reference instead of inlined | Pre-flight check on a handoff draft |
-| `scripts/skill_recommender.py` | Match handoff content to skills in this repo, ranked by signal strength | Producing the "Skills to use" section |
+| `scripts/handoff_template_generator.sh` | Generate a markdown scaffold tailored to next-session focus. Supports `--mktemp` for the path pattern Matt named | Starting a handoff document |
+| `scripts/artifact_deduplicator.sh` | Detect PRD/ADR/issue/commit content that should be replaced with a reference instead of inlined | Pre-flight check on a handoff draft |
+| `scripts/skill_recommender.sh` | Match handoff content to skills in this repo, ranked by signal strength | Producing the "Skills to use" section |
 
 All three:
-- Stdlib-only
+- Bash 4+ on the BS bootstrap (`bootstrap/init.sh`), no external runtime deps beyond git + GNU coreutils/grep
 - Run with embedded sample if no input provided
 - Output text or JSON (`--output json`)
 
@@ -21,7 +21,7 @@ Matt's SKILL.md specifies:
 
 > "Save it to a path produced by `mktemp -t handoff-XXXXXX.md` (read the file before you write to it)."
 
-`handoff_template_generator.py --mktemp` honors this — uses `tempfile.mkstemp(prefix="handoff-", suffix=".md")` under the hood, returns the path so the caller can read-verify before writing the final content.
+`handoff_template_generator.sh --mktemp` honors this — uses `mktemp "${TMPDIR:-/tmp}/handoff-XXXXXXXX.md"` under the hood, returns the path so the caller can read-verify before writing the final content.
 
 ## cs-handoff-author Persona Agent
 

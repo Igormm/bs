@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: python3 engineering/changelog-generator/scripts/commit_linter.py \
+      - run: bash engineering/changelog-generator/scripts/commit_linter.sh \
           --from-ref origin/main --to-ref HEAD --strict
 ```
 
@@ -19,8 +19,10 @@ jobs:
 
 ```yaml
 changelog_lint:
-  image: python:3.12
+  image: alpine:latest
   stage: test
+  before_script:
+    - apk add --no-cache bash git
   script:
-    - python3 engineering/changelog-generator/scripts/commit_linter.py --to-ref HEAD --strict
+    - bash engineering/changelog-generator/scripts/commit_linter.sh --to-ref HEAD --strict
 ```

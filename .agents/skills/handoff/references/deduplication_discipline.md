@@ -2,7 +2,7 @@
 
 This reference answers exactly one decision: **what counts as duplication, and how do we replace it with a reference?**
 
-Pair with `scripts/artifact_deduplicator.py` for automated detection.
+Pair with `scripts/artifact_deduplicator.sh` for automated detection.
 
 ## Matt Pocock's Non-Negotiable Rule
 
@@ -30,7 +30,7 @@ When the handoff has its own version of the PRD content, ownership becomes uncle
 
 If handoffs duplicate PRD content, the PRD itself stops getting updated — "we'll just put it in the handoff." The upstream artifact rots.
 
-## Five Categories of Common Duplication (How `artifact_deduplicator.py` Detects)
+## Five Categories of Common Duplication (How `artifact_deduplicator.sh` Detects)
 
 ### Category 1: PRD content
 
@@ -160,7 +160,7 @@ For every paragraph in the handoff, ask:
 2. If yes — replace with a reference. Duplication.
 3. If no — keep it in the handoff. This is original synthesis.
 
-## How `artifact_deduplicator.py` Helps
+## How `artifact_deduplicator.sh` Helps
 
 The tool scans for the 5 signal categories above and flags candidates. It does NOT delete or rewrite — it surfaces findings for human review. The handoff author makes the final call (sometimes context demands a brief restatement; the tool's "FAIL" verdict is advisory).
 

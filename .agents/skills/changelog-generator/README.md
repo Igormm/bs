@@ -6,21 +6,21 @@ Automates release notes from Conventional Commits with Keep a Changelog output a
 
 ```bash
 # Generate entry from git range
-python3 scripts/generate_changelog.py \
+bash scripts/generate_changelog.sh \
   --from-tag v1.2.0 \
   --to-tag v1.3.0 \
   --next-version v1.3.0 \
   --format markdown
 
 # Lint commit subjects
-python3 scripts/commit_linter.py --from-ref origin/main --to-ref HEAD --strict --format text
+bash scripts/commit_linter.sh --from-ref origin/main --to-ref HEAD --strict --format text
 ```
 
 ## Included Tools
 
-- `scripts/generate_changelog.py`: parse commits, infer semver bump, render markdown/JSON, optional file prepend
-- `scripts/commit_linter.py`: validate commit subjects against Conventional Commits rules
-- `scripts/version_bumper.py`: compute the recommended next version from `git log --oneline` output (`--current-version`, `--prerelease`, `--include-commands`)
+- `scripts/generate_changelog.sh`: parse commits, infer semver bump, render markdown/JSON, optional file prepend
+- `scripts/commit_linter.sh`: validate commit subjects against Conventional Commits rules
+- `scripts/version_bumper.sh`: compute the recommended next version from `git log --oneline` output (`--current-version`, `--prerelease`, `--include-commands`)
 
 ## References
 

@@ -35,7 +35,7 @@ Use this skill to produce consistent, auditable release notes from Conventional 
 ### 1. Generate Changelog Entry From Git
 
 ```bash
-python3 scripts/generate_changelog.py \
+bash scripts/generate_changelog.sh \
   --from-tag v1.3.0 \
   --to-tag v1.4.0 \
   --next-version v1.4.0 \
@@ -46,15 +46,15 @@ python3 scripts/generate_changelog.py \
 
 ```bash
 git log v1.3.0..v1.4.0 --pretty=format:'%s' | \
-  python3 scripts/generate_changelog.py --next-version v1.4.0 --format markdown
+  bash scripts/generate_changelog.sh --next-version v1.4.0 --format markdown
 
-python3 scripts/generate_changelog.py --input commits.txt --next-version v1.4.0 --format json
+bash scripts/generate_changelog.sh --input commits.txt --next-version v1.4.0 --format json
 ```
 
 ### 3. Update `CHANGELOG.md`
 
 ```bash
-python3 scripts/generate_changelog.py \
+bash scripts/generate_changelog.sh \
   --from-tag v1.3.0 \
   --to-tag HEAD \
   --next-version v1.4.0 \
@@ -67,22 +67,22 @@ When the user has not decided the next version, derive it instead of guessing:
 
 ```bash
 git log v1.3.0..HEAD --oneline | \
-  python3 scripts/version_bumper.py --current-version 1.3.0 --output-format json
+  bash scripts/version_bumper.sh --current-version 1.3.0 --output-format json
 ```
 
-Output JSON contains `recommended_version`, `bump_type` (`major`/`minor`/`patch`/`none`), and with `--include-commands` the exact `git tag` commands. Feed `recommended_version` into `generate_changelog.py --next-version`. Pre-releases: add `--prerelease alpha|beta|rc`. Input must be real `git log --oneline` output (hex hashes); a sample lives at `assets/sample_git_log.txt`.
+Output JSON contains `recommended_version`, `bump_type` (`major`/`minor`/`patch`/`none`), and with `--include-commands` the exact `git tag` commands. Feed `recommended_version` into `generate_changelog.sh --next-version`. Pre-releases: add `--prerelease alpha|beta|rc`. Input must be real `git log --oneline` output (hex hashes); a sample lives at `assets/sample_git_log.txt`.
 
 ### 5. Lint Commits Before Merge
 
 ```bash
-python3 scripts/commit_linter.py --from-ref origin/main --to-ref HEAD --strict --format text
+bash scripts/commit_linter.sh --from-ref origin/main --to-ref HEAD --strict --format text
 ```
 
 Or file/stdin:
 
 ```bash
-python3 scripts/commit_linter.py --input commits.txt --strict
-cat commits.txt | python3 scripts/commit_linter.py --format json
+bash scripts/commit_linter.sh --input commits.txt --strict
+cat commits.txt | bash scripts/commit_linter.sh --format json
 ```
 
 ## Conventional Commit Rules
@@ -105,11 +105,11 @@ SemVer mapping:
 
 ## Script Interfaces
 
-- `python3 scripts/generate_changelog.py --help`
+- `bash scripts/generate_changelog.sh --help`
   - Reads commits from git or stdin/`--input`
   - Renders markdown or JSON
   - Optional in-place changelog prepend
-- `python3 scripts/commit_linter.py --help`
+- `bash scripts/commit_linter.sh --help`
   - Validates commit format
   - Returns non-zero in `--strict` mode on violations
 
@@ -184,7 +184,7 @@ Use this release flow for predictability:
 
 ## CI Policy
 
-- Run `commit_linter.py --strict` on all PRs.
+- Run `commit_linter.sh --strict` on all PRs.
 - Block merge on invalid conventional commits.
 - Auto-generate draft release notes on tag push.
 - Require human approval before writing into `CHANGELOG.md` on main branch.

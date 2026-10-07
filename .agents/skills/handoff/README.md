@@ -10,7 +10,7 @@ Conversation-handoff document generator. Saves the current state of a conversati
 
 | Addition | Where | Why |
 |---|---|---|
-| **3 stdlib Python tools** | `skills/handoff/scripts/` | Template generator (tailored to next-session focus), artifact deduplicator (find references that should replace inline content), skill recommender (which skills next session needs) |
+| **3 BS-native Bash tools** | `skills/handoff/scripts/` | Template generator (tailored to next-session focus), artifact deduplicator (find references that should replace inline content), skill recommender (which skills next session needs) |
 | **3 in-depth references** (5+ sources each) | `skills/handoff/references/` | Handoff structure · Deduplication discipline · Skill matching for next session |
 | **cs-handoff-author persona agent** | `agents/cs-handoff-author.md` | Continuity-focused handoff author with hard rule against duplication |
 | **`/cs:handoff` slash command** | `commands/cs-handoff.md` | One-shot handoff generation with argument hint |
@@ -23,13 +23,13 @@ Conversation-handoff document generator. Saves the current state of a conversati
 
 ```bash
 # Generate a handoff template scaffold tailored to next-session focus
-python skills/handoff/scripts/handoff_template_generator.py --next-focus "ship PR 2"
+bash skills/handoff/scripts/handoff_template_generator.sh --next-focus "ship PR 2"
 
 # Detect artifacts in a handoff draft that could be replaced by references
-python skills/handoff/scripts/artifact_deduplicator.py path/to/draft-handoff.md
+bash skills/handoff/scripts/artifact_deduplicator.sh path/to/draft-handoff.md
 
 # Recommend skills for the next session based on handoff content
-python skills/handoff/scripts/skill_recommender.py path/to/handoff.md
+bash skills/handoff/scripts/skill_recommender.sh path/to/handoff.md
 ```
 
 ## License

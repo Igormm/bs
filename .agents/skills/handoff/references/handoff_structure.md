@@ -2,7 +2,7 @@
 
 This reference answers exactly one decision: **what sections does a handoff document need, and what content belongs in each?**
 
-Pair with `scripts/handoff_template_generator.py` for the structured scaffold.
+Pair with `scripts/handoff_template_generator.sh` for the structured scaffold.
 
 ## Matt Pocock's Implicit Structure
 
@@ -81,7 +81,7 @@ Pattern:
 - `ship-gate` — pre-production audit before merge
 ```
 
-Run `skill_recommender.py` against the handoff to auto-populate this section.
+Run `skill_recommender.sh` against the handoff to auto-populate this section.
 
 ### 5. Artifacts (reference only)
 
@@ -124,7 +124,7 @@ Tactics:
 
 ## Tailoring to Next-Session Focus
 
-The `handoff_template_generator.py` detects keywords in the focus argument and tailors prompts:
+The `handoff_template_generator.sh` detects keywords in the focus argument and tailors prompts:
 
 | Focus keyword | Section emphasis | Tailored prompts |
 |---|---|---|

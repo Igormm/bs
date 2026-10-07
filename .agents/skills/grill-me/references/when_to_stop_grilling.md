@@ -2,7 +2,7 @@
 
 This reference answers exactly one decision: **when is "shared understanding" actually reached, and how do we know to stop the interrogation?**
 
-Pair with `scripts/grill_session_tracker.py` — the session tracker shows progress and surfaces unanswered branches.
+Pair with `scripts/grill_session_tracker.sh` — the session tracker shows progress and surfaces unanswered branches.
 
 ## Matt Pocock's Stopping Condition (Implicit)
 
@@ -16,9 +16,9 @@ Pair with `scripts/grill_session_tracker.py` — the session tracker shows progr
 
 ### Condition 1: Every decision branch has an answer
 
-Track via `grill_session_tracker.py status`. When `percent_complete = 100%`, every detected branch has a recorded answer. Stop grilling.
+Track via `grill_session_tracker.sh status`. When `percent_complete = 100%`, every detected branch has a recorded answer. Stop grilling.
 
-**Risk:** The extractor missed branches. Run `decision_tree_extractor.py` once more after answers are in — sometimes answers reveal new branches.
+**Risk:** The extractor missed branches. Run `decision_tree_extractor.sh` once more after answers are in — sometimes answers reveal new branches.
 
 ### Condition 2: No new questions arise from the last 3 answers
 
@@ -58,7 +58,7 @@ If the answerer says "but if we do X, then we also need to decide Y" — Y is a 
 
 ## The "Recommended Answer Match" Heuristic
 
-When generating questions with `question_generator.py`, each question has a recommended answer. Track:
+When generating questions with `question_generator.sh`, each question has a recommended answer. Track:
 
 | Answer matches recommendation? | What it means |
 |---|---|

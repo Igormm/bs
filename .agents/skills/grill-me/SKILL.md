@@ -31,9 +31,9 @@ If a question can be answered by exploring the codebase, explore the codebase in
 ## Workflow
 
 1. User provides a plan or design (or path to one).
-2. Run `scripts/decision_tree_extractor.py` to extract branches.
-3. Run `scripts/question_generator.py` to produce the question list with recommendations.
-4. Start a session: `scripts/grill_session_tracker.py --action start`.
+2. Run `scripts/decision_tree_extractor.sh` to extract branches.
+3. Run `scripts/question_generator.sh` to produce the question list with recommendations.
+4. Start a session: `scripts/grill_session_tracker.sh --action start`.
 5. Walk the tree, one question at a time, recording answers in the session.
 6. When all branches resolved: report "shared understanding reached" + the locked-in decisions.
 

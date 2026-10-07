@@ -6,7 +6,7 @@ Production workflow for parallel branch development with isolated ports, env syn
 
 ```bash
 # Create + prepare a worktree
-python scripts/worktree_manager.py \
+bash scripts/worktree_manager.sh \
   --repo . \
   --branch feature/api-hardening \
   --name wt-api-hardening \
@@ -15,13 +15,13 @@ python scripts/worktree_manager.py \
   --format text
 
 # Review stale worktrees
-python scripts/worktree_cleanup.py --repo . --stale-days 14 --format text
+bash scripts/worktree_cleanup.sh --repo . --stale-days 14 --format text
 ```
 
 ## Included Tools
 
-- `scripts/worktree_manager.py`: create/list-prep workflow, deterministic ports, `.env*` sync, optional dependency install
-- `scripts/worktree_cleanup.py`: stale/dirty/merged analysis with optional safe removal
+- `scripts/worktree_manager.sh`: create/list-prep workflow, deterministic ports, `.env*` sync, optional dependency install
+- `scripts/worktree_cleanup.sh`: stale/dirty/merged analysis with optional safe removal
 
 Both support `--input <json-file>` and stdin JSON for automation.
 

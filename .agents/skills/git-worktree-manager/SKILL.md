@@ -42,7 +42,7 @@ This skill is optimized for multi-agent workflows where each agent or terminal s
 4. Start app using allocated ports.
 
 ```bash
-python scripts/worktree_manager.py \
+bash scripts/worktree_manager.sh \
   --repo . \
   --branch feature/new-auth \
   --name wt-auth \
@@ -54,9 +54,9 @@ python scripts/worktree_manager.py \
 If you use JSON automation input:
 
 ```bash
-cat config.json | python scripts/worktree_manager.py --format json
+cat config.json | bash scripts/worktree_manager.sh --format json
 # or
-python scripts/worktree_manager.py --input config.json --format json
+bash scripts/worktree_manager.sh --input config.json --format json
 ```
 
 ### 2. Run Parallel Sessions
@@ -76,8 +76,8 @@ Each worktree contains `.worktree-ports.json` with assigned ports.
 3. Remove only merged + clean worktrees, or force explicitly.
 
 ```bash
-python scripts/worktree_cleanup.py --repo . --stale-days 14 --format text
-python scripts/worktree_cleanup.py --repo . --remove-merged --format text
+bash scripts/worktree_cleanup.sh --repo . --stale-days 14 --format text
+bash scripts/worktree_cleanup.sh --repo . --remove-merged --format text
 ```
 
 ### 4. Docker Compose Pattern
@@ -99,12 +99,12 @@ See [port-allocation-strategy.md](references/port-allocation-strategy.md) for th
 
 ## Script Interfaces
 
-- `python scripts/worktree_manager.py --help`
+- `bash scripts/worktree_manager.sh --help`
   - Create/list worktrees
   - Allocate/persist ports
   - Copy `.env*` files
   - Optional dependency installation
-- `python scripts/worktree_cleanup.py --help`
+- `bash scripts/worktree_cleanup.sh --help`
   - Stale detection by age
   - Dirty-state detection
   - Merged-branch detection

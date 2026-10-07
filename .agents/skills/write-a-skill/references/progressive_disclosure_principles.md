@@ -2,7 +2,7 @@
 
 This reference answers exactly one decision: **when should a SKILL.md be split into reference files, and how do we keep the disclosure ladder shallow + scannable?**
 
-Pair with `scripts/skill_structure_validator.py` for automated enforcement of the 100-line ceiling + one-level-deep rule.
+Pair with `scripts/skill_structure_validator.sh` for automated enforcement of the 100-line ceiling + one-level-deep rule.
 
 ## What "Progressive Disclosure" Means in Skill Files
 
@@ -58,7 +58,7 @@ Operational consequence: keep `references/` flat. No nested subfolders.
 2. Count lines. If > 100, identify the next-largest section. Move it to `references/<topic>.md`.
 3. Replace the moved section with a 1-2-line pointer: "See [references/topic.md](references/topic.md) for X."
 4. Repeat until SKILL.md ≤ 100 lines.
-5. Validate: `python scripts/skill_structure_validator.py path/to/skill-folder/`
+5. Validate: `bash scripts/skill_structure_validator.sh path/to/skill-folder/`
 
 ## When 100 Is Too Restrictive
 

@@ -2,16 +2,16 @@
 
 Validation tools + cs-* wrapper layered on top of Matt's write-a-skill. Use these when authoring a new skill in this repo.
 
-## Validation Tools (stdlib Python)
+## Validation Tools (Bash)
 
 | Tool | Purpose | Run before |
 |---|---|---|
-| `scripts/skill_description_validator.py` | Validates description: ≤1024 chars, third person, "Use when" trigger, action verb in first sentence | First draft of SKILL.md |
-| `scripts/skill_structure_validator.py` | Validates folder structure: SKILL.md present, ≤100 lines, references one level deep, no circular refs | Pre-commit |
-| `scripts/skill_review_checklist_runner.py` | Runs all 6 review-checklist items from Matt's write-a-skill against a skill folder | Final check before PR |
+| `scripts/skill_description_validator.sh` | Validates description: ≤1024 chars, third person, "Use when" trigger, action verb in first sentence | First draft of SKILL.md |
+| `scripts/skill_structure_validator.sh` | Validates folder structure: SKILL.md present, ≤100 lines, references one level deep, no circular refs | Pre-commit |
+| `scripts/skill_review_checklist_runner.sh` | Runs all 6 review-checklist items from Matt's write-a-skill against a skill folder | Final check before PR |
 
 All three tools:
-- Stdlib-only (no external dependencies)
+- Bash 4+ with BS bootstrap (grep/sed/awk only; no Python)
 - Run with embedded sample if no path provided
 - Output text or JSON (`--output json`)
 - Exit code: 0 if PASS, 1 if FAIL/WARN
