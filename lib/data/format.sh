@@ -37,13 +37,6 @@ declare -gA FORMATTERS=(
     [xml]="format::render::xml"
 )
 
-# @global FORMAT_KEYS — Format: parsed record keys (category: state)
-# @global FORMAT_KEYS — Format: разобранные ключи записи (категория: state)
-declare -ga FORMAT_KEYS=()
-# @global FORMAT_VALUES — Format: parsed record values (category: state)
-# @global FORMAT_VALUES — Format: разобранные значения записи (категория: state)
-declare -ga FORMAT_VALUES=()
-
 # @description List available formats / Перечислить форматы
 # @stdout formats one per line / форматы по одному в строке
 format::list() {
@@ -79,24 +72,6 @@ format::record() {
     done
 }
 
-# @description Read canonical records from stdin into arrays.
-# @description Прочитать канонические записи из stdin в массивы.
-#   Sets FORMAT_KEYS, FORMAT_VALUES (parallel), FORMAT_BREAKS (record starts).
-#   Устанавливает FORMAT_KEYS, FORMAT_VALUES (параллельно), FORMAT_BREAKS.
-# @stdin canonical records / канонические записи
-format::__read() {
-    FORMAT_KEYS=()
-    FORMAT_VALUES=()
-    local line key value
-    while IFS= read -r line || is::not_empty "${line}"; do
-        is::empty "${line}" && continue
-        key="${line%%=*}"
-        value="${line#*=}"
-        FORMAT_KEYS+=("${key}")
-        FORMAT_VALUES+=("${value}")
-    done
-}
-
 # @description Escape a string for JSON / Экранировать строку для JSON
 # @param $1 String / Строка
 # @stdout escaped / экранированная
@@ -126,22 +101,41 @@ format::__xml_escape() {
     printf '%s' "${s}"
 }
 
-# @description Render string: a lone field prints its value; otherwise
-# `key: value` per field.
-# @description Строковый вывод: единственное поле печатает значение; иначе
-# `key: value` на поле.
+# @description Render string: if every record is single-field, print the bare
+# values (preserves list/scalar output); otherwise `key: value` per field,
+# records separated by a blank line.
+# @description Строковый вывод: если каждая запись однополевая — печатать
+# значения (сохраняет вывод списка/скаляра); иначе `key: value` на поле,
+# записи разделены пустой строкой.
 # @stdin canonical records / канонические записи
 # @stdout human text / человекочитаемый текст
 format::render::string() {
-    format::__read
-    local -i n=${#FORMAT_KEYS[@]} i
-    if (( n == 0 )); then return 0; fi
-    if (( n == 1 )); then
-        printf '%s\n' "${FORMAT_VALUES[0]}"
+    local -a counts=() texts=()
+    local cur="" n=0 line key value all_single=1 i
+    while IFS= read -r line || is::not_empty "${line}"; do
+        if is::empty "${line}"; then
+            if (( n > 0 )); then counts+=("${n}"); texts+=("${cur}"); cur=""; n=0; fi
+            continue
+        fi
+        key="${line%%=*}"; value="${line#*=}"
+        (( n == 0 )) || cur+=$'\n'
+        cur+="${key}: ${value}"
+        n=$(( n + 1 ))
+    done
+    (( n > 0 )) && { counts+=("${n}"); texts+=("${cur}"); }
+    (( ${#texts[@]} == 0 )) && return 0
+    for (( i = 0; i < ${#counts[@]}; i++ )); do
+        (( counts[i] == 1 )) || all_single=0
+    done
+    if (( all_single == 1 )); then
+        for (( i = 0; i < ${#texts[@]}; i++ )); do
+            printf '%s\n' "${texts[$i]#*: }"
+        done
         return 0
     fi
-    for (( i = 0; i < n; i++ )); do
-        printf '%s: %s\n' "${FORMAT_KEYS[$i]}" "${FORMAT_VALUES[$i]}"
+    for (( i = 0; i < ${#texts[@]}; i++ )); do
+        (( i > 0 )) && printf '\n'
+        printf '%s\n' "${texts[$i]}"
     done
     return 0
 }

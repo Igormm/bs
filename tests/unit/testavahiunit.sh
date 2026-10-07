@@ -40,6 +40,13 @@ main() {
     testframework::assert_command "is::not_empty '${hostname_local}'" \
         "hostname_local is not empty"
 
+    # Форматы: string — значение, json/xml — обёртка / formats
+    testframework::section "Formats / Форматы"
+    testframework::assert_equal "{\"hostname_local\":\"${hostname_local}\"}" \
+        "$(BS_OUTPUT_FORMAT=json network::avahi::hostname_local)" "json wraps hostname_local"
+    testframework::assert_equal "<record><hostname_local>${hostname_local}</hostname_local></record>" \
+        "$(BS_OUTPUT_FORMAT=xml network::avahi::hostname_local)" "xml wraps hostname_local"
+
     # Тест 3: available — чистый предикат, возвращает 0 или 1
     testframework::section "Availability / Доступность"
     local avail_rc=0
