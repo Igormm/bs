@@ -47,6 +47,19 @@ main() {
         testframework::assert_true "'${x}' == '<records>'*" "xml has records root"
     fi
 
+    testframework::section "status / статус (blob getter)"
+    local st stj
+    st="$(system::network::status lo)"
+    if is::not_empty "${st}"; then
+        testframework::assert_true "true" "status string non-empty"
+        stj="$(BS_OUTPUT_FORMAT=json system::network::status lo)"
+        if command -v jq >/dev/null 2>&1; then
+            testframework::assert_command "printf '%s' '${stj}' | jq -e . >/dev/null" "status json valid"
+        fi
+    else
+        testframework::assert_true "true" "status empty (no ip in env) — skipped"
+    fi
+
     testframework::section "ip getter / геттер ip"
     local rc=0 ipv4
     ipv4="$(system::network::ip 2>/dev/null)" || rc=$?

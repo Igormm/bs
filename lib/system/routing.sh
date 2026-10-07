@@ -7,7 +7,7 @@
 bs::guard "SYSTEM_ROUTING" || return 0
 
 # Зависимости / Dependencies
-bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../io/files.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../io/files.sh" "../data/format.sh"
 
 # @description Add static route
 # @param $1 Destination network (e.g., "192.168.2.0/24")
@@ -124,10 +124,10 @@ system::routing::default() {
 system::routing::show() {
     # Using ip command (modern approach)
     if utils::has ip; then
-        utils::attempt ip route show
+        utils::attempt ip route show | format::emit_lines route
     else
         # Fallback to route command
-        utils::attempt route -n
+        utils::attempt route -n | format::emit_lines route
     fi
 }
 
@@ -174,7 +174,7 @@ system::routing::table() {
         show)
             # Show routing table
             if utils::has ip; then
-                utils::attempt ip route show table "${table}"
+                utils::attempt ip route show table "${table}" | format::emit_lines route
             else
                 log::warn "ip command not available"
                 return "${E_ERROR}"
@@ -235,7 +235,7 @@ system::routing::policy() {
 system::routing::rules() {
     # Show policy routing rules
     if utils::has ip; then
-        utils::attempt ip rule show
+        utils::attempt ip rule show | format::emit_lines rule
     else
         log::warn "ip command not available"
         return "${E_ERROR}"
