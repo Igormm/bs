@@ -45,7 +45,7 @@
 bs::guard "NETWORK_SSH" || return 0
 
 # Зависимости / Dependencies
-bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/errorhandler.sh" "../system/platformcheck.sh" "../io/files.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/errorhandler.sh" "../system/platformcheck.sh" "../io/files.sh" "../data/format.sh"
 
 # @global SSH_NETWORK_CONFIG_DIR — Hook: sshnetwork config directory (category: constant)
 # @global SSH_NETWORK_CONFIG_DIR — Хук: каталог конфигурации sshnetwork (категория: constant)
@@ -250,7 +250,7 @@ sshnetwork::get_local_network() {
         fi
         
         if is::not_empty "${subnet}"; then
-            echo "${subnet}"
+            format::record network "${subnet}" | format::emit "${BS_OUTPUT_FORMAT:-string}"
             return 0
         fi
     fi
@@ -265,7 +265,7 @@ sshnetwork::get_local_network() {
     
     for network in "${common_networks[@]}"; do
         if utils::quiet ping -c 1 -W 1 "${network%.*}.1"; then
-            echo "${network}"
+            format::record network "${network}" | format::emit "${BS_OUTPUT_FORMAT:-string}"
             return 0
         fi
     done
