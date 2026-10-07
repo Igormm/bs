@@ -70,6 +70,9 @@ bs::append_local_bin_to_path() {
 # @returns 0 при успехе; 1, если каталог не удаётся определить.
 bs::script_dir() {
   local -r idx="${1:-1}"
+  # Индекс за пределами стека под set -u дал бы unbound variable / an
+  # out-of-range index under set -u would crash with unbound variable
+  (( idx >= 0 && idx < ${#BASH_SOURCE[@]} )) || return 1
   (cd -- "$(dirname -- "${BASH_SOURCE[${idx}]}")" >/dev/null 2>&1 && pwd -P)
 }
 

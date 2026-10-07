@@ -83,7 +83,25 @@ main() {
     output=$(log::info "Fallback level message" 2>&1)
     testframework::assert_true "${#output} -gt 0" "Invalid level falls back to INFO"
     export BS_LOG_LEVEL="$original_level"
-    
+
+    # Тест: multi-arg "$*" склеивается пробелом независимо от IFS вызывающего
+    # Test: multi-arg "$*" joins with a space regardless of the caller's IFS
+    testframework::section "Multi-arg join / Склейка аргументов"
+    local saved_ifs="${IFS}"
+    IFS=$'\n\t'
+    output=$(BS_LOG_COLOR=never BS_LOG_TIMESTAMP=false log::info one two three 2>&1)
+    IFS="${saved_ifs}"
+    testframework::assert_equal "[INFO ] one two three" "${output}" "multi-arg message joins with spaces"
+
+    # Тест: log::progress с max=0 возвращает E_ERROR, а не падает с делением на 0
+    # Test: log::progress with max=0 returns E_ERROR instead of division by zero
+    testframework::section "Progress guard / Защита прогресса"
+    local prc=0
+    log::progress 5 0 >/dev/null 2>&1 || prc=$?
+    testframework::assert_equal "${E_ERROR:-1}" "${prc}" "max=0 returns E_ERROR"
+    output=$(log::progress 50 100 2>/dev/null)
+    testframework::assert_true "'${output}' == *'50%'*" "progress renders 50%"
+
     # Вывод сводки
     testframework::summary
 }

@@ -53,11 +53,17 @@ fi
 if [[ -n "${BS_ROOT:-}" && -d "${BS_ROOT}" ]]; then
   [[ "${BS_DEBUG:-0}" == 1 ]] && printf 'DEBUG: BS_ROOT already set: %s\n' "${BS_ROOT}" >&2
 else
-  readonly __BS_INIT_DIR__="$(cd -- "$(dirname -- "${__bs_init_file__}")" >/dev/null 2>&1 && pwd -P)"
-  readonly __BS_ROOT_CANDIDATE__="$(cd -- "${__BS_INIT_DIR__}/.." >/dev/null 2>&1 && pwd -P)"
+  # Без readonly и с явным статусом: транзиентный сбой cd с readonly-вариантом
+  # навсегда блокировал бы retry в этом шелле (переменная осталась бы пустой и
+  # неизменяемой) / no readonly, explicit status: a transient cd failure with
+  # readonly would permanently block retry in this shell
+  __BS_INIT_DIR__="$(cd -- "$(dirname -- "${__bs_init_file__}")" >/dev/null 2>&1 && pwd -P)" || return 1
+  __BS_ROOT_CANDIDATE__="$(cd -- "${__BS_INIT_DIR__}/.." >/dev/null 2>&1 && pwd -P)" || return 1
   if [[ -d "${__BS_ROOT_CANDIDATE__}" && -f "${__BS_ROOT_CANDIDATE__}/bs" ]]; then
     export BS_ROOT="${__BS_ROOT_CANDIDATE__}"
+    unset __BS_INIT_DIR__ __BS_ROOT_CANDIDATE__
   else
+    unset __BS_INIT_DIR__ __BS_ROOT_CANDIDATE__
     printf 'ERROR: Unable to determine BS_ROOT. Set BS_ROOT environment variable.\n' >&2
     return 1
   fi

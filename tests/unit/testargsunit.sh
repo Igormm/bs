@@ -250,7 +250,7 @@ main() {
 
     local comp_out
     comp_out="$(args::completion "deploy.sh")"
-    testframework::assert_true "\$comp_out == *'complete -F _deploy_sh_completion deploy.sh'*" "complete command generated"
+    testframework::assert_true "\$comp_out == *'complete -F _deploy_sh_completion \"deploy.sh\"'*" "complete command generated"
     testframework::assert_true "\$comp_out == *'1) choices=\"deploy rollback\" ;;'*" "Level 1 choices embedded"
     testframework::assert_true "\$comp_out == *'2) choices=\"now later\" ;;'*" "Level 2 choices embedded"
     testframework::assert_true "\$comp_out == *'--env --verbose'*" "Flags embedded"
@@ -278,7 +278,7 @@ main() {
     args::reset
     args::define deploy
     comp_out="$(args::completion "deploy.sh")"
-    testframework::assert_true "\$comp_out == *'complete -F _deploy_sh_completion deploy.sh'*" "Completion works with zero flags"
+    testframework::assert_true "\$comp_out == *'complete -F _deploy_sh_completion \"deploy.sh\"'*" "Completion works with zero flags"
     testframework::assert_true "\$comp_out != *'--help --'*" "No ghost -- candidate with zero flags"
     comp_err="$(args::completion "deploy.sh" 2>&1 >/dev/null)"
     testframework::assert_equal "" "${comp_err}" "No invalid-subscript errors on zero flags"
@@ -392,6 +392,14 @@ arg" "$(args::rest)" "args::rest prints all"
     args::parse deploy --output -- -x
     testframework::assert_equal "-x" "${ARGS_REST[0]}" "-- stays raw separator after a value flag"
     testframework::assert_false "args::flag_get output" "value flag left empty when followed by --"
+
+    # Флаг в argv[0]: откат индекса 1→0 не должен убивать set -e / flag at
+    # argv[0]: the 1→0 index rewind must not kill a set -e caller
+    args::reset
+    args::flag output value
+    args::parse --output -- -x
+    testframework::assert_equal "-x" "${ARGS_REST[0]}" "-- raw separator when value flag is first arg"
+    testframework::assert_false "args::flag_get output" "first-arg value flag left empty before --"
 
     testframework::section "Variadic / Повторяемые уровни"
 

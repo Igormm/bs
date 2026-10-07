@@ -271,6 +271,7 @@ get_endpoint() {
 | 10 | Хуки модулей | `<MODULE>_*_{DIR,PATH,MOCK,FILE,TIMEOUT}` | `HW_DMI_PATH`, `LLM_MOCK_RESPONSE`, `VK_API_CACHE_DIR` | да |
 | 11 | Константы модуля | `readonly SCREAMING_SNAKE` | `COLOR_RESET`, `SSH_NETWORK_CONNECT_TIMEOUT` | да |
 | 12 | Внутреннее состояние модуля | `__<MODULE>_*` | `__ARGS_TREE`, `__ARGS_FLAGS` | да |
+| 13 | Состояние модуля (публичное, изменяемое) | `<MODULE>_*` (не хук, не readonly) | `TUI_KEY`, `TUI_MODAL_STACK`, `SSHD_WZ_VALUES` | да |
 
 Объявление через `: "${VAR:=...}"` — всегда **хук** (категория 10)
 независимо от суффикса имени.
@@ -289,7 +290,7 @@ declare -g FRAMEWORK_DEBUG=false
   переменная, не читая места её использования.
 - Метки категорий (машиночитаемые): `guard-flag`, `module-flag`,
   `ephemeral`, `nameref`, `private-fn`, `underscore`, `error-const`,
-  `framework-flag`, `env`, `hook`, `constant`, `private`.
+  `framework-flag`, `env`, `hook`, `constant`, `private`, `state`.
 - Категории 1, 4, 6 снипета не требуют (программные или локальные).
 
 **Гигиена масок.** Якорение границ обязательно: `\bE_[A-Z][A-Z_]*\b`

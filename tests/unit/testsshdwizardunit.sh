@@ -100,7 +100,19 @@ main() {
     SSHD_WZ_TARGET="dropin"
     sshd_wz::apply
     testframework::assert_equal "confirm" "$(tui::modal::top)" "apply opens confirm modal"
+    testframework::assert_equal "1" "${SSHD_WZ_CONFIRM_SEL}" "confirm defaults to No"
     testframework::assert_true "! -f '${aftmp}/99-bs.conf'" "nothing written before confirm"
+    tui::modal::close
+
+    # do_apply: установка после Yes + очистка temp-файла / install after Yes +
+    # temp file cleanup
+    sshd::reload() { return 0; }  # мок: не дёргать systemctl / mock: do not touch systemctl
+    sshd_wz::do_apply
+    unset -f sshd::reload
+    testframework::assert_true "-f '${aftmp}/99-bs.conf'" "do_apply installs the dropin"
+    testframework::assert_command "grep -q '^Port 2222$' '${aftmp}/99-bs.conf'" "dropin has rendered Port"
+    testframework::assert_true "'${SSHD_WZ_STATUS}' == Установлено*" "status reports installed"
+    testframework::assert_equal "" "$(compgen -G "${TMPDIR:-/tmp}/bs-sshd-wizard.*" || true)" "wizard temp file cleaned up"
     tui::modal::close
     rm -rf "${aftmp}"
 

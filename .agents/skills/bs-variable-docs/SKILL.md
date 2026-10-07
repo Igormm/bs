@@ -56,7 +56,7 @@ PY
 
 # 2. Verify each snippet names a §4.2 category label (guard-flag, module-flag,
 #    ephemeral, nameref, private-fn, underscore, error-const, framework-flag,
-#    env, hook, constant, private) — `rg -B2 <decl>` and check `(category: X)`.
+#    env, hook, constant, private, state) — `rg -B2 <decl>` and check `(category: X)`.
 ```
 
 ## Mask hygiene (from §4.2)

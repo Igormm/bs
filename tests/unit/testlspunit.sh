@@ -163,6 +163,21 @@ test_lsp_did_change() {
     rm -rf "${tmp_dir}"
 }
 
+test_lsp_did_close() {
+    # Регрессия: unset 'LSP_DOCS["${uri}"]' в одинарных кавычках не раскрывал
+    # ключ — didClose не удалял документ / regression: single-quoted
+    # unset 'LSP_DOCS["${uri}"]' never expanded the key — didClose removed nothing
+    LSP_DOCS["file:///tmp/close-me.sh"]="content"
+    lsp::__on_did_close '{"textDocument":{"uri":"file:///tmp/close-me.sh"}}'
+    testframework::assert_equal "" "${LSP_DOCS["file:///tmp/close-me.sh"]+set}" "didClose removes the doc from LSP_DOCS"
+
+    LSP_DOCS["file:///tmp/keep-a.sh"]="a"
+    LSP_DOCS["file:///tmp/keep-b.sh"]="b"
+    lsp::__on_did_close '{"textDocument":{"uri":"file:///tmp/keep-a.sh"}}'
+    testframework::assert_equal "b" "${LSP_DOCS["file:///tmp/keep-b.sh"]}" "didClose keeps other docs (no map wipe)"
+    unset 'LSP_DOCS[file:///tmp/keep-b.sh]'
+}
+
 test_lsp_description_search() {
     # Natural-language completion: `?query` or a comment line.
     local tmp_dir
@@ -230,6 +245,7 @@ main() {
 
     testframework::section "Document sync / Синхронизация документов"
     test_lsp_did_change
+    test_lsp_did_close
 
     testframework::section "Description search / Поиск по описанию"
     test_lsp_description_search

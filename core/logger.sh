@@ -28,6 +28,9 @@
 
 bs::guard "LOGGER" || return 0
 
+# Dependencies / Зависимости
+bs::source_relative "const.sh" "lang.sh"
+
 # @global BS_LOG_LEVEL — Env: log level (DEBUG/INFO/WARN/ERROR) (category: env)
 # @global BS_LOG_LEVEL — Env: уровень логирования (DEBUG/INFO/WARN/ERROR) (категория: env)
 : "${BS_LOG_LEVEL:=INFO}"
@@ -168,6 +171,9 @@ log::__format_message() {
     local -r level="${1^^}"
     local -r fd="${2:-1}"
     shift 2
+    # "$*" склеивает аргументы первым символом IFS вызывающего — фиксируем пробел
+    # "$*" joins args with the caller's first IFS char — pin it to a space
+    local IFS=' '
     local text="$*"
     
     local timestamp
@@ -394,7 +400,11 @@ log::progress() {
     local current="${1:?Missing current value}"
     local max="${2:?Missing max value}"
     local width="${3:-50}"
-    
+
+    # Деление на ноль под set -e убьёт вызывающий скрипт / Division by zero
+    # under set -e would kill the calling script
+    (( max > 0 )) || return "${E_ERROR:-1}"
+
     local percentage=$(( current * 100 / max ))
     local filled=$(( width * current / max ))
     local empty=$(( width - filled ))
@@ -409,7 +419,7 @@ log::progress() {
     printf '\r  [%s%s] %d%%' "$bar" "$empty_bar" "$percentage"
     
     if [[ $current -eq $max ]]; then
-        echo  # Новая строка при завершении / New line when done
+        printf '\n'  # Новая строка при завершении / New line when done
     fi
 }
 

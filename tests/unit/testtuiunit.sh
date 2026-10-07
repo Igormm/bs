@@ -56,7 +56,9 @@ test_styles() {
 
     TUI_TRUECOLOR=1
     testframework::assert_equal $'\e[1;44;38;2;255;136;0m' "$(tui::style bold bg_blue "#ff8800")" "style truecolor"
+    testframework::assert_equal $'\e[1;44;48;2;255;136;0m' "$(tui::style bold bg:blue "bg:#ff8800")" "style bg: colon named + hex"
     TUI_TRUECOLOR=0
+    testframework::assert_equal $'\e[44m' "$(tui::style bg:blue)" "style bg: colon named without truecolor"
     testframework::assert_equal $'\e[7m' "$(tui::style reverse)" "style reverse"
     testframework::assert_equal "" "$(tui::style)" "style empty"
 }

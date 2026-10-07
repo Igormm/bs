@@ -6,7 +6,7 @@
 # подсказками, валидация, профили, рендер, безопасная установка с откатом
 #
 # @depends core/lang, core/const
-# @tier core
+# @tier gnu-linux
 
 # Source Guard / Защита от повторной загрузки
 bs::guard "LIB_SYSTEM_SSHD" || return 0
@@ -194,9 +194,16 @@ sshd::validate() {
             ;;
         port)
             [[ "${value}" =~ ^[0-9]{1,5}$ ]] || return "${LIB_ERROR_INVALID_INPUT}"
-            (( value >= 1 && value <= 65535 )) || return "${LIB_ERROR_INVALID_INPUT}"
+            # 10#: без этого "08" парсился бы как восьмеричное число / without
+            # it "08" would parse as octal and spam stderr
+            local -i port_num=$(( 10#${value} ))
+            (( port_num >= 1 && port_num <= 65535 )) || return "${LIB_ERROR_INVALID_INPUT}"
             ;;
         enum:*)
+            # Запятая — разделитель вариантов, значение с ней матчилось бы как
+            # подстрока всего списка / a comma is the variant separator, a value
+            # containing one would match the whole list as a substring
+            [[ "${value}" != *,* ]] || return "${LIB_ERROR_INVALID_INPUT}"
             [[ ",${type#enum:}," == *",${value},"* ]] || return "${LIB_ERROR_INVALID_INPUT}"
             ;;
         string)
@@ -224,7 +231,24 @@ sshd::validate() {
             [[ "${value}" =~ ^/[^[:space:]]*$ || "${value}" == "internal-sftp" ]] || return "${LIB_ERROR_INVALID_INPUT}"
             ;;
         addr)
-            [[ "${value}" == "*" || "${value}" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ || "${value}" =~ ^[0-9A-Fa-f:]+$ ]] || return "${LIB_ERROR_INVALID_INPUT}"
+            # IPv4 с октетами ≤255; IPv6 — hex+двоеточия, минимум одно ":",
+            # без ":::". Тонкая форма: финальный гейт всё равно sshd -t /
+            # IPv4 with octets ≤255; IPv6 — hex+colons, at least one ":",
+            # no ":::". Shape only: sshd -t is the final gate anyway
+            if [[ "${value}" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]]; then
+                local IFS='.'
+                local -a octets=()
+                read -ra octets <<< "${value}"
+                # Без -i: присваивание "08" в integer-переменную само по себе
+                # упало бы с octal-ошибкой / no -i: assigning "08" into an
+                # integer variable would itself fail with an octal error
+                local octet
+                for octet in "${octets[@]}"; do
+                    (( 10#${octet} <= 255 )) || return "${LIB_ERROR_INVALID_INPUT}"
+                done
+            elif [[ "${value}" != "*" && ( "${value}" != *:* || ! "${value}" =~ ^[0-9A-Fa-f:]+$ || "${value}" == *:::* ) ]]; then
+                return "${LIB_ERROR_INVALID_INPUT}"
+            fi
             ;;
         time)
             [[ "${value}" =~ ^[0-9]+[smhd]?$ ]] || return "${LIB_ERROR_INVALID_INPUT}"
@@ -393,7 +417,16 @@ sshd::test() {
 sshd::backup() {
     local -r file="${1:?file required}"
     is::file "${file}" || return "${LIB_ERROR_FILE_NOT_FOUND}"
-    local -r dest="${file}.bak.$(date +%Y%m%d%H%M%S)"
+    # Разрешение по секундам: два backup подряд не должны молча перезаписать
+    # друг друга / second resolution: two backups in a row must not silently
+    # overwrite each other
+    local -r base="${file}.bak.$(date +%Y%m%d%H%M%S)"
+    local dest="${base}"
+    local -i n=1
+    while [[ -e "${dest}" ]]; do
+        dest="${base}.${n}"
+        (( n += 1 ))
+    done
     cp -a -- "${file}" "${dest}" || return "${LIB_ERROR_FILE_OPERATION}"
     printf '%s\n' "${dest}"
 }
@@ -444,8 +477,10 @@ sshd::install() {
         return "${LIB_ERROR_INVALID_INPUT}"
     fi
 
-    if ! cp -f -- "${src}" "${target}.tmp" || ! mv -f -- "${target}.tmp" "${target}"; then
-        rm -f -- "${target}.tmp"
+    local tmp
+    tmp="$(mktemp "${target}.tmp.XXXXXX")" || return "${LIB_ERROR_FILE_OPERATION}"
+    if ! cp -f -- "${src}" "${tmp}" || ! mv -f -- "${tmp}" "${target}"; then
+        rm -f -- "${tmp}"
         return "${LIB_ERROR_FILE_OPERATION}"
     fi
 
@@ -471,9 +506,13 @@ sshd::revert() {
     local -r target="${1:?target required}"
     local -a baks=()
     local f
+    # Сохраняем чужой nullglob: модуль не вправе менять опции вызывающего шелла
+    # Save the caller's nullglob: a module must not change the caller's options
+    local nullglob_was=0
+    shopt -q nullglob && nullglob_was=1
     shopt -s nullglob
     for f in "${target}".bak.*; do baks+=("${f}"); done
-    shopt -u nullglob
+    (( nullglob_was == 1 )) || shopt -u nullglob
     if (( ${#baks[@]} == 0 )); then
         return "${LIB_ERROR_FILE_NOT_FOUND}"
     fi
@@ -506,19 +545,31 @@ sshd::install_main() {
     if is::file "${BS_SSHD_MAIN}"; then
         backup="$(sshd::backup "${BS_SSHD_MAIN}")" || return $?
     fi
-    local -r tmp="${BS_SSHD_MAIN}.bs.tmp"
-    awk -v b="${SSHD_MARK_BEGIN}" -v e="${SSHD_MARK_END}" '
-        $0 == b {skip=1; next}
-        $0 == e {skip=0; next}
-        !skip   {print}
-    ' "${BS_SSHD_MAIN}" 2>/dev/null > "${tmp}"
+    local tmp
+    tmp="$(mktemp "${BS_SSHD_MAIN}.bs.XXXXXX")" || return "${LIB_ERROR_FILE_OPERATION}"
+    if is::file "${BS_SSHD_MAIN}"; then
+        # awk должен отработать: молчаливый провал чтения дал бы конфиг только
+        # из нашего блока / awk must succeed: a silent read failure would leave
+        # a config with only our managed block
+        if ! awk -v b="${SSHD_MARK_BEGIN}" -v e="${SSHD_MARK_END}" '
+            $0 == b {skip=1; next}
+            $0 == e {skip=0; next}
+            !skip   {print}
+        ' "${BS_SSHD_MAIN}" > "${tmp}" 2>/dev/null; then
+            rm -f -- "${tmp}"
+            return "${LIB_ERROR_FILE_OPERATION}"
+        fi
+    fi
     printf '\n' >> "${tmp}"
     cat -- "${src}" >> "${tmp}"
     if ! sshd::test "${tmp}" >/dev/null 2>&1; then
         rm -f -- "${tmp}"
         return "${LIB_ERROR_INVALID_INPUT}"
     fi
-    mv -f -- "${tmp}" "${BS_SSHD_MAIN}" || return "${LIB_ERROR_FILE_OPERATION}"
+    if ! mv -f -- "${tmp}" "${BS_SSHD_MAIN}"; then
+        rm -f -- "${tmp}"
+        return "${LIB_ERROR_FILE_OPERATION}"
+    fi
     sshd::reload || printf 'warning: reload %s failed / не удалось\n' "${BS_SSHD_SERVICE}" >&2
     return "${E_SUCCESS}"
 }

@@ -114,10 +114,14 @@ args::__level_of() {
 
     for level in "${!__ARGS_TREE[@]}"; do
         local item
-        # Список разбираем по пробелам независимо от IFS вызывающего
-        # Split the list on spaces regardless of the caller's IFS
+        # Список разбираем по пробелам независимо от IFS вызывающего;
+        # read -ra, а не for по подстановке: word-splitting без глоббинга
+        # Split the list on spaces regardless of the caller's IFS;
+        # read -ra, not for-in-expansion: word splitting without globbing
         local IFS=' '
-        for item in ${__ARGS_TREE["${level}"]}; do
+        local -a items=()
+        read -ra items <<< "${__ARGS_TREE["${level}"]}"
+        for item in "${items[@]}"; do
             if [[ "${item}" == "${name}" ]]; then
                 printf '%s\n' "${level}"
                 return "${E_SUCCESS:-0}"
@@ -141,7 +145,9 @@ args::__is_allowed_at() {
 
     local item
     local IFS=' '
-    for item in ${__ARGS_TREE["${level}"]}; do
+    local -a items=()
+    read -ra items <<< "${__ARGS_TREE["${level}"]}"
+    for item in "${items[@]}"; do
         [[ "${item}" == "${name}" ]] && return "${E_SUCCESS:-0}"
     done
     return "${E_ERROR:-1}"
@@ -166,7 +172,9 @@ args::__validate_flag_value() {
             local list="${validator#enum:}"
             local item ok=0
             local IFS=','
-            for item in ${list}; do
+            local -a items=()
+            read -ra items <<< "${list}"
+            for item in "${items[@]}"; do
                 [[ "${item}" == "${value}" ]] && ok=1
             done
             (( ok == 1 )) || return "${E_ERROR:-1}"
@@ -504,7 +512,9 @@ args::help() {
         if is::not_empty "${__ARGS_TREE["${level}"]:-}"; then
             local IFS=' '
             local choices=""
-            for item in ${__ARGS_TREE["${level}"]}; do
+            local -a items=()
+            read -ra items <<< "${__ARGS_TREE["${level}"]}"
+            for item in "${items[@]}"; do
                 if is::not_empty "${choices}"; then
                     choices+="|${item}"
                 else
@@ -527,7 +537,9 @@ args::help() {
             is::empty "${__ARGS_TREE["${level}"]:-}" && continue
             printf '  level %d: %s\n' "${level}" "${__ARGS_TREE[${level}]// / | }"
             local IFS=' '
-            for item in ${__ARGS_TREE["${level}"]}; do
+            local -a items=()
+            read -ra items <<< "${__ARGS_TREE["${level}"]}"
+            for item in "${items[@]}"; do
                 if is::not_empty "${__ARGS_DESCRIPTIONS["${item}"]:-}"; then
                     printf '    %-16s — %s\n' "${item}" "${__ARGS_DESCRIPTIONS["${item}"]}"
                 fi
@@ -674,7 +686,11 @@ args::parse() {
                         # Do not eat the "--" separator: the value is missing (empty);
                         # rewind i so the "--" branch handles the separator
                         ARGS_FLAGS["${flag_name}"]=""
-                        ((--i))
+                        # Присваивание, а не ((--i)): декремент 1→0 дал бы
+                        # статус 1 и убил бы set -e вызывающего / assignment,
+                        # not ((--i)): decrement 1→0 returns status 1 and would
+                        # kill a set -e caller
+                        i=$(( i - 1 ))
                     else
                         ARGS_FLAGS["${flag_name}"]="${argv[i]}"
                     fi
@@ -867,7 +883,9 @@ EOF
         local IFS=' '
         local vf_patterns=""
         local vf
-        for vf in ${value_flags}; do
+        local -a vfs=()
+        read -ra vfs <<< "${value_flags}"
+        for vf in "${vfs[@]}"; do
             if is::not_empty "${vf_patterns}"; then
                 vf_patterns+="|${vf}"
             else
@@ -948,7 +966,7 @@ EOF
     COMPREPLY=( \$(compgen -W "\${choices} ${flag_words}" -- "\${cur}") )
     return 0
 }
-complete -F ${func_name} ${prog}
+complete -F ${func_name} "${prog}"
 EOF
 }
 

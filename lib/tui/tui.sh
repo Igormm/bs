@@ -40,65 +40,72 @@ bs::source_relative "../../core/lang.sh" "../../core/utils.sh"
 # Terminal state / Состояние терминала
 # ==========================================
 
-# @global TUI_ACTIVE — Tui: active flag (0/1) (category: constant)
-# @global TUI_ACTIVE — Tui: флаг активности (0/1) (категория: constant)
+# @global TUI_ACTIVE — Tui: active flag (0/1) (category: state)
+# @global TUI_ACTIVE — Tui: флаг активности (0/1) (категория: state)
 declare -g TUI_ACTIVE=0
-# @global TUI_COLS — Tui: terminal columns (category: constant)
-# @global TUI_COLS — Tui: число колонок терминала (категория: constant)
+# @global TUI_COLS — Tui: terminal columns (category: state)
+# @global TUI_COLS — Tui: число колонок терминала (категория: state)
 declare -g TUI_COLS=80
-# @global TUI_LINES — Tui: terminal lines (category: constant)
-# @global TUI_LINES — Tui: число строк терминала (категория: constant)
+# @global TUI_LINES — Tui: terminal lines (category: state)
+# @global TUI_LINES — Tui: число строк терминала (категория: state)
 declare -g TUI_LINES=24
-# @global TUI_TRUECOLOR — Tui: truecolor support (0/1) (category: constant)
-# @global TUI_TRUECOLOR — Tui: поддержка truecolor (0/1) (категория: constant)
+# @global TUI_TRUECOLOR — Tui: truecolor support (0/1) (category: state)
+# @global TUI_TRUECOLOR — Tui: поддержка truecolor (0/1) (категория: state)
 declare -g TUI_TRUECOLOR=0
-# @global TUI_STTY_SAVE — Tui: saved stty state (category: constant)
-# @global TUI_STTY_SAVE — Tui: сохранённое состояние stty (категория: constant)
+# @global TUI_STTY_SAVE — Tui: saved stty state (category: state)
+# @global TUI_STTY_SAVE — Tui: сохранённое состояние stty (категория: state)
 declare -g TUI_STTY_SAVE=""
-# @global TUI_KEY — Tui: last pressed key (category: constant)
-# @global TUI_KEY — Tui: последняя нажатая клавиша (категория: constant)
+# @global TUI_KEY — Tui: last pressed key (category: state)
+# @global TUI_KEY — Tui: последняя нажатая клавиша (категория: state)
 declare -g TUI_KEY=""
-# @global TUI_KEY_CHAR — Tui: last key character (category: constant)
-# @global TUI_KEY_CHAR — Tui: символ последней клавиши (категория: constant)
+# @global TUI_KEY_CHAR — Tui: last key character (category: state)
+# @global TUI_KEY_CHAR — Tui: символ последней клавиши (категория: state)
 declare -g TUI_KEY_CHAR=""
-# @global TUI_MOUSE_X — Tui: mouse X position (category: constant)
-# @global TUI_MOUSE_X — Tui: позиция мыши X (категория: constant)
+# @global TUI_MOUSE_X — Tui: mouse X position (category: state)
+# @global TUI_MOUSE_X — Tui: позиция мыши X (категория: state)
 declare -g TUI_MOUSE_X=0
-# @global TUI_MOUSE_Y — Tui: mouse Y position (category: constant)
-# @global TUI_MOUSE_Y — Tui: позиция мыши Y (категория: constant)
+# @global TUI_MOUSE_Y — Tui: mouse Y position (category: state)
+# @global TUI_MOUSE_Y — Tui: позиция мыши Y (категория: state)
 declare -g TUI_MOUSE_Y=0
-# @global TUI_MOUSE_BUTTON — Tui: mouse button state (category: constant)
-# @global TUI_MOUSE_BUTTON — Tui: состояние кнопки мыши (категория: constant)
+# @global TUI_MOUSE_BUTTON — Tui: mouse button state (category: state)
+# @global TUI_MOUSE_BUTTON — Tui: состояние кнопки мыши (категория: state)
 declare -g TUI_MOUSE_BUTTON=0
-# @global TUI_RESIZED — Tui: resize flag (0/1) (category: constant)
-# @global TUI_RESIZED — Tui: флаг изменения размера (0/1) (категория: constant)
+# @global TUI_RESIZED — Tui: resize flag (0/1) (category: state)
+# @global TUI_RESIZED — Tui: флаг изменения размера (0/1) (категория: state)
 declare -g TUI_RESIZED=0
 
-# @global TUI_BUF — Tui: screen buffer map (category: constant)
-# @global TUI_BUF — Tui: буфер экрана (категория: constant)
+# @global TUI_BUF — Tui: screen buffer map (category: state)
+# @global TUI_BUF — Tui: буфер экрана (категория: state)
 declare -gA TUI_BUF=()
-# @global TUI_BUF_STYLE — Tui: screen buffer styles map (category: constant)
-# @global TUI_BUF_STYLE — Tui: стили буфера экрана (категория: constant)
+# @global TUI_BUF_STYLE — Tui: screen buffer styles map (category: state)
+# @global TUI_BUF_STYLE — Tui: стили буфера экрана (категория: state)
 declare -gA TUI_BUF_STYLE=()
-# @global TUI_LAST — Tui: last frame map (category: constant)
-# @global TUI_LAST — Tui: последний кадр (категория: constant)
+# @global TUI_LAST — Tui: last frame map (category: state)
+# @global TUI_LAST — Tui: последний кадр (категория: state)
 declare -gA TUI_LAST=()
-# @global TUI_LAST_STYLE — Tui: last frame styles map (category: constant)
-# @global TUI_LAST_STYLE — Tui: стили последнего кадра (категория: constant)
+# @global TUI_LAST_STYLE — Tui: last frame styles map (category: state)
+# @global TUI_LAST_STYLE — Tui: стили последнего кадра (категория: state)
 declare -gA TUI_LAST_STYLE=()
-# @global TUI_DIRTY — Tui: cells written since last render (category: constant)
-# @global TUI_DIRTY — Tui: клетки, записанные с прошлого рендера (категория: constant)
+# @global TUI_DIRTY — Tui: cells written since last render (category: state)
+# @global TUI_DIRTY — Tui: клетки, записанные с прошлого рендера (категория: state)
 declare -gA TUI_DIRTY=()
-# @global TUI_FULL — Tui: 1 = next render scans the whole buffer (category: constant)
-# @global TUI_FULL — Tui: 1 = следующий рендер сканирует весь буфер (категория: constant)
+# @global TUI_FULL — Tui: 1 = next render scans the whole buffer (category: state)
+# @global TUI_FULL — Tui: 1 = следующий рендер сканирует весь буфер (категория: state)
 declare -gi TUI_FULL=1
 
-# @global TUI_MODAL_DRAW — Tui: modal draw map (category: constant)
-# @global TUI_MODAL_DRAW — Tui: карта отрисовки модалок (категория: constant)
+# @global TUI_MODAL_DRAW — Tui: modal draw map (category: state)
+# @global TUI_MODAL_DRAW — Tui: карта отрисовки модалок (категория: state)
 declare -gA TUI_MODAL_DRAW=()
-# @global TUI_MODAL_STACK — Tui: modal stack (category: constant)
-# @global TUI_MODAL_STACK — Tui: стек модальных окон (категория: constant)
+# @global TUI_MODAL_STACK — Tui: modal stack (category: state)
+# @global TUI_MODAL_STACK — Tui: стек модальных окон (категория: state)
 declare -ga TUI_MODAL_STACK=()
+
+# @global TUI_CENTER_X — Tui: centered box column result (category: state)
+# @global TUI_CENTER_X — Tui: колонка центрированного блока (категория: state)
+declare -gi TUI_CENTER_X=0
+# @global TUI_CENTER_Y — Tui: centered box row result (category: state)
+# @global TUI_CENTER_Y — Tui: строка центрированного блока (категория: state)
+declare -gi TUI_CENTER_Y=0
 
 # ==========================================
 # ANSI primitives / ANSI-примитивы
@@ -202,6 +209,9 @@ tui::style() {
   local -a parts=()
   local w
   for w in "$@"; do
+    # bg:<name> → bg_<name> (ветки ниже); bg:#hex остаётся для truecolor-ветки.
+    # bg:<name> → bg_<name> (branches below); bg:#hex stays for the truecolor branch.
+    [[ "${w}" == bg:* && "${w}" != bg:\#* ]] && w="bg_${w#bg:}"
     case "${w}" in
       bold)      parts+=(1) ;;
       dim)       parts+=(2) ;;
@@ -228,7 +238,6 @@ tui::style() {
       bright_magenta) parts+=(95) ;;
       bright_cyan)    parts+=(96) ;;
       bright_white)   parts+=(97) ;;
-      bg:*)      parts+=("4${w#bg:}" ) ;;
       bg_black)  parts+=(40) ;;
       bg_red)    parts+=(41) ;;
       bg_green)  parts+=(42) ;;
@@ -268,17 +277,6 @@ tui::style() {
     done
     printf '\e[%sm' "${out}"
   fi
-}
-
-# @private
-# @description Join style parts with ';' / Склеить части стиля ';'.
-str::join_parts() {
-  local out="" p
-  for p in "$@"; do
-    is::empty "${out}" || out+=";"
-    out+="${p}"
-  done
-  printf '%s' "${out}"
 }
 
 # ==========================================
@@ -533,11 +531,11 @@ tui::__mouse_sgr() {
 # Borders / Рамки
 # ==========================================
 
-# @global TUI_BORDER_TL — Tui: top-left corner char (category: constant)
-# @global TUI_BORDER_TL — Tui: символ верхнего левого угла (категория: constant)
+# @global TUI_BORDER_TL — Tui: top-left corner char (category: state)
+# @global TUI_BORDER_TL — Tui: символ верхнего левого угла (категория: state)
 declare -g TUI_BORDER_TL="╔" TUI_BORDER_TR="╗" TUI_BORDER_BL="╚" TUI_BORDER_BR="╝"
-# @global TUI_BORDER_H — Tui: horizontal border char (category: constant)
-# @global TUI_BORDER_H — Tui: символ горизонтальной рамки (категория: constant)
+# @global TUI_BORDER_H — Tui: horizontal border char (category: state)
+# @global TUI_BORDER_H — Tui: символ горизонтальной рамки (категория: state)
 declare -g TUI_BORDER_H="═" TUI_BORDER_V="║"
 
 # @description Select a border style / Выбрать стиль рамки.
@@ -769,11 +767,11 @@ tui::modal::close() {
       [[ "${n}" != "${name}" ]] && new_stack+=("${n}")
     done
     TUI_MODAL_STACK=("${new_stack[@]}")
-    unset "TUI_MODAL_DRAW[${name}]"
+    map::remove TUI_MODAL_DRAW "${name}"
   elif (( ${#TUI_MODAL_STACK[@]} > 0 )); then
     name="${TUI_MODAL_STACK[-1]}"
     TUI_MODAL_STACK=("${TUI_MODAL_STACK[@]:0:${#TUI_MODAL_STACK[@]}-1}")
-    unset "TUI_MODAL_DRAW[${name}]"
+    map::remove TUI_MODAL_DRAW "${name}"
   fi
 }
 

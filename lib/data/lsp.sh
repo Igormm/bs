@@ -320,8 +320,12 @@ lsp::__on_did_change() {
 lsp::__on_did_close() {
   local -r __lsp_params="$1"
   local __lsp_uri
-  __lsp_uri="$(printf '%s' "${__lsp_params}" | jq -r '.textDocument.uri')"
-  unset 'LSP_DOCS["${__lsp_uri}"]' 2>/dev/null || :
+    __lsp_uri="$(printf '%s' "${__lsp_params}" | jq -r '.textDocument.uri')"
+    # map::remove, не unset 'm[k]': unset элемента assoc-массива сломан в
+    # Bash 5.3 (стирает весь map), а в одинарных кавычках ключ не раскрывался
+    # вовсе / map::remove, not unset 'm[k]': unset on assoc elements is broken
+    # in Bash 5.3 (wipes the whole map), and single quotes never expanded the key
+    map::remove LSP_DOCS "${__lsp_uri}"
 }
 
 # @description hover: find the word, return the tooltip.

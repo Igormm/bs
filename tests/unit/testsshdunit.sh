@@ -69,6 +69,10 @@ main() {
     testframework::assert_equal "0" "${vrc}" "enum ok"
     vrc=0; sshd::validate PermitRootLogin root || vrc=$?
     testframework::assert_equal "${LIB_ERROR_INVALID_INPUT}" "${vrc}" "enum bad rejected"
+    vrc=0; sshd::validate AddressFamily "any,inet" || vrc=$?
+    testframework::assert_equal "${LIB_ERROR_INVALID_INPUT}" "${vrc}" "enum comma multi-value rejected"
+    vrc=0; sshd::validate Port 08 || vrc=$?
+    testframework::assert_equal "0" "${vrc}" "port 08 valid (no octal misparse)"
 
     vrc=0; sshd::validate AllowUsers "alice,bob" || vrc=$?
     testframework::assert_equal "0" "${vrc}" "userlist ok"
@@ -211,6 +215,110 @@ EOF
     sshd::install_main "${mt}/block.conf" || true
     testframework::assert_equal "1" "$(grep -cF "${SSHD_MARK_BEGIN}" "${BS_SSHD_MAIN}")" "no duplicate block"
     rm -rf "${mt}"
+
+    testframework::section "addr validation / валидация адресов"
+    vrc=0; sshd::validate ListenAddress 192.168.0.1 || vrc=$?
+    testframework::assert_equal "0" "${vrc}" "ipv4 ok"
+    vrc=0; sshd::validate ListenAddress 999.1.1.1 || vrc=$?
+    testframework::assert_equal "${LIB_ERROR_INVALID_INPUT}" "${vrc}" "ipv4 octet >255 rejected"
+    vrc=0; sshd::validate ListenAddress ::1 || vrc=$?
+    testframework::assert_equal "0" "${vrc}" "ipv6 loopback ok"
+    vrc=0; sshd::validate ListenAddress deadbeef || vrc=$?
+    testframework::assert_equal "${LIB_ERROR_INVALID_INPUT}" "${vrc}" "colon-less ipv6 rejected"
+    vrc=0; sshd::validate ListenAddress :::: || vrc=$?
+    testframework::assert_equal "${LIB_ERROR_INVALID_INPUT}" "${vrc}" "triple colon rejected"
+
+    testframework::section "install rollback / откат после установки"
+    local rb; rb="$(mktemp -d)"
+    export BS_SSHD_DIR="${rb}" BS_SSHD_DROPIN="99-bs.conf"
+    # Фейк принимает источник, но отвергает установленную цель / fake accepts
+    # the source but rejects the installed target
+    cat > "${rb}/sshd-fake" <<'EOF'
+#!/bin/bash
+file="${!#}"
+case "${file}" in
+  */99-bs.conf) echo "target rejected" >&2; exit 1 ;;
+esac
+exit 0
+EOF
+    chmod +x "${rb}/sshd-fake"
+    export BS_SSHD_BIN="${rb}/sshd-fake"
+    printf 'Port 2200\n' > "${rb}/99-bs.conf"
+    printf 'Port 2222\n' > "${rb}/good.conf"
+    local brc=0; sshd::install "${rb}/good.conf" 2>/dev/null || brc=$?
+    testframework::assert_equal "${LIB_ERROR_INVALID_INPUT}" "${brc}" "post-install rejection reported"
+    testframework::assert_command "grep -q '^Port 2200$' '${rb}/99-bs.conf'" "backup restored over failed target"
+    testframework::assert_command "ls '${rb}/99-bs.conf.bak.'* >/dev/null 2>&1" "backup kept after rollback"
+    testframework::assert_command "! compgen -G '${rb}/99-bs.conf.tmp.*' >/dev/null" "no leftover temp file"
+    # Ветка без backup: цель удаляется / no-backup branch: target removed
+    rm -f "${rb}/99-bs.conf" "${rb}/99-bs.conf.bak."*
+    brc=0; sshd::install "${rb}/good.conf" 2>/dev/null || brc=$?
+    testframework::assert_equal "${LIB_ERROR_INVALID_INPUT}" "${brc}" "fresh install rejection reported"
+    testframework::assert_true "! -f '${rb}/99-bs.conf'" "failed fresh target removed"
+    rm -rf "${rb}"
+
+    testframework::section "revert newest / откат на новейший backup"
+    local rv; rv="$(mktemp -d)"
+    printf 'Port 1\n' > "${rv}/c.bak.20200101000000"
+    printf 'Port 2\n' > "${rv}/c.bak.20240101000000"
+    printf 'Port 9\n' > "${rv}/c"
+    sshd::revert "${rv}/c" >/dev/null
+    testframework::assert_command "grep -q '^Port 2$' '${rv}/c'" "revert picks newest backup"
+    # nullglob вызывающего сохраняется / caller's nullglob is preserved
+    local ng
+    shopt -s nullglob
+    sshd::revert "${rv}/c" >/dev/null
+    shopt -q nullglob && ng=on || ng=off
+    testframework::assert_equal "on" "${ng}" "nullglob stays ON after revert"
+    shopt -u nullglob
+    sshd::revert "${rv}/c" >/dev/null
+    shopt -q nullglob && ng=on || ng=off
+    testframework::assert_equal "off" "${ng}" "nullglob stays OFF after revert"
+
+    testframework::section "backup collision / коллизия backup"
+    printf 'x\n' > "${rv}/f"
+    local b1 b2
+    b1="$(sshd::backup "${rv}/f")"
+    b2="$(sshd::backup "${rv}/f")"
+    testframework::assert_true "'${b1}' != '${b2}'" "two backups in one second get distinct names"
+    testframework::assert_file_exists "${b2}" "second backup exists"
+    rm -rf "${rv}"
+
+    testframework::section "install_main failure / провалы install_main"
+    local mf; mf="$(mktemp -d)"
+    export BS_SSHD_MAIN="${mf}/sshd_config"
+    # Фейк отвергает временный файл блока / fake rejects the block temp file
+    cat > "${mf}/sshd-fake" <<'EOF'
+#!/bin/bash
+file="${!#}"
+case "${file}" in
+  *.bs.*) exit 1 ;;
+esac
+exit 0
+EOF
+    chmod +x "${mf}/sshd-fake"
+    export BS_SSHD_BIN="${mf}/sshd-fake"
+    printf 'Port 2200\n' > "${BS_SSHD_MAIN}"
+    printf '%s\nPort 2222\n%s\n' "${SSHD_MARK_BEGIN}" "${SSHD_MARK_END}" > "${mf}/block.conf"
+    local frc=0; sshd::install_main "${mf}/block.conf" 2>/dev/null || frc=$?
+    testframework::assert_equal "${LIB_ERROR_INVALID_INPUT}" "${frc}" "install_main rejects failing block"
+    testframework::assert_command "grep -q '^Port 2200$' '${BS_SSHD_MAIN}'" "main config unchanged after failed block"
+    testframework::assert_command "! compgen -G '${mf}/sshd_config.bs.*' >/dev/null" "block temp file cleaned"
+    if (( EUID != 0 )); then
+        chmod 000 "${BS_SSHD_MAIN}"
+        frc=0; sshd::install_main "${mf}/block.conf" 2>/dev/null || frc=$?
+        testframework::assert_equal "${LIB_ERROR_FILE_OPERATION}" "${frc}" "unreadable main → file operation error"
+        chmod 600 "${BS_SSHD_MAIN}"
+    fi
+    rm -rf "${mf}"
+
+    testframework::section "reload/init"
+    export BS_SSHD_DRY_RUN=1
+    local rout; rout="$(sshd::reload 2>&1)"
+    testframework::assert_true "'${rout}' == dry-run:*" "reload honors dry-run"
+    export BS_SSHD_DRY_RUN=0
+    sshd::init >/dev/null 2>&1
+    testframework::assert_equal "0" "$?" "init returns success"
 
     testframework::summary
 }

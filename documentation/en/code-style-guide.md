@@ -265,6 +265,7 @@ the name mask and whether a doc snippet is required.
 | 10 | Module hooks | `<MODULE>_*_{DIR,PATH,MOCK,FILE,TIMEOUT}` | `HW_DMI_PATH`, `LLM_MOCK_RESPONSE`, `VK_API_CACHE_DIR` | yes |
 | 11 | Module constants | `readonly SCREAMING_SNAKE` | `COLOR_RESET`, `SSH_NETWORK_CONNECT_TIMEOUT` | yes |
 | 12 | Module internal state | `__<MODULE>_*` | `__ARGS_TREE`, `__ARGS_FLAGS` | yes |
+| 13 | Module state (public mutable) | `<MODULE>_*` (non-hook, non-readonly) | `TUI_KEY`, `TUI_MODAL_STACK`, `SSHD_WZ_VALUES` | yes |
 
 A `: "${VAR:=...}"` declaration is always a **hook** (category 10) regardless
 of the name suffix.
@@ -283,7 +284,7 @@ declare -g FRAMEWORK_DEBUG=false
   without reading its users.
 - Category labels (machine-readable): `guard-flag`, `module-flag`,
   `ephemeral`, `nameref`, `private-fn`, `underscore`, `error-const`,
-  `framework-flag`, `env`, `hook`, `constant`, `private`.
+  `framework-flag`, `env`, `hook`, `constant`, `private`, `state`.
 - Categories 1, 4, 6 need no snippet (programmatic or function-local).
 
 **Mask hygiene.** Anchored boundaries matter: `\bE_[A-Z][A-Z_]*\b` matches
