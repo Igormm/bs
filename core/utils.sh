@@ -291,8 +291,8 @@ utils::ensure_source() {
   local -r func="${2:?Function name is required}"
 
   #  валидация аргументов
-  is::not_empty ${file} || { log::error "file argument is empty"; return "${E_INVALID:-2}"; }
-  is::not_empty ${func} || { log::error "function argument is empty"; return "${E_INVALID:-2}"; }
+  is::not_empty "${file}" || { log::error "file argument is empty"; return "${E_INVALID:-2}"; }
+  is::not_empty "${func}" || { log::error "function argument is empty"; return "${E_INVALID:-2}"; }
 
   if ! is::file "${file}"; then
     log::error "file not found: ${file}"
@@ -323,7 +323,7 @@ utils::ensure_shell_version() {
         return "${E_ERROR:-1}"
     fi
 
-    local -r shell_name="$(basename "$SHELL")"
+    local -r shell_name="$(basename "${SHELL}")"
 
     case "${shell_name}" in
         "bash")

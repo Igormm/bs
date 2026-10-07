@@ -88,6 +88,7 @@ main() {
     test_tempfile
     test_human_size
     test_head_bytes
+    test_ensure_source
 
     testframework::summary
 }
@@ -124,6 +125,26 @@ test_head_bytes() {
     testframework::assert_equal "hello world" "$(utils::head_bytes "${tmp}")" "head_bytes default 4000"
     testframework::assert_false "utils::head_bytes /no/such 5" "head_bytes rejects missing file"
     utils::__tmp_cleanup
+}
+
+# Test utils::ensure_source loads files and verifies function presence
+# even when paths contain spaces.
+test_ensure_source() {
+    local fixture_dir="${BS_PROJECT_ROOT}/tests/fixtures/utils ensure source"
+    mkdir -p "${fixture_dir}"
+    cat > "${fixture_dir}/sourced.sh" <<'EOF'
+#!/usr/bin/env bash
+test_ensure_source_fixture::hello() { printf 'hello from fixture\n'; }
+EOF
+
+    testframework::assert_command 'utils::ensure_source "${fixture_dir}/sourced.sh" test_ensure_source_fixture::hello' "ensure_source loads file with spaces in path"
+    testframework::assert_equal "hello from fixture" "$(test_ensure_source_fixture::hello)" "ensure_source verified function is available"
+
+    rm -rf "${fixture_dir}"
+
+    local rc=0
+    utils::quiet_err utils::ensure_source "/no such/file.sh" test_ensure_source_fixture::hello || rc=$?
+    testframework::assert_true "$rc -ne 0" "ensure_source rejects missing file"
 }
 
 main "$@"
