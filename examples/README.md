@@ -1,212 +1,179 @@
-# BS Framework Examples
+# BS Framework Examples / Примеры фреймворка BS
 
-Runnable scripts. Landing three:
+This directory contains runnable scripts that demonstrate BS modules and
+conventions. Each script is self-contained and can be launched with `./bs run`
+or directly if `bs` is on `PATH`.
+
+В этом каталоге — запускаемые скрипты, демонстрирующие модули и конвенции BS.
+Каждый скрипт самодостаточен: запускайте через `./bs run` или напрямую,
+если `bs` есть в `PATH`.
+
+Full guides: [documentation/en/06-examples](../documentation/en/06-examples/README.md)
+· [ru](../documentation/ru/06-examples/README.md).
+
+## Quick start / Быстрый старт
 
 ```bash
-./bs run examples/hello.sh     # short script
-./bs run examples/todo.sh      # TUI todo list
-./bs run examples/pulse.sh     # host capability pulse
+# Run a tiny script
+./bs run examples/hello.sh
+
+# Or make it executable and run directly
+chmod +x examples/hello.sh
+./examples/hello.sh
 ```
 
-Full table: [documentation/en/06-examples](../documentation/en/06-examples/README.md) · [ru](../documentation/ru/06-examples/README.md).
+A minimal BS script looks like this / минимальный скрипт BS выглядит так:
 
-## Examples Included
-
-### PS1 Configuration Example
-**File:** `ps1_configuration_example.sh`
-
-Demonstrates the advanced PS1 configuration module with features surpassing oh-my-zsh:
-- Multiple built-in themes (default, powerline, minimal, time, rainbow)
-- Git repository information with branch and status
-- SSH connection detection
-- Python virtual environment detection
-- Dynamic time display
-- Interactive theme selection
-- Professional and minimal configurations
-
-**Usage:**
 ```bash
-# Run interactively
-./examples/ps1_configuration_example.sh
+#!/usr/bin/env bs
+# shellcheck shell=bash
 
-# Or source for use in .bashrc
-source examples/ps1_configuration_example.sh
-# Then run: setup_ps1_professional
+load "lib/io/streams"
+
+io::streams::print "hello from BS"
 ```
 
-### IO Streams Examples
-**Files:** `iostreams_output_example.sh`, `iostreams_input_example.sh`,
-`iostreams_redirection_example.sh`, `iostreams_fd_example.sh`,
-`iostreams_pipe_buffering_example.sh`, `iostreams_state_example.sh`,
-`iostreams_dev_example.sh`
+## Examples index / Оглавление примеров
 
-Demonstrate the `io::streams` module (`lib/io/streams.sh`) — an abstraction
-over I/O streams, file descriptors and redirections:
+### Core and parsing / Ядро и парсинг аргументов
 
-- **Output / Вывод** — `print`, `printn`, `printf`, `eprint`, `tty_print`:
-  safe output that never breaks on `-n`/`-e` or format-string injection
-- **Input / Ввод** — `read_line`, `read_all`, `feed`:
-  reading lines, whole streams and here-string feeding
-- **Redirections / Перенаправления** — `redirect_stdout`, `redirect_stderr`,
-  `redirect_all`, `silence`: `exec`-based redirection with the correct
-  `>file 2>&1` order, all demos run in subshells
-- **FD management / Управление FD** — `save`, `restore`, `close`:
-  `dup`/`dup2` equivalents with temporary-FD cleanup (no EMFILE leaks)
-- **Pipe and buffering / Pipe и буферизация** — `pipe`, `run_line_buffered`,
-  `run_unbuffered`: `cmd1 | cmd2` and `stdbuf` buffering control
-- **Stream state / Состояние потоков** — `is_tty`, `can_read`,
-  `wait_readable`: terminal detection and `poll`/`select` equivalents
-- **/dev special files / Специальные файлы /dev** — `null_sink`,
-  `random_bytes`, `fd_path`, `list_fds`:
-  `/dev/null`, `/dev/urandom`, `/dev/fd/N`, `/proc/self/fd`
+- `argsparseexample.sh` — parameter tree, flags, auto-help and bash completion /
+  дерево параметров, флаги, авто-help и bash-completion
+- `bs_test.sh` — smoke test of core and basic lib modules /
+  дымовой тест ядра и базовых lib-модулей
+- `greet.sh` — short script with `core/args` tree and flags /
+  короткий скрипт с деревом параметров и флагами
+- `hello.sh` — shortest useful BS script / самый короткий полезный скрипт BS
 
-**Usage:**
-```bash
-# Each example runs standalone and non-interactively
-bs run examples/iostreams_output_example.sh
-```
+### Input/output / Ввод-вывод
 
-### Args Parse Example
-**File:** `argsparseexample.sh`
+- `filesops_example.sh` — `lib/io/files` usage demo (copy, move, find) /
+  демо модуля файловых операций
+- `filesops_atomic_example.sh` — atomic copy, backup and move-fallback /
+  атомарное копирование, бэкапы и move-fallback
+- `iostreams_output_example.sh` — safe output (`print`, `printf`, `eprint` …) /
+  безопасный вывод
+- `iostreams_input_example.sh` — input helpers (`read_line`, `read_all`, `feed`) /
+  функции ввода
+- `iostreams_redirection_example.sh` — `exec`-based redirections /
+  перенаправления на `exec`
+- `iostreams_fd_example.sh` — FD save/restore/close /
+  управление файловыми дескрипторами
+- `iostreams_pipe_buffering_example.sh` — pipes and stdio buffering control /
+  pipe и управление буферизацией
+- `iostreams_state_example.sh` — TTY detection and non-blocking reads /
+  определение терминала и неблокирующее чтение
+- `iostreams_dev_example.sh` — `/dev/null`, `/dev/urandom`, `/dev/fd/N` /
+  специальные файлы `/dev`
+- `processguard_example.sh` — `io::process::guard` timeout/respawn wrapper /
+  обёртка-сторож с таймаутом
 
-Demonstrates the `args` module (`core/args.sh`) — declarative script
-parameter trees with automatic validation and help generation:
+### System and hardware / Система и оборудование
 
-- `args::define first middle last` — linear parameter chains
-- `args::level 1 start stop` — tree branching (alternatives per level)
-- `args::describe` — descriptions that land in the generated help
-- `args::flag verbose` / `args::flag output value` — `--flag` and
-  `--flag value` / `--flag=value` support; flags never occupy positional levels
-- `args::parse "$@"` — validation: unknown parameters/flags and wrong-level
-  parameters are rejected with a printed reason and auto-generated help
-  (`E_INVALID`); `-h`/`--help` prints help and exits cleanly
-- `args::completion` — generates a working bash completion function
-  from the same tree (levels, alternatives and flags included)
+- `sysdiag.sh` — system diagnostics CLI with args, logger and result contract /
+  CLI диагностики системы
+- `hw_example.sh` — CPU, memory, block and GPU info getters /
+  геттеры информации об оборудовании
+- `gpu_diag.sh` — GPU diagnostic and stress CLI /
+  диагностика и нагрузочный тест видеокарты
+- `pulse.sh` — capability pulse of the host (tier, userland, tools, hardware) /
+  пульс возможностей машины
+- `sensor_diag.sh` — touch sensor device diagnostic /
+  диагностика сенсорных устройств
+- `sensor_tui.sh` — touch sensor real-time monitor TUI /
+  TUI-монитор сенсорного устройства
 
-**Usage:**
-```bash
-bs run examples/argsparseexample.sh deploy now --env production --dry-run
-bs run examples/argsparseexample.sh now      # level error + help
-bs run examples/argsparseexample.sh --help
-source <(bs run examples/argsparseexample.sh --emit-completion)  # bash completion
-```
+### Integration modules / Интеграции
 
-### Combo Examples (args + io::streams)
-**Files:** `deploytoolexample.sh`, `passwordgenexample.sh`,
-`logmonitorexample.sh`, `quizgameexample.sh`
+- `http_example.sh` — HTTP client demo / демо HTTP-клиента
+- `llm_example.sh` — LLM client demo / демо LLM-клиента
+- `k8s_example.sh` — Kubernetes client helpers demo / демо Kubernetes-клиента
+- `result_example.sh` — JSON result contract for integrations /
+  JSON-контракт результата для интеграций
 
-Small complete tools showing both modules working together:
+### TUI, wizards and apps / TUI, визарды и приложения
 
-- **deploytoolexample.sh** — mini deploy tool: parameter tree, `--env`/
-  `--dry-run` flags, FD save/restore that sends the whole deploy section
-  to a log file while the terminal sees only the summary
-- **passwordgenexample.sh** — password generator from `/dev/urandom`
-  with `--length`, `--count`, `--hex` flags and a strength estimate
-- **logmonitorexample.sh** — live log monitor: a background service writes
-  to a pipe, the monitor reads it non-blockingly via `can_read`, shows
-  waiting "ticks" and counts ERROR statistics
-- **quizgameexample.sh** — timed quiz: the answer is awaited with
-  `wait_readable` (poll/select) instead of a blocking `read`;
-  non-interactive environments get an auto mode
+- `app_demo.sh` — beginner TUI window with buttons /
+  TUI для новичков: окно и кнопки
+- `menu.sh` — minimal interactive menu / минимальное интерактивное меню
+- `tui_demo.sh` — full TUI framework demo (lists, modals, progress) /
+  полноценное демо TUI-фреймворка
+- `todo.sh` — terminal todo list on `lib/tui/app` /
+  терминальный список задач
+- `wizard_example.sh` — interactive setup wizard with Unicode frames /
+  интерактивный установщик
+- `sshd_wizard.sh` — interactive sshd config builder /
+  визард сборки конфига sshd
+- `ai_user_wizard.sh` — restricted AI-user sandbox wizard /
+  визард песочницы для ИИ-пользователя
+- `opencode_serve_wizard.sh` — interactive wizard for the opencode server /
+  визард запуска opencode-сервера
+- `opencode_serve.sh` — helper that starts the opencode server /
+  помощник запуска opencode-сервера
 
-**Usage:**
-```bash
-bs run examples/deploytoolexample.sh deploy --env production --dry-run
-bs run examples/passwordgenexample.sh --length 24 --count 5
-bs run examples/logmonitorexample.sh
-bs run examples/quizgameexample.sh          # best in a real terminal
-```
+### Complete small tools / Законченные мини-инструменты
 
-## How to Use Examples
+- `deploytoolexample.sh` — mini deploy tool with args + FD logging /
+  мини-утилита деплоя
+- `passwordgenexample.sh` — `/dev/urandom` password generator /
+  генератор паролей
+- `logmonitorexample.sh` — live log monitor with non-blocking reads /
+  живой монитор лога
+- `quizgameexample.sh` — timed quiz with `wait_readable` /
+  викторина с таймаутом
 
-### Running Examples
-```bash
-# Make example executable
-chmod +x examples/ps1_configuration_example.sh
+### Other / Прочее
 
-# Run example
-./examples/ps1_configuration_example.sh
+- `ps1configurationexample.sh` — PS1 prompt configuration examples /
+  примеры настройки приглашения PS1
+- `tree_example.sh` — generate a project tree from YAML/TXT/INI/CSV /
+  дерево проекта из текстовых форматов
+- `demo.sh` — asciinema-style framework demo / демо в стиле asciinema
 
-# Or source for use in current shell
-source examples/ps1_configuration_example.sh
-```
+### Output contract examples / Примеры контракта вывода
 
-### Integrating into .bashrc
-```bash
-# Add to ~/.bashrc
-cd /path/to/bosa_project
-source examples/ps1_configuration_example.sh
-setup_ps1_professional
-```
+The `output_contract/` subdirectory contains focused demos of BS output
+primitives. Run them with `./bs run examples/output_contract/<name>.sh`.
 
-### Using in Scripts
-```bash
-#!/usr/bin/env bash
-source "/path/to/bosa/boot.sh"
-bosa::init
+Подкаталог `output_contract/` содержит узкие демо примитивов вывода BS.
+Запуск: `./bs run examples/output_contract/<name>.sh`.
 
-# Load example functions
-source "/path/to/bosa/examples/ps1_configuration_example.sh"
+- `boxed.sh` — boxed text / рамка-текст
+- `bullets.sh` — bulleted lists / маркированные списки
+- `formats.sh` — string/json/xml representations / представления данных
+- `header_box.sh` — header boxes / рамка-заголовок
+- `log_levels.sh` — logger levels / уровни лога
+- `noop_box.sh` — "nothing to do" framed notice / рамка «ничего не сделано»
+- `notices.sh` — one-line notices / однострочные уведомления
+- `progress.sh` — inline progress bars / инлайн-бары прогресса
+- `steplog.sh` — step log with guaranteed flush / журнал шагов
+- `table.sh` — plain and framed tables / таблицы
+- `tui_elements.sh` — full-screen TUI elements / полноэкранные TUI-элементы
 
-# Use example functions
-setup_ps1_basic
-```
+## Creating new examples / Создание новых примеров
 
-## Creating New Examples
+When adding an example, follow the existing conventions:
 
-When adding new examples:
-1. Use bilingual comments (Russian/English)
-2. Include comprehensive usage examples
-3. Add clear explanations of features
-4. Provide both interactive and non-interactive modes
-5. Document requirements and dependencies
-6. Test on multiple distributions
+1. Use `#!/usr/bin/env bs` and `# shellcheck shell=bash` on the first two lines.
+2. Load framework modules with `load "core/..."` or `load "lib/..."`;
+   do not `source` them directly.
+3. Add bilingual comments: English line followed by Russian line (or vice versa).
+4. Include a short "Run / Запуск" usage comment.
+5. Keep the script self-contained and runnable non-interactively when possible.
+6. Update this README with the file and a one-line description.
 
-## Best Practices
+При добавлении примера соблюдайте существующие конвенции:
 
-1. **Always check if BOSA is loaded**
-2. **Use proper error handling**
-3. **Include usage examples**
-4. **Document functions with docstrings**
-5. **Test on different terminals**
-6. **Consider performance impact**
+1. Первые две строки: `#!/usr/bin/env bs` и `# shellcheck shell=bash`.
+2. Загружайте модули фреймворка через `load "core/..."` или `load "lib/..."`;
+   не используйте прямой `source`.
+3. Добавляйте двуязычные комментарии: строка на английском и строка на русском.
+4. Включайте короткий комментарий «Run / Запуск».
+5. Скрипт должен быть самодостаточным и по возможности запускаться
+   неинтерактивно.
+6. Обновляйте этот README: имя файла и однострочное описание.
 
-## Integration with Other Modules
+## License / Лицензия
 
-Examples can use any BOSA modules:
-```bash
-# Load multiple modules
-load "lib/ui/ps1config"
-load "lib/system/utils"
-load "lib/integration/telegramintegration"
-
-# Use together
-setup_ps1_professional
-system::utils::get_hostname | telegramintegration::send_message "$CHAT_ID"
-```
-
-## Testing Examples
-
-All examples should be tested:
-```bash
-# Test example
-./examples/ps1_configuration_example.sh
-
-# Or run through test framework
-source tests/testframework.sh
-testframework::assert_command "./examples/ps1_configuration_example.sh"
-```
-
-## Contributing Examples
-
-When contributing new examples:
-1. Follow existing patterns
-2. Add bilingual documentation
-3. Include usage instructions
-4. Test thoroughly
-5. Update this README
-6. Consider different use cases
-
-## License
-
-Examples are part of the BOSA framework and follow the same licensing terms.
+Examples are part of the BS framework and follow the same licensing terms.
+Примеры являются частью фреймворка BS и распространяются на тех же условиях.
