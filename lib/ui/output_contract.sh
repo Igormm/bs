@@ -39,6 +39,7 @@ declare -ga OUTPUT_CONTRACT_UNITS=(
     "noop_box:«Ничего не сделано» / No-op box:bs (update_box):examples/output_contract/noop_box.sh"
     "steplog:Журнал шагов / Step log:lib/ui/steplog.sh:examples/output_contract/steplog.sh"
     "tui_elements:TUI-элементы / TUI elements (12):lib/ui/elements/*:examples/output_contract/tui_elements.sh"
+    "formats:Форматы данных / Data formats (string/json/xml):lib/data/format.sh:examples/output_contract/formats.sh"
 )
 
 # @private Repo root: BS_ROOT or the module's parent dir / Корень репо.

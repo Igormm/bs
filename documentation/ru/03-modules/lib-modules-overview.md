@@ -78,7 +78,11 @@ RFC-хелперы: UUID 4/7 ([uuid.sh](../../../lib/rfc/uuid.sh)), URI, CSV.
 
 - [dataprocessor.sh](../../../lib/data/dataprocessor.sh) — обработка и конвертация JSON, XML, CSV, YAML и TSV с запросами в стиле jq / XPath / JSONPath. Требует внешних инструментов (`jq`, `xmllint`, `python3`), устанавливаемых через `dataprocessor::install_dependencies`.
 
-Ключевые функции: `dataprocessor::json::query`, `dataprocessor::xml::to_json`, `dataprocessor::csv::filter`, `dataprocessor::convert`.
+- [format.sh](../../../lib/data/format.sh) — рендер канонических записей `key=value` в `string`, `json` или `xml` через реестр форматов; без зависимостей. Используется bare-metal геттерами через `BS_OUTPUT_FORMAT`.
+
+Ключевые функции: `dataprocessor::json::query`, `dataprocessor::xml::to_json`, `dataprocessor::csv::filter`, `dataprocessor::convert`, `format::emit`, `format::record`.
+
+Подробнее: [data-format.md](data-format.md)
 
 ## integration — `lib/integration/`
 

@@ -78,7 +78,11 @@ Key functions: `sshnetwork::discover_devices`, `sshnetwork::execute_remote`, `ss
 
 - [dataprocessor.sh](../../../lib/data/dataprocessor.sh) — processing and conversion of JSON, XML, CSV, YAML and TSV, with jq / XPath / JSONPath-style querying. Requires external tools (`jq`, `xmllint`, `python3`) installed via `dataprocessor::install_dependencies`.
 
-Key functions: `dataprocessor::json::query`, `dataprocessor::xml::to_json`, `dataprocessor::csv::filter`, `dataprocessor::convert`.
+- [format.sh](../../../lib/data/format.sh) — render canonical `key=value` records as `string`, `json`, or `xml` via a format registry; dependency-free. Used by bare-metal data getters through `BS_OUTPUT_FORMAT`.
+
+Key functions: `dataprocessor::json::query`, `dataprocessor::xml::to_json`, `dataprocessor::csv::filter`, `dataprocessor::convert`, `format::emit`, `format::record`.
+
+Details: [data-format.md](data-format.md)
 
 ## integration — `lib/integration/`
 
