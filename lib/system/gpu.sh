@@ -13,7 +13,7 @@
 bs::guard "SYSTEM_GPU" || return 0
 
 # Dependencies / Зависимости
-bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/deps.sh" "../system/packages.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/deps.sh" "../system/packages.sh" "../data/format.sh"
 
 # @global SYSTEM_GPU_VERSION — Module version (category: module-flag)
 # @global SYSTEM_GPU_VERSION — Версия модуля (категория: module-flag)
@@ -99,7 +99,7 @@ gpu::vendor() {
     local out="" line=""
     out="$(gpu::__pci_gpus)" || return $?
     while IFS= read -r line; do
-        gpu::vendor_of "${line}"
+        format::record vendor "$(gpu::vendor_of "${line}")" | format::emit "${BS_OUTPUT_FORMAT:-string}"
         return "${E_SUCCESS}"
     done <<< "${out}"
     return "${LIB_ERROR_FILE_NOT_FOUND}"
@@ -112,7 +112,7 @@ gpu::name() {
     local out="" line=""
     out="$(gpu::__pci_gpus)" || return $?
     while IFS= read -r line; do
-        gpu::__clean_name "${line}"
+        format::record name "$(gpu::__clean_name "${line}")" | format::emit "${BS_OUTPUT_FORMAT:-string}"
         return "${E_SUCCESS}"
     done <<< "${out}"
     return "${LIB_ERROR_FILE_NOT_FOUND}"
@@ -128,7 +128,7 @@ gpu::detect() {
         v="$(gpu::vendor_of "${line}")"
         n="$(gpu::__clean_name "${line}")"
         printf '%s\t%s\n' "${v}" "${n}"
-    done <<< "${out}"
+    done <<< "${out}" | format::emit_lines gpu
     return "${E_SUCCESS}"
 }
 
@@ -142,13 +142,13 @@ gpu::detect() {
 # @return E_SUCCESS найден; LIB_ERROR_FILE_NOT_FOUND не определён
 gpu::driver() {
     if is::command "${GPU_NVIDIA_SMI}"; then
-        printf 'nvidia\n'
+        format::record driver nvidia | format::emit "${BS_OUTPUT_FORMAT:-string}"
         return "${E_SUCCESS}"
     fi
     local d
     for d in "${GPU_SYSFS_DRM_DIR}"/card[0-9]*/device/driver; do
         if [[ -L "${d}" ]]; then
-            printf '%s\n' "$(basename "$(readlink -f "${d}")")"
+            format::record driver "$(basename "$(readlink -f "${d}")")" | format::emit "${BS_OUTPUT_FORMAT:-string}"
             return "${E_SUCCESS}"
         fi
     done
@@ -165,7 +165,7 @@ gpu::vram() {
         local mi="" rc=0
         mi="$("${GPU_NVIDIA_SMI}" --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null)" || rc=$?
         if (( rc == 0 )) && is::number "${mi}"; then
-            printf '%s\n' "$(( mi * 1048576 ))"
+            format::record vram "$(( mi * 1048576 ))" | format::emit "${BS_OUTPUT_FORMAT:-string}"
             return "${E_SUCCESS}"
         fi
     fi
@@ -174,7 +174,7 @@ gpu::vram() {
         if is::readable "${f}"; then
             bytes="$(cat "${f}")"
             if is::number "${bytes}"; then
-                printf '%s\n' "${bytes}"
+                format::record vram "${bytes}" | format::emit "${BS_OUTPUT_FORMAT:-string}"
                 return "${E_SUCCESS}"
             fi
         fi
@@ -195,7 +195,7 @@ gpu::temperature() {
         local t="" rc=0
         t="$("${GPU_NVIDIA_SMI}" --query-gpu=temperature.gpu --format=csv,noheader,nounits 2>/dev/null)" || rc=$?
         if (( rc == 0 )) && is::number "${t}"; then
-            printf '%s\n' "${t}"
+            format::record temperature "${t}" | format::emit "${BS_OUTPUT_FORMAT:-string}"
             return "${E_SUCCESS}"
         fi
     fi
@@ -204,7 +204,7 @@ gpu::temperature() {
         if is::readable "${f}"; then
             millis="$(cat "${f}")"
             if is::number "${millis}"; then
-                printf '%s\n' "$(( millis / 1000 ))"
+                format::record temperature "$(( millis / 1000 ))" | format::emit "${BS_OUTPUT_FORMAT:-string}"
                 return "${E_SUCCESS}"
             fi
         fi
@@ -221,7 +221,7 @@ gpu::utilization() {
         local u="" rc=0
         u="$("${GPU_NVIDIA_SMI}" --query-gpu=utilization.gpu --format=csv,noheader,nounits 2>/dev/null)" || rc=$?
         if (( rc == 0 )) && is::number "${u}"; then
-            printf '%s\n' "${u}"
+            format::record utilization "${u}" | format::emit "${BS_OUTPUT_FORMAT:-string}"
             return "${E_SUCCESS}"
         fi
     fi
@@ -230,7 +230,7 @@ gpu::utilization() {
         if is::readable "${f}"; then
             p="$(cat "${f}")"
             if is::number "${p}"; then
-                printf '%s\n' "${p}"
+                format::record utilization "${p}" | format::emit "${BS_OUTPUT_FORMAT:-string}"
                 return "${E_SUCCESS}"
             fi
         fi

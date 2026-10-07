@@ -191,6 +191,17 @@ test_utilization() {
     rm -rf "${root}"
 }
 
+test_gpu_formats() {
+    local -r root="$(mktemp -d)"
+    __make_smi_fake "${root}"
+    local out
+    out="$(GPU_SYSFS_DRM_DIR="${root}/nope" GPU_NVIDIA_SMI="${root}/smi" BS_OUTPUT_FORMAT=json gpu::temperature 2>/dev/null)"
+    testframework::assert_equal '{"temperature":"64"}' "${out}" "temperature json"
+    out="$(GPU_SYSFS_DRM_DIR="${root}/nope" GPU_NVIDIA_SMI="${root}/smi" BS_OUTPUT_FORMAT=xml gpu::utilization 2>/dev/null)"
+    testframework::assert_equal '<record><utilization>33</utilization></record>' "${out}" "utilization xml"
+    rm -rf "${root}"
+}
+
 test_stress() {
     local -r root="$(mktemp -d)"
     __make_drm_fixture "${root}"
@@ -368,6 +379,7 @@ main() {
     testframework::section "Temperature and utilization / Температура и утилизация"
     test_temperature
     test_utilization
+    test_gpu_formats
 
     testframework::section "Stress test / Нагрузочный тест"
     test_stress
