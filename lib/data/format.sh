@@ -138,7 +138,7 @@ format::render::string() {
         fi
         key="${line%%=*}"; value="${line#*=}"
         (( n == 0 )) || cur+=$'\n'
-        cur+="${key}: ${value}"
+        cur+="${key}=${value}"
         n=$(( n + 1 ))
     done
     (( n > 0 )) && { counts+=("${n}"); texts+=("${cur}"); }
@@ -148,7 +148,7 @@ format::render::string() {
     done
     if (( all_single == 1 )); then
         for (( i = 0; i < ${#texts[@]}; i++ )); do
-            printf '%s\n' "${texts[$i]#*: }"
+            printf '%s\n' "${texts[$i]#*=}"
         done
         return 0
     fi
