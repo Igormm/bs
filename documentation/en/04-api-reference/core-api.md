@@ -65,7 +65,7 @@ bs::source_relative "../core/logger.sh" "../core/utils.sh"  # dependencies relat
 ## Language primitives — `core/lang.sh`
 
 The "language kernel": introspection, types, strings and collections over
-pure Bash 4+ built-ins (no external commands). Autoloaded right after
+pure Bash 4.2+ built-ins (no external commands). Autoloaded right after
 `core/prereq`.
 
 ### Introspection
@@ -276,7 +276,7 @@ Any module can register a cleanup function; the stack runs in LIFO order when th
 
 #### `error::handle <code> <message>`
 - Parameters: `$1` — error code; `$2` — message
-- Returns: handler's return code; if a function `error::handler::<code>` exists it is called with the message, otherwise falls back to `error::exit`
+- Returns: handler's return code; if a handler was registered via `error::set_handler` it is called with the message, otherwise falls back to `error::exit`
 - Example: `error::handle 127 "Command not found"`
 
 #### `error::set_handler <code> <function>`
@@ -286,7 +286,7 @@ Any module can register a cleanup function; the stack runs in LIFO order when th
 
 #### `error::reset_handler <code>`
 - Parameters: `$1` — error code
-- Returns: 0; removes `error::handler::<code>`
+- Returns: 0; removes the handler registered for that code
 - Example: `error::reset_handler 127`
 
 #### `function_exists <name>`
@@ -305,10 +305,10 @@ Any module can register a cleanup function; the stack runs in LIFO order when th
 - Returns: 0 on success; on failure logs `Command failed: ...` and returns the command's code
 - Example: `error::try command_that_might_fail`
 
-#### `error::try_with_fallback <primary> <fallback>`
-- Parameters: `$1` — primary command string (run via `eval`); `$2` — fallback command string
-- Returns: the fallback's code if the primary failed, otherwise 0
-- Example: `error::try_with_fallback "critical_command" "fallback_command"`
+#### `error::try_with_fallback <primary_fn> <fallback_fn> [args...]`
+- Parameters: `$1` — primary function name; `$2` — fallback function name; `$@` (from `$3`) — arguments passed to both functions
+- Returns: the primary's code on success; the fallback's code if the primary failed
+- Example: `error::try_with_fallback primary_func fallback_func "arg1" "arg2"`
 
 #### `error::retry <max> <cmd> [args...]`
 - Parameters: `$1` — max attempts; `$@` (from `$2`) — command to execute; `sleep 1` between attempts
@@ -327,15 +327,15 @@ Any module can register a cleanup function; the stack runs in LIFO order when th
 
 Note: internally this checks `command -v timeout >/dev/null 2>&1`; in your own code prefer `utils::has timeout` from `core/utils.sh`.
 
-#### `error::conditional <condition> <message> [code]`
-- Parameters: `$1` — condition string (run via `eval`); `$2` — message; `$3` — exit code (optional, default 1)
-- Returns: 0 if the condition is false; otherwise exits via `error::exit`
-- Example: `error::conditional "[[ -z ${config} ]]" "Config is empty" 2`
+#### `error::conditional <predicate> <message> [code]`
+- Parameters: `$1` — predicate function name; `$2` — message; `$3` — exit code (optional, default 1)
+- Returns: 0 if the predicate returns false; otherwise exits via `error::exit`
+- Example: `error::conditional is_config_empty "Config is empty" 2`
 
-#### `error::conditional_warning <condition> <message>`
-- Parameters: `$1` — condition string (run via `eval`); `$2` — warning message
-- Returns: 0; logs a warning if the condition is true
-- Example: `error::conditional_warning "check_deprecated_feature" "Feature is deprecated"`
+#### `error::conditional_warning <predicate> <message>`
+- Parameters: `$1` — predicate function name; `$2` — warning message
+- Returns: 0; logs a warning if the predicate returns true
+- Example: `error::conditional_warning check_deprecated_feature "Feature is deprecated"`
 
 ---
 
