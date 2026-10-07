@@ -12,7 +12,7 @@
 bs::guard "SYSTEM_SENSOR" || return 0
 
 # Dependencies / Зависимости
-bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../data/format.sh"
 
 # @global SYSTEM_SENSOR_VERSION — Module version (category: module-flag)
 # @global SYSTEM_SENSOR_VERSION — Версия модуля (категория: module-flag)
@@ -164,7 +164,7 @@ sensor::__event_of() {
 sensor::devices() {
     local -r pattern="${1:-}"
     local -i found=0
-    local ev d name
+    local ev d name out=""
 
     [[ -d "${SENSOR_INPUT_DIR}" ]] || {
         log::warn "No ${SENSOR_INPUT_DIR} on this platform"
@@ -177,10 +177,13 @@ sensor::devices() {
         if is::not_empty "${pattern}"; then
             str::contains "$(str::lower "${name}")" "$(str::lower "${pattern}")" || continue
         fi
-        printf '%s\t%s\n' "${ev}" "${name}"
+        out+="$(printf '%s\t%s\n' "${ev}" "${name}")"
         found+=1
     done
-    (( found > 0 )) && return "${E_SUCCESS}"
+    if (( found > 0 )); then
+        printf '%s' "${out}" | format::emit_lines device
+        return "${E_SUCCESS}"
+    fi
     return "${LIB_ERROR_FILE_NOT_FOUND}"
 }
 
@@ -206,18 +209,19 @@ sensor::info() {
         error::throw "Unknown input device: ${ev}" "${LIB_ERROR_FILE_NOT_FOUND}"
         return "${LIB_ERROR_FILE_NOT_FOUND}"
     }
-    printf 'device=%s\n' "${ev}"
-    printf 'path=%s\n' "$(sensor::device_path "${ev}")"
-    printf 'name=%s\n' "$(sensor::__name_of "${ev}")"
     local f
-    for f in phys uniq; do
-        [[ -f "${dir}/device/${f}" ]] && printf '%s=%s\n' "${f}" "$(utils::quiet_err head -n1 "${dir}/device/${f}")"
-    done
-    printf 'readable=%s\n' "$(is::readable "$(sensor::device_path "${ev}")" && printf yes || printf no)"
-    printf 'capabilities_ev=%s\n' "$(utils::quiet_err cat "${dir}/device/capabilities/ev" 2>/dev/null)"
-    # WRAPPER-CANDIDATE: utils::quiet_err already used; the trailing 2>/dev/null is redundant here (double suppression) — drop one / кандидат-обёртка: utils::quiet_err уже применён, хвост 2>/dev/null дублирует подавление
-    printf 'capabilities_key=%s\n' "$(utils::quiet_err cat "${dir}/device/capabilities/key" 2>/dev/null)"
-    printf 'capabilities_abs=%s\n' "$(utils::quiet_err cat "${dir}/device/capabilities/abs" 2>/dev/null)"
+    {
+        printf 'device=%s\n' "${ev}"
+        printf 'path=%s\n' "$(sensor::device_path "${ev}")"
+        printf 'name=%s\n' "$(sensor::__name_of "${ev}")"
+        for f in phys uniq; do
+            [[ -f "${dir}/device/${f}" ]] && printf '%s=%s\n' "${f}" "$(utils::quiet_err head -n1 "${dir}/device/${f}")"
+        done
+        printf 'readable=%s\n' "$(is::readable "$(sensor::device_path "${ev}")" && printf yes || printf no)"
+        printf 'capabilities_ev=%s\n' "$(utils::quiet_err cat "${dir}/device/capabilities/ev")"
+        printf 'capabilities_key=%s\n' "$(utils::quiet_err cat "${dir}/device/capabilities/key")"
+        printf 'capabilities_abs=%s\n' "$(utils::quiet_err cat "${dir}/device/capabilities/abs")"
+    } | format::emit "${BS_OUTPUT_FORMAT:-string}"
     return "${E_SUCCESS}"
 }
 
