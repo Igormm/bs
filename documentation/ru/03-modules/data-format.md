@@ -40,6 +40,7 @@ format::list                    # string, json, xml (по одному в стр
 format::validate json           # E_SUCCESS / LIB_ERROR_INVALID_INPUT
 format::record iface eth0 ip 192.0.2.10   # канонические строки в stdout
 format::emit json               # stdin записи → stdout отрендерено
+format::emit_lines route        # каждая входная строка → своя запись (блоб-геттеры)
 format::render::string          # рендереры по форматам
 format::render::json
 format::render::xml
@@ -48,13 +49,13 @@ format::render::xml
 ## Рендер
 
 `string` — единственное поле печатает **только значение** (человеческий дефолт
-для скаляра, например IP); несколько полей — `key: value`:
+для скаляра, например IP); несколько полей — `key=value`:
 
 ```bash
 printf 'ip=192.0.2.10\n' | format::emit string      # 192.0.2.10
 printf 'iface=eth0\nip=192.0.2.10\n' | format::emit string
-# iface: eth0
-# ip: 192.0.2.10
+# iface=eth0
+# ip=192.0.2.10
 ```
 
 `json` — одна запись → объект, несколько → массив объектов; экранирует

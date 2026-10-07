@@ -40,6 +40,7 @@ format::list                    # string, json, xml (one per line)
 format::validate json           # E_SUCCESS / LIB_ERROR_INVALID_INPUT
 format::record iface eth0 ip 192.0.2.10   # canonical lines on stdout
 format::emit json               # stdin canonical records → stdout rendered
+format::emit_lines route        # each input line → its own record (blob getters)
 format::render::string          # per-format renderers
 format::render::json
 format::render::xml
@@ -48,13 +49,13 @@ format::render::xml
 ## Rendering
 
 `string` — a lone field prints **its value only** (the human default for a
-scalar such as an IP); several fields print `key: value`:
+scalar such as an IP); several fields print `key=value`:
 
 ```bash
 printf 'ip=192.0.2.10\n' | format::emit string      # 192.0.2.10
 printf 'iface=eth0\nip=192.0.2.10\n' | format::emit string
-# iface: eth0
-# ip: 192.0.2.10
+# iface=eth0
+# ip=192.0.2.10
 ```
 
 `json` — one record → object, several → array of objects; escapes `" \ \n \r \t`
