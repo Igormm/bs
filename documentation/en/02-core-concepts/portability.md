@@ -7,7 +7,7 @@
 
 ## 1. Why
 
-BS runs on Bash 4+ and claims "ubiquity". But "everywhere" is several
+BS runs on Bash 4.2+ and claims "ubiquity". But "everywhere" is several
 worlds:
 
 - **GNU/Linux** — `grep -P`, `sed -z`, `sha256sum`, `stat -c`, `/proc`, `/sys`;
@@ -80,16 +80,16 @@ justified only for globally different runtimes.
 
 Compatibility tiers (for the version and `bs doctor`):
 
-- `core` — pure Bash 4+, no GNU tools: works everywhere;
+- `core` — pure Bash 4.2+, no GNU tools: works everywhere;
 - `gnu-linux` — GNU userland (`grep -P`, `sed -z`, `sha256sum`);
 - `posix` — POSIX-only tools (fallback mode);
 - `bsd` — macOS/FreeBSD compatibility layers.
 **The shell is part of the capability vector** (facts `shell`, `shell_ok`,
-`bash_version`): bash 4+ — full kernel; zsh — init-level only
+`bash_version`): bash 4.2+ — full kernel; zsh — init-level only
 (`bootstrap/init.sh`); dash/sh/fish — unsupported. The tiers below assume
 `shell_ok=1`, checked via `platform::get shell_ok`.
 **Оболочка — часть вектора возможностей** (факты `shell`, `shell_ok`,
-`bash_version`): bash 4+ — полное ядро; zsh — только инициализация
+`bash_version`): bash 4.2+ — полное ядро; zsh — только инициализация
 (`bootstrap/init.sh`); dash/sh/fish — не поддерживаются.
 
 A script checks the required tier at startup and fails with a clear
@@ -119,9 +119,9 @@ Fix the support matrix explicitly (checked by `bs doctor`):
 
 | Tier | Requirements |
 |---|---|
-| `core` | Bash 4.0+, POSIX tools, Linux-like FS |
+| `core` | Bash 4.2+, POSIX tools, Linux-like FS |
 | `gnu-linux` | tier core + GNU userland (grep -P, sed -z, sha256sum) |
-| `bsd` | tier core + Bash 4+ from packages (system Bash on macOS is 3.2!) |
+| `bsd` | tier core + Bash 4.2+ from packages (system Bash on macOS is 3.2!) |
 
 Note: the system Bash on macOS is 3.2 (GPLv2 license), so macOS support
 implies Bash from Homebrew. macOS is currently out of priority.

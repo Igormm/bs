@@ -7,7 +7,7 @@
 
 ## 1. Зачем это
 
-Проект BS работает на bash 4+ и претендует на «вездесущность». Но
+Проект BS работает на bash 4.2+ и претендует на «вездесущность». Но
 «везде» — это разные миры:
 
 - **GNU/Linux** — `grep -P`, `sed -z`, `sha256sum`, `stat -c`, `/proc`, `/sys`;
@@ -78,17 +78,17 @@ GNU-only инструменты и их fallback:
 
 Тиры совместимости (для версии и `bs doctor`):
 
-- `core` — чистый bash 4+, без GNU-инструментов: работает везде;
+- `core` — чистый bash 4.2+, без GNU-инструментов: работает везде;
 - `gnu-linux` — GNU userland (`grep -P`, `sed -z`, `sha256sum`);
 - `posix` — только POSIX-инструменты (fallback-режим);
 - `bsd` — macOS/FreeBSD слои совместимости.
 
 **Оболочка — часть вектора возможностей** (факты `shell`, `shell_ok`,
-`bash_version`): bash 4+ — полное ядро; zsh — только инициализация
+`bash_version`): bash 4.2+ — полное ядро; zsh — только инициализация
 (`bootstrap/init.sh`); dash/sh/fish — не поддерживаются. Тиры ниже
 предполагают `shell_ok=1`, проверяется через `platform::get shell_ok`.
 **The shell is part of the capability vector** (facts `shell`, `shell_ok`,
-`bash_version`): bash 4+ — full kernel; zsh — init-level only
+`bash_version`): bash 4.2+ — full kernel; zsh — init-level only
 (`bootstrap/init.sh`); dash/sh/fish — unsupported. The tiers below assume
 `shell_ok=1`, checked via `platform::get shell_ok`.
 
@@ -118,9 +118,9 @@ GNU-only инструменты и их fallback:
 
 | Тир | Требования |
 |---|---|
-| `core` | bash 4.0+, POSIX-инструменты, Linux-подобная ФС |
+| `core` | bash 4.2+, POSIX-инструменты, Linux-подобная ФС |
 | `gnu-linux` | тир core + GNU userland (grep -P, sed -z, sha256sum) |
-| `bsd` | тир core + bash 4+ из пакетов (системный bash на macOS — 3.2!) |
+| `bsd` | тир core + bash 4.2+ из пакетов (системный bash на macOS — 3.2!) |
 
 Замечание: системный bash на macOS — 3.2 (лицензия GPLv2), поэтому
 macOS-поддержка подразумевает bash из Homebrew. На данном этапе macOS —
