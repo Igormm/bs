@@ -32,6 +32,8 @@ main() {
     testframework::assert_equal "1.2.3.4" "$(format::record ip 1.2.3.4 | format::emit string)" "scalar → value only"
     testframework::assert_equal $'ip: 1.2.3.4\niface: eth0' \
         "$(printf 'ip=1.2.3.4\niface=eth0\n' | format::emit string)" "multi-field → key: value"
+    testframework::assert_equal $'eth0\nwlan0' \
+        "$(printf 'iface=eth0\n\niface=wlan0\n' | format::emit string)" "list of single-field → values only"
     testframework::assert_equal "" "$(format::emit string </dev/null)" "empty → empty"
 
     testframework::section "json renderer / json"

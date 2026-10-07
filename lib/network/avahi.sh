@@ -17,7 +17,7 @@
 bs::guard "LIB_NETWORK_AVAHI" || return 0
 
 # Dependencies / Зависимости
-bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/lang.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/lang.sh" "../data/format.sh"
 
 # @global LIB_NETWORK_AVAHI_VERSION — Module version (category: module-flag)
 # @global LIB_NETWORK_AVAHI_VERSION — Версия модуля (категория: module-flag)
@@ -72,5 +72,8 @@ network::avahi::hostname_local() {
     short_host="localhost"
   fi
 
-  printf '%s.local\n' "${short_host}"
+  # Canonical record + selected format; string default is the bare value.
+  # Каноническая запись + выбранный формат; string по умолчанию — значение.
+  format::record hostname_local "${short_host}.local" \
+    | format::emit "${BS_OUTPUT_FORMAT:-string}"
 }

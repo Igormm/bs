@@ -8,7 +8,7 @@
 bs::guard "SYSTEM_NETWORK" || return 0
 
 # Зависимости / Dependencies
-bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../io/files.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../io/files.sh" "../data/format.sh"
 
 # @description Configure network interface / Настроить сетевой интерфейс
 # @param $1 Interface name (e.g., "eth0", "wlan0") / Имя интерфейса (например, "eth0",
@@ -167,12 +167,52 @@ system::network::dns() {
 # @example
 #   system::network::list_interfaces
 system::network::list_interfaces() {
+    local names=""
     if utils::has ip; then
-        utils::quiet_err ip link show | awk -F': ' '/^[0-9]+: / {print $2}' | grep -v 'lo'
+        names="$(utils::quiet_err ip link show | awk -F': ' '/^[0-9]+: / {print $2}' | grep -v 'lo')"
     else
         # Fallback to ifconfig / Резервный вариант ifconfig
-        utils::quiet_err ifconfig -a | awk '/^[a-zA-Z]/ {print $1}' | grep -v 'lo' | sed 's/://'
+        names="$(utils::quiet_err ifconfig -a | awk '/^[a-zA-Z]/ {print $1}' | grep -v 'lo' | sed 's/://')"
     fi
+    local name
+    while IFS= read -r name; do
+        is::empty "${name}" && continue
+        format::record iface "${name}"
+        printf '\n'
+    done <<< "${names}" | format::emit "${BS_OUTPUT_FORMAT:-string}"
+}
+
+# @description Get the primary IPv4 address (of an interface, or the first
+# global one). / Получить основной IPv4-адрес (интерфейса или первый глобальный).
+# @description Output follows BS_OUTPUT_FORMAT (string default = bare address).
+# @param $1 [optional] Interface name / Имя интерфейса
+# @stdout address in the selected format / адрес в выбранном формате
+# @example
+#   system::network::ip            # 192.168.1.100
+#   system::network::ip eth0       # 192.168.1.100
+#   BS_OUTPUT_FORMAT=json system::network::ip eth0
+system::network::ip() {
+    local -r interface="${1:-}"
+    local ip=""
+    if utils::has ip; then
+        if is::not_empty "${interface}"; then
+            ip="$(utils::quiet_err ip -4 -o addr show dev "${interface}" 2>/dev/null \
+                | awk '{print $4}' | cut -d/ -f1 | head -n1)"
+        else
+            ip="$(utils::quiet_err ip -4 -o addr show scope global 2>/dev/null \
+                | awk '{print $4}' | cut -d/ -f1 | head -n1)"
+        fi
+    elif utils::has ifconfig; then
+        if is::not_empty "${interface}"; then
+            ip="$(utils::quiet_err ifconfig "${interface}" 2>/dev/null \
+                | awk '/inet /{print $2; exit}')"
+        fi
+    fi
+    if is::empty "${ip}"; then
+        log::warn "No IPv4 address found${interface:+ for ${interface}}"
+        return "${LIB_ERROR_FILE_NOT_FOUND}"
+    fi
+    format::record ip "${ip}" | format::emit "${BS_OUTPUT_FORMAT:-string}"
 }
 
 # @description Show network interface status / Показать статус сетевого интерфейса
