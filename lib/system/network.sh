@@ -224,15 +224,15 @@ system::network::status() {
     
     if is::not_empty "${interface}"; then
         if utils::has ip; then
-            utils::attempt ip addr show "${interface}"
+            utils::attempt ip addr show "${interface}" | format::emit_lines status
         else
-            utils::attempt ifconfig "${interface}"
+            utils::attempt ifconfig "${interface}" | format::emit_lines status
         fi
     else
         if utils::has ip; then
-            utils::attempt ip addr show
+            utils::attempt ip addr show | format::emit_lines status
         else
-            utils::attempt ifconfig
+            utils::attempt ifconfig | format::emit_lines status
         fi
     fi
 }

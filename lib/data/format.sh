@@ -72,6 +72,25 @@ format::record() {
     done
 }
 
+# @description Emit each non-empty input line as its own single-field record
+# (`key=<line>`), then render. Preserves the raw string view while giving
+# json/xml a list of values — for blob getters (raw command output).
+# @description Вывести каждую непустую входную строку отдельной однополевой
+# записью (`key=<line>`), затем отрендерить. Сохраняет сырой string-вид и даёт
+# json/xml список значений — для блоб-геттеров (сырой вывод команды).
+# @param $1 Field key / Ключ поля
+# @param $2 [optional] Format (default BS_OUTPUT_FORMAT) / Формат
+# @stdin lines / строки
+# @stdout rendered / отрендерено
+format::emit_lines() {
+    local -r key="${1:?key required}" fmt="${2:-${BS_OUTPUT_FORMAT:-string}}"
+    local line
+    while IFS= read -r line || is::not_empty "${line}"; do
+        is::empty "${line}" && continue
+        printf '%s=%s\n\n' "${key}" "${line}"
+    done | format::emit "${fmt}"
+}
+
 # @description Escape a string for JSON / Экранировать строку для JSON
 # @param $1 String / Строка
 # @stdout escaped / экранированная
