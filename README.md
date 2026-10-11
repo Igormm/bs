@@ -89,7 +89,7 @@ consistent code style and with zero external dependencies.
 
 load "lib/io/streams"
 
-io::streams::print "hello from BS ${BS_VERSION}"
+io::streams::print "hello from BS $(bs::version::get)"
 ```
 
 Запуск / Run: `./bs run examples/hello.sh`

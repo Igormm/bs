@@ -8,10 +8,20 @@
 # Режет видео ffmpeg, шлёт каждый фрагмент в /v1/chat/completions как base64
 # "video_url" и пишет ответы вместе со временем обработки каждого фрагмента.
 #
+# Everything about one video lives in the run directory <output>/<video name>/:
+# video.params (settings the run was started with), video.state (checkpoint),
+# video.txt (report), video.jsonl (answers with start_ms/end_ms) and the logs.
+# A rerun of the same command continues from the checkpoint.
+# Всё об одном видео лежит в каталоге прогона <output>/<имя видео>/:
+# video.params (параметры запуска), video.state (точка остановки), video.txt
+# (отчёт), video.jsonl (ответы со start_ms/end_ms) и журналы. Повторный запуск
+# той же команды продолжает с точки остановки.
+#
 # Usage / Использование:
 #   bs run examples/send_video.sh --file clip.mp4 --host llm.local
 #   bs run examples/send_video.sh --file clip.mp4 --suggest
-#   bs run examples/send_video.sh --file clip.mp4 --output result.txt
+#   bs run examples/send_video.sh --file clip.mp4 --output ~/results
+#   bs run examples/send_video.sh --file clip.mp4 --restart
 #   bs run examples/send_video.sh --help
 
 load "core/args"
@@ -20,6 +30,8 @@ load "core/errorhandler"
 load "core/logger"
 load "lib/io/streams"
 
+bs::source_relative "send_common.sh"
+
 # @global SEND_VIDEO_DEFAULT_HOST — constant (category: constant); server host
 # @global SEND_VIDEO_DEFAULT_HOST — константа (категория: constant); хост
 readonly SEND_VIDEO_DEFAULT_HOST="${SEND_VIDEO_HOST:-127.0.0.1}"
@@ -27,6 +39,10 @@ readonly SEND_VIDEO_DEFAULT_HOST="${SEND_VIDEO_HOST:-127.0.0.1}"
 # @global SEND_VIDEO_DEFAULT_PORT — constant (category: constant); server port
 # @global SEND_VIDEO_DEFAULT_PORT — константа (категория: constant); порт
 readonly SEND_VIDEO_DEFAULT_PORT="${SEND_VIDEO_PORT:-8000}"
+
+# @global SEND_VIDEO_DEFAULT_PROMPT — constant (category: constant); prompt
+# @global SEND_VIDEO_DEFAULT_PROMPT — константа (категория: constant); запрос
+readonly SEND_VIDEO_DEFAULT_PROMPT="Опиши, что происходит в этом видео."
 
 # @global SEND_VIDEO_SAFETY_PCT — constant (category: constant); limit share
 # @global SEND_VIDEO_SAFETY_PCT — константа (категория: constant); доля лимита
@@ -40,6 +56,20 @@ readonly SEND_VIDEO_PROBE_LIMIT=10
 # @global SEND_VIDEO_SPLIT_DEPTH — константа (категория: constant); деления
 readonly SEND_VIDEO_SPLIT_DEPTH=4
 
+# @global SEND_VIDEO_STAT_KEYS — constant (category: constant); saved counters
+# @global SEND_VIDEO_STAT_KEYS — константа (категория: constant); счётчики
+readonly -a SEND_VIDEO_STAT_KEYS=(done failed splits tokens model_ms)
+
+# @global SEND_VIDEO_PARAM_KEYS — constant (category: constant); params file
+# @global SEND_VIDEO_PARAM_KEYS — константа (категория: constant); параметры
+readonly -a SEND_VIDEO_PARAM_KEYS=(file file_size duration_ms base model
+  segment temperature max_tokens prompt_sha saved_at)
+
+# @global SEND_VIDEO_STATE_KEYS — constant (category: constant); checkpoint
+# @global SEND_VIDEO_STATE_KEYS — константа (категория: constant); остановка
+readonly -a SEND_VIDEO_STATE_KEYS=(status next_chunk chunks_total offset_ms
+  done failed splits tokens model_ms wall_ms updated_at)
+
 # @global __SEND_VIDEO_CFG — internal state (category: state); run settings
 # @global __SEND_VIDEO_CFG — внутреннее состояние (категория: state); настройки
 declare -gA __SEND_VIDEO_CFG=()
@@ -47,6 +77,14 @@ declare -gA __SEND_VIDEO_CFG=()
 # @global __SEND_VIDEO_STAT — internal state (category: state); counters
 # @global __SEND_VIDEO_STAT — внутреннее состояние (категория: state); счётчики
 declare -gA __SEND_VIDEO_STAT=()
+
+# @global __SEND_VIDEO_SAVED — internal state (category: state); loaded params
+# @global __SEND_VIDEO_SAVED — внутреннее состояние (категория: state); параметры
+declare -gA __SEND_VIDEO_SAVED=()
+
+# @global __SEND_VIDEO_STATE — internal state (category: state); checkpoint
+# @global __SEND_VIDEO_STATE — внутреннее состояние (категория: state); остановка
+declare -gA __SEND_VIDEO_STATE=()
 
 # ---------------------------------------------------------------------------
 # Logging and report / Логирование и отчёт
@@ -73,8 +111,10 @@ send_video::__log() {
   return 0
 }
 
-# @description Print a report line and append it to the --output file.
-# @description Вывести строку отчёта и дописать её в файл --output.
+# @description Print a report line and append it to the current report file
+#   (video.txt, or the buffer of the chunk being processed).
+# @description Вывести строку отчёта и дописать её в текущий файл отчёта
+#   (video.txt либо буфер обрабатываемого фрагмента).
 # @param $@ Text / Текст
 # @return 0
 send_video::__report() {
@@ -479,11 +519,16 @@ send_video::__process_chunk() {
   local -n __map_cfg=__SEND_VIDEO_CFG
   local -n __map_stat=__SEND_VIDEO_STAT
   local header reply
-  local -i rc=0 t_start elapsed
+  local -i rc=0 t_start elapsed chunk_ms=0 end_ms
 
+  if ! chunk_ms="$(send_video::__duration_ms "${chunk}")"; then
+    chunk_ms=0
+  fi
+  end_ms=$(( start_ms + chunk_ms ))
   if is::not_empty "${label}"; then
     header="=== Фрагмент ${label}"
-    header+=" ($(send_video::__timecode "${start_ms}")) ==="
+    header+=" ($(sendrun::timecode_ms "${start_ms}")"
+    header+=" – $(sendrun::timecode_ms "${end_ms}")) ==="
   else
     header="=== Ответ модели ==="
   fi
@@ -519,6 +564,13 @@ send_video::__process_chunk() {
     "токены: ${__map_stat[ptok]} → ${__map_stat[ctok]}"
   send_video::__report ""
   send_video::__report "${reply}"
+  # Machine-readable twin of the report: one object per answered piece
+  if is::not_empty "${__map_cfg[jsonl]:-}"; then
+    jq -cn --argjson start "${start_ms}" --argjson end "${end_ms}" \
+      --arg label "${label}" --arg text "${reply}" \
+      '{start_ms: $start, end_ms: $end, label: $label, text: $text}' \
+      >> "${__map_cfg[jsonl]}"
+  fi
   return 0
 }
 
@@ -637,7 +689,7 @@ send_video::__find_segment() {
 send_video::__check_deps() {
   local -a missing=()
   local -a specs=(curl jq base64:coreutils tr:coreutils mktemp:coreutils
-    wc:coreutils)
+    wc:coreutils sha256sum:coreutils)
   if [[ "${1:-no}" == "yes" ]]; then
     specs+=(ffmpeg ffprobe:ffmpeg)
   fi
@@ -718,12 +770,14 @@ send_video::__declare_flags() {
   args::flag segment-start value 15 number
   args::flag segment-max value 300 number
   args::flag suggest
-  args::flag output value
+  args::flag output value .
+  args::flag restart
+  args::flag keep-going
   args::flag host value "${SEND_VIDEO_DEFAULT_HOST}"
   args::flag port value "${SEND_VIDEO_DEFAULT_PORT}" number
   args::flag model value
   args::flag timeout value 600 number
-  args::flag prompt value "Опиши, что происходит в этом видео."
+  args::flag prompt value "${SEND_VIDEO_DEFAULT_PROMPT}"
   args::flag prompt-file value
   args::flag system value
   args::flag temperature value 0.7
@@ -742,7 +796,13 @@ send_video::__declare_flags() {
     "Верхний предел подбора при auto, сек / search cap"
   args::flag_describe suggest \
     "Только подобрать --segment и выйти / only find --segment"
-  args::flag_describe output "Файл отчёта: ответы, время, итоги / report"
+  args::flag_describe output \
+    "Где создать каталог прогона <имя видео>/ (отчёт, параметры, точка"\
+" остановки, журналы); по умолчанию здесь / run directory parent"
+  args::flag_describe restart \
+    "Начать заново: забыть параметры, точку остановки и отчёт / start over"
+  args::flag_describe keep-going \
+    "Не останавливаться на неудачном фрагменте, а идти дальше / keep going"
   args::flag_describe host "Хост сервера / server host"
   args::flag_describe port "Порт сервера / server port"
   args::flag_describe model "ID модели, по умолчанию первая с сервера"
@@ -755,7 +815,7 @@ send_video::__declare_flags() {
     "Лимит токенов ответа; auto = сколько позволит контекст"
   args::flag_describe log-level "Уровень журнала, по умолчанию TRACE"
   args::flag_describe log-file \
-    "Файл журнала (по умолчанию send_video_<время>.log здесь)"
+    "Файл журнала (по умолчанию send_video_<время>.log в каталоге прогона)"
   args::flag_describe xtrace "Трассировка bash (set -x) в журнал / xtrace"
   return 0
 }
@@ -770,9 +830,10 @@ send_video::__declare_flags() {
 send_video::__configure() {
   local -n __map_cfg=__SEND_VIDEO_CFG
   local prompt_file fd
+  local -i dir_rc=0
 
   __map_cfg[file]="$(send_video::__flag file)"
-  __map_cfg[output]="$(send_video::__flag output)"
+  __map_cfg[out_parent]="$(send_video::__flag output .)"
   __map_cfg[host]="$(send_video::__flag host "${SEND_VIDEO_DEFAULT_HOST}")"
   __map_cfg[port]="$(send_video::__flag port "${SEND_VIDEO_DEFAULT_PORT}")"
   __map_cfg[base]="http://${__map_cfg[host]}:${__map_cfg[port]}"
@@ -786,7 +847,8 @@ send_video::__configure() {
   __map_cfg[segment_max]="$(send_video::__flag segment-max 300)"
   __map_cfg[log_level]="$(send_video::__flag log-level TRACE)"
   __map_cfg[log_file]="$(send_video::__flag log-file)"
-  __map_cfg[prompt]="$(send_video::__flag prompt)"
+  __map_cfg[prompt]="$(send_video::__flag prompt \
+    "${SEND_VIDEO_DEFAULT_PROMPT}")"
   prompt_file="$(send_video::__flag prompt-file)"
 
   if is::empty "${__map_cfg[file]}"; then
@@ -825,10 +887,27 @@ send_video::__configure() {
   fi
   __map_cfg[ext]="${__map_cfg[file]##*.}"
 
+  # Run directory: looked up on every start, created only when missing
+  __map_cfg[run_dir]="$(sendrun::dir_for "${__map_cfg[out_parent]}" \
+    "${__map_cfg[file]}")"
+  sendrun::ensure_dir "${__map_cfg[run_dir]}" || dir_rc=$?
+  if (( dir_rc == 2 )); then
+    error::exit "Cannot use the run directory: ${__map_cfg[run_dir]}" \
+      "${LIB_ERROR_PERMISSION_DENIED}"
+  fi
+  __map_cfg[report]="${__map_cfg[run_dir]}/video.txt"
+  __map_cfg[results]="${__map_cfg[run_dir]}/video.jsonl"
+  __map_cfg[params]="${__map_cfg[run_dir]}/video.params"
+  __map_cfg[state]="${__map_cfg[run_dir]}/video.state"
+  __map_cfg[prompt_copy]="${__map_cfg[run_dir]}/video.prompt.txt"
+  # Nothing goes to the report until the run decides fresh start or resume
+  __map_cfg[output]=""
+  __map_cfg[jsonl]=""
+
   # Maximum log detail: TRACE on screen and in the file by default
   BS_LOG_LEVEL="${__map_cfg[log_level]}"
   if is::empty "${__map_cfg[log_file]}"; then
-    __map_cfg[log_file]="send_video_$(utils::stamp).log"
+    __map_cfg[log_file]="${__map_cfg[run_dir]}/send_video_$(utils::stamp).log"
   fi
   : > "${__map_cfg[log_file]}"
   if send_video::__flag_on xtrace; then
@@ -837,7 +916,158 @@ send_video::__configure() {
     PS4='+ ${BASH_SOURCE##*/}:${LINENO}: '
     set -x
   fi
+  if (( dir_rc == 0 )); then
+    send_video::__log info "run directory exists: ${__map_cfg[run_dir]}"
+  else
+    send_video::__log info "run directory created: ${__map_cfg[run_dir]}"
+  fi
   send_video::__log info "log file: ${__map_cfg[log_file]}"
+  return 0
+}
+
+# ---------------------------------------------------------------------------
+# Run directory: parameters and checkpoint / Параметры и точка остановки
+# ---------------------------------------------------------------------------
+
+# @description Save the settings this run works with to video.params.
+# @description Сохранить параметры, с которыми идёт прогон, в video.params.
+# @return 0 on success; exits if the file cannot be written
+send_video::__save_params() {
+  local -n __map_cfg=__SEND_VIDEO_CFG
+  local -A params=(
+    [file]="${__map_cfg[file_abs]}"
+    [file_size]="${__map_cfg[file_size]}"
+    [duration_ms]="${__map_cfg[duration_ms]:-0}"
+    [base]="${__map_cfg[base]}"
+    [model]="${__map_cfg[model]}"
+    [segment]="${__map_cfg[segment]}"
+    [temperature]="${__map_cfg[temperature]}"
+    [max_tokens]="${__map_cfg[max_tokens]:-auto}"
+    [prompt_sha]="${__map_cfg[prompt_sha]}"
+    [saved_at]="$(utils::log_stamp)"
+  )
+  if ! sendrun::kv_write "${__map_cfg[params]}" params \
+    "${SEND_VIDEO_PARAM_KEYS[@]}"; then
+    error::exit "Cannot write ${__map_cfg[params]}" "${E_ERROR}"
+  fi
+  io::streams::print "${__map_cfg[prompt]}" > "${__map_cfg[prompt_copy]}"
+  send_video::__log debug "parameters saved: ${__map_cfg[params]}"
+  return 0
+}
+
+# @description Save the checkpoint (position and counters) to video.state.
+# @description Сохранить точку остановки (позицию и счётчики) в video.state.
+# @param $1 Status: running|stopped|done / Статус
+# @return 0 on success; exits if the file cannot be written
+send_video::__save_state() {
+  local -n __map_cfg=__SEND_VIDEO_CFG
+  local -n __map_stat=__SEND_VIDEO_STAT
+  local -n __map_state=__SEND_VIDEO_STATE
+  local key
+  __map_state[status]="${1:?status required}"
+  for key in "${SEND_VIDEO_STAT_KEYS[@]}"; do
+    __map_state["${key}"]="${__map_stat[${key}]:-0}"
+  done
+  __map_state[updated_at]="$(utils::log_stamp)"
+  if ! sendrun::kv_write "${__map_cfg[state]}" __SEND_VIDEO_STATE \
+    "${SEND_VIDEO_STATE_KEYS[@]}"; then
+    error::exit "Cannot write ${__map_cfg[state]}" "${E_ERROR}"
+  fi
+  return 0
+}
+
+# @description Forget a previous run: parameters, checkpoint, report, results.
+#   Logs are kept.
+# @description Забыть прошлый прогон: параметры, точку остановки, отчёт и
+#   результаты. Журналы остаются.
+# @return 0
+send_video::__forget_run() {
+  local -n __map_cfg=__SEND_VIDEO_CFG
+  local -n __map_saved=__SEND_VIDEO_SAVED
+  local -n __map_state=__SEND_VIDEO_STATE
+  local key
+  for key in params state report results prompt_copy; do
+    utils::ignore rm -f -- "${__map_cfg[${key}]}"
+  done
+  __map_saved=()
+  __map_state=()
+  return 0
+}
+
+# @description Look at the run directory and decide: fresh start or resume.
+#   Sets cfg[resume] (yes|no) and, when the saved run is the same job, takes
+#   the chunk length found earlier instead of probing the server again.
+# @description Посмотреть в каталог прогона и решить: с нуля или продолжать.
+#   Ставит cfg[resume] (yes|no) и, если сохранённый прогон — та же задача,
+#   берёт найденную раньше длину фрагмента, не опрашивая сервер заново.
+# @return 0 on success; exits when the saved run conflicts with this one
+send_video::__load_run() {
+  local -n __map_cfg=__SEND_VIDEO_CFG
+  local -n __map_stat=__SEND_VIDEO_STAT
+  local -n __map_saved=__SEND_VIDEO_SAVED
+  local -n __map_state=__SEND_VIDEO_STATE
+  local key diff=""
+  local -i progress=0
+
+  __map_cfg[resume]=no
+  if send_video::__flag_on restart; then
+    send_video::__log warn "--restart: the previous run in" \
+      "${__map_cfg[run_dir]} is forgotten (logs are kept)"
+    send_video::__forget_run
+    return 0
+  fi
+  if ! sendrun::kv_read "${__map_cfg[params]}" __SEND_VIDEO_SAVED; then
+    send_video::__log info "no saved parameters: a fresh run"
+    send_video::__forget_run
+    return 0
+  fi
+  utils::ignore sendrun::kv_read "${__map_cfg[state]}" __SEND_VIDEO_STATE
+  if is::number "${__map_state[next_chunk]:-}"; then
+    progress="${__map_state[next_chunk]}"
+  fi
+
+  # The same job = the same file, model and prompt
+  for key in file file_size model prompt_sha; do
+    case "${key}" in
+      file) [[ "${__map_saved[file]:-}" == "${__map_cfg[file_abs]}" ]] ;;
+      *)    [[ "${__map_saved[${key}]:-}" == "${__map_cfg[${key}]}" ]] ;;
+    esac || diff+=" ${key}"
+  done
+  if is::number "${__map_cfg[segment]}" \
+    && is::number "${__map_saved[segment]:-}" \
+    && [[ "${__map_cfg[segment]}" != "${__map_saved[segment]}" ]]; then
+    diff+=" segment"
+  fi
+  if is::not_empty "${diff}"; then
+    if (( progress > 0 )) || [[ "${__map_state[status]:-}" == "done" ]]; then
+      error::exit "The run directory ${__map_cfg[run_dir]} holds another run\
+ (differs in:${diff}). Pass --restart to start over, or another --output." \
+        "${E_INVALID}"
+    fi
+    send_video::__log warn "saved parameters differ in:${diff};" \
+      "nothing was processed yet, starting fresh"
+    send_video::__forget_run
+    return 0
+  fi
+
+  if [[ "${__map_cfg[segment]}" == "auto" ]] \
+    && is::number "${__map_saved[segment]:-}"; then
+    __map_cfg[segment]="${__map_saved[segment]}"
+    send_video::__log success "chunk length ${__map_cfg[segment]} s taken" \
+      "from ${__map_cfg[params]} (no new probing)"
+  fi
+  if [[ "${__map_state[status]:-}" == "done" ]]; then
+    __map_cfg[resume]=done
+    return 0
+  fi
+  if (( progress > 0 )); then
+    __map_cfg[resume]=yes
+    for key in "${SEND_VIDEO_STAT_KEYS[@]}"; do
+      if is::number "${__map_state[${key}]:-}"; then
+        __map_stat["${key}"]="${__map_state[${key}]}"
+      fi
+    done
+  fi
   return 0
 }
 
@@ -946,8 +1176,12 @@ send_video::__summary() {
 send_video::main() {
   local -n __map_cfg=__SEND_VIDEO_CFG
   local -n __map_stat=__SEND_VIDEO_STAT
+  local -n __map_state=__SEND_VIDEO_STATE
   local -a chunks=()
+  local -A before=()
+  local key
   local -i t_run i dur_ms=0 total=0 offset_ms=0 chunk_ms segment
+  local -i first=0 wall_before=0
 
   # Decimal separators must not depend on the user's locale
   export LC_NUMERIC=C
@@ -964,8 +1198,22 @@ send_video::main() {
   fi
   __map_cfg[tmp]="$(mktemp -d "${TMPDIR:-/tmp}/send_video.XXXXXX")"
   cleanup::add send_video::__cleanup
-  send_video::__log_environment
   send_video::__connect
+
+  __map_cfg[file_abs]="$(sendrun::abs_path "${__map_cfg[file]}")"
+  __map_cfg[file_size]=$(( $(wc -c < "${__map_cfg[file]}") ))
+  __map_cfg[prompt_sha]="$(sendrun::hash \
+    "${__map_cfg[system]}"$'\n'"${__map_cfg[prompt]}")"
+  send_video::__load_run
+  send_video::__log_environment
+
+  if [[ "${__map_cfg[resume]}" == "done" ]] \
+    && ! send_video::__flag_on suggest; then
+    send_video::__log success "this video is already processed:" \
+      "${__map_cfg[report]}"
+    send_video::__log info "pass --restart to process it again"
+    bs::exit success
+  fi
 
   if [[ "${__map_cfg[segment]}" != "0" ]]; then
     if ! dur_ms="$(send_video::__duration_ms "${__map_cfg[file]}")"; then
@@ -974,6 +1222,7 @@ send_video::main() {
     total=$(( (dur_ms + 999) / 1000 ))
     send_video::__log info "video length: ${dur_ms} ms"
   fi
+  __map_cfg[duration_ms]="${dur_ms}"
 
   if [[ "${__map_cfg[segment]}" == "auto" ]]; then
     if ! send_video::__find_segment "${total}"; then
@@ -983,46 +1232,119 @@ send_video::main() {
     __map_cfg[segment]="${__map_stat[found]}"
     send_video::__log success \
       "chunk length found: ${__map_cfg[segment]} s (0 = the whole file)"
-    if send_video::__flag_on suggest; then
-      send_video::__log info \
-        "probe found: ${__map_cfg[segment]} s; --suggest only reports it," \
-        "the video transcription is not started"
-      send_video::__report "Используйте: --segment ${__map_cfg[segment]}"
-      bs::exit success
-    fi
-    send_video::__log info \
-      "probe found: ${__map_cfg[segment]} s — starting the video" \
-      "transcription now"
   fi
   segment="${__map_cfg[segment]}"
+  # The chunk length is known now: keep it so that a rerun does not probe
+  if [[ "${__map_cfg[resume]}" == "no" ]]; then
+    send_video::__save_params
+  fi
+  if send_video::__flag_on suggest; then
+    send_video::__log info \
+      "probe found: ${segment} s; --suggest only reports it," \
+      "the video transcription is not started"
+    io::streams::print "Используйте: --segment ${segment}"
+    io::streams::print "Сохранено в ${__map_cfg[params]}:" \
+      "следующий запуск возьмёт это значение сам"
+    bs::exit success
+  fi
+  send_video::__log info \
+    "probe found: ${segment} s — starting the video transcription now"
 
-  send_video::__report "# send_video: ${__map_cfg[file]}"
-  send_video::__report "# $(utils::log_stamp) | ${__map_cfg[base]} |" \
-    "${__map_cfg[model]}"
-  send_video::__report "# segment=${segment}" \
-    "temperature=${__map_cfg[temperature]}" \
-    "max-tokens=${__map_cfg[max_tokens]:-auto}"
-  if (( dur_ms > 0 )); then
-    send_video::__report "# Длина видео: $(send_video::__timecode "${dur_ms}")"
+  __map_cfg[output]="${__map_cfg[report]}"
+  if [[ "${__map_cfg[resume]}" == "yes" ]]; then
+    first="${__map_state[next_chunk]}"
+    offset_ms="${__map_state[offset_ms]:-0}"
+    wall_before="${__map_state[wall_ms]:-0}"
+    send_video::__log success "resuming from chunk $(( first + 1 ))" \
+      "($(sendrun::timecode_ms "${offset_ms}")), checkpoint" \
+      "${__map_cfg[state]}"
+    send_video::__report ""
+    send_video::__report "# Продолжение $(utils::log_stamp): с фрагмента" \
+      "$(( first + 1 )) ($(sendrun::timecode_ms "${offset_ms}"))"
+  else
+    : > "${__map_cfg[report]}"
+    : > "${__map_cfg[results]}"
+    send_video::__report "# send_video: ${__map_cfg[file_abs]}"
+    send_video::__report "# $(utils::log_stamp) | ${__map_cfg[base]} |" \
+      "${__map_cfg[model]}"
+    send_video::__report "# segment=${segment}" \
+      "temperature=${__map_cfg[temperature]}" \
+      "max-tokens=${__map_cfg[max_tokens]:-auto}"
+    if (( dur_ms > 0 )); then
+      send_video::__report "# Длина видео: $(sendrun::timecode_ms "${dur_ms}")"
+    fi
   fi
 
   send_video::__make_chunks chunks "${segment}"
+  __map_state[chunks_total]="${#chunks[@]}"
+  __map_state[next_chunk]="${first}"
+  __map_state[offset_ms]="${offset_ms}"
+  __map_state[wall_ms]="${wall_before}"
+  send_video::__save_state running
+
   for (( i = 0; i < ${#chunks[@]}; i++ )); do
-    if (( segment == 0 )); then
-      send_video::__process_chunk "${chunks[i]}" 0 "" 0
+    if (( i < first )); then
+      utils::ignore rm -f "${chunks[i]}"
       continue
     fi
-    send_video::__process_chunk "${chunks[i]}" "${offset_ms}" \
-      "$(( i + 1 ))/${#chunks[@]}" 0
-    if chunk_ms="$(send_video::__duration_ms "${chunks[i]}")"; then
-      offset_ms=$(( offset_ms + chunk_ms ))
+    # A chunk is written to buffers first: the report and the results get it
+    # only as a whole, so an interrupted chunk leaves no half-written entry
+    __map_cfg[output]="${__map_cfg[tmp]}/chunk.txt"
+    __map_cfg[jsonl]="${__map_cfg[tmp]}/chunk.jsonl"
+    : > "${__map_cfg[output]}"
+    : > "${__map_cfg[jsonl]}"
+    for key in "${SEND_VIDEO_STAT_KEYS[@]}"; do
+      before["${key}"]="${__map_stat[${key}]:-0}"
+    done
+
+    if (( segment == 0 )); then
+      send_video::__process_chunk "${chunks[i]}" 0 "" 0
     else
-      offset_ms=$(( offset_ms + segment * 1000 ))
+      send_video::__process_chunk "${chunks[i]}" "${offset_ms}" \
+        "$(( i + 1 ))/${#chunks[@]}" 0
     fi
-    utils::ignore rm -f "${chunks[i]}"
+
+    if (( ${__map_stat[failed]:-0} > before[failed] )) \
+      && ! send_video::__flag_on keep-going; then
+      # Stop here: the checkpoint still points at this chunk
+      for key in "${SEND_VIDEO_STAT_KEYS[@]}"; do
+        __map_stat["${key}"]="${before[${key}]}"
+      done
+      __map_cfg[output]=""
+      __map_cfg[jsonl]=""
+      __map_state[wall_ms]=$(( wall_before + $(utils::now_ms) - t_run ))
+      send_video::__save_state stopped
+      send_video::__log error "chunk $(( i + 1 ))/${#chunks[@]} failed —" \
+        "stopped; $(( i )) of ${#chunks[@]} chunks are done"
+      send_video::__log info "rerun the same command to continue from chunk" \
+        "$(( i + 1 )); --keep-going skips failed chunks instead"
+      send_video::__log info "log file: ${__map_cfg[log_file]}"
+      bs::exit "${E_ERROR}"
+    fi
+
+    cat -- "${__map_cfg[tmp]}/chunk.txt" >> "${__map_cfg[report]}"
+    cat -- "${__map_cfg[tmp]}/chunk.jsonl" >> "${__map_cfg[results]}"
+    if (( segment != 0 )); then
+      if chunk_ms="$(send_video::__duration_ms "${chunks[i]}")"; then
+        offset_ms=$(( offset_ms + chunk_ms ))
+      else
+        offset_ms=$(( offset_ms + segment * 1000 ))
+      fi
+      utils::ignore rm -f "${chunks[i]}"
+    fi
+    __map_state[next_chunk]=$(( i + 1 ))
+    __map_state[offset_ms]="${offset_ms}"
+    __map_state[wall_ms]=$(( wall_before + $(utils::now_ms) - t_run ))
+    send_video::__save_state running
   done
 
-  send_video::__summary "${dur_ms}" "$(( $(utils::now_ms) - t_run ))"
+  __map_cfg[output]="${__map_cfg[report]}"
+  __map_cfg[jsonl]=""
+  send_video::__summary "${dur_ms}" \
+    "$(( wall_before + $(utils::now_ms) - t_run ))"
+  send_video::__save_state done
+  send_video::__log info "report: ${__map_cfg[report]}"
+  send_video::__log info "results: ${__map_cfg[results]}"
   send_video::__log info "log file: ${__map_cfg[log_file]}"
   if (( ${__map_stat[failed]:-0} > 0 )); then
     bs::exit "${E_ERROR}"
