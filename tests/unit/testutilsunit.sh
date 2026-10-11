@@ -60,6 +60,13 @@ test_time_primitives() {
     ms="$(utils::now_ms)"
     testframework::assert_true "'${ms}' =~ ^[0-9]+$" "utils::now_ms returns epoch milliseconds"
     testframework::assert_true "${#ms} -gt ${#s}" "utils::now_ms has more digits than now_s"
+    testframework::assert_equal "13" "${#ms}" "utils::now_ms is 13 digits"
+    # Без GNU date (%3N печатается буквально) значение остаётся числом
+    # Without GNU date (%3N printed literally) the value stays numeric
+    ms="$(date() { if [[ "$1" == *N ]]; then printf '1791741410N\n'; else printf '1791741410\n'; fi; }; EPOCHREALTIME='' utils::now_ms)"
+    testframework::assert_equal "1791741410000" "${ms}" "utils::now_ms survives a date without %3N"
+    ms="$(LC_ALL=ru_RU.UTF-8 utils::now_ms)"
+    testframework::assert_true "'${ms}' =~ ^[0-9]+$" "utils::now_ms ignores the locale decimal separator"
 
     fl="$(utils::now_float)"
     testframework::assert_true "'${fl}' =~ ^[0-9]+\.[0-9]+$" "utils::now_float returns seconds with fraction"

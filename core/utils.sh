@@ -205,7 +205,26 @@ utils::now_s() {
 # @description Текущее время в миллисекундах (epoch).
 # @stdout миллисекунды с начала эпохи
 utils::now_ms() {
-  date +%s%3N
+  # bash 5+: EPOCHREALTIME = секунды<разделитель>микросекунды, разделитель
+  # зависит от локали (точка или запятая) — берём только цифры.
+  # bash 5+: EPOCHREALTIME = seconds<separator>microseconds, the separator
+  # is locale-dependent (dot or comma) — keep the digits only.
+  local now="${EPOCHREALTIME:-}"
+  now="${now//[!0-9]/}"
+  if (( ${#now} > 6 )); then
+    printf '%s\n' "${now:0:${#now}-3}"
+    return 0
+  fi
+  # %3N — расширение GNU date; другие date (BSD, busybox) печатают его
+  # буквально («...3N» или «...N»), поэтому вывод проверяется.
+  # %3N is a GNU date extension; other dates (BSD, busybox) print it
+  # literally ("...3N" or "...N"), so the output is validated.
+  now="$(date +%s%3N 2>/dev/null)" || now=""
+  if [[ "${now}" =~ ^[0-9]+$ ]]; then
+    printf '%s\n' "${now}"
+  else
+    printf '%s000\n' "$(date +%s)"
+  fi
 }
 
 # Текущее время в секундах с дробной частью (для интервалов через bc/awk).
