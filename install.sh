@@ -59,6 +59,13 @@ if [[ ! -f "${SCRIPT_DIR}/bootstrap/init.sh" ]]; then
   exit 1
 fi
 
+# PATH запустившей оболочки: bootstrap ниже сам добавляет ~/.local/bin,
+# а подсказке про PATH нужен исходный.
+# PATH of the calling shell: the bootstrap below prepends ~/.local/bin
+# itself, while the PATH hint needs the original one.
+# shellcheck disable=SC2034  # read by install/path_manager.sh
+INSTALL_ORIG_PATH="${PATH}"
+
 BS_SILENT=1
 # shellcheck disable=SC1090
 if ! source -- "${SCRIPT_DIR}/bootstrap/init.sh"; then

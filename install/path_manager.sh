@@ -125,4 +125,34 @@ auto_update_path() {
       printf "PATH уже настроен в %s\n" "${zshrc}"
     fi
   fi
+
+  # Установщик — дочерний процесс и не может изменить PATH запустившей его
+  # оболочки: rc-файл подхватит только новый терминал. Подсказываем команду
+  # для текущего.
+  # The installer is a child process and cannot change the PATH of the shell
+  # that started it: only a new terminal reads the rc file. Hint the command
+  # for the current one.
+  if [[ ":${INSTALL_ORIG_PATH:-${PATH}}:" != *":${BIN_DIR}:"* ]]; then
+    local shell_name="${SHELL##*/}"
+    local rc_hint="${bashrc}"
+    [[ "${shell_name}" == "zsh" ]] && is::file "${zshrc}" && rc_hint="${zshrc}"
+
+    # В терминале применяем сами: заменяем установщик новой оболочкой
+    # пользователя — она читает rc-файл, как при source. Сделать source в
+    # уже запущенной оболочке дочерний процесс не может.
+    # In a terminal apply it ourselves: replace the installer with a fresh
+    # user shell — it reads the rc file, just like source would. A child
+    # process cannot source into the shell that is already running.
+    if [[ -t 0 && -t 1 && -x "${SHELL:-}" && ( "${shell_name}" == "zsh" || "${shell_name}" == "bash" ) ]]; then
+      log::header "PATH ПРИМЕНЁН / PATH APPLIED"
+      log::success "выполнено: source ${rc_hint} — запущена новая оболочка ${shell_name}, bs доступен"
+      log::success "done: source ${rc_hint} — a fresh ${shell_name} is started, bs is available"
+      log::info "exit — вернуться в прежнюю оболочку / back to the previous shell"
+      exec "${SHELL}"
+    fi
+
+    printf "\nВ ЭТОМ терминале bs появится после / In THIS terminal run:\n"
+    printf "  source %s\n" "${rc_hint}"
+    printf "или откройте новый терминал / or open a new terminal.\n"
+  fi
 }
