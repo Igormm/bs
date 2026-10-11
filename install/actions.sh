@@ -33,6 +33,8 @@ do_install() {
   if [[ "${MODE}" == "system" ]]; then
     if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
       printf "ERROR: Нужны права root. Запустите: sudo ./install.sh\n" >&2
+      printf "       Или установите без root, в ~/.local: ./install.sh --local\n\n" >&2
+      usage >&2
       exit 1
     fi
   fi

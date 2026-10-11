@@ -352,6 +352,7 @@ test_system_mode_requires_root() {
     out="$(run_installer "${iso}")" || rc=$?
     testframework::assert_equal "1" "${rc}" "system install without root exits 1"
     testframework::assert_true "'${out}' =~ Нужны\ права\ root" "system mode asks for root"
+    testframework::assert_true "'${out}' =~ install.sh\ --local" "system mode without root shows the usage"
 }
 
 main() {
