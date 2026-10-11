@@ -36,6 +36,10 @@ test_update_basic() {
     testframework::assert_command "test -f '${target}/bootstrap/init.sh'" "bs update copies bootstrap"
     testframework::assert_equal "new_func() { :; }" "$(cat "${target}/core/new.sh")" "bs update copies content"
 
+    # Манифест: update записывает, откуда обновлено / manifest records the source
+    testframework::assert_command "grep -qx 'updated_from=${src}' '${target}/.install'" "bs update records the source in the manifest"
+    testframework::assert_command "grep -qx 'mode=custom' '${target}/.install'" "bs update creates a manifest for an old install"
+
     # Повторный update — идемпотентность / Second update is idempotent
     bash "${BS_PROJECT_ROOT}/bs" update --lib "${target}" --from "${src}" >/dev/null 2>&1
     testframework::assert_equal "0" "$?" "bs update idempotent"
@@ -65,6 +69,31 @@ test_update_autodetect() {
     HOME="${tmp_dir}/home" PATH="${tmp_dir}/bin:${PATH}" \
         bash "${BS_PROJECT_ROOT}/bs" update --from "${src}" >/dev/null 2>&1 </dev/null || true
     testframework::assert_command "test -f '${target}/core/new.sh'" "bs update detects the install behind the PATH wrapper"
+
+    rm -rf "${tmp_dir}"
+}
+
+# bs uninstall из самой установленной копии удаляет её; чекаут не трогает
+# bs uninstall run from the installed copy removes it; a checkout is kept
+test_uninstall_self() {
+    local tmp_dir lib_dir checkout
+    tmp_dir="$(mktemp -d)"
+    lib_dir="${tmp_dir}/prefix/lib/bs"
+    checkout="${tmp_dir}/checkout"
+
+    mkdir -p "${lib_dir}" "${tmp_dir}/prefix/bin" "${checkout}/tests"
+    cp -a "${BS_PROJECT_ROOT}/bootstrap" "${BS_PROJECT_ROOT}/core" "${BS_PROJECT_ROOT}/lib" "${BS_PROJECT_ROOT}/bs" "${lib_dir}/"
+    cp -a "${BS_PROJECT_ROOT}/bootstrap" "${BS_PROJECT_ROOT}/bs" "${checkout}/"
+    printf '#!/usr/bin/env bash\nexport BS_ROOT="%s"\nexec "${BS_ROOT}/bs" "$@"\n' "${lib_dir}" > "${tmp_dir}/prefix/bin/bs"
+    chmod +x "${tmp_dir}/prefix/bin/bs"
+
+    testframework::assert_false "'${tmp_dir}/prefix/bin/bs' uninstall --lib '${checkout}'" "bs uninstall refuses a source checkout"
+    testframework::assert_command "test -f '${checkout}/bs'" "source checkout is left intact"
+
+    "${tmp_dir}/prefix/bin/bs" uninstall --lib "${lib_dir}" >/dev/null 2>&1
+    testframework::assert_equal "0" "$?" "bs uninstall from the installed copy exits 0"
+    testframework::assert_command "test ! -e '${lib_dir}'" "bs uninstall removes the copy it runs from"
+    testframework::assert_command "test ! -e '${tmp_dir}/prefix/bin/bs'" "bs uninstall removes the wrapper"
 
     rm -rf "${tmp_dir}"
 }
@@ -160,6 +189,9 @@ main() {
 
     testframework::section "Autodetect / Автодетект"
     test_update_autodetect
+
+    testframework::section "Uninstall / Удаление"
+    test_uninstall_self
 
     testframework::section "Errors / Ошибки"
     test_update_errors

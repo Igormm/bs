@@ -3,6 +3,7 @@
 ## [0.6.0] - 2026-09-28
 
 ### Added
+- install: install manifest <lib>/.install (mode, prefix, lib, bin, version, source, source repo/commit, date, user) written by install.sh; bs update refreshes it (updated_at/updated_from/updated_commit) and creates one for installs made by an older installer; bs env prints it; bs uninstall takes the wrapper path from it
 - cli: bs update — target autodetect also covers the installed copy bs runs from and the install behind the `bs` wrapper in PATH (custom --lib); a root-owned install is updated through sudo when run in a terminal; the up-to-date check now runs before the writability check
 - cli: bs update --github [--repo URL] [--ref REF] — update installed copies straight from GitHub (shallow clone, tarball fallback); an installed copy with no repo around falls back to GitHub automatically; a local checkout is compared with the remote (ls-remote) — when it lacks new code bs warns and asks which source to use, and warns about unpushed/uncommitted local changes when installing from GitHub
 - agents: import 14 engineering skills from alirezarezvani/claude-skills (MIT); apply — security audit of skills, CHANGELOG.md, PR review, persona review of lib/tui/app
@@ -27,6 +28,7 @@
 - agents: systematize AI workspace — ai/ → .agents/{skills,prompts,guides}; webserver-analysis → .art; fix all references (AGENTS.md, docs, skills); add .agents/README
 
 ### Fixed
+- cli: bs uninstall refused to remove the install it was started from ("refusing to remove the BS source checkout") — the guard compared the target with BS_ROOT; a checkout is now recognised by .git or tests/
 - lib/tui: app.sh — warn on unknown window/button ids, bind args via record separator, reset → private __reset; 3 new tests
 
 <!-- recommended-semver-bump: minor -->

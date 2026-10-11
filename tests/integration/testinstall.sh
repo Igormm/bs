@@ -77,6 +77,15 @@ test_local_install() {
         testframework::assert_true "false" "wrapper exports BS_ROOT"
     fi
 
+    # Манифест установки: как и куда поставлена копия / install manifest
+    testframework::assert_file_exists "${lib}/.install" "install manifest written"
+    testframework::assert_command "grep -qx 'mode=local' '${lib}/.install'" "manifest records the install mode"
+    testframework::assert_command "grep -qx 'lib=${lib}' '${lib}/.install'" "manifest records the lib directory"
+    testframework::assert_command "grep -qx 'bin=${bin}' '${lib}/.install'" "manifest records the wrapper path"
+    local env_out
+    env_out="$(env HOME="${iso}" "${bin}" env)"
+    testframework::assert_true "'${env_out}' =~ mode=local" "bs env shows the install manifest"
+
     local version_out
     version_out="$(env HOME="${iso}" "${bin}" version)"
     # Версия берётся из core/version.sh (единственный источник BS_VERSION), а не хардкодится

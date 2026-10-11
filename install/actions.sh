@@ -2,6 +2,31 @@
 
 # Installation and uninstallation functions
 
+# Записать манифест установки: как, откуда и куда поставлена эта копия BS.
+# Его читают `bs env`, `bs update` и `bs uninstall`.
+# Write the install manifest: how, from where and where this BS copy was
+# installed. Read by `bs env`, `bs update` and `bs uninstall`.
+write_install_manifest() {
+  local commit="" repo=""
+  if utils::has git && [[ -e "${SOURCE_ROOT}/.git" ]]; then
+    commit="$(git -C "${SOURCE_ROOT}" rev-parse HEAD 2>/dev/null)" || commit=""
+    repo="$(git -C "${SOURCE_ROOT}" remote get-url origin 2>/dev/null)" || repo=""
+  fi
+  {
+    printf '# BS install manifest — written by install.sh, updated by bs update\n'
+    printf 'mode=%s\n' "${MODE}"
+    printf 'prefix=%s\n' "${PREFIX}"
+    printf 'lib=%s\n' "${TARGET_LIB}"
+    printf 'bin=%s\n' "${TARGET_BIN}"
+    printf 'version=%s\n' "${BS_VERSION:-unknown}"
+    printf 'source=%s\n' "${SOURCE_ROOT}"
+    printf 'source_repo=%s\n' "${repo}"
+    printf 'source_commit=%s\n' "${commit}"
+    printf 'installed_at=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')"
+    printf 'installed_by=%s\n' "${SUDO_USER:-${USER:-$(id -un)}}"
+  } > "${TARGET_LIB}/.install"
+}
+
 # Install
 do_install() {
   # Root required for system mode
@@ -47,6 +72,8 @@ export BS_ROOT="${TARGET_LIB}"
 exec "\${BS_ROOT}/bs" "\$@"
 WRAP
   chmod 0755 "${TARGET_BIN}"
+
+  write_install_manifest
 
   printf "Готово.\n"
 

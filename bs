@@ -107,7 +107,39 @@ HELP
 }
 
 version() { bs::version::print; }
-env_cmd() { printf 'BS_ROOT=%s\nPATH=%s\n' "$BS_ROOT" "$PATH"; }
+# @private Значение ключа из манифеста установки (<lib>/.install, key=value).
+# @private Value of a key from the install manifest (<lib>/.install, key=value).
+# @param $1 Install directory / Каталог установки
+# @param $2 Key / Ключ
+install_info_get() {
+  local -r file="$1/.install" key="$2"
+  local line
+  [[ -f "${file}" ]] || return 0
+  while IFS= read -r line; do
+    if [[ "${line}" == "${key}="* ]]; then
+      printf '%s\n' "${line#*=}"
+      return 0
+    fi
+  done < "${file}"
+  return 0
+}
+
+env_cmd() {
+  printf 'BS_ROOT=%s\nPATH=%s\n' "$BS_ROOT" "$PATH"
+  # Как установлена эта копия (манифест пишет install.sh)
+  # How this copy was installed (the manifest is written by install.sh)
+  if [[ -f "${BS_ROOT}/.install" ]]; then
+    printf '\nInstall manifest (%s):\n' "${BS_ROOT}/.install"
+    local line
+    while IFS= read -r line; do
+      [[ -z "${line}" || "${line}" == '#'* ]] || printf '  %s\n' "${line}"
+    done < "${BS_ROOT}/.install"
+  elif is::dir "${BS_ROOT}/tests"; then
+    printf '\nInstall: source checkout (not installed) / исходный репозиторий\n'
+  else
+    printf '\nInstall: no manifest (installed by an older installer) / манифеста нет\n'
+  fi
+}
 
 list_cmd() {
   echo 'Available modules:'
@@ -826,6 +858,49 @@ update_wrapper_root() {
   return 0
 }
 
+# @private Обновить манифест установки после update: дата, источник, коммит.
+# Для установки без манифеста (старый установщик) он создаётся: режим и
+# обёртка выводятся из пути.
+# @private Refresh the install manifest after an update: date, source,
+# commit. An install without a manifest (older installer) gets one: mode and
+# wrapper are derived from the path.
+# @param $1 Install directory / Каталог установки
+# @param $2 Source directory / Каталог-источник
+# @param $3 Source label (path or URL@ref) / Метка источника
+# @param $@ Optional command prefix (sudo) / Необязательный префикс (sudo)
+update_manifest() {
+  local -r target="$1" from="$2" label="$3"
+  shift 3
+  local -r file="${target}/.install"
+  local content="" line commit=""
+  if [[ -f "${file}" ]]; then
+    while IFS= read -r line; do
+      case "${line}" in
+        version=*|updated_at=*|updated_from=*|updated_commit=*) ;;
+        *) content+="${line}"$'\n' ;;
+      esac
+    done < "${file}"
+  else
+    local mode="custom"
+    [[ "${target}" == "${HOME}/.local/lib/bs" ]] && mode="local"
+    [[ "${target}" == "/usr/local/lib/bs" ]] && mode="system"
+    content+="# BS install manifest — written by install.sh, updated by bs update"$'\n'
+    content+="mode=${mode}"$'\n'
+    content+="prefix=${target%/lib/bs}"$'\n'
+    content+="lib=${target}"$'\n'
+    content+="bin=${target%/lib/bs}/bin/bs"$'\n'
+  fi
+  if utils::has git && [[ -e "${from}/.git" ]]; then
+    commit="$(git -C "${from}" rev-parse HEAD 2>/dev/null)" || commit=""
+  fi
+  content+="version=${BS_VERSION:-unknown}"$'\n'
+  content+="updated_at=$(date '+%Y-%m-%d %H:%M:%S')"$'\n'
+  content+="updated_from=${label}"$'\n'
+  content+="updated_commit=${commit}"$'\n'
+  printf '%s' "${content}" | "$@" tee -- "${file}" >/dev/null \
+    || log::warn "update: cannot write the install manifest: ${file}"
+}
+
 update_cmd() {
   local from="${BS_ROOT}"
   local from_explicit=0
@@ -1060,6 +1135,7 @@ update_cmd() {
     "${as_root[@]}" rm -rf -- "${target}/core" && "${as_root[@]}" mv -f -- "${tmp_dir}/core" "${target}/core"
     "${as_root[@]}" rm -rf -- "${target}/lib" && "${as_root[@]}" mv -f -- "${tmp_dir}/lib" "${target}/lib"
     "${as_root[@]}" rmdir -- "${tmp_dir}" 2>/dev/null || true
+    update_manifest "${target}" "${from}" "${source_label}" "${as_root[@]}"
     ok=1
     if (( verbose == 1 )); then
       log::info "  files: $(find "${from}/core" "${from}/lib" -name '*.sh' | wc -l) modules copied"
@@ -1175,9 +1251,13 @@ uninstall_cmd() {
       log::warn "uninstall: not a BS install, skipping: ${target}"
       continue
     fi
-    # Никогда не удалять исходный чекаут/рабочий BS_ROOT
-    # Never remove the source checkout or the running BS_ROOT
-    if [[ "${target}" == "${BS_ROOT}" || -d "${target}/.git" ]]; then
+    # Никогда не удалять исходный чекаут: у него есть .git или tests/, у
+    # установленной копии их нет. Сравнивать с BS_ROOT нельзя — у bs,
+    # запущенного из установки, BS_ROOT и есть эта установка.
+    # Never remove the source checkout: it has .git or tests/, an installed
+    # copy has neither. Comparing with BS_ROOT is wrong — for a bs started
+    # from an install, BS_ROOT is that very install.
+    if [[ -e "${target}/.git" || -d "${target}/tests" ]]; then
       log::warn "uninstall: refusing to remove the BS source checkout: ${target}"
       continue
     fi
@@ -1187,8 +1267,11 @@ uninstall_cmd() {
     fi
 
     local bin_dir wrapper
-    bin_dir="${target%/lib/bs}/bin"
-    wrapper="${bin_dir}/bs"
+    # Обёртка — из манифеста установки, иначе выводится из пути
+    # The wrapper comes from the install manifest, else derived from the path
+    wrapper="$(install_info_get "${target}" bin)"
+    [[ -n "${wrapper}" ]] || wrapper="${target%/lib/bs}/bin/bs"
+    bin_dir="${wrapper%/*}"
     log::info "uninstalling ${target}"
     # Wrapper удаляется только если указывает на этот target
     # Wrapper is removed only when it points back at this install
@@ -1202,12 +1285,12 @@ uninstall_cmd() {
     fi
 
     # rm -rf на защищённый target безопасен: выше уже проверено, что это
-    # настоящая BS-установка (bs + bootstrap/init.sh), не чекаут (без .git,
-    # не BS_ROOT) и записываемый. Файл с именем /x/lib/bs не пройдёт
+    # настоящая BS-установка (bs + bootstrap/init.sh), не чекаут (без .git
+    # и tests/) и записываемый. Файл с именем /x/lib/bs не пройдёт
     # проверку -f "${target}/bs" и будет пропущен.
     # rm -rf on the guarded target is safe: checks above already proved it is
     # a real BS install (bs + bootstrap/init.sh), not a checkout (no .git,
-    # not BS_ROOT) and is writable. A *file* named /x/lib/bs fails the
+    # no tests/) and is writable. A *file* named /x/lib/bs fails the
     # -f "${target}/bs" test and is skipped.
     rm -rf -- "${target}"
     if (( verbose == 1 )); then
