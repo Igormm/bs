@@ -1,661 +1,1016 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# examples/send_video.sh — describe a video with a vLLM vision model
+# examples/send_video.sh — описание видео моделью vLLM по фрагментам
 #
-# send_video.sh - отправка видео на локальный vLLM-сервер и получение ответа модели.
-# Длинные видео режутся на фрагменты (ffmpeg) и отправляются по одному.
-# Время обработки каждого фрагмента и итоговая статистика пишутся в текст.
+# Cuts the video with ffmpeg, sends every chunk to /v1/chat/completions as a
+# base64 "video_url" item and writes the answers with per-chunk timings.
+# Режет видео ffmpeg, шлёт каждый фрагмент в /v1/chat/completions как base64
+# "video_url" и пишет ответы вместе со временем обработки каждого фрагмента.
 #
-# Видео кодируется в base64 и уходит в /v1/chat/completions как content-блок
-# "video_url" (data URI). Нужна мультимодальная (VLM) модель с поддержкой видео.
-#
-# Параметры (все описаны в --help):
-#   Файл:      --file, --segment (число или auto), --suggest, --output
-#   Сервер:    --host, --port, --model, --context, --timeout
-#   Промпт:    --prompt, --prompt-file, --system, --temperature, --max-tokens
-#
-# Значения по умолчанию можно менять переменными окружения:
-#   VIDEO_SERVER_HOST (по умолчанию 192.168.1.83), VIDEO_SERVER_PORT (8000)
-#
-# Автоподбор длины фрагмента (--segment auto): скрипт отправляет короткую пробу
-# (~10 с видео), читает из ответа сервера реальное число токенов (usage) и
-# считает, сколько секунд видео помещается в контекст модели с запасом.
-#
-# Если сервер отклоняет фрагмент как слишком большой (HTTP 400: превышен кеш
-# энкодера или контекст), скрипт разбирает число токенов и лимит из текста ошибки,
-# делит фрагмент на нужное число частей (ffmpeg, с перекодированием) и обрабатывает
-# каждую часть. Это работает и при ручном --segment.
-#
-# Нарезка выполняется там, где запущен скрипт. Если видео лежит на сервере,
-# запускайте скрипт на нём с --host 127.0.0.1: тогда по сети ничего не идёт.
-#
-# Примеры:
-#   ./bs run send_video.sh --file ~/clip.mp4
-#   ./bs run send_video.sh --file ~/long.mp4 --suggest
-#   ./bs run send_video.sh --file ~/long.mp4 --segment auto --output ~/result.txt
-#   ./bs run send_video.sh --file ~/long.mp4 --segment 15 --output ~/result.txt
-#
-# Зависимости (проверяются при запуске, недостающие выводятся списком с командой
-# установки): bash 4.4+, curl, jq 1.6+, awk, base64, tr, mktemp, date;
-# ffmpeg и ffprobe - только для --segment/--suggest. Работает на Linux и macOS
-# (на macOS нужен bash из Homebrew: brew install bash).
+# Usage / Использование:
+#   bs run examples/send_video.sh --file clip.mp4 --host llm.local
+#   bs run examples/send_video.sh --file clip.mp4 --suggest
+#   bs run examples/send_video.sh --file clip.mp4 --output result.txt
+#   bs run examples/send_video.sh --help
 
 load "core/args"
+load "core/deps"
+load "core/errorhandler"
+load "core/logger"
 load "lib/io/streams"
 
-# Вывод ошибки в stderr и выход
-send_video::die() {
-    io::streams::print "ERROR: $*" >&2
-    exit 1
+# @global SEND_VIDEO_DEFAULT_HOST — constant (category: constant); server host
+# @global SEND_VIDEO_DEFAULT_HOST — константа (категория: constant); хост
+readonly SEND_VIDEO_DEFAULT_HOST="${SEND_VIDEO_HOST:-127.0.0.1}"
+
+# @global SEND_VIDEO_DEFAULT_PORT — constant (category: constant); server port
+# @global SEND_VIDEO_DEFAULT_PORT — константа (категория: constant); порт
+readonly SEND_VIDEO_DEFAULT_PORT="${SEND_VIDEO_PORT:-8000}"
+
+# @global SEND_VIDEO_SAFETY_PCT — constant (category: constant); limit share
+# @global SEND_VIDEO_SAFETY_PCT — константа (категория: constant); доля лимита
+readonly SEND_VIDEO_SAFETY_PCT=85
+
+# @global SEND_VIDEO_PROBE_LIMIT — constant (category: constant); max probes
+# @global SEND_VIDEO_PROBE_LIMIT — константа (категория: constant); число проб
+readonly SEND_VIDEO_PROBE_LIMIT=10
+
+# @global SEND_VIDEO_SPLIT_DEPTH — constant (category: constant); max re-splits
+# @global SEND_VIDEO_SPLIT_DEPTH — константа (категория: constant); деления
+readonly SEND_VIDEO_SPLIT_DEPTH=4
+
+# @global __SEND_VIDEO_CFG — internal state (category: state); run settings
+# @global __SEND_VIDEO_CFG — внутреннее состояние (категория: state); настройки
+declare -gA __SEND_VIDEO_CFG=()
+
+# @global __SEND_VIDEO_STAT — internal state (category: state); counters
+# @global __SEND_VIDEO_STAT — внутреннее состояние (категория: state); счётчики
+declare -gA __SEND_VIDEO_STAT=()
+
+# ---------------------------------------------------------------------------
+# Logging and report / Логирование и отчёт
+# ---------------------------------------------------------------------------
+
+# @description Log a message on screen and append it to the log file.
+# @description Записать сообщение на экран и дописать его в файл журнала.
+# @param $1 Level: trace|debug|info|success|warn|error / Уровень
+# @param $@ Message / Сообщение
+# @return 0
+send_video::__log() {
+  local -r level="${1:?level required}"
+  shift
+  # "$*" joins with the first IFS char; bs run sets IFS to newline/tab
+  local IFS=' '
+  local -n __map_cfg=__SEND_VIDEO_CFG
+  local -r log_file="${__map_cfg[log_file]:-}"
+  local -r msg="$*"
+  if is::not_empty "${log_file}"; then
+    io::streams::print \
+      "$(utils::log_stamp) ${level^^} ${msg}" >> "${log_file}"
+  fi
+  "log::${level}" "${msg}"
+  return 0
 }
 
-# Пакет, в котором лежит команда (имя может зависеть от системы)
-send_video::pkg_for() {
-    case "$1" in
-        ffprobe)                          printf 'ffmpeg' ;;
-        base64|tr|mktemp|date|wc|df)      printf 'coreutils' ;;
-        awk)                              printf 'gawk' ;;
-        *)                                printf '%s' "$1" ;;
-    esac
+# @description Print a report line and append it to the --output file.
+# @description Вывести строку отчёта и дописать её в файл --output.
+# @param $@ Text / Текст
+# @return 0
+send_video::__report() {
+  local IFS=' '
+  local -n __map_cfg=__SEND_VIDEO_CFG
+  local -r output="${__map_cfg[output]:-}"
+  local -r text="$*"
+  io::streams::print "${text}"
+  if is::not_empty "${output}"; then
+    io::streams::print "${text}" >> "${output}"
+  fi
+  return 0
 }
 
-# Команда установки пакетов для текущей системы (пусто, если менеджер не найден)
-send_video::install_cmd() {
-    local -a pkgs=("$@")
-    if [[ "$(uname -s)" == "Darwin" ]]; then
-        printf 'brew install %s' "${pkgs[*]}"
-    elif command -v apt-get >/dev/null 2>&1; then
-        printf 'sudo apt-get install -y %s' "${pkgs[*]}"
-    elif command -v dnf >/dev/null 2>&1; then
-        # В репозиториях Fedora полноценный ffmpeg есть только в RPM Fusion;
-        # свободная сборка ffmpeg-free содержит и ffmpeg, и ffprobe.
-        printf 'sudo dnf install -y %s' "${pkgs[*]//ffmpeg/ffmpeg-free}"
-    elif command -v pacman >/dev/null 2>&1; then
-        printf 'sudo pacman -S --needed %s' "${pkgs[*]}"
-    elif command -v zypper >/dev/null 2>&1; then
-        printf 'sudo zypper install %s' "${pkgs[*]}"
-    elif command -v apk >/dev/null 2>&1; then
-        printf 'sudo apk add %s' "${pkgs[*]}"
+# ---------------------------------------------------------------------------
+# Integer arithmetic: no awk, no locale / Целочисленная арифметика
+# ---------------------------------------------------------------------------
+
+# @description Convert "12.345" seconds to integer milliseconds.
+# @description Перевести секунды вида "12.345" в целые миллисекунды.
+# @param $1 Seconds, dot or comma decimal / Секунды, точка или запятая
+# @stdout Milliseconds / Миллисекунды
+# @return 0 on success, 1 if the value is not a number
+send_video::__to_ms() {
+  local -r raw="${1:-}"
+  local -r re='^([0-9]+)([.,]([0-9]*))?$'
+  local frac
+  if [[ ! "${raw}" =~ ${re} ]]; then
+    return 1
+  fi
+  frac="${BASH_REMATCH[3]:-}000"
+  io::streams::printf '%d' \
+    "$(( 10#${BASH_REMATCH[1]} * 1000 + 10#${frac:0:3} ))"
+}
+
+# @description Format milliseconds as HH:MM:SS.
+# @description Отформатировать миллисекунды как ЧЧ:ММ:СС.
+# @param $1 Milliseconds / Миллисекунды
+# @stdout Time code / Таймкод
+send_video::__timecode() {
+  local -r ms="${1:-0}"
+  local -i sec=0
+  if is::number "${ms}"; then
+    sec=$(( ms / 1000 ))
+  fi
+  io::streams::printf '%02d:%02d:%02d' \
+    "$(( sec / 3600 ))" "$(( (sec % 3600) / 60 ))" "$(( sec % 60 ))"
+}
+
+# @description Format milliseconds as seconds with one decimal digit.
+# @description Отформатировать миллисекунды как секунды с одним знаком.
+# @param $1 Milliseconds / Миллисекунды
+# @stdout Seconds, e.g. 12.3 / Секунды
+send_video::__seconds() {
+  local -r ms="${1:-0}"
+  io::streams::printf '%d.%d' "$(( ms / 1000 ))" "$(( (ms % 1000) / 100 ))"
+}
+
+# @description Duration of a video file in milliseconds via ffprobe.
+# @description Длительность видеофайла в миллисекундах через ffprobe.
+# @param $1 File / Файл
+# @stdout Milliseconds / Миллисекунды
+# @return 0 on success, 1 if ffprobe failed
+send_video::__duration_ms() {
+  local -r file="${1:?file required}"
+  local raw
+  if ! raw="$(ffprobe -v error -show_entries format=duration \
+    -of default=noprint_wrappers=1:nokey=1 "${file}" 2>&1)"; then
+    return 1
+  fi
+  send_video::__to_ms "${raw}"
+}
+
+# @description MIME type of a video file by its extension.
+# @description MIME-тип видеофайла по расширению.
+# @param $1 File / Файл
+# @stdout MIME type / MIME-тип
+send_video::__mime() {
+  case "${1,,}" in
+    *.webm) io::streams::printf 'video/webm' ;;
+    *.mkv)  io::streams::printf 'video/x-matroska' ;;
+    *.mov)  io::streams::printf 'video/quicktime' ;;
+    *.avi)  io::streams::printf 'video/x-msvideo' ;;
+    *)      io::streams::printf 'video/mp4' ;;
+  esac
+}
+
+# ---------------------------------------------------------------------------
+# Server errors / Ошибки сервера
+# ---------------------------------------------------------------------------
+
+# @description Parse a server "too large" error into "<size> <limit>".
+# @description Разобрать ошибку сервера «слишком большой» в "<размер> <лимит>".
+# @param $1 File with the error text / Файл с текстом ошибки
+# @stdout Two integers: requested size and the limit, in tokens
+# @return 0 if the message is a size error, 1 otherwise
+send_video::__overflow_parse() {
+  local -r file="${1:?error file required}"
+  local -r re_item='item[[:space:]]+with[^0-9]*([0-9]+)'
+  local -r re_cache='cache[[:space:]]+size[^0-9]*([0-9]+)'
+  local -r re_ctx='maximum[[:space:]]+context[[:space:]]+length[^0-9]*([0-9]+)'
+  local -r re_req='requested[[:space:]]+([0-9]+)[[:space:]]+tokens'
+  local -r re_len='prompt[[:space:]]+\(length[[:space:]]+([0-9]+)\)'
+  local -r re_max='model[[:space:]]+length[[:space:]]+of[[:space:]]+([0-9]+)'
+  local msg over="" limit=""
+  msg="$(<"${file}")"
+  if [[ "${msg}" =~ ${re_item} ]]; then
+    over="${BASH_REMATCH[1]}"
+    if [[ "${msg}" =~ ${re_cache} ]]; then
+      limit="${BASH_REMATCH[1]}"
     fi
-}
-
-# Проверка окружения: версия bash и все нужные утилиты. Все недостающие
-# программы выводятся одним списком, вместе с командой установки.
-# $1 - "yes", если нужны ffmpeg/ffprobe (нарезка или автоподбор --segment).
-send_video::preflight() {
-    local -r need_ffmpeg="${1:-no}"
-
-    if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
-        io::streams::print "ERROR: нужен bash 4.4 или новее, сейчас ${BASH_VERSION}" >&2
-        if [[ "$(uname -s)" == "Darwin" ]]; then
-            io::streams::print "  macOS: brew install bash  (и проверьте: env bash --version)" >&2
-        fi
-        exit 1
+  elif [[ "${msg}" =~ ${re_ctx} ]]; then
+    limit="${BASH_REMATCH[1]}"
+    if [[ "${msg}" =~ ${re_req} ]]; then
+      over="${BASH_REMATCH[1]}"
     fi
-
-    local -a required=(curl jq base64 awk tr mktemp date wc df)
-    if [[ "${need_ffmpeg}" == "yes" ]]; then
-        required+=(ffmpeg ffprobe)
+  elif [[ "${msg}" =~ ${re_len} ]]; then
+    over="${BASH_REMATCH[1]}"
+    if [[ "${msg}" =~ ${re_max} ]]; then
+      limit="${BASH_REMATCH[1]}"
     fi
-
-    local -a missing=() pkgs=()
-    local cmd pkg known p
-    for cmd in "${required[@]}"; do
-        command -v "${cmd}" >/dev/null 2>&1 && continue
-        missing+=("${cmd}")
-        pkg="$(send_video::pkg_for "${cmd}")"
-        known=no
-        for p in "${pkgs[@]}"; do
-            [[ "${p}" == "${pkg}" ]] && known=yes
-        done
-        if [[ "${known}" == "no" ]]; then
-            pkgs+=("${pkg}")
-        fi
-    done
-
-    if (( ${#missing[@]} > 0 )); then
-        io::streams::print "ERROR: не хватает программ: ${missing[*]}" >&2
-        local hint
-        hint="$(send_video::install_cmd "${pkgs[@]}")"
-        if [[ -n "${hint}" ]]; then
-            io::streams::print "  Установите: ${hint}" >&2
-        else
-            io::streams::print "  Установите пакеты: ${pkgs[*]}" >&2
-        fi
-        exit 1
-    fi
-
-    # --rawfile появился в jq 1.6: на старых версиях запрос не соберётся
-    if ! jq -n --rawfile x /dev/null '$x' >/dev/null 2>&1; then
-        io::streams::print "ERROR: jq слишком старый (нужен 1.6+): $(jq --version 2>&1)" >&2
-        exit 1
-    fi
-}
-
-# Вывод на экран и (если задан --output) дописывание в текстовый файл.
-# Использует переменную output из main (динамическая область видимости).
-send_video::emit() {
-    io::streams::print "$*"
-    if [[ -n "${output:-}" ]]; then
-        printf '%s\n' "$*" >> "${output}"
-    fi
-}
-
-# MIME-тип по расширению файла
-send_video::mime() {
-    case "${1,,}" in
-        *.mp4|*.m4v) printf 'video/mp4' ;;
-        *.webm)      printf 'video/webm' ;;
-        *.mkv)       printf 'video/x-matroska' ;;
-        *.mov)       printf 'video/quicktime' ;;
-        *.avi)       printf 'video/x-msvideo' ;;
-        *)           printf 'video/mp4' ;;
-    esac
-}
-
-# Секунды (целые или дробные) -> ЧЧ:ММ:СС
-send_video::timecode() {
-    local raw="${1:-0}"
-    local -i s="${raw%.*}"
-    printf '%02d:%02d:%02d' $(( s / 3600 )) $(( (s % 3600) / 60 )) $(( s % 60 ))
-}
-
-# Длительность видео в секундах с дробной частью (пусто, если ffprobe недоступен/ошибка)
-send_video::duration_f() {
-    command -v ffprobe >/dev/null 2>&1 || return 0
-    ffprobe -v error -show_entries format=duration \
-        -of default=noprint_wrappers=1:nokey=1 "$1" 2>/dev/null \
-        | awk 'NR==1 && $1 ~ /^[0-9.]+$/ { printf "%.2f", $1 }'
-}
-
-# Длительность видео в целых секундах (пусто, если ffprobe недоступен/ошибка)
-send_video::duration() {
-    local d
-    d="$(send_video::duration_f "$1")"
-    [[ -n "${d}" ]] && printf '%d' "${d%.*}"
+  fi
+  if is::number "${over}" && is::number "${limit}"; then
+    io::streams::printf '%s %s' "${over}" "${limit}"
     return 0
+  fi
+  return 1
 }
 
-# Отправка одного файла. Использует переменные из main (динамическая область):
-# base, model, prompt, system_prompt, temperature, max_tokens, timeout, tmp.
-# Необязательный 2-й аргумент - свой лимит токенов ответа (для пробы).
-# Печатает ответ модели в stdout; токены (prompt completion) пишет в ${tmp}/usage.txt.
-send_video::send_one() {
-    local -r chunk="$1"
-    local -r mt="${2:-${max_tokens}}"
-    local mime
-    mime="$(send_video::mime "${chunk}")"
+# @description Send one video file to the server and store the outcome.
+# @description Отправить один видеофайл на сервер и сохранить результат.
+# @param $1 Video file / Видеофайл
+# @param $2 max_tokens, empty = let the server choose / Пусто = решает сервер
+# @return 0 ok, 2 size error (over/limit in state), 1 any other error
+send_video::__request() {
+  local -r chunk="${1:?chunk required}"
+  local -r max_tokens="${2:-}"
+  local -n __map_cfg=__SEND_VIDEO_CFG
+  local -n __map_stat=__SEND_VIDEO_STAT
+  local -r tmp="${__map_cfg[tmp]}"
+  local -r jq_usage='"\(.usage.prompt_tokens // 0)
+    \(.usage.completion_tokens // 0) \(.choices[0].finish_reason // "?")"'
+  local mime line code ttotal sent info over limit
+  local -i size t_start t_sent
+  local ptok=0 ctok=0 finish="?"
 
-    # Видео и тело запроса идут через файлы, а не через аргументы командной
-    # строки: base64 большого видео не помещается в лимит длины аргумента.
-    printf 'data:%s;base64,' "${mime}" > "${tmp}/video.uri"
-    # base64 без переносов строк; "< файл | tr" работает и в GNU, и в BSD (macOS)
-    base64 < "${chunk}" | tr -d '\n' >> "${tmp}/video.uri"
+  mime="$(send_video::__mime "${chunk}")"
+  size=$(( $(wc -c < "${chunk}") ))
+  send_video::__log debug \
+    "request: ${chunk} ${size} B, ${mime}, max_tokens=${max_tokens:-auto}"
 
-    jq -n \
-        --arg model "${model}" \
-        --arg prompt "${prompt}" \
-        --arg system "${system_prompt}" \
-        --argjson temperature "${temperature}" \
-        --argjson max_tokens "${mt}" \
-        --rawfile video "${tmp}/video.uri" \
-        '{
-            model: $model,
-            max_tokens: $max_tokens,
-            temperature: $temperature,
-            messages: (
-                (if $system != "" then [{role: "system", content: $system}] else [] end)
-                + [{
-                    role: "user",
-                    content: [
-                        {type: "video_url", video_url: {url: $video}},
-                        {type: "text", text: $prompt}
-                    ]
-                }]
-            )
-        }' > "${tmp}/payload.json" \
-        || send_video::die "не удалось собрать JSON-запрос (проверьте --temperature и --max-tokens: нужны числа)"
+  t_start="$(utils::now_ms)"
+  io::streams::printf 'data:%s;base64,' "${mime}" > "${tmp}/video.uri"
+  if ! base64 < "${chunk}" | tr -d '\n' >> "${tmp}/video.uri"; then
+    send_video::__log error "base64 failed for ${chunk}"
+    return 1
+  fi
+  if ! jq -n \
+    --arg model "${__map_cfg[model]}" \
+    --arg prompt "${__map_cfg[prompt]}" \
+    --arg system "${__map_cfg[system]}" \
+    --arg max_tokens "${max_tokens}" \
+    --argjson temperature "${__map_cfg[temperature]}" \
+    --rawfile video "${tmp}/video.uri" \
+    '{model: $model, temperature: $temperature,
+      messages: (
+        (if $system != "" then [{role: "system", content: $system}] else [] end)
+        + [{role: "user", content: [
+            {type: "video_url", video_url: {url: $video}},
+            {type: "text", text: $prompt}]}])}
+     + (if $max_tokens != ""
+        then {max_tokens: ($max_tokens | tonumber)} else {} end)' \
+    > "${tmp}/payload.json"; then
+    send_video::__log error "jq could not build the request body"
+    return 1
+  fi
+  t_sent="$(utils::now_ms)"
+  send_video::__log trace "payload built in $(( t_sent - t_start )) ms," \
+    "$(( $(wc -c < "${tmp}/payload.json") )) B"
 
-    local http_code
-    http_code="$(curl -sS --max-time "${timeout}" \
-        -H 'Content-Type: application/json' \
-        --data-binary "@${tmp}/payload.json" \
-        -o "${tmp}/response.json" \
-        -w '%{http_code}' \
-        "${base}/v1/chat/completions")" \
-        || { io::streams::print "ошибка соединения при отправке" >&2; return 1; }
+  if ! line="$(curl -sS --max-time "${__map_cfg[timeout]}" \
+    -H 'Content-Type: application/json' \
+    --data-binary "@${tmp}/payload.json" \
+    --stderr "${tmp}/curl.err" \
+    -o "${tmp}/response.json" \
+    -w '%{http_code} %{time_total} %{size_upload}' \
+    "${__map_cfg[base]}/v1/chat/completions")"; then
+    send_video::__log error "curl failed: $(<"${tmp}/curl.err")"
+    return 1
+  fi
+  IFS=' ' read -r code ttotal sent <<< "${line}"
+  send_video::__log debug \
+    "response: HTTP ${code}, curl ${ttotal} s, uploaded ${sent} B"
+  __map_stat[http]="${code}"
 
-    if [[ "${http_code}" != "200" ]]; then
-        # Текст ошибки сохраняем: по нему определяем превышение лимитов сервера
-        jq -r '.error.message // .' "${tmp}/response.json" > "${tmp}/error.txt" 2>/dev/null \
-            || cp "${tmp}/response.json" "${tmp}/error.txt"
-        # Код 2 - фрагмент слишком большой (лимит кеша энкодера или контекста)
-        if [[ "${http_code}" == "400" ]] && send_video::overflow "${tmp}/error.txt" >/dev/null; then
-            return 2
-        fi
-        io::streams::print "HTTP ${http_code}" >&2
-        cat "${tmp}/error.txt" >&2
-        return 1
+  if [[ "${code}" != "200" ]]; then
+    if ! utils::quiet_err jq -r '.error.message // .message // tostring' \
+      "${tmp}/response.json" > "${tmp}/error.txt"; then
+      cp "${tmp}/response.json" "${tmp}/error.txt"
     fi
-
-    jq -r '"\(.usage.prompt_tokens // 0) \(.usage.completion_tokens // 0)"' \
-        "${tmp}/response.json" > "${tmp}/usage.txt"
-    jq -r '.choices[0].message.content // "(пустой ответ)"' "${tmp}/response.json"
-}
-
-# Разбор сообщения сервера о превышении лимита. Читает файл с текстом ошибки и
-# печатает "<сколько токенов> <лимит>"; код возврата 1, если это не ошибка лимита.
-# Распознаются два вида сообщений vLLM:
-#   - "video item with N ... exceeds the pre-allocated encoder cache size M"
-#   - "maximum context length is M tokens. However, you requested N tokens"
-send_video::overflow() {
-    local msg
-    msg="$(<"$1")"
-    local over limit
-    if [[ "${msg}" =~ item[[:space:]]+with[^0-9]*([0-9]+) ]]; then
-        over="${BASH_REMATCH[1]}"
-        if [[ "${msg}" =~ cache[[:space:]]+size[^0-9]*([0-9]+) ]]; then
-            limit="${BASH_REMATCH[1]}"
-            printf '%s %s' "${over}" "${limit}"
-            return 0
-        fi
-    fi
-    if [[ "${msg}" =~ maximum[[:space:]]+context[[:space:]]+length[^0-9]*([0-9]+) ]]; then
-        limit="${BASH_REMATCH[1]}"
-        if [[ "${msg}" =~ requested[[:space:]]+([0-9]+)[[:space:]]+tokens ]]; then
-            over="${BASH_REMATCH[1]}"
-            printf '%s %s' "${over}" "${limit}"
-            return 0
-        fi
+    send_video::__log warn "server error HTTP ${code}: $(<"${tmp}/error.txt")"
+    if info="$(send_video::__overflow_parse "${tmp}/error.txt")"; then
+      IFS=' ' read -r over limit <<< "${info}"
+      __map_stat[over]="${over}"
+      __map_stat[limit]="${limit}"
+      return 2
     fi
     return 1
-}
+  fi
 
-# Точная нарезка с перекодированием: $1 - файл, $2 - длина части в секундах,
-# $3 - папка для частей (part_000.mp4, ...). Перекодирование нужно потому, что
-# резка без него (-c copy) идёт по ключевым кадрам и части могут снова выйти
-# слишком длинными. Сначала пробуется libx264, затем встроенный mpeg4
-# (в сборках без libx264, например ffmpeg-free в Fedora).
-send_video::split_exact() {
-    local -r in="$1" len="$2" out="$3"
-    local enc
-    for enc in "-c:v libx264 -preset ultrafast -crf 23" "-c:v mpeg4 -q:v 4"; do
-        rm -f "${out}"/part_*.mp4
-        # shellcheck disable=SC2086
-        if ffmpeg -loglevel error -y -i "${in}" -map 0:v:0 -an -sn ${enc} \
-            -force_key_frames "expr:gte(t,n_forced*${len})" \
-            -f segment -segment_time "${len}" -reset_timestamps 1 \
-            "${out}/part_%03d.mp4" 2>/dev/null; then
-            return 0
-        fi
-    done
+  if ! jq -r '.choices[0].message.content // empty' \
+    "${tmp}/response.json" > "${tmp}/reply.txt"; then
+    send_video::__log error "response is not valid JSON"
     return 1
+  fi
+  info="$(jq -r "${jq_usage//$'\n'/}" "${tmp}/response.json")"
+  IFS=' ' read -r ptok ctok finish <<< "${info}"
+  __map_stat[ptok]="${ptok}"
+  __map_stat[ctok]="${ctok}"
+  send_video::__log debug \
+    "usage: prompt=${ptok} completion=${ctok} finish=${finish}"
+  if [[ "${finish}" == "length" ]]; then
+    send_video::__log warn "answer was cut by the token limit (finish=length)"
+  fi
+  return 0
 }
 
-# Обработка одного фрагмента. Если сервер отклонил его как слишком большой,
-# фрагмент автоматически делится на части по данным из ответа сервера, и каждая
-# часть обрабатывается так же (до 4 уровней вложенности).
-# $1 - файл, $2 - смещение начала в видео (сек), $3 - метка ("3/75" или ""),
-# $4 - глубина. Изменяет счётчики main: done_count, failed, model_time, split_count.
-# Всегда возвращает 0: результат учитывается в счётчиках.
-send_video::process_chunk() {
-    local -r chunk="$1" start="$2" label="$3" depth="${4:-0}"
-    local header t0 elapsed reply rc=0 ptok ctok
+# ---------------------------------------------------------------------------
+# ffmpeg
+# ---------------------------------------------------------------------------
 
-    if [[ -n "${label}" ]]; then
-        header="=== Фрагмент ${label} (≈ $(send_video::timecode "${start}")) ==="
+# @description Run ffmpeg with logging of the command and its diagnostics.
+# @description Запустить ffmpeg с журналом команды и диагностики.
+# @param $@ ffmpeg arguments / Аргументы ffmpeg
+# @return ffmpeg exit code / Код возврата ffmpeg
+send_video::__ffmpeg() {
+  local -n __map_cfg=__SEND_VIDEO_CFG
+  local -r err="${__map_cfg[tmp]}/ffmpeg.err"
+  local -a argv=(ffmpeg -hide_banner -loglevel warning -y "$@")
+  local -i rc=0
+  send_video::__log debug "run: $(arr::join argv ' ')"
+  "${argv[@]}" 2> "${err}" || rc=$?
+  if is::file_not_empty "${err}"; then
+    send_video::__log debug "ffmpeg: $(<"${err}")"
+  fi
+  return "${rc}"
+}
+
+# @description Cut the first N seconds of a video without re-encoding.
+# @description Вырезать первые N секунд видео без перекодирования.
+# @param $1 Input / Вход
+# @param $2 Seconds / Секунды
+# @param $3 Output / Выход
+# @return ffmpeg exit code
+send_video::__cut_head() {
+  send_video::__ffmpeg -i "${1:?input required}" -map 0:v:0 -c copy \
+    -t "${2:?seconds required}" "${3:?output required}"
+}
+
+# @description Cut a chunk into equal parts with re-encoding.
+# @description Нарезать фрагмент на равные части с перекодированием.
+# @param $1 Input / Вход
+# @param $2 Part length, seconds / Длина части, секунды
+# @param $3 Output dir / Папка для part_NNN.mp4
+# @param $@ Encoder arguments (from $4) / Аргументы кодера
+# @return ffmpeg exit code
+send_video::__split_try() {
+  local -r input="${1:?input required}"
+  local -r len="${2:?length required}"
+  local -r out="${3:?output dir required}"
+  shift 3
+  utils::ignore rm -f "${out}"/part_*.mp4
+  send_video::__ffmpeg -i "${input}" -map 0:v:0 -an -sn "$@" \
+    -force_key_frames "expr:gte(t,n_forced*${len})" \
+    -f segment -segment_time "${len}" -reset_timestamps 1 \
+    "${out}/part_%03d.mp4"
+}
+
+# @description Exact cut: libx264 first, the built-in mpeg4 as fallback.
+# @description Точная нарезка: сначала libx264, при отсутствии — mpeg4.
+# @param $1 Input / Вход
+# @param $2 Part length, seconds / Длина части, секунды
+# @param $3 Output dir / Папка
+# @return 0 on success, 1 if both encoders failed
+send_video::__split_exact() {
+  if send_video::__split_try "$1" "$2" "$3" \
+    -c:v libx264 -preset ultrafast -crf 23 -pix_fmt yuv420p; then
+    return 0
+  fi
+  send_video::__log warn "libx264 failed, trying the mpeg4 encoder"
+  send_video::__split_try "$1" "$2" "$3" -c:v mpeg4 -q:v 4
+}
+
+# ---------------------------------------------------------------------------
+# Chunk processing / Обработка фрагментов
+# ---------------------------------------------------------------------------
+
+# @description Count a failed chunk and write the reason to the report.
+# @description Учесть неудачный фрагмент и записать причину в отчёт.
+# @param $1 Report header / Заголовок
+# @param $2 Reason / Причина
+# @return 0
+send_video::__fail() {
+  local -n __map_stat=__SEND_VIDEO_STAT
+  __map_stat[failed]=$(( ${__map_stat[failed]:-0} + 1 ))
+  send_video::__log error "$1: $2"
+  send_video::__report ""
+  send_video::__report "$1"
+  send_video::__report "ОШИБКА: $2"
+  return 0
+}
+
+# @description Split a rejected chunk by the server's numbers and resend.
+# @description Поделить отклонённый фрагмент по данным сервера и отправить.
+# @param $1 Chunk file / Файл фрагмента
+# @param $2 Chunk start in the video, ms / Начало в видео, мс
+# @param $3 Label / Метка
+# @param $4 Split depth / Глубина деления
+# @param $5 Report header / Заголовок отчёта
+# @return 0 always; the outcome is counted in the state map
+send_video::__resplit() {
+  local -r chunk="${1:?chunk required}"
+  local -r label="${3:-}"
+  local -r depth="${4:-0}"
+  local -r header="${5:-}"
+  local -n __map_cfg=__SEND_VIDEO_CFG
+  local -n __map_stat=__SEND_VIDEO_STAT
+  local -i over="${__map_stat[over]}" limit="${__map_stat[limit]}"
+  local -i poff_ms="${2:-0}" dur_ms=0 parts part_len k=0 part_ms
+  local sub part sub_label
+
+  if (( depth >= SEND_VIDEO_SPLIT_DEPTH )); then
+    send_video::__fail "${header}" \
+      "слишком велик (${over} токенов, лимит ${limit}), глубина исчерпана"
+    return 0
+  fi
+  dur_ms="$(send_video::__duration_ms "${chunk}")" || dur_ms=0
+  if (( dur_ms < 2000 )); then
+    send_video::__fail "${header}" \
+      "слишком велик (${over} > ${limit} токенов), делить нельзя"
+    return 0
+  fi
+
+  parts=$(( (over * 100 + limit * SEND_VIDEO_SAFETY_PCT - 1)
+    / (limit * SEND_VIDEO_SAFETY_PCT) ))
+  parts=$(( parts < 2 ? 2 : (parts > 16 ? 16 : parts) ))
+  part_len=$(( (dur_ms + parts * 1000 - 1) / (parts * 1000) ))
+  __map_stat[splits]=$(( ${__map_stat[splits]:-0} + 1 ))
+  send_video::__report ""
+  send_video::__report "${header}"
+  send_video::__report "Не поместился в лимит (${over} токенов, лимит" \
+    "${limit}): делю на ${parts} части по ~${part_len} с"
+
+  sub="$(mktemp -d "${__map_cfg[tmp]}/split.XXXXXX")"
+  if ! send_video::__split_exact "${chunk}" "${part_len}" "${sub}"; then
+    send_video::__fail "${header}" "ffmpeg не смог разделить фрагмент"
+    utils::ignore rm -rf "${sub}"
+    return 0
+  fi
+  for part in "${sub}"/part_*.mp4; do
+    is::file "${part}" || continue
+    k=$(( k + 1 ))
+    if [[ "${label}" == */* ]]; then
+      sub_label="${label%%/*}.${k}/${label#*/}"
     else
-        header="=== Ответ модели ==="
+      sub_label="${label:-1}.${k}"
     fi
-    io::streams::print "Отправляю: ${header}"
-
-    t0="$(date +%s)"
-    if reply="$(send_video::send_one "${chunk}")"; then rc=0; else rc=$?; fi
-    elapsed=$(( $(date +%s) - t0 ))
-
-    if (( rc == 0 )); then
-        model_time=$(( model_time + elapsed ))
-        done_count=$(( done_count + 1 ))
-        read -r ptok ctok < "${tmp}/usage.txt"
-        send_video::emit ""
-        send_video::emit "${header}"
-        send_video::emit "Время обработки: ${elapsed} с | токены: ${ptok} → ${ctok}"
-        send_video::emit ""
-        send_video::emit "${reply}"
-        return 0
+    send_video::__process_chunk "${part}" "${poff_ms}" "${sub_label}" \
+      "$(( depth + 1 ))"
+    if part_ms="$(send_video::__duration_ms "${part}")"; then
+      poff_ms=$(( poff_ms + part_ms ))
     fi
-
-    if (( rc == 2 )); then
-        local over limit
-        read -r over limit < <(send_video::overflow "${tmp}/error.txt")
-
-        if (( depth >= 4 )) || ! command -v ffmpeg >/dev/null 2>&1 \
-            || ! command -v ffprobe >/dev/null 2>&1; then
-            failed=$(( failed + 1 ))
-            send_video::emit ""
-            send_video::emit "${header}"
-            send_video::emit "ОШИБКА: фрагмент слишком велик для сервера (${over} токенов, лимит ${limit}), а разделить его нельзя (глубина ${depth} или нет ffmpeg)."
-            return 0
-        fi
-
-        # Сколько частей нужно, чтобы уложиться в лимит с запасом 15%
-        local -i parts part_len
-        local cdur
-        cdur="$(send_video::duration_f "${chunk}")"
-        parts="$(awk -v o="${over}" -v l="${limit}" 'BEGIN {
-            p = o / (l * 0.85); n = int(p); if (n < p) n++
-            if (n < 2) n = 2
-            if (n > 16) n = 16
-            print n }')"
-        part_len="$(awk -v d="${cdur:-0}" -v n="${parts}" 'BEGIN {
-            p = d / n; r = int(p); if (r < p) r++
-            if (r < 1) r = 1
-            print r }')"
-
-        split_count=$(( split_count + 1 ))
-        send_video::emit ""
-        send_video::emit "${header}"
-        send_video::emit "Фрагмент не поместился в лимит сервера (${over} токенов при лимите ${limit}): делю на ${parts} части по ~${part_len} с"
-
-        local sub
-        sub="$(mktemp -d "${tmp}/split.XXXXXX")" || { failed=$(( failed + 1 )); return 0; }
-        if ! send_video::split_exact "${chunk}" "${part_len}" "${sub}"; then
-            failed=$(( failed + 1 ))
-            send_video::emit "ОШИБКА: ffmpeg не смог разделить фрагмент"
-            rm -rf "${sub}"
-            return 0
-        fi
-
-        local part pd sub_label poff="${start}"
-        local -i k=0
-        for part in "${sub}"/part_*.mp4; do
-            [[ -f "${part}" ]] || continue
-            k=$(( k + 1 ))
-            pd="$(send_video::duration_f "${part}")"
-            # Метка части: "2/75" -> "2.1/75", "2.1/75" -> "2.1.1/75"
-            if [[ "${label}" == */* ]]; then
-                sub_label="${label%%/*}.${k}/${label#*/}"
-            else
-                sub_label="${label:-1}.${k}"
-            fi
-            send_video::process_chunk "${part}" "${poff}" "${sub_label}" "$(( depth + 1 ))"
-            rm -f "${part}"
-            poff="$(awk -v a="${poff}" -v b="${pd:-0}" 'BEGIN { printf "%.2f", a + b }')"
-        done
-        rm -rf "${sub}"
-        return 0
-    fi
-
-    failed=$(( failed + 1 ))
-    send_video::emit ""
-    send_video::emit "${header}"
-    send_video::emit "ОШИБКА: фрагмент не обработан (прошло ${elapsed} с)"
-    return 0
+    utils::ignore rm -f "${part}"
+  done
+  utils::ignore rm -rf "${sub}"
+  return 0
 }
 
-# Подбор длины фрагмента по пробе. Печатает "<секунд> <токенов в секунду>" в stdout,
-# диагностику - в stderr. Использует переменные main: file, ext, context,
-# models_json, max_tokens, tmp.
-#
-# Данные берутся из ответа сервера на пробный фрагмент (~10 с видео):
-#   - если проба принята - из usage.prompt_tokens (ограничение: контекст модели);
-#   - если проба отклонена как слишком большая - из текста ошибки (число токенов
-#     видео и лимит кеша энкодера), и подбор идёт по этому лимиту.
-send_video::auto_segment() {
-    local -i probe_len=10
-    local ctx="${context}"
-    if [[ -z "${ctx}" ]]; then
-        ctx="$(jq -r '.data[0].max_model_len // empty' <<<"${models_json}")"
-    fi
-    [[ "${ctx}" =~ ^[0-9]+$ ]] \
-        || send_video::die "не удалось узнать размер контекста модели: укажите --context"
+# @description Process one chunk; split it again if the server rejects it.
+# @description Обработать фрагмент; при отказе сервера поделить ещё раз.
+# @param $1 Chunk file / Файл фрагмента
+# @param $2 Chunk start in the video, ms / Начало в видео, мс
+# @param $3 Label like "3/75" or empty / Метка
+# @param $4 Split depth / Глубина деления
+# @return 0 always; the outcome is counted in the state map
+send_video::__process_chunk() {
+  local -r chunk="${1:?chunk required}"
+  local -r start_ms="${2:-0}"
+  local -r label="${3:-}"
+  local -r depth="${4:-0}"
+  local -n __map_cfg=__SEND_VIDEO_CFG
+  local -n __map_stat=__SEND_VIDEO_STAT
+  local header reply
+  local -i rc=0 t_start elapsed
 
-    io::streams::print "Проба: режу первые ${probe_len} с для замера токенов ..." >&2
-    ffmpeg -loglevel error -i "${file}" -map 0:v:0 -c copy -t "${probe_len}" \
-        "${tmp}/probe.${ext}" \
-        || send_video::die "ffmpeg не смог сделать пробный фрагмент"
+  if is::not_empty "${label}"; then
+    header="=== Фрагмент ${label}"
+    header+=" ($(send_video::__timecode "${start_ms}")) ==="
+  else
+    header="=== Ответ модели ==="
+  fi
+  send_video::__log info "send ${header} file=${chunk} depth=${depth}"
 
-    # Реальная длина пробы: при -c copy она может отличаться от 10 с
-    local probe_dur
-    probe_dur="$(send_video::duration_f "${tmp}/probe.${ext}")"
-    probe_dur="$(awk -v d="${probe_dur:-0}" -v f="${probe_len}" 'BEGIN { if (d + 0 <= 0) d = f; printf "%.2f", d }')"
+  t_start="$(utils::now_ms)"
+  send_video::__request "${chunk}" "${__map_cfg[max_tokens]}" || rc=$?
+  elapsed=$(( $(utils::now_ms) - t_start ))
 
-    io::streams::print "Проба: отправляю на сервер (длина пробы ${probe_dur} с) ..." >&2
-    local -i rc=0
-    send_video::send_one "${tmp}/probe.${ext}" 16 >/dev/null || rc=$?
+  if (( rc == 2 )); then
+    send_video::__resplit "${chunk}" "${start_ms}" "${label}" "${depth}" \
+      "${header}"
+    return 0
+  fi
+  if (( rc != 0 )); then
+    send_video::__fail "${header}" \
+      "фрагмент не обработан (код ${rc}, прошло $(( elapsed / 1000 )) с)"
+    return 0
+  fi
 
-    local tokens limit=0
+  __map_stat[done]=$(( ${__map_stat[done]:-0} + 1 ))
+  __map_stat[model_ms]=$(( ${__map_stat[model_ms]:-0} + elapsed ))
+  __map_stat[tokens]=$(( ${__map_stat[tokens]:-0} + __map_stat[ptok] ))
+  reply="$(<"${__map_cfg[tmp]}/reply.txt")"
+  if is::empty "${reply}"; then
+    reply="(пустой ответ)"
+  fi
+  send_video::__report ""
+  send_video::__report "${header}"
+  local secs
+  secs="$(send_video::__seconds "${elapsed}")"
+  send_video::__report "Время обработки: ${secs} с |" \
+    "токены: ${__map_stat[ptok]} → ${__map_stat[ctok]}"
+  send_video::__report ""
+  send_video::__report "${reply}"
+  return 0
+}
+
+# ---------------------------------------------------------------------------
+# Segment length search / Подбор длины фрагмента
+# ---------------------------------------------------------------------------
+
+# @description Send the first N seconds as a probe and report the outcome.
+# @description Отправить первые N секунд как пробу и вернуть результат.
+# @param $1 Probe length, seconds / Длина пробы, секунды
+# @return 0 accepted, 2 rejected as too large, 1 other error
+send_video::__probe() {
+  local -r secs="${1:?seconds required}"
+  local -n __map_cfg=__SEND_VIDEO_CFG
+  local -n __map_stat=__SEND_VIDEO_STAT
+  local -r probe="${__map_cfg[tmp]}/probe.${__map_cfg[ext]}"
+  local -i rc=0 dur_ms=0 ptok=0
+
+  if ! send_video::__cut_head "${__map_cfg[file]}" "${secs}" "${probe}"; then
+    send_video::__log error "could not cut a ${secs} s probe"
+    return 1
+  fi
+  if ! dur_ms="$(send_video::__duration_ms "${probe}")"; then
+    dur_ms=$(( secs * 1000 ))
+    send_video::__log warn "probe length unknown, assuming ${secs} s"
+  fi
+  send_video::__log info "probe ${secs} s (real length ${dur_ms} ms)"
+  send_video::__request "${probe}" 16 || rc=$?
+  utils::ignore rm -f "${probe}"
+
+  case "${rc}" in
+    0)
+      ptok="${__map_stat[ptok]}"
+      send_video::__log success "probe ${secs} s accepted: ${ptok} tokens," \
+        "$(( ptok * 1000 / (dur_ms > 0 ? dur_ms : 1) )) tok/s"
+      ;;
+    2)
+      send_video::__log warn "probe ${secs} s rejected:" \
+        "${__map_stat[over]} tokens, limit ${__map_stat[limit]}"
+      ;;
+  esac
+  return "${rc}"
+}
+
+# @description Find the longest chunk length the server accepts.
+# @description Найти максимальную длину фрагмента, которую принимает сервер.
+# @param $1 Video length, seconds / Длина видео, секунды
+# @return 0 on success (state "found"; 0 = the whole video fits), 1 on failure
+send_video::__find_segment() {
+  local -r total="${1:?duration required}"
+  local -n __map_cfg=__SEND_VIDEO_CFG
+  local -n __map_stat=__SEND_VIDEO_STAT
+  local -i cap="${__map_cfg[segment_max]}"
+  local -i cur="${__map_cfg[segment_start]}"
+  local -i lo=0 hi=0 next=0 iter rc over limit
+
+  cap=$(( cap < total ? cap : total ))
+  cur=$(( cur < cap ? cur : cap ))
+  cur=$(( cur < 1 ? 1 : cur ))
+  send_video::__log info "segment search: start=${cur} s, cap=${cap} s"
+
+  for (( iter = 1; iter <= SEND_VIDEO_PROBE_LIMIT; iter++ )); do
+    rc=0
+    send_video::__probe "${cur}" || rc=$?
     if (( rc == 0 )); then
-        read -r tokens _ < "${tmp}/usage.txt"
-        [[ "${tokens}" =~ ^[0-9]+$ ]] && (( tokens > 0 )) \
-            || send_video::die "сервер не вернул usage.prompt_tokens, подобрать значение нельзя"
+      lo="${cur}"
+      if (( lo >= total )); then
+        __map_stat[found]=0
+        return 0
+      fi
+      if (( hi == 0 )); then
+        next=$(( cur * 2 < cap ? cur * 2 : cap ))
+        (( next > lo )) || break
+      else
+        (( hi - lo > 1 && (hi - lo) * 10 > lo )) || break
+        next=$(( (lo + hi) / 2 ))
+      fi
     elif (( rc == 2 )); then
-        read -r tokens limit < <(send_video::overflow "${tmp}/error.txt")
-        io::streams::print "Проба превысила лимит сервера: ${tokens} токенов при лимите ${limit}. Подбираю по этим данным." >&2
+      hi="${cur}"
+      over="${__map_stat[over]}"
+      limit="${__map_stat[limit]}"
+      if (( hi == 1 )); then
+        send_video::__log error "even a 1 s probe is rejected by the server"
+        return 1
+      fi
+      next=$(( cur * limit * 90 / ((over > 0 ? over : 1) * 100) ))
+      if (( next <= lo || next >= hi )); then
+        next=$(( lo > 0 ? (lo + hi) / 2 : hi / 2 ))
+      fi
+      next=$(( next < 1 ? 1 : next ))
+      if (( lo > 0 && hi - lo <= 1 )); then
+        break
+      fi
     else
-        send_video::die "проба не прошла: сервер отклонил запрос (сообщение выше)"
+      return 1
     fi
+    cur="${next}"
+  done
 
-    # tps - токенов на секунду видео. Лимит контекста: ctx - ответ - 512 (запас под
-    # текст промпта); лимит кеша энкодера (если известен) берётся из ошибки сервера.
-    # Коэффициент 0.85 - запас; итог ограничен диапазоном 2..300 секунд.
-    awk -v ctx="${ctx}" -v mt="${max_tokens}" -v tok="${tokens}" -v lim="${limit}" -v d="${probe_dur}" 'BEGIN {
-        tps = tok / d
-        s = (ctx - mt - 512) * 0.85 / tps
-        if (lim > 0) {
-            l = lim * 0.85 / tps
-            if (l < s) s = l
-        }
-        s = int(s)
-        if (s < 2) s = 2
-        if (s > 300) s = 300
-        printf "%d %.1f", s, tps
-    }'
+  if (( lo == 0 )); then
+    send_video::__log error "no accepted probe length was found"
+    return 1
+  fi
+  __map_stat[found]="${lo}"
+  return 0
 }
 
-main() {
-    local -r default_host="${VIDEO_SERVER_HOST:-192.168.1.83}"
-    local -r default_port="${VIDEO_SERVER_PORT:-8000}"
-    local -r default_prompt="Опиши, что происходит в этом видео."
+# ---------------------------------------------------------------------------
+# Environment / Окружение
+# ---------------------------------------------------------------------------
 
-    # --- Файл ---
-    args::flag file value
-    args::flag segment value 0
-    args::flag suggest
-    args::flag output value
-    args::flag_describe file "Путь к видеофайлу (обязательный параметр)"
-    args::flag_describe segment "Длина фрагмента в секундах; auto - подобрать по ответу сервера; 0 - не резать (по умолчанию 0). Слишком большие фрагменты сервер отклоняет, скрипт делит их сам"
-    args::flag_describe suggest "Только подобрать и показать значение --segment (делает пробный запрос), без обработки видео"
-    args::flag_describe output "Дописывать результаты, время и статистику в этот текстовый файл"
-
-    # --- Сервер ---
-    args::flag host value "${default_host}"
-    args::flag port value "${default_port}"
-    args::flag model value
-    args::flag context value
-    args::flag timeout value 600
-    args::flag_describe host "IP или имя сервера (по умолчанию ${default_host}, env: VIDEO_SERVER_HOST)"
-    args::flag_describe port "Порт vLLM (по умолчанию ${default_port}, env: VIDEO_SERVER_PORT)"
-    args::flag_describe model "ID модели (по умолчанию первая из /v1/models)"
-    args::flag_describe context "Размер контекста модели в токенах для автоподбора (по умолчанию берётся с сервера)"
-    args::flag_describe timeout "Таймаут одного запроса в секундах (по умолчанию 600)"
-
-    # --- Промпт ---
-    args::flag prompt value "${default_prompt}"
-    args::flag prompt-file value
-    args::flag system value
-    args::flag temperature value 0.3
-    args::flag max-tokens value 2048
-    args::flag_describe prompt "Текст запроса к модели"
-    args::flag_describe prompt-file "Файл с текстом запроса (имеет приоритет над --prompt)"
-    args::flag_describe system "Системный промпт (роль модели), необязательно"
-    args::flag_describe temperature "Температура генерации, 0-2 (по умолчанию 0.3)"
-    args::flag_describe max-tokens "Лимит токенов ответа (по умолчанию 2048)"
-
-    args::require "$@"
-
-    local -r t_start="$(date +%s)"
-    local -r file="${ARGS_FLAGS["file"]:-}"
-    local segment="${ARGS_FLAGS["segment"]:-0}"
-    local -r output="${ARGS_FLAGS["output"]:-}"
-    local -r host="${ARGS_FLAGS["host"]:-${default_host}}"
-    local -r port="${ARGS_FLAGS["port"]:-${default_port}}"
-    local -r timeout="${ARGS_FLAGS["timeout"]:-600}"
-    local -r system_prompt="${ARGS_FLAGS["system"]:-}"
-    local -r temperature="${ARGS_FLAGS["temperature"]:-0.3}"
-    local -r max_tokens="${ARGS_FLAGS["max-tokens"]:-2048}"
-    local -r prompt_file="${ARGS_FLAGS["prompt-file"]:-}"
-    local -r context="${ARGS_FLAGS["context"]:-}"
-    local prompt="${ARGS_FLAGS["prompt"]:-${default_prompt}}"
-    local model="${ARGS_FLAGS["model"]:-}"
-    local -r base="http://${host}:${port}"
-
-    if args::flag_is_set suggest; then
-        segment="auto"
-    fi
-    [[ "${segment}" == "auto" || "${segment}" =~ ^[0-9]+$ ]] \
-        || send_video::die "--segment: целое число секунд или auto"
-
-    # Проверка окружения до любой работы: ffmpeg нужен для нарезки и автоподбора
-    if [[ "${segment}" == "auto" || "${segment}" != "0" ]]; then
-        send_video::preflight yes
-    else
-        send_video::preflight no
-    fi
-
-    [[ -n "${file}" ]] || send_video::die "укажите видео: --file /путь/к/видео.mp4"
-    [[ -f "${file}" ]] || send_video::die "файл не найден: ${file}"
-    [[ -r "${file}" ]] || send_video::die "нет прав на чтение файла: ${file}"
-
-    if [[ -n "${prompt_file}" ]]; then
-        [[ -f "${prompt_file}" ]] || send_video::die "файл промпта не найден: ${prompt_file}"
-        prompt="$(<"${prompt_file}")"
-    fi
-
-    # --- 1. Проверка доступности сервера -----------------------------------
-    io::streams::print "Проверяю сервер ${base} ..."
-    local models_json
-    if ! models_json="$(curl -fsS --max-time 10 "${base}/v1/models" 2>&1)"; then
-        send_video::die "сервер недоступен: ${base} (${models_json})"
-    fi
-
-    if [[ -z "${model}" ]]; then
-        model="$(jq -r '.data[0].id // empty' <<<"${models_json}")"
-        [[ -n "${model}" ]] || send_video::die "не удалось определить модель из /v1/models"
-    fi
-    io::streams::print "Модель: ${model}"
-
-    # --- 2. Временная папка (чистится при выходе) --------------------------
-    local tmp
-    tmp="$(mktemp -d)" || send_video::die "не удалось создать временную папку"
-    # shellcheck disable=SC2064
-    trap "rm -rf '${tmp}'" EXIT
-
-    local -r ext="${file##*.}"
-    local duration=""
-    duration="$(send_video::duration "${file}")"
-
-    # --- 3. Автоподбор длины фрагмента --------------------------------------
-    if [[ "${segment}" == "auto" ]]; then
-        [[ "${duration}" =~ ^[0-9]+$ ]] \
-            || send_video::die "ffprobe не определил длительность видео"
-        if (( duration <= 15 )); then
-            io::streams::print "Видео короткое (${duration} с): нарезка не нужна."
-            segment=0
-        else
-            local auto_result tps
-            auto_result="$(send_video::auto_segment)" || exit 1
-            segment="${auto_result% *}"
-            tps="${auto_result#* }"
-            io::streams::print "Подобрано: --segment ${segment} (≈ ${tps} токенов на секунду видео)"
-            if (( segment < 10 )); then
-                io::streams::print "  Фрагменты получаются короткими: сервер тратит много токенов на секунду видео." >&2
-                io::streams::print "  Чтобы резать реже, снизьте fps/max_pixels (--mm-processor-kwargs) или увеличьте --max-num-batched-tokens в vLLM." >&2
-            fi
-        fi
-        if args::flag_is_set suggest; then
-            io::streams::print "Используйте: --segment ${segment}"
-            return 0
-        fi
-    fi
-
-    # --- 4. Заголовок текстового отчёта -------------------------------------
-    send_video::emit "# send_video: ${file} | $(date '+%F %T')"
-    send_video::emit "# Сервер: ${base} | модель: ${model}"
-    send_video::emit "# segment=${segment} | temperature=${temperature} | max-tokens=${max_tokens}"
-    if [[ "${duration}" =~ ^[0-9]+$ ]]; then
-        send_video::emit "# Длина видео: $(send_video::timecode "${duration}")"
-    fi
-    send_video::emit ""
-
-    # --- 5. Список фрагментов -----------------------------------------------
-    local -a chunks=()
-    if (( segment > 0 )); then
-        # Предупреждение, если во временной папке может не хватить места
-        local -i need_kb free_kb
-        need_kb=$(( $(wc -c < "${file}") / 1024 ))
-        free_kb="$(df -Pk "${tmp}" | awk 'NR==2 { print $4 }')"
-        if (( free_kb > 0 && free_kb < need_kb )); then
-            io::streams::print "ВНИМАНИЕ: во временной папке ~$(( free_kb / 1024 )) МБ свободно, нужно до $(( need_kb / 1024 )) МБ." >&2
-            io::streams::print "  Укажите другую папку: TMPDIR=/путь/на/диске bs run ..." >&2
-        fi
-        io::streams::print "Режу на фрагменты по ${segment} с (ffmpeg, без перекодирования) ..."
-        # -map 0:v:0 - только видеодорожка (звук vLLM не использует).
-        # -c copy режет по ключевым кадрам, поэтому длины фрагментов приблизительные;
-        # слишком длинные фрагменты потом делятся автоматически (см. process_chunk).
-        ffmpeg -loglevel error -i "${file}" -map 0:v:0 -c copy \
-            -f segment -segment_time "${segment}" -reset_timestamps 1 \
-            "${tmp}/part_%04d.${ext}" \
-            || send_video::die "ffmpeg не смог разрезать видео"
-        local part
-        for part in "${tmp}"/part_*."${ext}"; do
-            [[ -f "${part}" ]] && chunks+=("${part}")
-        done
-        (( ${#chunks[@]} > 0 )) || send_video::die "ffmpeg не создал ни одного фрагмента"
-        io::streams::print "Фрагментов: ${#chunks[@]}"
-    else
-        chunks=("${file}")
-    fi
-
-    # --- 6. Отправка по одному, с замером времени ----------------------------
-    # Счётчики изменяются из process_chunk (динамическая область видимости).
-    local -i failed=0 model_time=0 done_count=0 split_count=0 i
-    local offset="0.00" cdur label
-    for (( i = 0; i < ${#chunks[@]}; i++ )); do
-        cdur="$(send_video::duration_f "${chunks[i]}")"
-        if (( segment > 0 )); then
-            label="$(( i + 1 ))/${#chunks[@]}"
-        else
-            label=""
-        fi
-        send_video::process_chunk "${chunks[i]}" "${offset}" "${label}" 0
-        # Фрагмент больше не нужен - освобождаем место (оригинал не трогаем)
-        if (( segment > 0 )); then
-            rm -f "${chunks[i]}"
-        fi
-        offset="$(awk -v a="${offset}" -v b="${cdur:-${segment}}" 'BEGIN { printf "%.2f", a + b }')"
-    done
-
-    # --- 7. Итоги -----------------------------------------------------------
-    local -i wall=$(( $(date +%s) - t_start ))
-    send_video::emit ""
-    send_video::emit "=== Итого ==="
-    send_video::emit "Обработано фрагментов: ${done_count} (ошибок: ${failed}, автоматических делений: ${split_count})"
-    if [[ "${duration}" =~ ^[0-9]+$ ]]; then
-        send_video::emit "Длина видео: $(send_video::timecode "${duration}")"
-    fi
-    send_video::emit "Общее время работы: $(send_video::timecode "${wall}") (${wall} с)"
-    send_video::emit "Время ответов модели: $(send_video::timecode "${model_time}") (${model_time} с)"
-    if (( done_count > 0 )); then
-        send_video::emit "Среднее на фрагмент: $(( model_time / done_count )) с"
-    fi
-    if [[ "${duration}" =~ ^[0-9]+$ ]] && (( wall > 0 )); then
-        send_video::emit "Скорость: $(awk -v d="${duration}" -v w="${wall}" 'BEGIN { printf "%.1f", d / w }')x от реального времени"
-    fi
-    if [[ -n "${output}" ]]; then
-        io::streams::print "Результаты сохранены: ${output}"
-    fi
-
-    (( failed == 0 )) || send_video::die "не обработано фрагментов: ${failed}"
+# @description Check required programs; stop with a package list if missing.
+# @description Проверить нужные программы; при нехватке остановиться.
+# @param $1 "yes" if ffmpeg and ffprobe are needed / «yes», если нужен ffmpeg
+# @return 0 on success; exits with LIB_ERROR_DEPENDENCY_MISSING otherwise
+send_video::__check_deps() {
+  local -a missing=()
+  local -a specs=(curl jq base64:coreutils tr:coreutils mktemp:coreutils
+    wc:coreutils)
+  if [[ "${1:-no}" == "yes" ]]; then
+    specs+=(ffmpeg ffprobe:ffmpeg)
+  fi
+  deps::missing_tools missing "${specs[@]}"
+  if (( ${#missing[@]} > 0 )); then
+    error::exit "Missing packages: $(arr::join missing ', ')." \
+      "${LIB_ERROR_DEPENDENCY_MISSING}"
+  fi
+  # jq --rawfile appeared in jq 1.6 / --rawfile появился в jq 1.6
+  if ! utils::quiet jq -n --rawfile x /dev/null '$x'; then
+    error::exit "jq 1.6+ is required: $(jq --version)" \
+      "${LIB_ERROR_DEPENDENCY_MISSING}"
+  fi
 }
 
-main "$@"
+# @description Log versions and settings for post-mortem analysis.
+# @description Записать версии и настройки для разбора проблем.
+# @return 0
+send_video::__log_environment() {
+  local -n __map_cfg=__SEND_VIDEO_CFG
+  local key line
+  send_video::__log debug \
+    "bash ${BASH_VERSION}, IFS=$(io::streams::printf '%q' "${IFS}")"
+  send_video::__log debug \
+    "locale: LC_ALL=${LC_ALL:-} LC_NUMERIC=${LC_NUMERIC:-} LANG=${LANG:-}"
+  send_video::__log debug "system: $(uname -sr)"
+  for key in curl jq ffmpeg; do
+    if utils::has "${key}" \
+      && IFS= read -r line < <("${key}" --version 2>&1); then
+      send_video::__log debug "${key}: ${line}"
+    fi
+  done
+  for key in "${!__map_cfg[@]}"; do
+    if [[ "${key}" != "prompt" ]]; then
+      send_video::__log trace "cfg[${key}]=${__map_cfg[${key}]}"
+    fi
+  done
+  return 0
+}
+
+# @description Remove the temporary directory; registered as a cleanup.
+# @description Удалить временную папку; регистрируется как cleanup.
+# @return 0
+send_video::__cleanup() {
+  local -n __map_cfg=__SEND_VIDEO_CFG
+  local -r tmp="${__map_cfg[tmp]:-}"
+  if is::not_empty "${tmp}" && is::dir "${tmp}"; then
+    # Temporary chunks are removed directly, without backups
+    utils::ignore rm -rf -- "${tmp}"
+  fi
+  return 0
+}
+
+# @description Read a flag value, falling back to a default.
+# @description Прочитать значение флага, при отсутствии — значение по умолчанию.
+# @param $1 Flag name / Имя флага
+# @param $2 Default / Значение по умолчанию
+# @stdout Value / Значение
+send_video::__flag() {
+  local -n __map_flags=ARGS_FLAGS
+  io::streams::printf '%s' "${__map_flags[$1]:-${2-}}"
+}
+
+# @description True if a boolean flag was passed.
+# @description Истина, если булев флаг указан.
+# @param $1 Flag name / Имя флага
+# @return 0 if set, 1 otherwise
+send_video::__flag_on() {
+  utils::quiet args::flag_get "${1:?flag name required}"
+}
+
+# @description Declare all command-line flags.
+# @description Объявить все флаги командной строки.
+# @return 0
+send_video::__declare_flags() {
+  args::flag file value
+  args::flag segment value auto
+  args::flag segment-start value 15 number
+  args::flag segment-max value 300 number
+  args::flag suggest
+  args::flag output value
+  args::flag host value "${SEND_VIDEO_DEFAULT_HOST}"
+  args::flag port value "${SEND_VIDEO_DEFAULT_PORT}" number
+  args::flag model value
+  args::flag timeout value 600 number
+  args::flag prompt value "Опиши, что происходит в этом видео."
+  args::flag prompt-file value
+  args::flag system value
+  args::flag temperature value 0.7
+  args::flag max-tokens value auto
+  args::flag log-level value TRACE "enum:TRACE,DEBUG,INFO,SUCCESS,WARN,ERROR"
+  args::flag log-file value
+  args::flag xtrace
+
+  args::flag_describe file "Видеофайл / video file (required)"
+  args::flag_describe segment \
+    "Секунд в фрагменте: число, auto = подобрать по ответам сервера,"\
+" 0 = не резать / chunk length"
+  args::flag_describe segment-start \
+    "С какой длины начинать подбор при auto, сек / search start"
+  args::flag_describe segment-max \
+    "Верхний предел подбора при auto, сек / search cap"
+  args::flag_describe suggest \
+    "Только подобрать --segment и выйти / only find --segment"
+  args::flag_describe output "Файл отчёта: ответы, время, итоги / report"
+  args::flag_describe host "Хост сервера / server host"
+  args::flag_describe port "Порт сервера / server port"
+  args::flag_describe model "ID модели, по умолчанию первая с сервера"
+  args::flag_describe timeout "Таймаут запроса, сек / request timeout"
+  args::flag_describe prompt "Текст запроса к модели / prompt text"
+  args::flag_describe prompt-file "Файл с запросом (приоритетнее --prompt)"
+  args::flag_describe system "Системный промпт / system prompt"
+  args::flag_describe temperature "Температура генерации / temperature"
+  args::flag_describe max-tokens \
+    "Лимит токенов ответа; auto = сколько позволит контекст"
+  args::flag_describe log-level "Уровень журнала, по умолчанию TRACE"
+  args::flag_describe log-file \
+    "Файл журнала (по умолчанию send_video_<время>.log здесь)"
+  args::flag_describe xtrace "Трассировка bash (set -x) в журнал / xtrace"
+  return 0
+}
+
+# ---------------------------------------------------------------------------
+# Entry point / Точка входа
+# ---------------------------------------------------------------------------
+
+# @description Validate arguments and set up logging.
+# @description Проверить аргументы и настроить журнал.
+# @return 0 on success; exits with a framework code on invalid input
+send_video::__configure() {
+  local -n __map_cfg=__SEND_VIDEO_CFG
+  local prompt_file fd
+
+  __map_cfg[file]="$(send_video::__flag file)"
+  __map_cfg[output]="$(send_video::__flag output)"
+  __map_cfg[host]="$(send_video::__flag host "${SEND_VIDEO_DEFAULT_HOST}")"
+  __map_cfg[port]="$(send_video::__flag port "${SEND_VIDEO_DEFAULT_PORT}")"
+  __map_cfg[base]="http://${__map_cfg[host]}:${__map_cfg[port]}"
+  __map_cfg[model]="$(send_video::__flag model)"
+  __map_cfg[timeout]="$(send_video::__flag timeout 600)"
+  __map_cfg[system]="$(send_video::__flag system)"
+  __map_cfg[temperature]="$(send_video::__flag temperature 0.7)"
+  __map_cfg[max_tokens]="$(send_video::__flag max-tokens auto)"
+  __map_cfg[segment]="$(send_video::__flag segment auto)"
+  __map_cfg[segment_start]="$(send_video::__flag segment-start 15)"
+  __map_cfg[segment_max]="$(send_video::__flag segment-max 300)"
+  __map_cfg[log_level]="$(send_video::__flag log-level TRACE)"
+  __map_cfg[log_file]="$(send_video::__flag log-file)"
+  __map_cfg[prompt]="$(send_video::__flag prompt)"
+  prompt_file="$(send_video::__flag prompt-file)"
+
+  if is::empty "${__map_cfg[file]}"; then
+    error::exit "--file is required (see --help)" "${E_INVALID}"
+  fi
+  if ! is::file "${__map_cfg[file]}"; then
+    error::exit "File not found: ${__map_cfg[file]}" \
+      "${LIB_ERROR_FILE_NOT_FOUND}"
+  fi
+  if ! is::readable "${__map_cfg[file]}"; then
+    error::exit "File is not readable: ${__map_cfg[file]}" \
+      "${LIB_ERROR_PERMISSION_DENIED}"
+  fi
+  if send_video::__flag_on suggest; then
+    __map_cfg[segment]=auto
+  fi
+  if [[ "${__map_cfg[segment]}" != "auto" ]] \
+    && ! is::number "${__map_cfg[segment]}"; then
+    error::exit "--segment: a number of seconds or auto" "${E_INVALID}"
+  fi
+  # Decimal numbers have no is:: predicate; plain regex / десятичные числа
+  if [[ ! "${__map_cfg[temperature]}" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+    error::exit "--temperature: a number such as 0.7" "${E_INVALID}"
+  fi
+  if [[ "${__map_cfg[max_tokens]}" == "auto" ]]; then
+    __map_cfg[max_tokens]=""
+  elif ! is::number "${__map_cfg[max_tokens]}"; then
+    error::exit "--max-tokens: a number or auto" "${E_INVALID}"
+  fi
+  if is::not_empty "${prompt_file}"; then
+    if ! is::file "${prompt_file}"; then
+      error::exit "Prompt file not found: ${prompt_file}" \
+        "${LIB_ERROR_FILE_NOT_FOUND}"
+    fi
+    __map_cfg[prompt]="$(<"${prompt_file}")"
+  fi
+  __map_cfg[ext]="${__map_cfg[file]##*.}"
+
+  # Maximum log detail: TRACE on screen and in the file by default
+  BS_LOG_LEVEL="${__map_cfg[log_level]}"
+  if is::empty "${__map_cfg[log_file]}"; then
+    __map_cfg[log_file]="send_video_$(utils::stamp).log"
+  fi
+  : > "${__map_cfg[log_file]}"
+  if send_video::__flag_on xtrace; then
+    exec {fd}>> "${__map_cfg[log_file]}"
+    BASH_XTRACEFD="${fd}"
+    PS4='+ ${BASH_SOURCE##*/}:${LINENO}: '
+    set -x
+  fi
+  send_video::__log info "log file: ${__map_cfg[log_file]}"
+  return 0
+}
+
+# @description Contact the server and pick the model.
+# @description Связаться с сервером и выбрать модель.
+# @return 0 on success; exits when the server cannot be used
+send_video::__connect() {
+  local -n __map_cfg=__SEND_VIDEO_CFG
+  local models_json ctx
+  send_video::__log info "server: ${__map_cfg[base]}"
+  if ! models_json="$(curl -fsS --max-time 10 \
+    "${__map_cfg[base]}/v1/models" 2>&1)"; then
+    error::exit "Server is unavailable: ${__map_cfg[base]} (${models_json})" \
+      "${E_ERROR}"
+  fi
+  send_video::__log trace "models: ${models_json:0:2000}"
+  if is::empty "${__map_cfg[model]}"; then
+    __map_cfg[model]="$(jq -r '.data[0].id // empty' <<< "${models_json}")"
+  fi
+  if is::empty "${__map_cfg[model]}"; then
+    error::exit "No model in /v1/models; pass --model" "${E_ERROR}"
+  fi
+  ctx="$(jq -r '.data[0].max_model_len // "?"' <<< "${models_json}")"
+  send_video::__log info "model: ${__map_cfg[model]} (context ${ctx})"
+  return 0
+}
+
+# @description Cut the video into chunks and list them in the array "$1".
+# @description Нарезать видео на фрагменты и перечислить их в массиве "$1".
+# @param $1 Name of the output array / Имя выходного массива
+# @param $2 Chunk length, seconds; 0 = the whole file / Длина фрагмента
+# @return 0 on success; exits if ffmpeg fails
+send_video::__make_chunks() {
+  local -n __arr_out="${1:?array name required}"
+  local -r segment="${2:?segment required}"
+  local -n __map_cfg=__SEND_VIDEO_CFG
+  local part free_kb
+  local -i need_kb
+
+  if (( segment == 0 )); then
+    arr::push __arr_out "${__map_cfg[file]}"
+    return 0
+  fi
+  need_kb=$(( $(wc -c < "${__map_cfg[file]}") / 1024 ))
+  IFS=' ' read -r _ _ _ free_kb _ \
+    <<< "$(df -Pk "${__map_cfg[tmp]}" | tail -n 1)"
+  if is::number "${free_kb}" && (( free_kb < need_kb )); then
+    send_video::__log warn "temp dir has ~$(( free_kb / 1024 )) MB free," \
+      "up to $(( need_kb / 1024 )) MB needed; set TMPDIR to a bigger disk"
+  fi
+  if ! send_video::__ffmpeg -i "${__map_cfg[file]}" -map 0:v:0 -c copy \
+    -f segment -segment_time "${segment}" -reset_timestamps 1 \
+    "${__map_cfg[tmp]}/part_%05d.${__map_cfg[ext]}"; then
+    error::exit "ffmpeg could not cut the video" "${E_ERROR}"
+  fi
+  for part in "${__map_cfg[tmp]}"/part_*."${__map_cfg[ext]}"; do
+    if is::file "${part}"; then
+      arr::push __arr_out "${part}"
+    fi
+  done
+  if (( ${#__arr_out[@]} == 0 )); then
+    error::exit "ffmpeg produced no chunks" "${E_ERROR}"
+  fi
+  send_video::__log info "chunks: ${#__arr_out[@]}"
+  return 0
+}
+
+# @description Write the final statistics to the report.
+# @description Записать итоговую статистику в отчёт.
+# @param $1 Video length, ms / Длина видео, мс
+# @param $2 Wall time, ms / Общее время, мс
+# @return 0
+send_video::__summary() {
+  local -r dur_ms="${1:-0}"
+  local -r wall_ms="${2:-0}"
+  local -n __map_stat=__SEND_VIDEO_STAT
+  local -i done_n="${__map_stat[done]:-0}" model_ms="${__map_stat[model_ms]:-0}"
+  local -i speed
+
+  send_video::__report ""
+  send_video::__report "=== Итого ==="
+  send_video::__report "Фрагментов обработано: ${done_n}," \
+    "ошибок: ${__map_stat[failed]:-0}," \
+    "автоделений: ${__map_stat[splits]:-0}"
+  send_video::__report "Токенов видео: ${__map_stat[tokens]:-0}"
+  send_video::__report "Общее время: $(send_video::__timecode "${wall_ms}")" \
+    "($(( wall_ms / 1000 )) с)"
+  send_video::__report "Время ответов модели:" \
+    "$(send_video::__timecode "${model_ms}")"
+  if (( done_n > 0 )); then
+    send_video::__report "Среднее на фрагмент:" \
+      "$(send_video::__seconds "$(( model_ms / done_n ))") с"
+  fi
+  if (( dur_ms > 0 && wall_ms > 0 )); then
+    speed=$(( dur_ms * 10 / wall_ms ))
+    send_video::__report \
+      "Скорость: $(( speed / 10 )).$(( speed % 10 ))x от реального времени"
+  fi
+  return 0
+}
+
+# @description Run the whole pipeline: checks, search, chunks, report.
+# @description Выполнить весь процесс: проверки, подбор, фрагменты, отчёт.
+# @param $@ Command-line arguments / Аргументы командной строки
+# @return Does not return: leaves through bs::exit
+send_video::main() {
+  local -n __map_cfg=__SEND_VIDEO_CFG
+  local -n __map_stat=__SEND_VIDEO_STAT
+  local -a chunks=()
+  local -i t_run i dur_ms=0 total=0 offset_ms=0 chunk_ms segment
+
+  # Decimal separators must not depend on the user's locale
+  export LC_NUMERIC=C
+
+  send_video::__declare_flags
+  args::require "$@"
+  t_run="$(utils::now_ms)"
+  send_video::__configure
+
+  if [[ "${__map_cfg[segment]}" != "0" ]]; then
+    send_video::__check_deps yes
+  else
+    send_video::__check_deps no
+  fi
+  __map_cfg[tmp]="$(mktemp -d "${TMPDIR:-/tmp}/send_video.XXXXXX")"
+  cleanup::add send_video::__cleanup
+  send_video::__log_environment
+  send_video::__connect
+
+  if [[ "${__map_cfg[segment]}" != "0" ]]; then
+    if ! dur_ms="$(send_video::__duration_ms "${__map_cfg[file]}")"; then
+      error::exit "ffprobe could not read the video length" "${E_ERROR}"
+    fi
+    total=$(( (dur_ms + 999) / 1000 ))
+    send_video::__log info "video length: ${dur_ms} ms"
+  fi
+
+  if [[ "${__map_cfg[segment]}" == "auto" ]]; then
+    if ! send_video::__find_segment "${total}"; then
+      error::exit "Could not find a chunk length the server accepts" \
+        "${E_ERROR}"
+    fi
+    __map_cfg[segment]="${__map_stat[found]}"
+    send_video::__log success \
+      "chunk length found: ${__map_cfg[segment]} s (0 = the whole file)"
+    if send_video::__flag_on suggest; then
+      send_video::__report "Используйте: --segment ${__map_cfg[segment]}"
+      bs::exit success
+    fi
+  fi
+  segment="${__map_cfg[segment]}"
+
+  send_video::__report "# send_video: ${__map_cfg[file]}"
+  send_video::__report "# $(utils::log_stamp) | ${__map_cfg[base]} |" \
+    "${__map_cfg[model]}"
+  send_video::__report "# segment=${segment}" \
+    "temperature=${__map_cfg[temperature]}" \
+    "max-tokens=${__map_cfg[max_tokens]:-auto}"
+  if (( dur_ms > 0 )); then
+    send_video::__report "# Длина видео: $(send_video::__timecode "${dur_ms}")"
+  fi
+
+  send_video::__make_chunks chunks "${segment}"
+  for (( i = 0; i < ${#chunks[@]}; i++ )); do
+    if (( segment == 0 )); then
+      send_video::__process_chunk "${chunks[i]}" 0 "" 0
+      continue
+    fi
+    send_video::__process_chunk "${chunks[i]}" "${offset_ms}" \
+      "$(( i + 1 ))/${#chunks[@]}" 0
+    if chunk_ms="$(send_video::__duration_ms "${chunks[i]}")"; then
+      offset_ms=$(( offset_ms + chunk_ms ))
+    else
+      offset_ms=$(( offset_ms + segment * 1000 ))
+    fi
+    utils::ignore rm -f "${chunks[i]}"
+  done
+
+  send_video::__summary "${dur_ms}" "$(( $(utils::now_ms) - t_run ))"
+  send_video::__log info "log file: ${__map_cfg[log_file]}"
+  if (( ${__map_stat[failed]:-0} > 0 )); then
+    bs::exit "${E_ERROR}"
+  fi
+  bs::exit success
+}
+
+send_video::main "$@"

@@ -3,6 +3,7 @@
 ## [0.6.0] - 2026-09-28
 
 ### Added
+- cli: bs update — target autodetect also covers the installed copy bs runs from and the install behind the `bs` wrapper in PATH (custom --lib); a root-owned install is updated through sudo when run in a terminal; the up-to-date check now runs before the writability check
 - cli: bs update --github [--repo URL] [--ref REF] — update installed copies straight from GitHub (shallow clone, tarball fallback); an installed copy with no repo around falls back to GitHub automatically; a local checkout is compared with the remote (ls-remote) — when it lacks new code bs warns and asks which source to use, and warns about unpushed/uncommitted local changes when installing from GitHub
 - agents: import 14 engineering skills from alirezarezvani/claude-skills (MIT); apply — security audit of skills, CHANGELOG.md, PR review, persona review of lib/tui/app
 - skills: bs-audit — полный аудит проекта (валидация, сниппеты, артефакты, en/ru синхронизация, ревизия модулей)

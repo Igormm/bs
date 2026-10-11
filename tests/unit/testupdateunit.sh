@@ -43,6 +43,32 @@ test_update_basic() {
     rm -rf "${tmp_dir}"
 }
 
+# Автодетект: каталог установки берётся из обёртки `bs` в PATH
+# Autodetect: the install directory comes from the `bs` wrapper in PATH
+test_update_autodetect() {
+    local tmp_dir src target
+    tmp_dir="$(mktemp -d)"
+    src="${tmp_dir}/repo"
+    target="${tmp_dir}/custom/lib/bs"
+
+    mkdir -p "${src}/core" "${src}/lib" "${src}/bootstrap" "${target}/core" "${tmp_dir}/bin" "${tmp_dir}/home"
+    printf '#!/usr/bin/env bash\necho fake-bs\n' > "${src}/bs"
+    printf '#!/usr/bin/env bash\n' > "${src}/bootstrap/init.sh"
+    printf 'new_func() { :; }\n' > "${src}/core/new.sh"
+    printf '#!/usr/bin/env bash\nexport BS_ROOT="%s"\nexec "${BS_ROOT}/bs" "$@"\n' "${target}" > "${tmp_dir}/bin/bs"
+    chmod +x "${tmp_dir}/bin/bs"
+
+    # Без терминала (stdin не TTY) sudo не вызывается; системная установка
+    # на машине разработчика может дать ненулевой код — проверяем файлы.
+    # No terminal (stdin is not a TTY) means no sudo; a system install on the
+    # developer machine may yield a non-zero code — so check the files.
+    HOME="${tmp_dir}/home" PATH="${tmp_dir}/bin:${PATH}" \
+        bash "${BS_PROJECT_ROOT}/bs" update --from "${src}" >/dev/null 2>&1 </dev/null || true
+    testframework::assert_command "test -f '${target}/core/new.sh'" "bs update detects the install behind the PATH wrapper"
+
+    rm -rf "${tmp_dir}"
+}
+
 test_update_errors() {
     local tmp_dir src missing
     tmp_dir="$(mktemp -d)"
@@ -131,6 +157,9 @@ main() {
 
     testframework::section "GitHub source / Источник GitHub"
     test_update_github
+
+    testframework::section "Autodetect / Автодетект"
+    test_update_autodetect
 
     testframework::section "Errors / Ошибки"
     test_update_errors

@@ -808,6 +808,24 @@ update_local_state() {
   fi
 }
 
+# @private Каталог установки из обёртки `bs` (install.sh пишет в неё
+# export BS_ROOT="..."). Пустой вывод, если файл — не обёртка.
+# @private Install directory named by a `bs` wrapper (install.sh writes
+# export BS_ROOT="..." into it). Empty output if the file is not a wrapper.
+# @param $1 Path to a `bs` executable / Путь к исполняемому `bs`
+update_wrapper_root() {
+  local -r file="$1"
+  local -r re='^export BS_ROOT="([^"$]+)"$'
+  local line n=0
+  while IFS= read -r line && (( n++ < 5 )); do
+    if [[ "${line}" =~ ${re} ]]; then
+      printf '%s\n' "${BASH_REMATCH[1]}"
+      return 0
+    fi
+  done < "${file}" 2>/dev/null
+  return 0
+}
+
 update_cmd() {
   local from="${BS_ROOT}"
   local from_explicit=0
@@ -875,8 +893,10 @@ update_cmd() {
         printf 'installed copy with no repo around — GitHub.\n'
         printf 'A local git checkout is compared with GitHub first: if it lacks new\n'
         printf 'code, bs asks which source to use (non-interactive: warns, uses local).\n'
-        printf 'Without target flags: update every detected install (local + system).\n'
-        printf 'Copies bootstrap/, core/, lib/, bs. Use sudo bs update --system.\n'
+        printf 'Without target flags: update every detected install — ~/.local/lib/bs,\n'
+        printf '/usr/local/lib/bs, the copy bs runs from, the one behind `bs` in PATH.\n'
+        printf 'Copies bootstrap/, core/, lib/, bs. A root-owned install is updated\n'
+        printf 'through sudo when run in a terminal (otherwise: sudo bs update).\n'
         return 0 ;;
       *)
         die "update: unknown argument: $1" ;;
@@ -942,14 +962,27 @@ update_cmd() {
     fi
   fi
 
-  # Детект установок / Detect installs
+  # Детект установок: стандартные каталоги, установленная копия, из которой
+  # запущен bs, и каталог из обёртки `bs` в PATH (нестандартный --lib).
+  # Detect installs: the standard directories, the installed copy bs runs
+  # from, and the directory named by the `bs` wrapper in PATH (custom --lib).
   if (( explicit == 0 )); then
-    if is::dir "${HOME}/.local/lib/bs"; then
-      targets+=("${HOME}/.local/lib/bs")
-    fi
-    if is::dir "/usr/local/lib/bs"; then
-      targets+=("/usr/local/lib/bs")
-    fi
+    local -a found=("${HOME}/.local/lib/bs" "/usr/local/lib/bs")
+    is::dir "${BS_ROOT}/tests" || found+=("${BS_ROOT}")
+    local wrapper wrapper_root
+    while IFS= read -r wrapper; do
+      wrapper_root="$(update_wrapper_root "${wrapper}")"
+      [[ -n "${wrapper_root}" ]] && found+=("${wrapper_root}")
+    done < <(type -aP bs 2>/dev/null)
+    local dir seen=$'\n'
+    for dir in "${found[@]}"; do
+      dir="${dir%/}"
+      is::dir "${dir}/core" || continue
+      [[ "${dir}" == "${checkout%/}" ]] && continue
+      [[ "${seen}" == *$'\n'"${dir}"$'\n'* ]] && continue
+      seen+="${dir}"$'\n'
+      targets+=("${dir}")
+    done
   fi
 
   if (( ${#targets[@]} == 0 )); then
@@ -980,11 +1013,6 @@ update_cmd() {
       same_paths+=("${target}")
       continue
     fi
-    if ! [[ -w "${target}" ]]; then
-      log::warn "update: target not writable: ${target} (try: sudo bs update --system)"
-      ro_paths+=("${target}")
-      continue
-    fi
     # Уже актуально: содержимое совпадает — копировать нечего (повторный
     # запуск update не должен давать «UPDATE COMPLETE»).
     # Already up to date: identical content — nothing to copy (a re-run of
@@ -996,24 +1024,42 @@ update_cmd() {
       uptodate_paths+=("${target}")
       continue
     fi
+    # Нет прав на запись: в терминале повышаем права через sudo сами (sudo
+    # спросит пароль); без терминала — только предупреждение.
+    # Not writable: in a terminal elevate with sudo ourselves (sudo asks for
+    # the password); without a terminal just warn.
+    local -a as_root=()
+    if ! [[ -w "${target}" ]]; then
+      if [[ -t 0 ]] && utils::has sudo; then
+        log::info "update: ${target} needs root — using sudo / нужны права root"
+        as_root=(sudo)
+      else
+        log::warn "update: target not writable: ${target} (try: sudo bs update --system)"
+        ro_paths+=("${target}")
+        continue
+      fi
+    fi
     log::info "syncing ${source_label} -> ${target}"
     # Атомарная замена: копируем во временный каталог, затем mv (rename).
     # Atomic replace: copy to a temp dir, then mv (rename) — a running `bs`
     # keeps the old inode instead of reading a half-truncated file.
     local tmp_dir
     tmp_dir="${target}/.update.$$"
-    rm -rf -- "${tmp_dir}"
-    mkdir -p -- "${tmp_dir}"
-    if ! cp -a "${from}/bootstrap" "${from}/core" "${from}/lib" "${from}/bs" "${tmp_dir}/"; then
-      rm -rf -- "${tmp_dir}"
+    if ! { "${as_root[@]}" rm -rf -- "${tmp_dir}" && "${as_root[@]}" mkdir -p -- "${tmp_dir}"; }; then
+      log::warn "update: cannot write to ${target} (try: sudo bs update --system)"
+      ro_paths+=("${target}")
+      continue
+    fi
+    if ! "${as_root[@]}" cp -a "${from}/bootstrap" "${from}/core" "${from}/lib" "${from}/bs" "${tmp_dir}/"; then
+      "${as_root[@]}" rm -rf -- "${tmp_dir}"
       log::error "update: copy failed for ${target} (source files intact)"
       continue
     fi
-    mv -f -- "${tmp_dir}/bs" "${target}/bs"
-    rm -rf -- "${target}/bootstrap" && mv -f -- "${tmp_dir}/bootstrap" "${target}/bootstrap"
-    rm -rf -- "${target}/core" && mv -f -- "${tmp_dir}/core" "${target}/core"
-    rm -rf -- "${target}/lib" && mv -f -- "${tmp_dir}/lib" "${target}/lib"
-    rmdir -- "${tmp_dir}" 2>/dev/null || true
+    "${as_root[@]}" mv -f -- "${tmp_dir}/bs" "${target}/bs"
+    "${as_root[@]}" rm -rf -- "${target}/bootstrap" && "${as_root[@]}" mv -f -- "${tmp_dir}/bootstrap" "${target}/bootstrap"
+    "${as_root[@]}" rm -rf -- "${target}/core" && "${as_root[@]}" mv -f -- "${tmp_dir}/core" "${target}/core"
+    "${as_root[@]}" rm -rf -- "${target}/lib" && "${as_root[@]}" mv -f -- "${tmp_dir}/lib" "${target}/lib"
+    "${as_root[@]}" rmdir -- "${tmp_dir}" 2>/dev/null || true
     ok=1
     if (( verbose == 1 )); then
       log::info "  files: $(find "${from}/core" "${from}/lib" -name '*.sh' | wc -l) modules copied"
