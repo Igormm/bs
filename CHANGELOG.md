@@ -3,6 +3,7 @@
 ## [0.6.0] - 2026-09-28
 
 ### Added
+- cli: bs update --github [--repo URL] [--ref REF] — update installed copies straight from GitHub (shallow clone, tarball fallback); an installed copy with no repo around falls back to GitHub automatically; a local checkout is compared with the remote (ls-remote) — when it lacks new code bs warns and asks which source to use, and warns about unpushed/uncommitted local changes when installing from GitHub
 - agents: import 14 engineering skills from alirezarezvani/claude-skills (MIT); apply — security audit of skills, CHANGELOG.md, PR review, persona review of lib/tui/app
 - skills: bs-audit — полный аудит проекта (валидация, сниппеты, артефакты, en/ru синхронизация, ревизия модулей)
 - lib/tui: высокоуровневый слой app.sh — окна, кнопки, биндинги, модалки, цикл; app_demo.sh для новичков; todo.sh переведён на tui::app (267→150 строк)
