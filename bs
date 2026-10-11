@@ -91,7 +91,7 @@ Commands:
   build <script>      Assemble a standalone self-extracting script
   repl                Interactive REPL (BS shell / интерактивная консоль)
   calc                RPN calculator on dc (обратная польская нотация)
-  update              Apply repo changes to installed copies (no reinstall)
+  update              Update installed copies from a local repo or GitHub
   uninstall           Remove installed BS copies (wrapper + lib tree)
   init-shell          Print snippet for ~/.bashrc or ~/.zshrc
 
@@ -674,8 +674,8 @@ EOF
 }
 
 # ==========================================
-# bs update: apply repo changes to installed copies without reinstalling
-# bs update: применить изменения репозитория к установленным копиям
+# bs update: apply repo changes (local checkout or GitHub) to installed copies
+# bs update: применить изменения репозитория (локального или с GitHub) к установленным копиям
 # ==========================================
 
 # @private Boxed notice printed WITHOUT log prefixes — timestamps would
@@ -728,8 +728,92 @@ update_box() {
   printf '%s╰%s╯%s\n' "${color_b}" "${rule}" "${color_reset}"
 }
 
+# URL репозитория по умолчанию для `bs update --github` (переопределяется
+# флагом --repo или переменной BS_UPDATE_REPO).
+# Default repository URL for `bs update --github` (override with --repo or
+# the BS_UPDATE_REPO variable).
+readonly UPDATE_DEFAULT_REPO="https://github.com/Igormm/bs"
+
+# @private Каталог со скачанным источником; удаляется стеком cleanup.
+# @private Directory with the downloaded source; removed by the cleanup stack.
+UPDATE_FETCH_DIR=""
+update_fetch_cleanup() {
+  [[ -n "${UPDATE_FETCH_DIR}" ]] && rm -rf -- "${UPDATE_FETCH_DIR}"
+  return 0
+}
+
+# @private Скачать репозиторий во временный каталог: git clone (shallow),
+# иначе tar-архив через curl/wget. Путь кладётся в UPDATE_FETCH_DIR.
+# @private Download the repository into a temp dir: shallow git clone, else
+# a tarball via curl/wget. The path is stored in UPDATE_FETCH_DIR.
+# @param $1 Repo URL / URL репозитория
+# @param $2 Branch or tag / Ветка или тег
+update_fetch() {
+  local -r repo="${1%.git}"
+  local -r ref="$2"
+  UPDATE_FETCH_DIR="$(mktemp -d)"
+  cleanup::add update_fetch_cleanup
+  local -r dest="${UPDATE_FETCH_DIR}/src"
+
+  if utils::has git \
+     && utils::quiet git clone --quiet --depth 1 --branch "${ref}" -- "${repo}" "${dest}"; then
+    return 0
+  fi
+  rm -rf -- "${dest}"
+  mkdir -p -- "${dest}"
+
+  local -r archive="${repo}/archive/${ref}.tar.gz"
+  if utils::has curl; then
+    curl -fsSL -- "${archive}" 2>/dev/null | utils::quiet tar -xz -C "${dest}" --strip-components=1 \
+      && return 0
+  elif utils::has wget; then
+    wget -qO- -- "${archive}" 2>/dev/null | utils::quiet tar -xz -C "${dest}" --strip-components=1 \
+      && return 0
+  fi
+  die "update: cannot download ${repo} (${ref}) — need git or curl/wget and network access"
+}
+
+# @private Сравнить локальный checkout с удалённой веткой, ничего не меняя
+# в репозитории (ls-remote, без fetch). Печатает одно слово:
+#   same     — HEAD совпадает с удалённой веткой
+#   ahead    — локально есть коммиты, которых нет на удалённой стороне
+#   behind   — на удалённой стороне есть код, которого нет локально
+#              (в т.ч. разошедшиеся истории)
+#   unknown  — не git-checkout, нет сети или нет такой ветки
+# @private Compare a local checkout with the remote branch without touching
+# the repository (ls-remote, no fetch). Prints one word: same | ahead |
+# behind (remote has code the checkout lacks, diverged included) | unknown.
+# @param $1 Local checkout / Локальный checkout
+# @param $2 Repo URL / URL репозитория
+# @param $3 Branch / Ветка
+update_local_state() {
+  local -r dir="$1" repo="${2%.git}" ref="$3"
+  if ! utils::has git || ! [[ -e "${dir}/.git" ]]; then
+    printf 'unknown\n'
+    return 0
+  fi
+  local -a limit=()
+  utils::has timeout && limit=(timeout 15)
+  local remote_sha head_sha
+  remote_sha="$(GIT_TERMINAL_PROMPT=0 "${limit[@]}" git ls-remote -- "${repo}" "refs/heads/${ref}" 2>/dev/null | cut -f1)" || remote_sha=""
+  head_sha="$(git -C "${dir}" rev-parse HEAD 2>/dev/null)" || head_sha=""
+  if [[ -z "${remote_sha}" || -z "${head_sha}" ]]; then
+    printf 'unknown\n'
+  elif [[ "${remote_sha}" == "${head_sha}" ]]; then
+    printf 'same\n'
+  elif utils::quiet git -C "${dir}" merge-base --is-ancestor "${remote_sha}" HEAD; then
+    printf 'ahead\n'
+  else
+    printf 'behind\n'
+  fi
+}
+
 update_cmd() {
   local from="${BS_ROOT}"
+  local from_explicit=0
+  local github=0
+  local repo="${BS_UPDATE_REPO:-${UPDATE_DEFAULT_REPO}}"
+  local ref="main"
   local -a targets=()
   local explicit=0
   local verbose=0
@@ -754,19 +838,44 @@ update_cmd() {
         shift
         [[ $# -ge 1 ]] || die "update: --from requires a source directory"
         from="$1"
+        from_explicit=1
+        shift ;;
+      --github)
+        github=1
+        shift ;;
+      --repo)
+        shift
+        [[ $# -ge 1 ]] || die "update: --repo requires a repository URL"
+        github=1
+        repo="$1"
+        shift ;;
+      --ref)
+        shift
+        [[ $# -ge 1 ]] || die "update: --ref requires a branch or tag"
+        github=1
+        ref="$1"
         shift ;;
       -v|--verbose)
         verbose=1
         shift ;;
       -h|--help)
-        printf 'Usage: bs update [--local] [--system] [--lib DIR] [--from DIR] [-v]\n\n'
-        printf 'Copies framework changes from the source repository to installed\n'
-        printf 'copies without reinstalling. Run from the repo: ./bs update\n'
+        printf 'Usage: bs update [--local] [--system] [--lib DIR]\n'
+        printf '                 [--from DIR | --github [--repo URL] [--ref REF]] [-v]\n\n'
+        printf 'Applies framework changes to installed copies without reinstalling.\n'
+        printf 'Targets:\n'
         printf '  --local   update to ~/.local/lib/bs      (local install)\n'
         printf '  --system  update to /usr/local/lib/bs    (system install, needs root)\n'
         printf '  --lib DIR update to a custom install directory\n'
-        printf '  --from    source repo (default: repo detected from CWD, else running BS_ROOT)\n'
-        printf 'Without flags: update to every detected install (local + system).\n'
+        printf 'Source:\n'
+        printf '  --from DIR  local repo checkout\n'
+        printf '  --github    download from GitHub (%s)\n' "${UPDATE_DEFAULT_REPO}"
+        printf '  --repo URL  another repository (or BS_UPDATE_REPO); implies --github\n'
+        printf '  --ref REF   branch or tag (default: main); implies --github\n'
+        printf 'Default source: the repo in CWD (./bs update); when bs runs from an\n'
+        printf 'installed copy with no repo around — GitHub.\n'
+        printf 'A local git checkout is compared with GitHub first: if it lacks new\n'
+        printf 'code, bs asks which source to use (non-interactive: warns, uses local).\n'
+        printf 'Without target flags: update every detected install (local + system).\n'
         printf 'Copies bootstrap/, core/, lib/, bs. Use sudo bs update --system.\n'
         return 0 ;;
       *)
@@ -776,8 +885,61 @@ update_cmd() {
 
   # Источник: если CWD — каталог репозитория, используем его.
   # Source: if CWD is the repo directory, use it as the source.
-  if [[ "${from}" == "${BS_ROOT}" && -f "${PWD}/bs" && -d "${PWD}/core" && -d "${PWD}/tests" ]]; then
-    from="${PWD}"
+  if (( github == 1 && from_explicit == 1 )); then
+    die "update: --from and --github are mutually exclusive"
+  fi
+  # Локальный checkout рядом (для сверки с GitHub): CWD-репозиторий, иначе
+  # BS_ROOT, если это репозиторий, а не установленная копия (в ней нет tests/).
+  # Local checkout around (to compare with GitHub): the CWD repo, else BS_ROOT
+  # when it is a repo and not an installed copy (which has no tests/).
+  local checkout=""
+  if (( from_explicit == 1 )); then
+    checkout="${from}"
+  elif [[ -f "${PWD}/bs" && -d "${PWD}/core" && -d "${PWD}/tests" ]]; then
+    checkout="${PWD}"
+  elif is::dir "${from}/tests"; then
+    checkout="${from}"
+  fi
+
+  if (( github == 0 && from_explicit == 0 )); then
+    if [[ -n "${checkout}" ]]; then
+      from="${checkout}"
+    else
+      # Развилка: bs запущен из установленной копии и репозитория рядом
+      # нет — локального источника нет, берём с GitHub.
+      # Fork: bs runs from an installed copy and there is no repo around —
+      # no local source, so fetch from GitHub.
+      github=1
+    fi
+  fi
+
+  # Конфликт источников: локальный checkout и GitHub могут расходиться.
+  # Source conflict: the local checkout and GitHub may differ.
+  local state="unknown"
+  [[ -n "${checkout}" ]] && state="$(update_local_state "${checkout}" "${repo}" "${ref}")"
+  if (( github == 0 )) && [[ "${state}" == "behind" ]]; then
+    log::warn "update: local repo is behind ${repo%.git}@${ref} — it lacks new code / локальный репозиторий отстаёт от GitHub"
+    log::warn "update:   ${checkout}"
+    if (( from_explicit == 0 )) && [[ -t 0 && -t 1 ]]; then
+      local answer=""
+      printf 'Источник / Source: [g]ithub (новее/newer), [l]ocal, [a]bort? [g] '
+      read -r answer || answer="a"
+      case "${answer,,}" in
+        ''|g|github) github=1 ;;
+        l|local)     : ;;
+        *)           die "update: aborted / отменено" ;;
+      esac
+    else
+      log::warn "update: installing the LOCAL code; for the newest run: git pull, or bs update --github"
+    fi
+  elif (( github == 1 )) && [[ -n "${checkout}" ]]; then
+    if [[ "${state}" == "ahead" ]]; then
+      log::warn "update: local repo has commits not pushed to ${repo%.git}@${ref} — GitHub lacks them / на GitHub нет локальных коммитов: ${checkout}"
+    fi
+    if utils::has git && [[ -e "${checkout}/.git" ]] \
+       && [[ -n "$(git -C "${checkout}" status --porcelain -- bs bootstrap core lib 2>/dev/null)" ]]; then
+      log::warn "update: local repo has uncommitted changes — they are NOT installed from GitHub / незакоммиченные правки не попадут в установку: ${checkout}"
+    fi
   fi
 
   # Детект установок / Detect installs
@@ -793,7 +955,14 @@ update_cmd() {
   if (( ${#targets[@]} == 0 )); then
     die "update: no BS installs found (use --local, --system or --lib DIR)"
   fi
-  is::dir "${from}/core" || die "update: source is not a BS repo: ${from}"
+  local source_label="${from}"
+  if (( github == 1 )); then
+    source_label="${repo%.git}@${ref}"
+    log::info "fetching ${source_label}"
+    update_fetch "${repo}" "${ref}"
+    from="${UPDATE_FETCH_DIR}/src"
+  fi
+  is::dir "${from}/core" || die "update: source is not a BS repo: ${source_label}"
 
   local target ok=0
   local -a same_paths=() miss_paths=() ro_paths=() uptodate_paths=()
@@ -827,7 +996,7 @@ update_cmd() {
       uptodate_paths+=("${target}")
       continue
     fi
-    log::info "syncing ${from} -> ${target}"
+    log::info "syncing ${source_label} -> ${target}"
     # Атомарная замена: копируем во временный каталог, затем mv (rename).
     # Atomic replace: copy to a temp dir, then mv (rename) — a running `bs`
     # keeps the old inode instead of reading a half-truncated file.
@@ -879,6 +1048,8 @@ update_cmd() {
     reasons+=("  cd <repo> && ./bs update")
     reasons+=("или укажите источник / or pass the source:")
     reasons+=("  bs update --from <repo-path>")
+    reasons+=("или обновитесь с GitHub / or update from GitHub:")
+    reasons+=("  bs update --github")
   fi
   update_box "ОБНОВЛЕНИЙ НЕТ / NO UPDATES" "${reasons[@]}"
   # Пропуск «источник == цель» или «уже актуально» — это не ошибка, а отказ

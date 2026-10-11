@@ -58,6 +58,69 @@ test_update_errors() {
     rm -rf "${tmp_dir}"
 }
 
+# Фейковый git-репозиторий BS с веткой main / Fake BS git repo on branch main
+make_git_repo() {
+    local -r repo="$1"
+    mkdir -p "${repo}/core" "${repo}/lib" "${repo}/bootstrap"
+    printf '#!/usr/bin/env bash\necho remote-bs\n' > "${repo}/bs"
+    printf '#!/usr/bin/env bash\n' > "${repo}/bootstrap/init.sh"
+    printf 'remote_func() { :; }\n' > "${repo}/core/remote.sh"
+    printf 'remote_lib() { :; }\n' > "${repo}/lib/remote.sh"
+    git -C "${repo}" init --quiet --initial-branch=main
+    git -C "${repo}" add -A
+    git -C "${repo}" -c user.name=test -c user.email=test@example.com commit --quiet -m init
+}
+
+test_update_github() {
+    if ! utils::has git; then
+        testframework::assert_true "true" "bs update --github skipped (no git)"
+        return 0
+    fi
+    local tmp_dir repo target
+    tmp_dir="$(mktemp -d)"
+    repo="${tmp_dir}/remote"
+    target="${tmp_dir}/installed"
+    make_git_repo "${repo}"
+    mkdir -p "${target}"
+
+    # Явный источник: --repo подразумевает --github / --repo implies --github
+    bash "${BS_PROJECT_ROOT}/bs" update --lib "${target}" --repo "file://${repo}" >/dev/null 2>&1
+    testframework::assert_equal "0" "$?" "bs update --repo exits 0"
+    testframework::assert_command "test -f '${target}/core/remote.sh'" "bs update --repo copies remote core"
+    testframework::assert_command "test -f '${target}/lib/remote.sh'" "bs update --repo copies remote lib"
+    testframework::assert_command "test ! -e '${target}/.git'" "bs update --repo does not copy .git"
+
+    testframework::assert_false "bash '${BS_PROJECT_ROOT}/bs' update --lib '${target}' --repo 'file://${repo}' --ref no-such-ref" "bs update fails on unknown ref"
+    testframework::assert_false "bash '${BS_PROJECT_ROOT}/bs' update --lib '${target}' --github --from '${repo}'" "bs update rejects --from with --github"
+
+    # Развилка: установленная копия без репозитория рядом идёт на GitHub
+    # Fork: an installed copy with no repo around falls back to GitHub
+    local installed="${tmp_dir}/copy"
+    mkdir -p "${installed}"
+    cp -a "${BS_PROJECT_ROOT}/bootstrap" "${BS_PROJECT_ROOT}/core" "${BS_PROJECT_ROOT}/lib" "${BS_PROJECT_ROOT}/bs" "${installed}/"
+    (cd "${tmp_dir}" && env -u BS_ROOT -u BS_HOME BS_UPDATE_REPO="file://${repo}" bash "${installed}/bs" update --lib "${installed}" >/dev/null 2>&1)
+    testframework::assert_equal "0" "$?" "bs update from installed copy exits 0"
+    testframework::assert_command "test -f '${installed}/core/remote.sh'" "installed copy updates from remote repo"
+
+    # Конфликт: локальный клон отстаёт от удалённого репозитория
+    # Conflict: the local clone is behind the remote repository
+    local clone="${tmp_dir}/clone" out
+    git clone --quiet "file://${repo}" "${clone}"
+    printf 'newer_func() { :; }\n' > "${repo}/core/newer.sh"
+    git -C "${repo}" add -A
+    git -C "${repo}" -c user.name=test -c user.email=test@example.com commit --quiet -m newer
+    rm -rf "${target}" && mkdir -p "${target}"
+    out="$(BS_UPDATE_REPO="file://${repo}" bash "${BS_PROJECT_ROOT}/bs" update --lib "${target}" --from "${clone}" 2>&1 </dev/null)"
+    testframework::assert_equal "0" "$?" "bs update from a stale clone exits 0"
+    testframework::assert_command "grep -q 'is behind' <<< '${out//\'/}'" "bs update warns when local repo is behind"
+    testframework::assert_command "test ! -e '${target}/core/newer.sh'" "stale clone installs local code when non-interactive"
+
+    bash "${BS_PROJECT_ROOT}/bs" update --lib "${target}" --repo "file://${repo}" >/dev/null 2>&1
+    testframework::assert_command "test -f '${target}/core/newer.sh'" "bs update --repo installs the newer remote code"
+
+    rm -rf "${tmp_dir}"
+}
+
 main() {
     print_header "Update Unit Tests / Модульные тесты sync"
 
@@ -65,6 +128,9 @@ main() {
 
     testframework::section "Update / Обновление"
     test_update_basic
+
+    testframework::section "GitHub source / Источник GitHub"
+    test_update_github
 
     testframework::section "Errors / Ошибки"
     test_update_errors
