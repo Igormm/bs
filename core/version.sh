@@ -13,7 +13,7 @@ bs::guard "VERSION" || return 0
 # Единственный источник BS_VERSION — этот модуль; bs и const.sh только используют
 # Single source of BS_VERSION is this module; bs and const.sh only use it
 if is::empty "${BS_VERSION:-}"; then
-  export BS_VERSION="0.6.0"
+  export BS_VERSION="0.7.0"
 fi
 
 # @global BS_NAME — Env: framework full name (category: env)
@@ -35,6 +35,31 @@ bs::version::print() {
 #   version=$(BS::version::get)
 bs::version::get() {
     printf '%s\n' "${BS_VERSION}"
+}
+
+# @description Version of another BS directory (a repository, an installed
+#   copy, a downloaded source). It only READS core/version.sh: no code from
+#   that directory is run.
+# @description Версия другого каталога BS (репозитория, установленной копии,
+#   скачанного источника). Только ЧИТАЕТ core/version.sh: код из этого
+#   каталога не запускается.
+# @param $1 BS directory / Каталог BS
+# @stdout Version string; empty if the directory has no readable version
+# @return 0 always
+# @example
+#   installed=$(bs::version::of "$HOME/.local/lib/bs")
+bs::version::of() {
+    local -r file="${1:?directory required}/core/version.sh"
+    local -r re='^[[:space:]]*export[[:space:]]+BS_VERSION="([^"]+)"'
+    local line
+    [[ -f "${file}" ]] || return 0
+    while IFS= read -r line; do
+        if [[ "${line}" =~ ${re} ]]; then
+            printf '%s\n' "${BASH_REMATCH[1]}"
+            return 0
+        fi
+    done < "${file}"
+    return 0
 }
 
 # @description Compare versions / Сравнить версии

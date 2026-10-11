@@ -62,11 +62,21 @@ test_update_autodetect() {
     printf '#!/usr/bin/env bash\nexport BS_ROOT="%s"\nexec "${BS_ROOT}/bs" "$@"\n' "${target}" > "${tmp_dir}/bin/bs"
     chmod +x "${tmp_dir}/bin/bs"
 
-    # Без терминала (stdin не TTY) sudo не вызывается; системная установка
-    # на машине разработчика может дать ненулевой код — проверяем файлы.
-    # No terminal (stdin is not a TTY) means no sudo; a system install on the
-    # developer machine may yield a non-zero code — so check the files.
-    HOME="${tmp_dir}/home" PATH="${tmp_dir}/bin:${PATH}" \
+    # Изоляция: автопоиск обходит PATH и находит ВСЕ обёртки bs, поэтому PATH
+    # урезан до поддельной обёртки и системных каталогов — настоящая установка
+    # пользователя (~/.local/bin/bs) не должна быть видна. Реальная системная
+    # установка, доступная на запись (запуск от root), — повод пропустить тест.
+    # Isolation: the autodetect walks PATH and finds EVERY bs wrapper, so PATH
+    # is cut down to the fake wrapper and the system directories — the user's
+    # real install (~/.local/bin/bs) must not be visible. A real system
+    # install writable by us (a run as root) is a reason to skip the test.
+    if [[ -d /usr/local/lib/bs && -w /usr/local/lib/bs ]]; then
+        printf "  ⊘ Skipping PATH autodetect: a writable system install exists\n"
+        rm -rf "${tmp_dir}"
+        return 0
+    fi
+    # Без терминала (stdin не TTY) sudo не вызывается / no TTY, so no sudo
+    HOME="${tmp_dir}/home" PATH="${tmp_dir}/bin:/usr/bin:/bin" \
         bash "${BS_PROJECT_ROOT}/bs" update --from "${src}" >/dev/null 2>&1 </dev/null || true
     testframework::assert_command "test -f '${target}/core/new.sh'" "bs update detects the install behind the PATH wrapper"
 

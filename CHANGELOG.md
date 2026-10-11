@@ -1,8 +1,11 @@
 # Changelog
 
-## [0.6.0] - 2026-09-28
+## [0.7.0] - 2026-10-12
 
 ### Added
+- version: BS_VERSION 0.7.0 — the number lives only in core/version.sh (core/const.sh pulls it in, its own copy is gone); bs::version::of <dir> reads the version of another BS directory without running its code; bs version --full shows where this copy is from (root, install mode, source commit, last update); bs update prints "version old → new" and warns about a DOWNGRADE
+- examples: send_video.sh / send_audio.sh — a reliable checkpoint: *.state records the exact sizes of the report and the results, so a resume cuts off anything written after it (a crash between the append and the state write) and never duplicates a piece; Ctrl-C/SIGTERM/SIGHUP mark the run as stopped; a resume checks that the media is cut into the same number of chunks and that the files were not shortened; .video.lock/.audio.lock keep two copies out of one directory; a plain file given as --output now gets a clear message
+- tests: unit/testsendcommonunit.sh — run directory naming and creation, key=value files, checkpoint size helpers, lock
 - examples: send_audio.sh — transcribe the audio track of a video through /v1/audio/transcriptions (Whisper): mono 16 kHz WAV on the video timeline, phrases with start_ms/end_ms, understands start_ms/end_ms segments and OpenAI verbose_json
 - examples: send_video.sh / send_audio.sh — run directory <output>/<media name>/ shared by both: *.params (settings of the run, incl. the chunk length found by probing), *.state (checkpoint), *.txt report, *.jsonl results with millisecond bounds, logs; a rerun resumes from the checkpoint, --restart starts over, a failed chunk stops the run (send_video: --keep-going keeps the old behaviour); examples/send_common.sh holds the shared helpers
 - install: install manifest <lib>/.install (mode, prefix, lib, bin, version, source, source repo/commit, date, user) written by install.sh; bs update refreshes it (updated_at/updated_from/updated_commit) and creates one for installs made by an older installer; bs env prints it; bs uninstall takes the wrapper path from it

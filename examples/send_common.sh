@@ -10,8 +10,16 @@
 #     video.txt     audio.txt      human-readable report
 #     video.jsonl   audio.jsonl    one JSON object per piece, start_ms/end_ms
 #     send_video_<time>.log ...    processing logs
+#     .video.lock   .audio.lock    held while a run is active
 # Оба скрипта держат всё об одном медиафайле в одном каталоге (см. выше):
 # параметры, точку остановки, отчёт, машинный результат и журналы.
+#
+# Checkpoint rules / Правила точки остановки:
+#   * video.state is rewritten atomically after every finished piece;
+#   * it records the exact sizes of the report and the results file, so on
+#     resume anything written after the checkpoint (a crash between the
+#     append and the state write) is cut off and the piece is redone;
+#   * a piece reaches the report and the results only as a whole.
 
 # Source Guard
 bs::guard "SEND_COMMON" || return 0
@@ -50,6 +58,91 @@ sendrun::ensure_dir() {
     return 2
   fi
   return 1
+}
+
+# @description Say why a run directory cannot be used: the first existing
+#   ancestor decides (a plain file in the way, no write permission, ...).
+# @description Объяснить, почему каталог прогона недоступен: решает первый
+#   существующий предок (на пути лежит файл, нет прав на запись и т. д.).
+# @param $1 Run directory / Каталог прогона
+# @stdout One-line reason, Russian / English
+sendrun::explain_dir_error() {
+  local probe="${1:?directory required}"
+  while [[ "${probe}" != "/" && "${probe}" != "." && ! -e "${probe}" ]]; do
+    probe="$(dirname -- "${probe}")"
+  done
+  if [[ -e "${probe}" && ! -d "${probe}" ]]; then
+    io::streams::printf '%s' "${probe} — это файл, а не каталог (отчёт \
+старого формата?). Укажите в --output каталог или переименуйте файл: \
+${probe} is a file, not a directory; pass a directory to --output or \
+rename it"
+  elif [[ -d "${probe}" && ! -w "${probe}" ]]; then
+    io::streams::printf '%s' "нет прав на запись в ${probe} / \
+no write permission in ${probe}"
+  elif [[ -d "$1" && ! -w "$1" ]]; then
+    io::streams::printf '%s' "нет прав на запись в $1 / no write permission in $1"
+  else
+    io::streams::printf '%s' "не удалось создать $1 / cannot create $1"
+  fi
+}
+
+# @description Lock a run directory for one script, so that two copies do
+#   not write the same checkpoint. The lock lives as long as the process
+#   (the kernel drops it even after kill -9). Without flock it is skipped.
+# @description Заблокировать каталог прогона для одного скрипта, чтобы две
+#   копии не писали одну точку остановки. Блокировка живёт, пока жив процесс
+#   (ядро снимает её даже после kill -9). Без flock пропускается.
+# @param $1 Run directory / Каталог прогона
+# @param $2 Lock name, e.g. "video" / Имя блокировки
+# @return 0 locked (or flock is missing), 1 another run holds the lock
+sendrun::lock() {
+  local -r file="${1:?directory required}/.${2:?name required}.lock"
+  if ! utils::has flock; then
+    return 0
+  fi
+  exec {SENDRUN_LOCK_FD}>> "${file}" || return 0
+  if ! flock -n "${SENDRUN_LOCK_FD}"; then
+    return 1
+  fi
+  return 0
+}
+
+# @description Size of a file in bytes; 0 if it does not exist.
+# @description Размер файла в байтах; 0, если файла нет.
+# @param $1 File / Файл
+# @stdout Bytes / Байты
+sendrun::size() {
+  if is::file "${1:?file required}"; then
+    io::streams::printf '%d' "$(( $(wc -c < "$1") ))"
+  else
+    io::streams::printf '0'
+  fi
+}
+
+# @description Bring a file back to the size recorded in the checkpoint:
+#   data written after the checkpoint is cut off. A file that is SHORTER
+#   than recorded has lost data and cannot be trusted.
+# @description Вернуть файл к размеру из точки остановки: данные, записанные
+#   после неё, отрезаются. Файл КОРОЧЕ записанного потерял данные и ему
+#   нельзя доверять.
+# @param $1 File / Файл
+# @param $2 Recorded size, bytes / Записанный размер
+# @return 0 file is consistent now (cut=1 on stdout if bytes were cut),
+#   1 the file is shorter than recorded
+sendrun::truncate_to() {
+  local -r file="${1:?file required}"
+  local -r want="${2:?size required}"
+  local -r have="$(sendrun::size "${file}")"
+  if (( have < want )); then
+    return 1
+  fi
+  if (( have > want )); then
+    truncate -s "${want}" -- "${file}" || return 1
+    io::streams::printf '%s' "$(( have - want ))"
+    return 0
+  fi
+  io::streams::printf '0'
+  return 0
 }
 
 # @description Absolute path of an existing file.

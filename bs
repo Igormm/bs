@@ -78,7 +78,7 @@ Usage: bs [command] [args...]
 
 Commands:
   help, -h, --help    Show this help
-  version             Print framework version
+  version [--full]    Print framework version (--full: build and install info)
   env                 Show environment (BS_ROOT, PATH)
   list                List available modules (core/, lib/)
   lang-doc            Emit a JSON index of function docs (LSP metadata)
@@ -106,7 +106,44 @@ Examples:
 HELP
 }
 
-version() { bs::version::print; }
+# @private Первые 7 символов хеша коммита / First 7 characters of a commit hash
+short_sha() { printf '%s' "${1:0:7}"; }
+
+# bs version [--full]: номер версии; с --full — откуда взята эта копия BS
+# bs version [--full]: the version number; --full adds where this BS copy is from
+version_cmd() {
+  case "${1:-}" in
+    "")          bs::version::print; return 0 ;;
+    -f|--full)   bs::version::print ;;
+    *)           die "version: unknown argument: $1 (try: bs version --full)" ;;
+  esac
+
+  local key
+  local -A info=()
+  printf '  %-10s %s\n' "root:" "${BS_ROOT}"
+  if [[ -f "${BS_ROOT}/.install" ]]; then
+    for key in mode installed_at installed_by source source_commit \
+               updated_at updated_from updated_commit; do
+      info["${key}"]="$(install_info_get "${BS_ROOT}" "${key}")"
+    done
+    printf '  %-10s %s, installed %s by %s\n' "install:" \
+      "${info[mode]:-?}" "${info[installed_at]:-?}" "${info[installed_by]:-?}"
+    printf '  %-10s %s @ %s\n' "source:" \
+      "${info[source]:-?}" "$(short_sha "${info[source_commit]:-}")"
+    if [[ -n "${info[updated_at]}" ]]; then
+      printf '  %-10s %s from %s @ %s\n' "updated:" "${info[updated_at]}" \
+        "${info[updated_from]:-?}" "$(short_sha "${info[updated_commit]:-}")"
+    fi
+  elif [[ -e "${BS_ROOT}/.git" ]] && utils::has git; then
+    printf '  %-10s source checkout, commit %s (%s)%s\n' "install:" \
+      "$(git -C "${BS_ROOT}" rev-parse --short=7 HEAD 2>/dev/null)" \
+      "$(git -C "${BS_ROOT}" log -1 --format=%cd --date=short 2>/dev/null)" \
+      "$([[ -n "$(git -C "${BS_ROOT}" status --porcelain 2>/dev/null)" ]] && printf ', with uncommitted changes')"
+  else
+    printf '  %-10s %s\n' "install:" \
+      "no manifest (installed by an older installer)"
+  fi
+}
 # @private Значение ключа из манифеста установки (<lib>/.install, key=value).
 # @private Value of a key from the install manifest (<lib>/.install, key=value).
 # @param $1 Install directory / Каталог установки
@@ -899,14 +936,9 @@ update_manifest() {
   # The version of the SOURCE, not of the running bs: ask the source itself
   # (its bs version → bs::version::get); if it does not answer with a
   # version, fall back to the running bs.
-  local version=""
-  local -r re_version='([0-9]+(\.[0-9]+)+)$'
-  version="$(env -u BS_VERSION -u BS_INITIALIZED BS_ROOT="${from}" BS_HOME="${from}" bash "${from}/bs" version 2>/dev/null)" || version=""
-  if [[ "${version}" =~ ${re_version} ]]; then
-    version="${BASH_REMATCH[1]}"
-  else
-    version="$(bs::version::get)"
-  fi
+  local version
+  version="$(bs::version::of "${from}")"
+  [[ -n "${version}" ]] || version="$(bs::version::get)"
   content+="version=${version}"$'\n'
   content+="updated_at=$(date '+%Y-%m-%d %H:%M:%S')"$'\n'
   content+="updated_from=${label}"$'\n'
@@ -1086,7 +1118,10 @@ update_cmd() {
   fi
   is::dir "${from}/core" || die "update: source is not a BS repo: ${source_label}"
 
-  local target ok=0
+  local target ok=0 new_ver old_ver
+  local -i rc_cmp
+  new_ver="$(bs::version::of "${from}")"
+  [[ -n "${new_ver}" ]] || new_ver="$(bs::version::get)"
   local -a same_paths=() miss_paths=() ro_paths=() uptodate_paths=()
   for target in "${targets[@]}"; do
     if ! is::dir "${target}"; then
@@ -1128,7 +1163,18 @@ update_cmd() {
         continue
       fi
     fi
-    log::info "syncing ${source_label} -> ${target}"
+    old_ver="$(bs::version::of "${target}")"
+    log::info "syncing ${source_label} -> ${target}" \
+      "(version ${old_ver:-?} → ${new_ver})"
+    # Откат на более старую версию — не ошибка, но о нём стоит сказать вслух
+    # Installing an OLDER version is not an error, but worth saying aloud
+    if [[ -n "${old_ver}" ]]; then
+      rc_cmp=0
+      bs::version::compare "${old_ver}" "${new_ver}" || rc_cmp=$?
+      if (( rc_cmp == 1 )); then
+        log::warn "update: DOWNGRADE ${old_ver} → ${new_ver} (the source is older than the install)"
+      fi
+    fi
     # Атомарная замена: копируем во временный каталог, затем mv (rename).
     # Atomic replace: copy to a temp dir, then mv (rename) — a running `bs`
     # keeps the old inode instead of reading a half-truncated file.
@@ -1176,7 +1222,7 @@ update_cmd() {
     reasons+=("• ${p} — нет прав на запись / not writable (try: sudo bs update --system)")
   done
   for p in "${uptodate_paths[@]}"; do
-    reasons+=("• ${p} — уже актуально / already up to date")
+    reasons+=("• ${p} — уже актуально / already up to date (version $(bs::version::of "${p}"))")
   done
   if (( ${#same_paths[@]} > 0 )); then
     reasons+=("")
@@ -1378,7 +1424,7 @@ fi
 # 8. Обычный CLI-диспетчер
 case "${1:-help}" in
   help|-h|--help) help ;;
-  version)        version ;;
+  version)        shift; version_cmd "$@" ;;
   env)            env_cmd ;;
   list)           list_cmd ;;
   lang-doc)       shift; lang_doc_cmd "$@" ;;

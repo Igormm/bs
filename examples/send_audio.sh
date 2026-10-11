@@ -56,7 +56,7 @@ readonly -a SEND_AUDIO_PARAM_KEYS=(file file_size duration_ms base model
 # @global SEND_AUDIO_STATE_KEYS — constant (category: constant); checkpoint
 # @global SEND_AUDIO_STATE_KEYS — константа (категория: constant); остановка
 readonly -a SEND_AUDIO_STATE_KEYS=(status next_chunk chunks_total offset_ms
-  done phrases model_ms wall_ms updated_at)
+  report_bytes results_bytes done phrases model_ms wall_ms updated_at)
 
 # @global __SEND_AUDIO_CFG — internal state (category: state); run settings
 # @global __SEND_AUDIO_CFG — внутреннее состояние (категория: state); настройки
@@ -357,8 +357,9 @@ send_audio::__declare_flags() {
 
   args::flag_describe file "Видео- или аудиофайл / media file (required)"
   args::flag_describe output \
-    "Где создать каталог прогона <имя файла>/ (отчёт, параметры, точка"\
-" остановки, журналы); по умолчанию здесь / run directory parent"
+    "КАТАЛОГ, в котором создаётся <имя файла>/ с audio.txt, audio.jsonl,"\
+" audio.params, audio.state (точка остановки) и журналами; по умолчанию"\
+" текущий. Повторный запуск продолжает с точки остановки / parent dir"
   args::flag_describe segment \
     "Секунд звука в одном запросе; 0 = весь файл одним запросом"\
 " / seconds of audio per request"
@@ -423,8 +424,14 @@ send_audio::__configure() {
     "${__map_cfg[file]}")"
   sendrun::ensure_dir "${__map_cfg[run_dir]}" || dir_rc=$?
   if (( dir_rc == 2 )); then
-    error::exit "Cannot use the run directory: ${__map_cfg[run_dir]}" \
+    error::exit "Cannot use the run directory ${__map_cfg[run_dir]}: \
+$(sendrun::explain_dir_error "${__map_cfg[run_dir]}")" \
       "${LIB_ERROR_PERMISSION_DENIED}"
+  fi
+  # One copy per directory: two runs would write the same checkpoint
+  if ! sendrun::lock "${__map_cfg[run_dir]}" audio; then
+    error::exit "Another send_audio is already running in \
+${__map_cfg[run_dir]} (lock .audio.lock)" "${E_ERROR}"
   fi
   for key in txt jsonl params state wav; do
     __map_cfg["path_${key}"]="${__map_cfg[run_dir]}/audio.${key}"
@@ -483,12 +490,40 @@ send_audio::__save_state() {
   for key in "${SEND_AUDIO_STAT_KEYS[@]}"; do
     __map_state["${key}"]="${__map_stat[${key}]:-0}"
   done
+  # Exact sizes of the files at this moment: on resume everything written
+  # after the checkpoint is cut off (a crash between append and state write)
+  __map_state[report_bytes]="$(sendrun::size "${__map_cfg[path_txt]}")"
+  __map_state[results_bytes]="$(sendrun::size "${__map_cfg[path_jsonl]}")"
   __map_state[updated_at]="$(utils::log_stamp)"
   if ! sendrun::kv_write "${__map_cfg[path_state]}" __SEND_AUDIO_STATE \
     "${SEND_AUDIO_STATE_KEYS[@]}"; then
     error::exit "Cannot write ${__map_cfg[path_state]}" "${E_ERROR}"
   fi
   return 0
+}
+
+# @description Ctrl-C, SIGTERM or a closed terminal: mark the checkpoint as
+#   stopped and leave. Counters and position are those of the last finished
+#   chunk, so nothing half-done is recorded.
+# @description Ctrl-C, SIGTERM или закрытый терминал: пометить точку
+#   остановки как stopped и выйти. Счётчики и позиция — по последнему
+#   готовому фрагменту, недоделанное не записывается.
+# @return Does not return
+send_audio::__interrupted() {
+  local -n __map_cfg=__SEND_AUDIO_CFG
+  local -n __map_state=__SEND_AUDIO_STATE
+  trap - INT TERM HUP
+  if is::number "${__map_state[next_chunk]:-}"; then
+    __map_state[status]=stopped
+    __map_state[updated_at]="$(utils::log_stamp)"
+    utils::ignore sendrun::kv_write "${__map_cfg[path_state]}" \
+      __SEND_AUDIO_STATE "${SEND_AUDIO_STATE_KEYS[@]}"
+    send_audio::__log warn "interrupted; checkpoint saved:" \
+      "${__map_cfg[path_state]}"
+    send_audio::__log info "rerun the same command to continue from chunk" \
+      "$(( __map_state[next_chunk] + 1 ))"
+  fi
+  exit 130
 }
 
 # @description Forget a previous run: parameters, checkpoint, report, results
@@ -562,6 +597,10 @@ send_audio::__load_run() {
   fi
   if (( progress > 0 )); then
     __map_cfg[resume]=yes
+    send_audio::__log info "found an unfinished run (status" \
+      "${__map_state[status]:-?}): ${progress} of" \
+      "${__map_state[chunks_total]:-?} chunks done," \
+      "last update ${__map_state[updated_at]:-?}"
     for key in "${SEND_AUDIO_STAT_KEYS[@]}"; do
       if is::number "${__map_state[${key}]:-}"; then
         __map_stat["${key}"]="${__map_state[${key}]}"
@@ -668,7 +707,8 @@ send_audio::main() {
   local -n __map_state=__SEND_AUDIO_STATE
   local -a chunks=()
   local -i t_run t_start i dur_ms=0 offset_ms=0 chunk_ms segment
-  local -i first=0 wall_before=0 count
+  local -i first=0 wall_before=0 count cut_bytes=0
+  local key want pair
 
   # Decimal separators must not depend on the user's locale
   export LC_NUMERIC=C
@@ -677,6 +717,9 @@ send_audio::main() {
   args::require "$@"
   t_run="$(utils::now_ms)"
   send_audio::__configure
+  signal::on INT send_audio::__interrupted
+  signal::on TERM send_audio::__interrupted
+  signal::on HUP send_audio::__interrupted
   send_audio::__check_deps
   __map_cfg[tmp]="$(mktemp -d "${TMPDIR:-/tmp}/send_audio.XXXXXX")"
   cleanup::add send_audio::__cleanup
@@ -701,8 +744,32 @@ send_audio::main() {
   send_audio::__log info "audio length: ${dur_ms} ms," \
     "chunk length: ${segment} s (0 = the whole file)"
 
+  # Cut first: a resume is only valid if the audio is cut the same way
+  send_audio::__make_chunks chunks "${segment}"
   __map_cfg[report]="${__map_cfg[path_txt]}"
   if [[ "${__map_cfg[resume]}" == "yes" ]]; then
+    if [[ "${#chunks[@]}" != "${__map_state[chunks_total]:-}" ]]; then
+      error::exit "The audio is cut into ${#chunks[@]} chunks now, the \
+checkpoint was made for ${__map_state[chunks_total]:-?}. Pass --restart to \
+start over." "${E_INVALID}"
+    fi
+    # Bring the report and the results back to the checkpoint
+    for pair in txt:report_bytes jsonl:results_bytes; do
+      key="${pair%%:*}"
+      want="${__map_state[${pair#*:}]:-}"
+      if ! is::number "${want}"; then
+        continue
+      fi
+      if ! cut_bytes="$(sendrun::truncate_to "${__map_cfg[path_${key}]}" \
+        "${want}")"; then
+        error::exit "${__map_cfg[path_${key}]} is shorter than the \
+checkpoint says: data was lost. Pass --restart to start over." "${E_ERROR}"
+      fi
+      if (( cut_bytes > 0 )); then
+        send_audio::__log warn "audio.${key}: cut ${cut_bytes} B written" \
+          "after the checkpoint (an interrupted run)"
+      fi
+    done
     first="${__map_state[next_chunk]}"
     offset_ms="${__map_state[offset_ms]:-0}"
     wall_before="${__map_state[wall_ms]:-0}"
@@ -722,7 +789,6 @@ send_audio::main() {
     send_audio::__report ""
   fi
 
-  send_audio::__make_chunks chunks "${segment}"
   __map_state[chunks_total]="${#chunks[@]}"
   __map_state[next_chunk]="${first}"
   __map_state[offset_ms]="${offset_ms}"

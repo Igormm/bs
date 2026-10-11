@@ -77,6 +77,7 @@ sudo ./install.sh uninstall      # system
 ./bs doctor    # framework integrity check
 ./bs list      # list modules
 ./bs version   # framework version
+./bs version --full   # + where this copy is from
 ```
 
 - `bs doctor` checks that `bootstrap/init.sh`, the core modules, and the

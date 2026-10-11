@@ -364,7 +364,7 @@ Note: internally this checks `command -v timeout >/dev/null 2>&1`; in your own c
 
 - `FRAMEWORK_DEBUG=false` — debug mode flag.
 - `FRAMEWORK_DRY_RUN=false` — dry-run flag (no actions executed).
-- `BS_VERSION` — framework version; owned by the `bs` script (readonly), set here only if empty.
+- `BS_VERSION` — framework version; defined only in `core/version.sh`, `const.sh` pulls that module in.
 
 ### Constant groups
 
@@ -393,7 +393,7 @@ Note: internally this checks `command -v timeout >/dev/null 2>&1`; in your own c
 
 ## Version — `core/version.sh`
 
-- `BS_VERSION` — current version (e.g. `0.6.0`); exported only if empty, the `bs` script owns the readonly variable.
+- `BS_VERSION` — current version (e.g. `0.7.0`); the single place where the number is written; exported only if empty.
 - `BS_NAME="BS (Bash Open Source Architecture) BOSA Framework"`.
 
 #### `bs::version::print`
@@ -405,6 +405,12 @@ Note: internally this checks `command -v timeout >/dev/null 2>&1`; in your own c
 - Prints the version string
 - Returns: 0
 - Example: `version=$(bs::version::get)`
+
+#### `bs::version::of <dir>`
+- Parameters: `$1` — a BS directory (repository, installed copy, downloaded source)
+- Prints the version written in `<dir>/core/version.sh`, empty if there is none. It only reads the file; no code from `<dir>` is run
+- Returns: 0
+- Example: `installed=$(bs::version::of "$HOME/.local/lib/bs")`
 
 #### `bs::version::compare <ver1> <ver2>`
 - Parameters: `$1`, `$2` — dotted version strings, compared numerically per part

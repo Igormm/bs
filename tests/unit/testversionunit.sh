@@ -20,11 +20,37 @@ source "${TEST_SCRIPT_DIR}/../testframework.sh"
 export BS_SILENT=1
 source "${BS_PROJECT_ROOT}/bootstrap/init.sh"
 
+# Один номер на весь репозиторий / One number for the whole repository
+test_single_source() {
+    local tmp top
+    tmp="$(mktemp -d)"
+
+    # Версия другого каталога читается, а не исполняется
+    # The version of another directory is read, not executed
+    mkdir -p "${tmp}/core"
+    printf 'touch "%s/executed"\nexport BS_VERSION="9.8.7"\n' "${tmp}" > "${tmp}/core/version.sh"
+    testframework::assert_equal "9.8.7" "$(bs::version::of "${tmp}")" "bs::version::of reads another directory"
+    testframework::assert_command "test ! -e '${tmp}/executed'" "bs::version::of runs no code from that directory"
+    testframework::assert_equal "" "$(bs::version::of "${tmp}/missing")" "bs::version::of of a missing directory is empty"
+    testframework::assert_equal "${BS_VERSION}" "$(bs::version::of "${BS_PROJECT_ROOT}")" "bs::version::of the repository equals BS_VERSION"
+    rm -rf "${tmp}"
+
+    # const.sh не держит своего номера, CHANGELOG начинается с текущей версии
+    # const.sh has no number of its own; the CHANGELOG starts with the current version
+    testframework::assert_false "grep -qE 'BS_VERSION=\"[0-9]' '${BS_PROJECT_ROOT}/core/const.sh'" "core/const.sh has no version literal"
+    top="$(sed -n 's/^## \[\([0-9][0-9.]*\)\].*/\1/p' "${BS_PROJECT_ROOT}/CHANGELOG.md" | head -n 1)"
+    testframework::assert_equal "${BS_VERSION}" "${top}" "the top CHANGELOG section is the current version"
+    testframework::assert_equal "$(bash "${BS_PROJECT_ROOT}/bs" version)" "$(bash "${BS_PROJECT_ROOT}/bs" version --full | head -n 1)" "bs version --full starts with the plain bs version line"
+}
+
 # Главная функция тестов
 main() {
     print_header "Version Unit Tests / Модульные тесты версий"
     
     testframework::init
+
+    testframework::section "Single source / Один источник"
+    test_single_source
     
     # Тест 1: Сравнение версий (0 — равны, 1 — первая больше, 2 — первая меньше)
     # Version comparison (0 — equal, 1 — first is greater, 2 — first is less)
