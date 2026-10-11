@@ -18,7 +18,7 @@ write_install_manifest() {
     printf 'prefix=%s\n' "${PREFIX}"
     printf 'lib=%s\n' "${TARGET_LIB}"
     printf 'bin=%s\n' "${TARGET_BIN}"
-    printf 'version=%s\n' "${BS_VERSION:-unknown}"
+    printf 'version=%s\n' "$(bs::version::get)"
     printf 'source=%s\n' "${SOURCE_ROOT}"
     printf 'source_repo=%s\n' "${repo}"
     printf 'source_commit=%s\n' "${commit}"
@@ -90,7 +90,9 @@ do_uninstall() {
   # Root required for system mode
   if [[ "${MODE}" == "system" ]]; then
     if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
-      printf "ERROR: Нужны права root. Запустите: sudo ./install.sh\n" >&2
+      printf "ERROR: Нужны права root. Запустите: sudo ./install.sh uninstall\n" >&2
+      printf "       Локальная установка удаляется без root: ./install.sh --local uninstall\n\n" >&2
+      usage >&2
       exit 1
     fi
   fi

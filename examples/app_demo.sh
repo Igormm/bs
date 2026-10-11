@@ -25,7 +25,7 @@ main() {
 }
 
 app::say_hello() {
-    tui::app::message_modal "Hello" "Hello from BS ${BS_VERSION}!"
+    tui::app::message_modal "Hello" "Hello from BS $(bs::version::get)!"
 }
 
 if [[ -n "${BASH_EXECUTION_STRING:-}" || "${BASH_SOURCE[0]}" == "$0" ]]; then

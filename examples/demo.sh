@@ -17,7 +17,7 @@ __demo::section() {
 
 main() {
     __demo::section "BS Framework demo"
-    echo "Version: ${BS_VERSION}"
+    echo "Version: $(bs::version::get)"
 
     __demo::section "HTTP client (dry-run)"
     export FRAMEWORK_DRY_RUN=true

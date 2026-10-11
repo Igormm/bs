@@ -30,7 +30,7 @@ readonly REPL_HISTORY_MAX=200
 # @description Показать справку REPL / Show REPL help
 repl::help() {
   cat <<HELP
-BS REPL ${BS_VERSION:-} — interactive shell for the BS framework
+BS REPL $(bs::version::get) — interactive shell for the BS framework
 
 Usage / Использование:
   bs repl [--help|-h]
@@ -234,7 +234,7 @@ repl::main() {
 
   repl::__history_load "${history_file}"
 
-  printf 'BS REPL %s — BS Bash framework interactive shell\n' "${BS_VERSION:-}"
+  printf 'BS REPL %s — BS Bash framework interactive shell\n' "$(bs::version::get)"
   printf 'Тех, кто не знает команд, отправляем в :help; выход — :exit\n'
 
   while true; do

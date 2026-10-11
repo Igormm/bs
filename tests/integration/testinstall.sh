@@ -341,6 +341,28 @@ test_installer_uninstall_safety() {
     testframework::assert_command "test -f '${BS_PROJECT_ROOT}/bs'" "repo survives when TARGET_LIB == SOURCE_ROOT"
 }
 
+# uninstall без --local сам находит локальную установку и не требует root
+# uninstall without --local finds the local install itself, no root needed
+test_uninstall_detects_local() {
+    if [[ -d /usr/local/lib/bs ]]; then
+        printf "  ⊘ Skipping uninstall autodetect: a system install exists on this machine\n"
+        return 0
+    fi
+    local iso rc=0 out
+    iso="$(mk_isolated_home)"
+    run_installer "${iso}" --local >/dev/null 2>&1 || true
+
+    out="$(run_installer "${iso}" uninstall)" || rc=$?
+    testframework::assert_equal "0" "${rc}" "uninstall without --local exits 0 for a local install"
+    testframework::assert_true "'${out}' =~ mode=local" "uninstall reads the mode from the install manifest"
+    testframework::assert_command "test ! -e '${iso}/.local/lib/bs'" "uninstall without --local removes the local install"
+
+    rc=0
+    out="$(run_installer "${iso}" uninstall)" || rc=$?
+    testframework::assert_equal "0" "${rc}" "uninstall with nothing installed exits 0"
+    testframework::assert_true "'${out}' =~ не\ установлена" "uninstall reports that BS is not installed"
+}
+
 test_system_mode_requires_root() {
     if [[ "$(id -u)" -eq 0 ]]; then
         printf "  ⊘ Skipping system-mode root check: running as root\n"
@@ -383,6 +405,7 @@ main() {
     test_uninstall_readonly_rc
 
     testframework::section "System mode / Системная установка"
+    test_uninstall_detects_local
     test_system_mode_requires_root
 
     testframework::summary

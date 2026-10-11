@@ -73,7 +73,7 @@ die()  { error::exit "$*"; }
 
 help() {
   cat <<HELP
-BS Framework ${BS_VERSION} – command launcher & shebang interpreter
+BS Framework $(bs::version::get) – command launcher & shebang interpreter
 Usage: bs [command] [args...]
 
 Commands:
@@ -893,7 +893,21 @@ update_manifest() {
   if utils::has git && [[ -e "${from}/.git" ]]; then
     commit="$(git -C "${from}" rev-parse HEAD 2>/dev/null)" || commit=""
   fi
-  content+="version=${BS_VERSION:-unknown}"$'\n'
+  # Версия ИСТОЧНИКА, а не запущенного bs: спрашиваем у самого источника
+  # (его bs version → bs::version::get); если он не отвечает версией —
+  # берём версию текущего bs.
+  # The version of the SOURCE, not of the running bs: ask the source itself
+  # (its bs version → bs::version::get); if it does not answer with a
+  # version, fall back to the running bs.
+  local version=""
+  local -r re_version='([0-9]+(\.[0-9]+)+)$'
+  version="$(env -u BS_VERSION -u BS_INITIALIZED BS_ROOT="${from}" BS_HOME="${from}" bash "${from}/bs" version 2>/dev/null)" || version=""
+  if [[ "${version}" =~ ${re_version} ]]; then
+    version="${BASH_REMATCH[1]}"
+  else
+    version="$(bs::version::get)"
+  fi
+  content+="version=${version}"$'\n'
   content+="updated_at=$(date '+%Y-%m-%d %H:%M:%S')"$'\n'
   content+="updated_from=${label}"$'\n'
   content+="updated_commit=${commit}"$'\n'

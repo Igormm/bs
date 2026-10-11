@@ -38,6 +38,7 @@ HELP
 
 # Дефолтные значения для параметров \ Parse arguments
 MODE="system"        # system|local
+MODE_EXPLICIT="0"    # 1 если режим задан флагом --local
 ACTION="install"     # install|uninstall
 ACTION_EXPLICIT="0"  # 1 если действие задано явно
 FLAG_PATH="0"        # 0|1
@@ -47,7 +48,7 @@ FLAG_UPDATE_PATH="0" # 0|1
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --local)
-      MODE="local"; shift ;;
+      MODE="local"; MODE_EXPLICIT="1"; shift ;;
     --path)
       FLAG_PATH="1"; shift ;;
     --update-path)
@@ -61,6 +62,31 @@ while [[ $# -gt 0 ]]; do
       exit 1 ;;
   esac
 done
+
+# Удаление без --local: режим определяется по тому, что реально установлено.
+# Есть только локальная копия (~/.local/lib/bs), системной нет — удаляем её,
+# а не требуем root ради несуществующей системной установки.
+# Uninstall without --local: the mode follows what is actually installed.
+# Only a local copy (~/.local/lib/bs) and no system one — remove that
+# instead of demanding root for a system install that does not exist.
+if [[ "${ACTION}" != "install" && "${MODE_EXPLICIT}" == "0" \
+      && -z "${PREFIX:-}" && -z "${BIN_DIR:-}" && -z "${LIB_DIR:-}" \
+      && ! -d "/usr/local/lib/bs" ]]; then
+  if [[ -d "${HOME}/.local/lib/bs" ]]; then
+    MODE="local"
+    # Режим записан в манифесте установки (<lib>/.install); у копий старого
+    # установщика манифеста нет — тогда режим следует из каталога.
+    # The mode is recorded in the install manifest (<lib>/.install); copies
+    # made by an older installer have none — then the directory decides.
+    recorded_mode="$(sed -n 's/^mode=//p' "${HOME}/.local/lib/bs/.install" 2>/dev/null | head -n 1)"
+    printf "Найдена локальная установка (mode=%s) — удаляется %s\n" "${recorded_mode:-local}" "${HOME}/.local/lib/bs"
+    printf "Local install found (mode=%s) — removing %s\n" "${recorded_mode:-local}" "${HOME}/.local/lib/bs"
+  else
+    printf "BS не установлена: нет ни %s, ни %s\n" "/usr/local/lib/bs" "${HOME}/.local/lib/bs"
+    printf "BS is not installed: neither %s nor %s exists\n" "/usr/local/lib/bs" "${HOME}/.local/lib/bs"
+    exit 0
+  fi
+fi
 
 # Resolve paths
 SOURCE_ROOT="${SCRIPT_DIR}"

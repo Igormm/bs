@@ -5,4 +5,4 @@
 
 load "lib/io/streams"
 
-io::streams::print "hello from BS ${BS_VERSION}"
+io::streams::print "hello from BS $(bs::version::get)"
