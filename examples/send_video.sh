@@ -177,6 +177,7 @@ send_video::__overflow_parse() {
   local -r re_cache='cache[[:space:]]+size[^0-9]*([0-9]+)'
   local -r re_ctx='maximum[[:space:]]+context[[:space:]]+length[^0-9]*([0-9]+)'
   local -r re_req='requested[[:space:]]+([0-9]+)[[:space:]]+tokens'
+  local -r re_input='[Ii]nput[[:space:]]+length[^0-9]*([0-9]+)'
   local -r re_len='prompt[[:space:]]+\(length[[:space:]]+([0-9]+)\)'
   local -r re_max='model[[:space:]]+length[[:space:]]+of[[:space:]]+([0-9]+)'
   local msg over="" limit=""
@@ -188,8 +189,18 @@ send_video::__overflow_parse() {
     fi
   elif [[ "${msg}" =~ ${re_ctx} ]]; then
     limit="${BASH_REMATCH[1]}"
-    if [[ "${msg}" =~ ${re_req} ]]; then
+    # vLLM: "Input length (26569) exceeds model's maximum context length
+    # (24576)"; старый формат — "... you requested N tokens". Если размер
+    # не распознан, это всё равно ошибка размера: 0 = «неизвестно», поиск
+    # длины фрагмента пойдёт делением пополам.
+    # vLLM: "Input length (26569) exceeds model's maximum context length
+    # (24576)"; the older format is "... you requested N tokens". An
+    # unrecognised size is still a size error: 0 = "unknown", the chunk
+    # search then falls back to bisection.
+    if [[ "${msg}" =~ ${re_req} || "${msg}" =~ ${re_input} ]]; then
       over="${BASH_REMATCH[1]}"
+    else
+      over=0
     fi
   elif [[ "${msg}" =~ ${re_len} ]]; then
     over="${BASH_REMATCH[1]}"
@@ -973,9 +984,15 @@ send_video::main() {
     send_video::__log success \
       "chunk length found: ${__map_cfg[segment]} s (0 = the whole file)"
     if send_video::__flag_on suggest; then
+      send_video::__log info \
+        "probe found: ${__map_cfg[segment]} s; --suggest only reports it," \
+        "the video transcription is not started"
       send_video::__report "Используйте: --segment ${__map_cfg[segment]}"
       bs::exit success
     fi
+    send_video::__log info \
+      "probe found: ${__map_cfg[segment]} s — starting the video" \
+      "transcription now"
   fi
   segment="${__map_cfg[segment]}"
 
