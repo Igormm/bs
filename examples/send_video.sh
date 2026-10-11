@@ -20,6 +20,11 @@
 # (~10 с видео), читает из ответа сервера реальное число токенов (usage) и
 # считает, сколько секунд видео помещается в контекст модели с запасом.
 #
+# Если сервер отклоняет фрагмент как слишком большой (HTTP 400: превышен кеш
+# энкодера или контекст), скрипт разбирает число токенов и лимит из текста ошибки,
+# делит фрагмент на нужное число частей (ffmpeg, с перекодированием) и обрабатывает
+# каждую часть. Это работает и при ручном --segment.
+#
 # Нарезка выполняется там, где запущен скрипт. Если видео лежит на сервере,
 # запускайте скрипт на нём с --host 127.0.0.1: тогда по сети ничего не идёт.
 #
@@ -147,18 +152,27 @@ send_video::mime() {
     esac
 }
 
-# Секунды -> ЧЧ:ММ:СС
+# Секунды (целые или дробные) -> ЧЧ:ММ:СС
 send_video::timecode() {
-    local -i s="$1"
+    local raw="${1:-0}"
+    local -i s="${raw%.*}"
     printf '%02d:%02d:%02d' $(( s / 3600 )) $(( (s % 3600) / 60 )) $(( s % 60 ))
+}
+
+# Длительность видео в секундах с дробной частью (пусто, если ffprobe недоступен/ошибка)
+send_video::duration_f() {
+    command -v ffprobe >/dev/null 2>&1 || return 0
+    ffprobe -v error -show_entries format=duration \
+        -of default=noprint_wrappers=1:nokey=1 "$1" 2>/dev/null \
+        | awk 'NR==1 && $1 ~ /^[0-9.]+$/ { printf "%.2f", $1 }'
 }
 
 # Длительность видео в целых секундах (пусто, если ffprobe недоступен/ошибка)
 send_video::duration() {
-    command -v ffprobe >/dev/null 2>&1 || return 0
-    ffprobe -v error -show_entries format=duration \
-        -of default=noprint_wrappers=1:nokey=1 "$1" 2>/dev/null \
-        | awk 'NR==1 && $1 ~ /^[0-9.]+$/ { printf "%d", $1 }'
+    local d
+    d="$(send_video::duration_f "$1")"
+    [[ -n "${d}" ]] && printf '%d' "${d%.*}"
+    return 0
 }
 
 # Отправка одного файла. Использует переменные из main (динамическая область):
@@ -211,8 +225,15 @@ send_video::send_one() {
         || { io::streams::print "ошибка соединения при отправке" >&2; return 1; }
 
     if [[ "${http_code}" != "200" ]]; then
+        # Текст ошибки сохраняем: по нему определяем превышение лимитов сервера
+        jq -r '.error.message // .' "${tmp}/response.json" > "${tmp}/error.txt" 2>/dev/null \
+            || cp "${tmp}/response.json" "${tmp}/error.txt"
+        # Код 2 - фрагмент слишком большой (лимит кеша энкодера или контекста)
+        if [[ "${http_code}" == "400" ]] && send_video::overflow "${tmp}/error.txt" >/dev/null; then
+            return 2
+        fi
         io::streams::print "HTTP ${http_code}" >&2
-        jq -r '.error.message // .' "${tmp}/response.json" >&2
+        cat "${tmp}/error.txt" >&2
         return 1
     fi
 
@@ -221,9 +242,164 @@ send_video::send_one() {
     jq -r '.choices[0].message.content // "(пустой ответ)"' "${tmp}/response.json"
 }
 
-# Подбор длины фрагмента по пробе. Печатает число секунд в stdout,
-# диагностику - в stderr. Использует переменные main: file, ext, duration,
-# context, models_json, max_tokens, tmp.
+# Разбор сообщения сервера о превышении лимита. Читает файл с текстом ошибки и
+# печатает "<сколько токенов> <лимит>"; код возврата 1, если это не ошибка лимита.
+# Распознаются два вида сообщений vLLM:
+#   - "video item with N ... exceeds the pre-allocated encoder cache size M"
+#   - "maximum context length is M tokens. However, you requested N tokens"
+send_video::overflow() {
+    local msg
+    msg="$(<"$1")"
+    local over limit
+    if [[ "${msg}" =~ item[[:space:]]+with[^0-9]*([0-9]+) ]]; then
+        over="${BASH_REMATCH[1]}"
+        if [[ "${msg}" =~ cache[[:space:]]+size[^0-9]*([0-9]+) ]]; then
+            limit="${BASH_REMATCH[1]}"
+            printf '%s %s' "${over}" "${limit}"
+            return 0
+        fi
+    fi
+    if [[ "${msg}" =~ maximum[[:space:]]+context[[:space:]]+length[^0-9]*([0-9]+) ]]; then
+        limit="${BASH_REMATCH[1]}"
+        if [[ "${msg}" =~ requested[[:space:]]+([0-9]+)[[:space:]]+tokens ]]; then
+            over="${BASH_REMATCH[1]}"
+            printf '%s %s' "${over}" "${limit}"
+            return 0
+        fi
+    fi
+    return 1
+}
+
+# Точная нарезка с перекодированием: $1 - файл, $2 - длина части в секундах,
+# $3 - папка для частей (part_000.mp4, ...). Перекодирование нужно потому, что
+# резка без него (-c copy) идёт по ключевым кадрам и части могут снова выйти
+# слишком длинными. Сначала пробуется libx264, затем встроенный mpeg4
+# (в сборках без libx264, например ffmpeg-free в Fedora).
+send_video::split_exact() {
+    local -r in="$1" len="$2" out="$3"
+    local enc
+    for enc in "-c:v libx264 -preset ultrafast -crf 23" "-c:v mpeg4 -q:v 4"; do
+        rm -f "${out}"/part_*.mp4
+        # shellcheck disable=SC2086
+        if ffmpeg -loglevel error -y -i "${in}" -map 0:v:0 -an -sn ${enc} \
+            -force_key_frames "expr:gte(t,n_forced*${len})" \
+            -f segment -segment_time "${len}" -reset_timestamps 1 \
+            "${out}/part_%03d.mp4" 2>/dev/null; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Обработка одного фрагмента. Если сервер отклонил его как слишком большой,
+# фрагмент автоматически делится на части по данным из ответа сервера, и каждая
+# часть обрабатывается так же (до 4 уровней вложенности).
+# $1 - файл, $2 - смещение начала в видео (сек), $3 - метка ("3/75" или ""),
+# $4 - глубина. Изменяет счётчики main: done_count, failed, model_time, split_count.
+# Всегда возвращает 0: результат учитывается в счётчиках.
+send_video::process_chunk() {
+    local -r chunk="$1" start="$2" label="$3" depth="${4:-0}"
+    local header t0 elapsed reply rc=0 ptok ctok
+
+    if [[ -n "${label}" ]]; then
+        header="=== Фрагмент ${label} (≈ $(send_video::timecode "${start}")) ==="
+    else
+        header="=== Ответ модели ==="
+    fi
+    io::streams::print "Отправляю: ${header}"
+
+    t0="$(date +%s)"
+    if reply="$(send_video::send_one "${chunk}")"; then rc=0; else rc=$?; fi
+    elapsed=$(( $(date +%s) - t0 ))
+
+    if (( rc == 0 )); then
+        model_time=$(( model_time + elapsed ))
+        done_count=$(( done_count + 1 ))
+        read -r ptok ctok < "${tmp}/usage.txt"
+        send_video::emit ""
+        send_video::emit "${header}"
+        send_video::emit "Время обработки: ${elapsed} с | токены: ${ptok} → ${ctok}"
+        send_video::emit ""
+        send_video::emit "${reply}"
+        return 0
+    fi
+
+    if (( rc == 2 )); then
+        local over limit
+        read -r over limit < <(send_video::overflow "${tmp}/error.txt")
+
+        if (( depth >= 4 )) || ! command -v ffmpeg >/dev/null 2>&1 \
+            || ! command -v ffprobe >/dev/null 2>&1; then
+            failed=$(( failed + 1 ))
+            send_video::emit ""
+            send_video::emit "${header}"
+            send_video::emit "ОШИБКА: фрагмент слишком велик для сервера (${over} токенов, лимит ${limit}), а разделить его нельзя (глубина ${depth} или нет ffmpeg)."
+            return 0
+        fi
+
+        # Сколько частей нужно, чтобы уложиться в лимит с запасом 15%
+        local -i parts part_len
+        local cdur
+        cdur="$(send_video::duration_f "${chunk}")"
+        parts="$(awk -v o="${over}" -v l="${limit}" 'BEGIN {
+            p = o / (l * 0.85); n = int(p); if (n < p) n++
+            if (n < 2) n = 2
+            if (n > 16) n = 16
+            print n }')"
+        part_len="$(awk -v d="${cdur:-0}" -v n="${parts}" 'BEGIN {
+            p = d / n; r = int(p); if (r < p) r++
+            if (r < 1) r = 1
+            print r }')"
+
+        split_count=$(( split_count + 1 ))
+        send_video::emit ""
+        send_video::emit "${header}"
+        send_video::emit "Фрагмент не поместился в лимит сервера (${over} токенов при лимите ${limit}): делю на ${parts} части по ~${part_len} с"
+
+        local sub
+        sub="$(mktemp -d "${tmp}/split.XXXXXX")" || { failed=$(( failed + 1 )); return 0; }
+        if ! send_video::split_exact "${chunk}" "${part_len}" "${sub}"; then
+            failed=$(( failed + 1 ))
+            send_video::emit "ОШИБКА: ffmpeg не смог разделить фрагмент"
+            rm -rf "${sub}"
+            return 0
+        fi
+
+        local part pd sub_label poff="${start}"
+        local -i k=0
+        for part in "${sub}"/part_*.mp4; do
+            [[ -f "${part}" ]] || continue
+            k=$(( k + 1 ))
+            pd="$(send_video::duration_f "${part}")"
+            # Метка части: "2/75" -> "2.1/75", "2.1/75" -> "2.1.1/75"
+            if [[ "${label}" == */* ]]; then
+                sub_label="${label%%/*}.${k}/${label#*/}"
+            else
+                sub_label="${label:-1}.${k}"
+            fi
+            send_video::process_chunk "${part}" "${poff}" "${sub_label}" "$(( depth + 1 ))"
+            rm -f "${part}"
+            poff="$(awk -v a="${poff}" -v b="${pd:-0}" 'BEGIN { printf "%.2f", a + b }')"
+        done
+        rm -rf "${sub}"
+        return 0
+    fi
+
+    failed=$(( failed + 1 ))
+    send_video::emit ""
+    send_video::emit "${header}"
+    send_video::emit "ОШИБКА: фрагмент не обработан (прошло ${elapsed} с)"
+    return 0
+}
+
+# Подбор длины фрагмента по пробе. Печатает "<секунд> <токенов в секунду>" в stdout,
+# диагностику - в stderr. Использует переменные main: file, ext, context,
+# models_json, max_tokens, tmp.
+#
+# Данные берутся из ответа сервера на пробный фрагмент (~10 с видео):
+#   - если проба принята - из usage.prompt_tokens (ограничение: контекст модели);
+#   - если проба отклонена как слишком большая - из текста ошибки (число токенов
+#     видео и лимит кеша энкодера), и подбор идёт по этому лимиту.
 send_video::auto_segment() {
     local -i probe_len=10
     local ctx="${context}"
@@ -238,26 +414,39 @@ send_video::auto_segment() {
         "${tmp}/probe.${ext}" \
         || send_video::die "ffmpeg не смог сделать пробный фрагмент"
 
+    # Реальная длина пробы: при -c copy она может отличаться от 10 с
     local probe_dur
-    probe_dur="$(send_video::duration "${tmp}/probe.${ext}")"
-    [[ "${probe_dur}" =~ ^[0-9]+$ ]] && (( probe_dur > 0 )) || probe_dur="${probe_len}"
+    probe_dur="$(send_video::duration_f "${tmp}/probe.${ext}")"
+    probe_dur="$(awk -v d="${probe_dur:-0}" -v f="${probe_len}" 'BEGIN { if (d + 0 <= 0) d = f; printf "%.2f", d }')"
 
-    io::streams::print "Проба: отправляю на сервер ..." >&2
-    send_video::send_one "${tmp}/probe.${ext}" 16 >/dev/null \
-        || send_video::die "проба не прошла: сервер отклонил запрос"
+    io::streams::print "Проба: отправляю на сервер (длина пробы ${probe_dur} с) ..." >&2
+    local -i rc=0
+    send_video::send_one "${tmp}/probe.${ext}" 16 >/dev/null || rc=$?
 
-    local ptok
-    read -r ptok _ < "${tmp}/usage.txt"
-    [[ "${ptok}" =~ ^[0-9]+$ ]] && (( ptok > 0 )) \
-        || send_video::die "сервер не вернул usage.prompt_tokens, подобрать значение нельзя"
+    local tokens limit=0
+    if (( rc == 0 )); then
+        read -r tokens _ < "${tmp}/usage.txt"
+        [[ "${tokens}" =~ ^[0-9]+$ ]] && (( tokens > 0 )) \
+            || send_video::die "сервер не вернул usage.prompt_tokens, подобрать значение нельзя"
+    elif (( rc == 2 )); then
+        read -r tokens limit < <(send_video::overflow "${tmp}/error.txt")
+        io::streams::print "Проба превысила лимит сервера: ${tokens} токенов при лимите ${limit}. Подбираю по этим данным." >&2
+    else
+        send_video::die "проба не прошла: сервер отклонил запрос (сообщение выше)"
+    fi
 
-    # Бюджет = контекст - ответ - 512 (запас под текст промпта), с коэффициентом 0.85.
-    # Токены пробы включают и текст промпта, поэтому оценка слегка завышена (в запас).
-    awk -v ctx="${ctx}" -v mt="${max_tokens}" -v pt="${ptok}" -v d="${probe_dur}" 'BEGIN {
-        budget = (ctx - mt - 512) * 0.85
-        tps = pt / d
-        s = int(budget / tps)
-        if (s < 5) s = 5
+    # tps - токенов на секунду видео. Лимит контекста: ctx - ответ - 512 (запас под
+    # текст промпта); лимит кеша энкодера (если известен) берётся из ошибки сервера.
+    # Коэффициент 0.85 - запас; итог ограничен диапазоном 2..300 секунд.
+    awk -v ctx="${ctx}" -v mt="${max_tokens}" -v tok="${tokens}" -v lim="${limit}" -v d="${probe_dur}" 'BEGIN {
+        tps = tok / d
+        s = (ctx - mt - 512) * 0.85 / tps
+        if (lim > 0) {
+            l = lim * 0.85 / tps
+            if (l < s) s = l
+        }
+        s = int(s)
+        if (s < 2) s = 2
         if (s > 300) s = 300
         printf "%d %.1f", s, tps
     }'
@@ -274,7 +463,7 @@ main() {
     args::flag suggest
     args::flag output value
     args::flag_describe file "Путь к видеофайлу (обязательный параметр)"
-    args::flag_describe segment "Длина фрагмента в секундах; auto - подобрать автоматически; 0 - не резать (по умолчанию 0)"
+    args::flag_describe segment "Длина фрагмента в секундах; auto - подобрать по ответу сервера; 0 - не резать (по умолчанию 0). Слишком большие фрагменты сервер отклоняет, скрипт делит их сам"
     args::flag_describe suggest "Только подобрать и показать значение --segment (делает пробный запрос), без обработки видео"
     args::flag_describe output "Дописывать результаты, время и статистику в этот текстовый файл"
 
@@ -378,6 +567,10 @@ main() {
             segment="${auto_result% *}"
             tps="${auto_result#* }"
             io::streams::print "Подобрано: --segment ${segment} (≈ ${tps} токенов на секунду видео)"
+            if (( segment < 10 )); then
+                io::streams::print "  Фрагменты получаются короткими: сервер тратит много токенов на секунду видео." >&2
+                io::streams::print "  Чтобы резать реже, снизьте fps/max_pixels (--mm-processor-kwargs) или увеличьте --max-num-batched-tokens в vLLM." >&2
+            fi
         fi
         if args::flag_is_set suggest; then
             io::streams::print "Используйте: --segment ${segment}"
@@ -407,7 +600,8 @@ main() {
         fi
         io::streams::print "Режу на фрагменты по ${segment} с (ffmpeg, без перекодирования) ..."
         # -map 0:v:0 - только видеодорожка (звук vLLM не использует).
-        # -c copy режет по ключевым кадрам, поэтому длины фрагментов приблизительные.
+        # -c copy режет по ключевым кадрам, поэтому длины фрагментов приблизительные;
+        # слишком длинные фрагменты потом делятся автоматически (см. process_chunk).
         ffmpeg -loglevel error -i "${file}" -map 0:v:0 -c copy \
             -f segment -segment_time "${segment}" -reset_timestamps 1 \
             "${tmp}/part_%04d.${ext}" \
@@ -423,47 +617,29 @@ main() {
     fi
 
     # --- 6. Отправка по одному, с замером времени ----------------------------
-    local -i i failed=0 model_time=0 done_count=0 t0 t1 elapsed ptok ctok
-    local reply header
+    # Счётчики изменяются из process_chunk (динамическая область видимости).
+    local -i failed=0 model_time=0 done_count=0 split_count=0 i
+    local offset="0.00" cdur label
     for (( i = 0; i < ${#chunks[@]}; i++ )); do
+        cdur="$(send_video::duration_f "${chunks[i]}")"
         if (( segment > 0 )); then
-            header="=== Фрагмент $(( i + 1 ))/${#chunks[@]} (≈ $(send_video::timecode $(( i * segment )))) ==="
+            label="$(( i + 1 ))/${#chunks[@]}"
         else
-            header="=== Ответ модели ==="
+            label=""
         fi
-        io::streams::print "Отправляю: ${header}"
-
-        t0="$(date +%s)"
-        if reply="$(send_video::send_one "${chunks[i]}")"; then
-            t1="$(date +%s)"
-            elapsed=$(( t1 - t0 ))
-            model_time=$(( model_time + elapsed ))
-            done_count=$(( done_count + 1 ))
-            read -r ptok ctok < "${tmp}/usage.txt"
-            send_video::emit ""
-            send_video::emit "${header}"
-            send_video::emit "Время обработки: ${elapsed} с | токены: ${ptok} → ${ctok}"
-            send_video::emit ""
-            send_video::emit "${reply}"
-        else
-            t1="$(date +%s)"
-            elapsed=$(( t1 - t0 ))
-            failed=$(( failed + 1 ))
-            send_video::emit ""
-            send_video::emit "${header}"
-            send_video::emit "ОШИБКА: фрагмент не обработан (прошло ${elapsed} с)"
-        fi
+        send_video::process_chunk "${chunks[i]}" "${offset}" "${label}" 0
         # Фрагмент больше не нужен - освобождаем место (оригинал не трогаем)
         if (( segment > 0 )); then
             rm -f "${chunks[i]}"
         fi
+        offset="$(awk -v a="${offset}" -v b="${cdur:-${segment}}" 'BEGIN { printf "%.2f", a + b }')"
     done
 
     # --- 7. Итоги -----------------------------------------------------------
     local -i wall=$(( $(date +%s) - t_start ))
     send_video::emit ""
     send_video::emit "=== Итого ==="
-    send_video::emit "Фрагментов: ${#chunks[@]} (успешно: ${done_count}, ошибок: ${failed})"
+    send_video::emit "Обработано фрагментов: ${done_count} (ошибок: ${failed}, автоматических делений: ${split_count})"
     if [[ "${duration}" =~ ^[0-9]+$ ]]; then
         send_video::emit "Длина видео: $(send_video::timecode "${duration}")"
     fi
