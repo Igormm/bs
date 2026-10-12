@@ -125,6 +125,7 @@ Two independent choices decide what happens: **where to install** (the target) a
 | `--from DIR` | source: this directory |
 | `--github` | source: GitHub, branch `main` |
 | `--ref REF` | source: GitHub, this branch or tag (implies `--github`) |
+| `--pull` | before anything else, fast-forward the local repository (`git pull --ff-only`); independent of the source flags |
 | `--repo URL` | source: another repository (implies `--github`); the default can be set in `BS_UPDATE_REPO` |
 
 `--from` and `--github` exclude each other. GitHub is fetched with a shallow `git clone`, or, without `git`, as a tarball through `curl`/`wget`.
@@ -144,9 +145,28 @@ For a system install use the commands without `--local`, or `--system`. When alr
 
 When the source is a git checkout, `bs update` first compares its `HEAD` with the remote branch (`git ls-remote`, nothing is fetched or changed):
 
-- the checkout **lacks new code** (is behind): in a terminal `bs` asks `[g]ithub / [l]ocal / [a]bort` (default GitHub); without a terminal, or with an explicit `--from`, it warns and installs the local code;
+- the checkout **lacks new code** (is behind): in a terminal `bs` asks `[p]ull / [g]ithub / [l]ocal / [a]bort` (default `p` when the repository can be pulled, otherwise `g`); without a terminal, or with an explicit `--from`, it warns, names `--pull` and installs the local code;
 - with `--github` and a checkout around: a warning if it has commits not pushed to GitHub or uncommitted changes in `bs`, `bootstrap/`, `core/`, `lib/` — those are **not** installed;
 - without a network the comparison is skipped.
+
+### The install, the repository and GitHub
+
+`bs update` changes the **install** (`bs`, `bootstrap/`, `core/`, `lib/`). It never copies `examples/`, `tests/` or the documentation, and it does not touch the **repository** (`R`) unless you ask with `--pull`. Scripts such as `bs run ~/bs/examples/send_video.sh` run from the repository, so an install updated from GitHub next to an old repository gives "updated, but the new flag is missing". The table shows where `I` (install), `R` (repository) and `G` (GitHub) end up:
+
+| Situation | What `bs update` does | Afterwards |
+| --- | --- | --- |
+| `R` is behind `G`, a terminal | asks `[p]ull / [g]ithub / [l]ocal / [a]bort`; the default is `p` when the pull is possible | `p`: `I = R = G`; `g`: `I = G`, `R` old (warned); `l`: `I = R` old |
+| the same, no terminal | installs the LOCAL code and warns, naming `--pull` | `I = R`, both older than `G` |
+| `--pull` | `git pull --ff-only` in `R`, then installs from `R` | `I = R = G` |
+| `--github` | installs from `G`; `R` is not touched, a warning says so | `I = G`, `R` old |
+| `--github --pull` | pulls `R`, installs from `G` | `I = R = G` |
+| `--pull`, but `R` has uncommitted changes to tracked files, its history has diverged from the remote, the branch has no upstream, or there is no network | refuses with the reason, exit 1, nothing is changed | unchanged |
+| `--pull` and no repository around | an error: run it from the repository directory or pass `--from DIR` | unchanged |
+| `R` equals `G` | nothing to ask | `I = R = G` |
+
+`--pull` only fast-forwards: history is never rewritten and nothing is merged.
+
+At the end of every successful run `bs update` prints "State after the update": the installed version, the repository (path, version, commit, relation to GitHub) and a verdict — "the install and the repository agree", or a warning that the repository is older than the install with the command that fixes it.
 
 ### Safety and output
 

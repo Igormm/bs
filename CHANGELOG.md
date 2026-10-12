@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.4] - 2026-10-12
+
+### Added
+- cli: bs update --pull — `git pull --ff-only` in the local repository before anything else (history is never rewritten, nothing is merged); the interactive question about a repository that is behind GitHub gets `[p]ull` (the default when the pull is possible): pull, then install from the repository; without a terminal the warning names `--pull`; a refusal (uncommitted changes, diverged history, no upstream, no network, no repository around) is explained, exits 1 and changes nothing
+- cli: bs update — after the install it prints "State after the update" (installed version, the repository with its version, commit and relation to GitHub, a verdict); `--github` next to a repository that is behind says that the repository was NOT updated (bs update copies only bs, bootstrap, core, lib — examples/ and tests/ stay as they are), which is why a flag added on GitHub was "missing" after an update
+- tests: unit/testupdatepullunit.sh — the install/repository/GitHub scenario table (42 checks on local file:// repositories)
+
 ## [0.7.3] - 2026-10-12
 
 ### Added

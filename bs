@@ -1409,10 +1409,102 @@ update_path_summary() {
   return 0
 }
 
+# @private Можно ли безопасно подтянуть репозиторий: это git-репозиторий, в нём
+# нет незакоммиченных правок отслеживаемых файлов и у ветки есть upstream.
+# Печатает причину отказа (одной строкой) и возвращает 1, если нельзя.
+# @private Can the repository be pulled safely: a git repository, no uncommitted
+# changes to tracked files, and the branch has an upstream. Prints the reason
+# (one line) and returns 1 when it cannot.
+# @param $1 Repository / Репозиторий
+update_pull_blocker() {
+  local -r dir="$1"
+  if ! utils::has git || [[ ! -e "${dir}/.git" ]]; then
+    printf 'не git-репозиторий (или нет git) / not a git repository (or no git)'
+    return 1
+  fi
+  if [[ -n "$(git -C "${dir}" status --porcelain --untracked-files=no 2>/dev/null)" ]]; then
+    printf 'есть незакоммиченные правки отслеживаемых файлов / uncommitted changes to tracked files'
+    return 1
+  fi
+  if ! git -C "${dir}" rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
+    printf 'у текущей ветки нет upstream (detached HEAD?) / the current branch has no upstream'
+    return 1
+  fi
+  return 0
+}
+
+# @private git pull --ff-only в репозитории: только перемотка вперёд, история
+# не переписывается, ничего не сливается. Возвращает 1 с объяснением при отказе.
+# @private git pull --ff-only in the repository: a fast-forward only, history
+# is never rewritten, nothing is merged. Returns 1 with an explanation on refusal.
+# @param $1 Repository / Репозиторий
+update_pull_checkout() {
+  local -r dir="$1"
+  local why out before after
+  if ! why="$(update_pull_blocker "${dir}")"; then
+    update_warn "update: git pull пропущен для ${dir}: ${why}"
+    return 1
+  fi
+  before="$(git -C "${dir}" rev-parse --short=7 HEAD 2>/dev/null || printf '?')"
+  local -a limit=()
+  utils::has timeout && limit=(timeout 120)
+  if ! out="$(GIT_TERMINAL_PROMPT=0 "${limit[@]}" git -C "${dir}" pull --ff-only 2>&1)"; then
+    update_warn "update: git pull --ff-only не удался в ${dir} (история разошлась или нет сети) / failed (diverged history or no network): ${out//$'\n'/ | }"
+    return 1
+  fi
+  after="$(git -C "${dir}" rev-parse --short=7 HEAD 2>/dev/null || printf '?')"
+  if [[ "${before}" == "${after}" ]]; then
+    log::info "update: репозиторий уже актуален / the repository is already up to date: ${dir} @ ${after}"
+  else
+    log::info "update: репозиторий подтянут / the repository was pulled: ${dir} ${before} → ${after}"
+  fi
+  return 0
+}
+
+# @private Итог по трём сущностям: установка, репозиторий, GitHub. Расхождение
+# между установкой и репозиторием (examples/ и tests/ старее bs) раньше никак
+# не показывалось — отсюда «обновил, а флага нет».
+# @private The outcome for the three things: the install, the repository and
+# GitHub. A mismatch between the install and the repository (examples/ and
+# tests/ older than bs) used to go unnoticed — hence "updated, yet no flag".
+# @param $1 Repository around (may be empty) / Репозиторий рядом (может быть пуст)
+# @param $2 Its relation to the remote: same|ahead|behind|unknown / Отношение к удалённому
+# @param $3 Version that was installed / Установленная версия
+update_state_summary() {
+  local -r checkout="$1" state="$2" inst_ver="$3"
+  [[ -n "${checkout}" ]] || return 0
+  local repo_ver commit="" rel verdict_ok=1 rc=0
+  repo_ver="$(bs::version::of "${checkout}")"
+  if [[ -e "${checkout}/.git" ]] && utils::has git; then
+    commit="$(git -C "${checkout}" rev-parse --short=7 HEAD 2>/dev/null || true)"
+  fi
+  case "${state}" in
+    same)   rel="совпадает с GitHub / same as GitHub" ;;
+    ahead)  rel="впереди GitHub (есть непушенные коммиты) / ahead of GitHub" ;;
+    behind) rel="ОТСТАЁТ от GitHub / BEHIND GitHub"; verdict_ok=0 ;;
+    *)      rel="связь с GitHub не проверена (нет сети?) / relation to GitHub unknown" ;;
+  esac
+  if [[ -n "${inst_ver}" && -n "${repo_ver}" ]]; then
+    bs::version::compare "${repo_ver}" "${inst_ver}" || rc=$?
+    (( rc != 2 )) || verdict_ok=0
+  fi
+  printf '\n== Состояние после обновления / State after the update ==\n'
+  printf '  Установка / Install:   версия / version %s\n' "${inst_ver:-?}"
+  printf '  Репозиторий / Repo:    %s — версия / version %s%s — %s\n' \
+    "${checkout}" "${repo_ver:-?}" "${commit:+, commit ${commit}}" "${rel}"
+  if (( verdict_ok == 1 )); then
+    printf '  Вердикт / Verdict:     установка и репозиторий согласованы / the install and the repository agree\n'
+  else
+    printf '  Вердикт / Verdict:     ⚠ examples/ и tests/ репозитория старее установки (bs update их не копирует) / the repository is older than the install\n'
+    printf '  Что сделать / Fix:     bs update --pull   (или / or:  git -C %s pull)\n' "${checkout}"
+  fi
+}
+
 update_cmd() {
   local from="${BS_ROOT}"
   local from_explicit=0
   local github=0
+  local pull=0
   local repo="${BS_UPDATE_REPO:-${UPDATE_DEFAULT_REPO}}"
   local repo_set=0 ref_set=0
   local ref="main"
@@ -1461,6 +1553,9 @@ update_cmd() {
       --github)
         github=1
         shift ;;
+      --pull)
+        pull=1
+        shift ;;
       --repo)
         shift
         update_flag_value "--repo" "a repository URL" "$@"
@@ -1498,6 +1593,9 @@ update_cmd() {
         printf '            (flags may be combined and repeated; duplicates are merged)\n'
         printf 'Source / Источник:\n'
         printf '  --from DIR  local repo checkout / локальный репозиторий\n'
+        printf '  --pull      first fast-forward the local repo (git pull --ff-only): bs update does\n'
+        printf '              not touch the repository, so examples/ and tests/ stay old without it\n'
+        printf '              / сначала подтянуть локальный репозиторий; examples/ иначе не обновятся\n'
         printf '  --github    download from GitHub (%s)\n' "${UPDATE_DEFAULT_REPO}"
         printf '  --repo URL  another repository (or BS_UPDATE_REPO); implies --github\n'
         printf '  --ref REF   branch or tag (default: main); implies --github\n'
@@ -1564,23 +1662,51 @@ update_cmd() {
   # Конфликт источников: локальный checkout и GitHub могут расходиться.
   # Source conflict: the local checkout and GitHub may differ.
   local state="unknown"
+  # --pull: сначала подтянуть сам репозиторий (bs update его не трогает)
+  # --pull: first pull the repository itself (bs update does not touch it)
+  if (( pull == 1 )); then
+    if [[ -z "${checkout}" ]]; then
+      update_die "update: --pull: рядом нет репозитория BS — запустите из его каталога или укажите --from DIR / no BS repository around: run from its directory or pass --from DIR"
+    fi
+    update_pull_checkout "${checkout}" \
+      || update_die "update: --pull не выполнен, ничего не изменено / --pull failed, nothing was changed"
+  fi
   [[ -n "${checkout}" ]] && state="$(update_local_state "${checkout}" "${repo}" "${ref}")"
   if (( github == 0 )) && [[ "${state}" == "behind" ]]; then
     update_warn "update: local repo is behind ${repo%.git}@${ref} — it lacks new code / локальный репозиторий отстаёт от GitHub"
     update_warn "update:   ${checkout}"
     if (( from_explicit == 0 )) && [[ -t 0 && -t 1 ]]; then
-      local answer=""
-      printf 'Источник / Source: [g]ithub (новее/newer), [l]ocal, [a]bort? [g] '
+      local answer="" why_no_pull="" dflt="p"
+      why_no_pull="$(update_pull_blocker "${checkout}")" || dflt="g"
+      if [[ "${dflt}" == "g" ]]; then
+        printf 'Подтянуть репозиторий нельзя (%s) / cannot pull: %s\n' "${why_no_pull}" "${why_no_pull}"
+        printf 'Источник / Source: [g]ithub (репозиторий не изменится / the repo stays old), [l]ocal, [a]bort? [g] '
+      else
+        printf 'Источник / Source: [p]ull — подтянуть репозиторий и ставить из него (рекомендуется), [g]ithub (репозиторий останется старым), [l]ocal, [a]bort? [p] '
+      fi
       read -r answer || answer="a"
+      [[ -n "${answer}" ]] || answer="${dflt}"
       case "${answer,,}" in
-        ''|g|github) github=1 ;;
-        l|local)     : ;;
-        *)           update_die "update: aborted / отменено" ;;
+        p|pull)
+          update_pull_checkout "${checkout}" \
+            || update_die "update: git pull не удался, ничего не изменено / git pull failed, nothing was changed"
+          state="$(update_local_state "${checkout}" "${repo}" "${ref}")" ;;
+        g|github) github=1 ;;
+        l|local)  : ;;
+        *)        update_die "update: aborted / отменено" ;;
       esac
     else
-      update_warn "update: installing the LOCAL code; for the newest run: git pull, or bs update --github"
+      update_warn "update: installing the LOCAL code; for the newest run: bs update --pull (или / or git pull), or bs update --github"
     fi
-  elif (( github == 1 )) && [[ -n "${checkout}" ]]; then
+  fi
+  if (( github == 1 )) && [[ "${state}" == "behind" ]]; then
+    # bs update ставит только bs, bootstrap, core, lib: examples/ и tests/
+    # репозитория остаются прежними — это не ошибка, но об этом нужно сказать
+    # bs update installs bs, bootstrap, core and lib only: examples/ and
+    # tests/ of the repository stay as they are — not an error, but say so
+    update_warn "update: репозиторий ${checkout} отстаёт от GitHub и НЕ обновлён (bs update ставит только bs, bootstrap, core, lib; examples/ и tests/ не затрагиваются). Обновить репозиторий: bs update --pull (или git -C ${checkout} pull) / the repository is behind GitHub and was NOT updated (examples/ and tests/ are not touched)"
+  fi
+  if (( github == 1 )) && [[ -n "${checkout}" ]]; then
     if [[ "${state}" == "ahead" ]]; then
       update_warn "update: local repo has commits not pushed to ${repo%.git}@${ref} — GitHub lacks them / на GitHub нет локальных коммитов: ${checkout}"
     fi
@@ -1821,6 +1947,7 @@ update_cmd() {
       printf '  ✓ %s\n' "${p}"
     done
     update_path_summary
+    update_state_summary "${checkout}" "${state}" "${new_ver}"
     if (( ${#reasons[@]} > 0 )); then
       local skip_title="ПРОПУЩЕНО / SKIPPED"
       (( failures == 0 )) || skip_title="ЧАСТЬ ЦЕЛЕЙ ПРОПУЩЕНА / SOME TARGETS SKIPPED"
@@ -1838,6 +1965,7 @@ update_cmd() {
   local title="ОБНОВЛЕНИЙ НЕТ / NO UPDATES"
   (( failures == 0 )) || title="ОБНОВЛЕНИЕ НЕ ВЫПОЛНЕНО / UPDATE NOT DONE"
   update_box "${title}" "${reasons[@]}"
+  (( failures > 0 )) || update_state_summary "${checkout}" "${state}" "${new_ver}"
   (( failures == 0 )) || exit 1
   return 0
 }

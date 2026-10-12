@@ -13,7 +13,7 @@ bs::guard "VERSION" || return 0
 # Единственный источник BS_VERSION — этот модуль; bs и const.sh только используют
 # Single source of BS_VERSION is this module; bs and const.sh only use it
 if is::empty "${BS_VERSION:-}"; then
-  export BS_VERSION="0.7.3"
+  export BS_VERSION="0.7.4"
 fi
 
 # @global BS_NAME — Env: framework full name (category: env)
