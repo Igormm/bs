@@ -136,6 +136,15 @@ bs run examples/send_video.sh --file clip.mp4 --host llm.local
 bs run examples/send_audio.sh --file talk.mp4 --language ru
 ```
 
+If the vision model answers in English although the prompt (`--prompt` or
+`--prompt-file`) asks for another language: give it a system message
+(`--system 'Always answer in Russian…'`) and preset the start of the answer
+with `--prefill 'Описание на русском: '` — the model then continues that text
+instead of starting over in English (`continue_final_message` of vLLM, which
+returns only the continuation; the report shows the prefix plus the
+continuation). A changed prompt, `--system` or `--prefill` is a different run:
+use `--restart` or another `--output`.
+
 ## How to Use Examples
 
 ### Running Examples

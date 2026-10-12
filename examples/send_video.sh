@@ -22,6 +22,7 @@
 #   bs run examples/send_video.sh --file clip.mp4 --suggest
 #   bs run examples/send_video.sh --file clip.mp4 --output ~/results
 #   bs run examples/send_video.sh --file clip.mp4 --restart
+#   bs run examples/send_video.sh --file clip.mp4 --prefill 'Описание на русском: '
 #   bs run examples/send_video.sh --help
 
 load "core/args"
@@ -288,6 +289,7 @@ send_video::__request() {
     --arg model "${__map_cfg[model]}" \
     --arg prompt "${__map_cfg[prompt]}" \
     --arg system "${__map_cfg[system]}" \
+    --arg prefill "${__map_cfg[prefill]:-}" \
     --arg max_tokens "${max_tokens}" \
     --argjson temperature "${__map_cfg[temperature]}" \
     --rawfile video "${tmp}/video.uri" \
@@ -296,7 +298,16 @@ send_video::__request() {
         (if $system != "" then [{role: "system", content: $system}] else [] end)
         + [{role: "user", content: [
             {type: "video_url", video_url: {url: $video}},
-            {type: "text", text: $prompt}]}])}
+            {type: "text", text: $prompt}]}]
+        # Начало ответа задано заранее: модель ПРОДОЛЖАЕТ его (vLLM
+        # continue_final_message), а не начинает заново на своём языке.
+        # The start of the answer is preset: the model CONTINUES it (vLLM
+        # continue_final_message) instead of starting over in its own language.
+        + (if $prefill != ""
+           then [{role: "assistant", content: $prefill}] else [] end))}
+     + (if $prefill != ""
+        then {add_generation_prompt: false, continue_final_message: true}
+        else {} end)
      + (if $max_tokens != ""
         then {max_tokens: ($max_tokens | tonumber)} else {} end)' \
     > "${tmp}/payload.json"; then
@@ -557,6 +568,9 @@ send_video::__process_chunk() {
   if is::empty "${reply}"; then
     reply="(пустой ответ)"
   fi
+  # С --prefill сервер возвращает только продолжение: в отчёт идёт целиком
+  # With --prefill the server returns only the continuation: the report gets all
+  reply="${__map_cfg[prefill]:-}${reply}"
   send_video::__report ""
   send_video::__report "${header}"
   local secs
@@ -781,6 +795,7 @@ send_video::__declare_flags() {
   args::flag prompt value "${SEND_VIDEO_DEFAULT_PROMPT}"
   args::flag prompt-file value
   args::flag system value
+  args::flag prefill value
   args::flag temperature value 0.7
   args::flag max-tokens value auto
   args::flag log-level value TRACE "enum:TRACE,DEBUG,INFO,SUCCESS,WARN,ERROR"
@@ -812,6 +827,9 @@ send_video::__declare_flags() {
   args::flag_describe prompt "Текст запроса к модели / prompt text"
   args::flag_describe prompt-file "Файл с запросом (приоритетнее --prompt)"
   args::flag_describe system "Системный промпт / system prompt"
+  args::flag_describe prefill \
+    "Начало ответа модели, например 'Описание на русском: ' — модель продолжит"\
+" его; надёжно держит язык ответа (vLLM continue_final_message) / answer prefix"
   args::flag_describe temperature "Температура генерации / temperature"
   args::flag_describe max-tokens \
     "Лимит токенов ответа; auto = сколько позволит контекст"
@@ -842,6 +860,7 @@ send_video::__configure() {
   __map_cfg[model]="$(send_video::__flag model)"
   __map_cfg[timeout]="$(send_video::__flag timeout 600)"
   __map_cfg[system]="$(send_video::__flag system)"
+  __map_cfg[prefill]="$(send_video::__flag prefill)"
   __map_cfg[temperature]="$(send_video::__flag temperature 0.7)"
   __map_cfg[max_tokens]="$(send_video::__flag max-tokens auto)"
   __map_cfg[segment]="$(send_video::__flag segment auto)"
@@ -1253,7 +1272,7 @@ send_video::main() {
   __map_cfg[file_abs]="$(sendrun::abs_path "${__map_cfg[file]}")"
   __map_cfg[file_size]=$(( $(wc -c < "${__map_cfg[file]}") ))
   __map_cfg[prompt_sha]="$(sendrun::hash \
-    "${__map_cfg[system]}"$'\n'"${__map_cfg[prompt]}")"
+    "${__map_cfg[system]}"$'\n'"${__map_cfg[prefill]}"$'\n'"${__map_cfg[prompt]}")"
   send_video::__load_run
   send_video::__log_environment
 
