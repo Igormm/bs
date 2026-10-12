@@ -394,7 +394,7 @@ Note: internally this checks `command -v timeout >/dev/null 2>&1`; in your own c
 
 ## Version — `core/version.sh`
 
-- `BS_VERSION` — current version (e.g. `0.7.2`); the single place where the number is written; exported only if empty.
+- `BS_VERSION` — current version (e.g. `0.7.3`); the single place where the number is written; exported only if empty.
 - `BS_NAME="BS (Bash Open Source Architecture) BOSA Framework"`.
 
 #### `bs::version::print`

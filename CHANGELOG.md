@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.7.2] - 2026-10-12
+## [0.7.3] - 2026-10-12
 
 ### Added
 - examples: send_video.sh — `--prefill TEXT` presets the start of the model's answer (an assistant message with vLLM `continue_final_message`), the most reliable way to keep the language of the answer when a vision model drifts to English; the report shows the prefix plus the continuation; the prefill is part of the run's identity; tests for the `--prompt-file` / `--system` / `--prefill` request body (unit/testsendvideoprefillunit.sh)
@@ -8,6 +8,8 @@
 - examples: send_audio.sh — while a long request is processed (a Whisper chunk on a CPU takes minutes) it prints "waiting for the server: N s, chunk i/n" every `SEND_AUDIO_HEARTBEAT_S` seconds (default 20), and after each chunk the progress, the speed relative to real time and the estimated remaining time; Ctrl-C/SIGTERM now also stops the background `curl`
 - install: the "ALREADY INSTALLED" notice compares the versions (update available / the same / the installed one is newer), offers the repository command first (`./bs update --local` works without `PATH`; before, the only advice was `bs update --local`, useless when `bs` is not in the shell's `PATH`), and warns when `bs` is missing from the `PATH` of the shell or another copy runs first
 - tests: unit/testsendaudioprogressunit.sh
+
+## [0.7.2] - 2026-10-12
 
 ### Changed
 - cli: bs update / bs uninstall — the running copy is described by exactly the rows of `bs version --full` (root, install, source, updated; for a checkout its commit and uncommitted changes): the "Запущен / Running: bs VERSION" block opens every run and every notice box, ERROR/WARN end with the same data in one line (before, a shorter summary built by separate code covered only part of the fields)
