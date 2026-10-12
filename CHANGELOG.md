@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.7.2] - 2026-10-12
+
+### Changed
+- cli: bs update / bs uninstall — the running copy is described by exactly the rows of `bs version --full` (root, install, source, updated; for a checkout its commit and uncommitted changes): the "Запущен / Running: bs VERSION" block opens every run and every notice box, ERROR/WARN end with the same data in one line (before, a shorter summary built by separate code covered only part of the fields)
+
 ## [0.7.1] - 2026-10-12
 
 ### Added
@@ -7,7 +12,7 @@
 - install: the installer never deletes or overwrites what is not BS — a foreign `TARGET_LIB` (directory, file, symlink, source checkout) and a foreign `TARGET_BIN` (no `export BS_ROOT=`) are refused for install and left alone by uninstall (the old `rm -rf TARGET_LIB` without a check is gone); installation is transactional (staging next to the target + rename, the previous copy is put back on failure, the ERROR names the real cause)
 - install: write access to `BIN_DIR`/`LIB_DIR` is checked instead of `EUID`, so `PREFIX=/opt/x ./install.sh` works without root; `sudo ./install.sh --local` into the home of `SUDO_USER` is refused (root-owned files in a user's home), with `HOME=/root` it only warns; unset or unwritable `HOME`, a relative `PREFIX`, forbidden characters in paths, `BIN_DIR` equal to `LIB_DIR` and an incomplete source are bilingual errors; `BIN_DIR` outside `PATH` gets the exact `export` line; an unwritable rc file no longer aborts the install; uninstall edits rc files in place (keeps a symlinked dotfile and its owner)
 - install: `BS_SYSTEM_PREFIX` (default `/usr/local`) defines the system install for `install.sh`, `bs update` and `bs uninstall`, so the system case can be reproduced without root; manifest `mode` is `local`/`system`/`custom`
-- cli: bs update — every run starts with a "Запущен / Running: bs VERSION" block holding exactly the rows of `bs version --full` (root, install, source, updated), the same block opens every notice box and every ERROR/WARN ends with the same data in one line, so output always shows which copy of `bs` produced it (also for `bs uninstall`)
+- cli: bs update — every run starts with "Запущен / Running: bs VERSION | ROOT | KIND | …" and the same line opens every notice box and ends every ERROR/WARN, so output always shows which copy of `bs` produced it (also for `bs uninstall`)
 - cli: bs update — `--local` with only a system install (and the reverse) says so and gives the command ("UPDATE NOT DONE", exit 1); "BS NOT INSTALLED"; explanations for root/sudo (the install of `SUDO_USER`), a broken wrapper in `PATH`, a lib without a wrapper, several installs of different versions (`path: OLD → NEW`, `PATH` order, DOWNGRADE for every kind of target), a damaged manifest (kept as `.install.bad`), a symlink target, `--github` failures (no network, missing branch/tag, no git/curl); the full table is in documentation/{en,ru}/install.md
 - cli: bs update — the target must be a BS install and the source must be complete (`bs`, `bootstrap/{init,loader}.sh`, `core/`, `lib/`, `core/version.sh` with a version) before anything is written; the old parts are kept in `.update-old.PID` and restored if the smoke test (`bs version` from the target) fails or the run is interrupted; leftovers of crashed runs are cleaned; `.update-lock` stops two simultaneous updates; a copy failure is an ERROR with exit 1 (it used to end as "NO UPDATES", exit 0); a mixed run with a failed target ends with exit 1 after the summary
 - cli: bs uninstall — framed notices instead of "see messages above", a check of write access, a wrapper of another install stays, the removal of the running copy is announced; `bs version --full` and `bs env` cope with a damaged manifest and a checkout without git
