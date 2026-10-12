@@ -109,15 +109,15 @@ HELP
 # @private Первые 7 символов хеша коммита / First 7 characters of a commit hash
 short_sha() { printf '%s' "${1:0:7}"; }
 
-# bs version [--full]: номер версии; с --full — откуда взята эта копия BS
-# bs version [--full]: the version number; --full adds where this BS copy is from
-version_cmd() {
-  case "${1:-}" in
-    "")          bs::version::print; return 0 ;;
-    -f|--full)   bs::version::print ;;
-    *)           die "version: unknown argument: $1 (try: bs version --full)" ;;
-  esac
-
+# @private Строки сведений о запущенной копии — ровно то, что `bs version --full`
+# печатает после строки версии: root, вид установки, источник, последнее
+# обновление. Читает манифест и git, чужой код не запускает. Те же строки идут
+# в начале и в каждой рамке `bs update` / `bs uninstall`.
+# @private The detail lines about the running copy — exactly what
+# `bs version --full` prints after the version line: root, install kind,
+# source, last update. Reads the manifest and git, runs no foreign code. The
+# same lines open every `bs update` / `bs uninstall` run and notice box.
+bs_full_info_lines() {
   local key
   local -A info=()
   printf '  %-10s %s\n' "root:" "${BS_ROOT}"
@@ -148,6 +148,27 @@ version_cmd() {
     printf '  %-10s %s\n' "install:" \
       "no manifest (installed by an older installer)"
   fi
+}
+
+# @private Сведения о запущенной копии одним блоком: заголовок с версией и
+# строки bs_full_info_lines. Первая строка «Запущен / Running: bs ВЕРСИЯ».
+# @private The running copy as one block: a heading with the version and the
+# bs_full_info_lines rows. The first line is "Запущен / Running: bs VERSION".
+bs_running_block() {
+  printf 'Запущен / Running: bs %s\n' "$(bs::version::get)"
+  bs_full_info_lines
+}
+
+# bs version [--full]: номер версии; с --full — откуда взята эта копия BS
+# bs version [--full]: the version number; --full adds where this BS copy is from
+version_cmd() {
+  case "${1:-}" in
+    "")          bs::version::print; return 0 ;;
+    -f|--full)   bs::version::print ;;
+    *)           die "version: unknown argument: $1 (try: bs version --full)" ;;
+  esac
+
+  bs_full_info_lines
 }
 # @private Значение ключа из манифеста установки (<lib>/.install, key=value).
 # @private Value of a key from the install manifest (<lib>/.install, key=value).
@@ -769,7 +790,9 @@ update_box() {
   # Первая строка тела — какая копия bs печатает это уведомление.
   # First body line: which bs copy prints this notice.
   update_ctx
-  set -- "Запущен / Running: ${UPDATE_RUN_INFO}" "" "$@"
+  local -a run_rows=()
+  mapfile -t run_rows <<< "${UPDATE_RUN_BLOCK}"
+  set -- "${run_rows[@]}" "" "$@"
   for text in "$@"; do
     while (( ${#text} > inner )); do
       body+=("${text:0:inner}")
@@ -935,6 +958,7 @@ update_wrapper_root() {
 update_system_lib() { printf '%s/lib/bs\n' "${BS_SYSTEM_PREFIX:-/usr/local}"; }
 
 UPDATE_RUN_INFO=""
+UPDATE_RUN_BLOCK=""
 UPDATE_RUN_SHORT=""
 
 # @private Вид запущенной копии: mode из манифеста, source checkout, no manifest.
@@ -970,7 +994,8 @@ bs_running_info() {
     fi
   elif [[ -f "${BS_ROOT}/.install" ]]; then
     src="$(install_info_get "${BS_ROOT}" source_commit)"
-    [[ -z "${src}" ]] || out+=" | source @ $(short_sha "${src}")"
+    out+=" | installed $(install_info_get "${BS_ROOT}" installed_at) by $(install_info_get "${BS_ROOT}" installed_by)"
+    out+=" | source $(install_info_get "${BS_ROOT}" source) @ $(short_sha "${src}")"
     upd="$(install_info_get "${BS_ROOT}" updated_at)"
     if [[ -n "${upd}" ]]; then
       out+=" | updated ${upd} from $(install_info_get "${BS_ROOT}" updated_from) @ $(short_sha "$(install_info_get "${BS_ROOT}" updated_commit)")"
@@ -983,7 +1008,8 @@ bs_running_info() {
 update_ctx() {
   [[ -n "${UPDATE_RUN_INFO}" ]] && return 0
   UPDATE_RUN_INFO="$(bs_running_info)"
-  UPDATE_RUN_SHORT="запущен bs $(bs::version::get), ${BS_ROOT}, $(bs_running_kind) / running"
+  UPDATE_RUN_BLOCK="$(bs_running_block)"
+  UPDATE_RUN_SHORT="Запущен / Running: ${UPDATE_RUN_INFO}"
   return 0
 }
 
@@ -1392,7 +1418,7 @@ update_cmd() {
   # Первая строка любого реального запуска: какая копия bs работает.
   # First line of every real run: which bs copy is running.
   if (( banner == 1 )); then
-    printf 'Запущен / Running: %s\n' "${UPDATE_RUN_INFO}"
+    printf '%s\n' "${UPDATE_RUN_BLOCK}"
   fi
   trap 'exit 130' INT
   trap 'exit 143' TERM HUP
@@ -1781,7 +1807,7 @@ update_cmd() {
 
   if (( ok == 1 )); then
     log::header "UPDATE COMPLETE / ОБНОВЛЕНИЕ ЗАВЕРШЕНО"
-    log::info "Запущен / Running: ${UPDATE_RUN_INFO}"
+    printf '%s\n' "${UPDATE_RUN_BLOCK}"
     for p in "${done_lines[@]}"; do
       printf '  ✓ %s\n' "${p}"
     done
@@ -1820,7 +1846,7 @@ uninstall_cmd() {
     [[ "${a}" == "-h" || "${a}" == "--help" ]] && banner=0
   done
   update_ctx
-  (( banner == 0 )) || printf 'Запущен / Running: %s\n' "${UPDATE_RUN_INFO}"
+  (( banner == 0 )) || printf '%s\n' "${UPDATE_RUN_BLOCK}"
 
   while [[ $# -gt 0 ]]; do
     case "${1:-}" in

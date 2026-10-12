@@ -489,18 +489,25 @@ test_running_info() {
     run_bs update --lib "${T}/target" --from "${T}/src"
     first="${OUT%%$'\n'*}"
     eq "y" "$(has "${first}" "Запущен / Running: bs ")" "info: first line of a run names the running bs"
-    eq "y" "$(has "${first}" "| ${BS_PROJECT_ROOT} |")" "info: first line has the running root"
+    # Ниже первой строки — те же сведения, что печатает `bs version --full`
+    # Below the first line: the same details `bs version --full` prints
+    local full
+    full="$(bash "${BS_PROJECT_ROOT}/bs" version --full | tail -n +2)"
+    eq "y" "$(has "${OUT}" "  root:      ${BS_PROJECT_ROOT}")" "info: the run header has the root row of version --full"
+    eq "y" "$(has "${OUT}" "  install:")" "info: the run header has the install row of version --full"
+    eq "y" "$(has "${OUT}" "${full%%$'\n'*}")" "info: the first detail line equals the one of version --full"
 
     run_bs update --lib "${T}/target" --from "${T}/src"
     eq "y" "$(has "${OUT}" "уже актуально")" "info: the up-to-date box appears"
+    eq "y" "$(has "${OUT}" "  install:")" "info: the box carries the install row of version --full"
     eq "y" "$(has "${OUT}" "Запущен / Running: bs ")" "info: the box carries the running copy as its first body line"
 
     run_bs update --lib "${T}/target" --from "${T}/nope"
     eq "y" "$(has "${OUT}" "Запущен / Running: bs ")" "info: the invalid-source box carries it too"
     run_bs update --bogus
-    eq "y" "$(has "${OUT}" "(запущен bs ")" "info: ERROR lines end with the short running-copy summary"
+    eq "y" "$(has "${OUT}" "(Запущен / Running: bs ")" "info: ERROR lines end with the short running-copy summary"
     run_bs update --ref
-    eq "y" "$(has "${OUT}" "(запущен bs ")" "info: flag errors end with the summary"
+    eq "y" "$(has "${OUT}" "(Запущен / Running: bs ")" "info: flag errors end with the summary"
     make_inst "${T}/ro/lib/bs" 0.1.0
     run_bs update --local --from "${T}/src"
     eq "y" "$(has "${OUT}" "Запущен / Running: bs ")" "info: the missing-target box carries it"
