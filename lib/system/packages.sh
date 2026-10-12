@@ -10,6 +10,46 @@ bs::guard "SYSTEM_PACKAGES" || return 0
 # Зависимости / Dependencies
 bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../io/files.sh"
 
+# @private Run a package-manager command; log success, or the output tail on failure
+# @private Выполнить команду пакетного менеджера; записать успех или хвост вывода при ошибке
+# @param $1 Success message / Сообщение об успехе
+# @param $@ Command and arguments / Команда и аргументы
+# @return 0 on success, E_ERROR otherwise / 0 при успехе, иначе E_ERROR
+system::packages::__run() {
+    local -r message="${1:?message required}"
+    shift
+    # stdout остаётся видимым (прогресс), stderr собираем для сообщения об ошибке
+    # stdout stays visible (progress), stderr is collected for the error message
+    local errfile
+    errfile="$(mktemp)" || errfile=""
+    if "$@" 2> "${errfile:-/dev/null}"; then
+        log::info "${message}"
+        if is::not_empty "${errfile}"; then utils::ignore rm -f -- "${errfile}"; fi
+        return 0
+    fi
+    log::error "Command failed / Команда не удалась: $*"
+    if is::not_empty "${errfile}"; then
+        log::error "$(tail -n 5 "${errfile}" 2>/dev/null)"
+        utils::ignore rm -f -- "${errfile}"
+    fi
+    return "${E_ERROR}"
+}
+
+# @private Remove .repo files that mention the repository text (fixed-string match, one by one)
+# @private Удалить .repo-файлы, где встречается текст репозитория (точное совпадение, по одному)
+# @param $1 Repository text / Текст репозитория
+# @param $2 Manager label for the log / Метка менеджера для журнала
+system::packages::__remove_repo_files() {
+    local -r repo="${1:?repo required}" label="${2:-}"
+    local file
+    while IFS= read -r file; do
+        if is::empty "${file}"; then continue; fi
+        if utils::quiet_err rm -f -- "${file}"; then
+            log::info "Repository file removed for ${label}: ${file}"
+        fi
+    done < <(utils::attempt grep -rlF --include='*.repo' -- "${repo}" /etc/yum.repos.d/)
+}
+
 # @description Update package list / Обновить список пакетов
 # @example
 #   system::packages::update
@@ -48,20 +88,15 @@ system::packages::install() {
     
     # Detect package manager / Определить менеджер пакетов
     if utils::has apt; then
-        utils::quiet_err apt install -y "$@"
-        log::info "Packages installed with APT: $*"
+        system::packages::__run "Packages installed with APT: $*" apt install -y "$@" || return "${E_ERROR}"
     elif utils::has yum; then
-        utils::quiet_err yum install -y "$@"
-        log::info "Packages installed with YUM: $*"
+        system::packages::__run "Packages installed with YUM: $*" yum install -y "$@" || return "${E_ERROR}"
     elif utils::has dnf; then
-        utils::quiet_err dnf install -y "$@"
-        log::info "Packages installed with DNF: $*"
+        system::packages::__run "Packages installed with DNF: $*" dnf install -y "$@" || return "${E_ERROR}"
     elif utils::has pacman; then
-        utils::quiet_err pacman -S --noconfirm "$@"
-        log::info "Packages installed with Pacman: $*"
+        system::packages::__run "Packages installed with Pacman: $*" pacman -S --noconfirm "$@" || return "${E_ERROR}"
     elif utils::has zypper; then
-        utils::quiet_err zypper install -y "$@"
-        log::info "Packages installed with Zypper: $*"
+        system::packages::__run "Packages installed with Zypper: $*" zypper install -y "$@" || return "${E_ERROR}"
     else
         log::warn "No supported package manager found"
         return "${E_ERROR}"
@@ -80,20 +115,15 @@ system::packages::remove() {
     
     # Detect package manager / Определить менеджер пакетов
     if utils::has apt; then
-        utils::quiet_err apt remove -y "$@"
-        log::info "Packages removed with APT: $*"
+        system::packages::__run "Packages removed with APT: $*" apt remove -y "$@" || return "${E_ERROR}"
     elif utils::has yum; then
-        utils::quiet_err yum remove -y "$@"
-        log::info "Packages removed with YUM: $*"
+        system::packages::__run "Packages removed with YUM: $*" yum remove -y "$@" || return "${E_ERROR}"
     elif utils::has dnf; then
-        utils::quiet_err dnf remove -y "$@"
-        log::info "Packages removed with DNF: $*"
+        system::packages::__run "Packages removed with DNF: $*" dnf remove -y "$@" || return "${E_ERROR}"
     elif utils::has pacman; then
-        utils::quiet_err pacman -R --noconfirm "$@"
-        log::info "Packages removed with Pacman: $*"
+        system::packages::__run "Packages removed with Pacman: $*" pacman -R --noconfirm "$@" || return "${E_ERROR}"
     elif utils::has zypper; then
-        utils::quiet_err zypper remove -y "$@"
-        log::info "Packages removed with Zypper: $*"
+        system::packages::__run "Packages removed with Zypper: $*" zypper remove -y "$@" || return "${E_ERROR}"
     else
         log::warn "No supported package manager found"
         return "${E_ERROR}"
@@ -106,20 +136,15 @@ system::packages::remove() {
 system::packages::upgrade() {
     # Detect package manager / Определить менеджер пакетов
     if utils::has apt; then
-        utils::quiet_err apt upgrade -y
-        log::info "Packages upgraded with APT"
+        system::packages::__run "Packages upgraded with APT" apt upgrade -y || return "${E_ERROR}"
     elif utils::has yum; then
-        utils::quiet_err yum update -y
-        log::info "Packages upgraded with YUM"
+        system::packages::__run "Packages upgraded with YUM" yum update -y || return "${E_ERROR}"
     elif utils::has dnf; then
-        utils::quiet_err dnf upgrade -y
-        log::info "Packages upgraded with DNF"
+        system::packages::__run "Packages upgraded with DNF" dnf upgrade -y || return "${E_ERROR}"
     elif utils::has pacman; then
-        utils::quiet_err pacman -Syu --noconfirm
-        log::info "Packages upgraded with Pacman"
+        system::packages::__run "Packages upgraded with Pacman" pacman -Syu --noconfirm || return "${E_ERROR}"
     elif utils::has zypper; then
-        utils::quiet_err zypper update -y
-        log::info "Packages upgraded with Zypper"
+        system::packages::__run "Packages upgraded with Zypper" zypper update -y || return "${E_ERROR}"
     else
         log::warn "No supported package manager found"
         return "${E_ERROR}"
@@ -131,7 +156,7 @@ system::packages::upgrade() {
 # @example
 #   system::packages::search "vim"
 system::packages::search() {
-    local search_term="${1}"
+    local search_term="${1:-}"
     
     if is::empty "${search_term}"; then
         log::warn "Search term not specified"
@@ -181,7 +206,7 @@ system::packages::list() {
 # @example
 #   system::packages::add_repo "ppa:deadsnakes/ppa"
 system::packages::add_repo() {
-    local repo="${1}"
+    local repo="${1:-}"
     
     if is::empty "${repo}"; then
         log::warn "Repository specification not provided"
@@ -213,7 +238,7 @@ system::packages::add_repo() {
 # @example
 #   system::packages::remove_repo "ppa:deadsnakes/ppa"
 system::packages::remove_repo() {
-    local repo="${1}"
+    local repo="${1:-}"
     
     if is::empty "${repo}"; then
         log::warn "Repository specification not provided"
@@ -226,25 +251,31 @@ system::packages::remove_repo() {
             utils::quiet_err apt-add-repository -r -y "${repo}"
         else
             # Remove from sources.list / Удалить из sources.list
-            utils::quiet_err sed -i "\|${repo}|d" /etc/apt/sources.list
+            # Точное совпадение подстроки, не regex: "." и "*" в адресе
+            # репозитория не должны удалять чужие строки
+            # Fixed-string match, not a regex: "." and "*" in a repository
+            # address must not delete foreign lines
+            local sources_tmp
+            sources_tmp="$(mktemp)" || return "${E_ERROR}"
+            if awk -v r="${repo}" 'index($0, r) == 0' /etc/apt/sources.list > "${sources_tmp}" \
+                && cat -- "${sources_tmp}" > /etc/apt/sources.list; then
+                :
+            else
+                utils::ignore rm -f -- "${sources_tmp}"
+                log::error "Failed to update /etc/apt/sources.list"
+                return "${E_ERROR}"
+            fi
+            utils::ignore rm -f -- "${sources_tmp}"
         fi
         log::info "Repository removed for APT: ${repo}"
     elif utils::has yum; then
         # For YUM, we need to find and remove the repo file / Для YUM нужно найти и
         # удалить файл репозитория
-        local repo_file=$(utils::quiet_err find /etc/yum.repos.d/ -name "*.repo" -exec grep -l "${repo}" {} \;)
-        if is::not_empty "${repo_file}"; then
-            utils::quiet_err rm -f "${repo_file}"
-            log::info "Repository file removed for YUM: ${repo_file}"
-        fi
+        system::packages::__remove_repo_files "${repo}" "YUM"
     elif utils::has dnf; then
         # For DNF, we need to find and remove the repo file / Для DNF нужно найти и
         # удалить файл репозитория
-        local repo_file=$(utils::quiet_err find /etc/yum.repos.d/ -name "*.repo" -exec grep -l "${repo}" {} \;)
-        if is::not_empty "${repo_file}"; then
-            utils::quiet_err rm -f "${repo_file}"
-            log::info "Repository file removed for DNF: ${repo_file}"
-        fi
+        system::packages::__remove_repo_files "${repo}" "DNF"
     else
         log::warn "Repository management not implemented for this package manager"
         return "${E_ERROR}"

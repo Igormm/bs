@@ -51,6 +51,16 @@ test_missing_tools_multi_package() {
     testframework::assert_equal "pkg-two" "${missing[1]}" "second package name kept"
 }
 
+# Under bs strict mode IFS is newline/tab: packages must still be split on spaces
+# В строгом режиме bs IFS = перевод строки/табуляция: пакеты всё равно делятся по пробелам
+test_missing_tools_multi_package_strict_ifs() {
+    local -a missing=()
+    local IFS=$'\n\t'
+    deps::missing_tools missing "definitely-not-a-real-cmd-xyz|another-missing-cmd:pkg-one pkg-two"
+    testframework::assert_equal "2" "${#missing[@]}" "packages are split on spaces even with IFS=newline/tab"
+    testframework::assert_equal "pkg-one" "${missing[0]}" "first package name is whole"
+}
+
 main() {
     print_header "Core Deps Unit Tests / Модульные тесты core/deps"
 
@@ -61,6 +71,7 @@ main() {
     test_missing_tools_package_map
     test_missing_tools_alternatives
     test_missing_tools_multi_package
+    test_missing_tools_multi_package_strict_ifs
 
     testframework::summary
 }

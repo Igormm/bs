@@ -343,7 +343,7 @@ regex::__expand_repl() {
           __rg_out+="\\${__rg_ch}"
           ;;
       esac
-      (( __rg_i++ ))
+      __rg_i=$(( __rg_i + 1 ))
     elif [[ "${__rg_ch}" == "&" ]]; then
       __rg_out+="${BASH_REMATCH[0]:-}"
     else

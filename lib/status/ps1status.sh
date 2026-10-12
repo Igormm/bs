@@ -580,7 +580,7 @@ ps1status::network::update() {
 
             status="up"
 
-            ((successful_pings++))
+            successful_pings=$(( successful_pings + 1 ))
 
             
 

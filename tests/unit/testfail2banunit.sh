@@ -43,6 +43,7 @@ main() {
     rc=0; fail2ban::validate maxretry "5;rm" || rc=$?; testframework::assert_equal "${LIB_ERROR_INVALID_INPUT}" "${rc}" "int injection rejected"
     rc=0; fail2ban::validate bantime.increment true || rc=$?; testframework::assert_equal 0 "${rc}" "bool ok"
     rc=0; fail2ban::validate backend bogus || rc=$?; testframework::assert_equal "${LIB_ERROR_INVALID_INPUT}" "${rc}" "enum bad rejected"
+    rc=0; fail2ban::validate backend "auto,pyinotify" || rc=$?; testframework::assert_equal "${LIB_ERROR_INVALID_INPUT}" "${rc}" "enum with a comma (two variants) rejected"
     rc=0; fail2ban::validate ignoreip "10.0.0.0/8 192.168.1.5" || rc=$?; testframework::assert_equal 0 "${rc}" "iplist ok"
     rc=0; fail2ban::validate ignoreip "10.0.0.1;x" || rc=$?; testframework::assert_equal "${LIB_ERROR_INVALID_INPUT}" "${rc}" "iplist bad rejected"
 
@@ -110,6 +111,22 @@ EOF
     fail2ban::install "${tmp}/good/jail.local" || irc=$?
     testframework::assert_true "! -f '${tmp}/jail.d/99-bs.conf'" "dry-run writes nothing"
     export BS_FAIL2BAN_DRY_RUN=0
+
+    testframework::section "backup/revert / копии и откат"
+    local b1 b2
+    printf 'one\n' > "${tmp}/good/x.conf"
+    b1="$(fail2ban::backup "${tmp}/good/x.conf")"
+    printf 'two\n' > "${tmp}/good/x.conf"
+    b2="$(fail2ban::backup "${tmp}/good/x.conf")"
+    testframework::assert_true "'${b1}' != '${b2}'" "two backups in one second get different names"
+    testframework::assert_equal "one" "$(cat "${b1}")" "the first backup is not overwritten by the second"
+    shopt -u nullglob
+    fail2ban::revert "${tmp}/good/x.conf" >/dev/null
+    testframework::assert_command "! shopt -q nullglob" "revert does not turn nullglob on for the caller"
+    shopt -s nullglob
+    fail2ban::revert "${tmp}/good/x.conf" >/dev/null
+    testframework::assert_command "shopt -q nullglob" "revert keeps the caller's nullglob"
+    shopt -u nullglob
 
     testframework::section "detect / автообнаружение"
     mkdir -p "${tmp}/filter.d"

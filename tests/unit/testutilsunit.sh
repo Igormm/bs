@@ -119,6 +119,8 @@ test_human_size() {
     testframework::assert_equal "12.0 MiB" "$(utils::human_size 12288K)" "human_size suffixed"
     testframework::assert_equal "1.0 KiB" "$(utils::human_size 1024)" "human_size exact KiB"
     testframework::assert_equal "abc" "$(utils::human_size abc)" "human_size passes through unparseable"
+    testframework::assert_equal "3.0 GiB" "$(utils::human_size 3GiB)" "human_size accepts IEC suffixes (GiB)"
+    testframework::assert_equal "12.0 KiB" "$(utils::human_size 12KiB)" "human_size accepts IEC suffixes (KiB)"
 }
 
 # Test utils::head_bytes capped read

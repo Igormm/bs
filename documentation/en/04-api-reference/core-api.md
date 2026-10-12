@@ -246,6 +246,7 @@ Any module can register a cleanup function; the stack runs in LIFO order when th
 #### `error::throw <message> [code]`
 - Like `errorhandler::throw`, but the caller's function name is auto-detected via `FUNCNAME` — no `local func_name="..."` boilerplate, and the name stays correct after renames
 - Example: `error::throw "Something failed" "${LIB_ERROR_FILE_NOT_FOUND}"`
+- Does not exit: it only logs and returns the code. The script stops only if `set -e` is active at the call site (it is switched off inside `if`, `||`, `&&` conditions and in non-strict scripts). Where execution must not continue, write `error::throw "msg" "${CODE}" || return $?`
 
 #### `signal::on <signal> <handler>` / `signal::ignore <signal>` / `signal::reset <signal>`
 - Linguistic wrappers over `trap`: subscribe a function to a signal, ignore a signal, restore the default disposition. Names with or without `SIG` are accepted
@@ -393,7 +394,7 @@ Note: internally this checks `command -v timeout >/dev/null 2>&1`; in your own c
 
 ## Version — `core/version.sh`
 
-- `BS_VERSION` — current version (e.g. `0.7.0`); the single place where the number is written; exported only if empty.
+- `BS_VERSION` — current version (e.g. `0.7.1`); the single place where the number is written; exported only if empty.
 - `BS_NAME="BS (Bash Open Source Architecture) BOSA Framework"`.
 
 #### `bs::version::print`

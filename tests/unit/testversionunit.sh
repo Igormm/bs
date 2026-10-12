@@ -76,6 +76,18 @@ main() {
     bs::version::compare "2.0.0" "1.9.9" || rc=$?
     testframework::assert_equal "1" "$rc" "2.0.0 > 1.9.9"
     
+    rc=0
+    bs::version::compare "1.2.3rc1" "1.2.9" || rc=$?
+    testframework::assert_equal "2" "$rc" "1.2.3rc1 < 1.2.9 (suffix is not digits)"
+
+    rc=0
+    bs::version::compare "0.8.0-rc1" "0.8.0" || rc=$?
+    testframework::assert_equal "0" "$rc" "0.8.0-rc1 == 0.8.0 (suffix ignored)"
+
+    rc=0
+    bs::version::compare "v0.10.0" "0.9.0" || rc=$?
+    testframework::assert_equal "1" "$rc" "v-prefix: v0.10.0 > 0.9.0"
+
     # Тест 2: Получение версии
     testframework::section "Version Info / Информация о версии"
     testframework::assert_equal "${BS_VERSION}" "$(bs::version::get)" "bs::version::get matches BS_VERSION"

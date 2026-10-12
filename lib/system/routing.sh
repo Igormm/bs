@@ -9,6 +9,19 @@ bs::guard "SYSTEM_ROUTING" || return 0
 # Зависимости / Dependencies
 bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../io/files.sh" "../data/format.sh"
 
+# @private Run a routing command; log its output on failure (success is silent)
+# @private Выполнить команду маршрутизации; при ошибке записать её вывод (успех молчит)
+# @param $@ Command and arguments / Команда и аргументы
+# @return 0 on success, E_ERROR otherwise / 0 при успехе, иначе E_ERROR
+system::routing::__run() {
+    local out
+    if out="$("$@" 2>&1)"; then
+        return 0
+    fi
+    log::error "Command failed / Команда не удалась: $* ${out:+(${out})}"
+    return "${E_ERROR}"
+}
+
 # @description Add static route
 # @param $1 Destination network (e.g., "192.168.2.0/24")
 # @param $2 Gateway IP (e.g., "192.168.1.1")
@@ -16,9 +29,9 @@ bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/uti
 # @example
 #   system::routing::add "192.168.2.0/24" "192.168.1.1" "eth0"
 system::routing::add() {
-    local destination="${1}"
-    local gateway="${2}"
-    local interface="${3}"
+    local destination="${1:-}"
+    local gateway="${2:-}"
+    local interface="${3:-}"
     
     if is::empty "${destination}" || is::empty "${gateway}"; then
         log::warn "Destination network and gateway must be specified"
@@ -28,17 +41,17 @@ system::routing::add() {
     # Using ip command (modern approach)
     if utils::has ip; then
         if is::not_empty "${interface}"; then
-            utils::attempt ip route add "${destination}" via "${gateway}" dev "${interface}"
+            system::routing::__run ip route add "${destination}" via "${gateway}" dev "${interface}" || return "${E_ERROR}"
         else
-            utils::attempt ip route add "${destination}" via "${gateway}"
+            system::routing::__run ip route add "${destination}" via "${gateway}" || return "${E_ERROR}"
         fi
         log::info "Static route added: ${destination} via ${gateway}"
     else
         # Fallback to route command
         if is::not_empty "${interface}"; then
-            utils::attempt route add -net "${destination}" gw "${gateway}" dev "${interface}"
+            system::routing::__run route add -net "${destination}" gw "${gateway}" dev "${interface}" || return "${E_ERROR}"
         else
-            utils::attempt route add -net "${destination}" gw "${gateway}"
+            system::routing::__run route add -net "${destination}" gw "${gateway}" || return "${E_ERROR}"
         fi
         log::info "Static route added: ${destination} via ${gateway}"
     fi
@@ -50,8 +63,8 @@ system::routing::add() {
 # @example
 #   system::routing::delete "192.168.2.0/24" "192.168.1.1"
 system::routing::delete() {
-    local destination="${1}"
-    local gateway="${2}"
+    local destination="${1:-}"
+    local gateway="${2:-}"
     
     if is::empty "${destination}"; then
         log::warn "Destination network must be specified"
@@ -61,17 +74,17 @@ system::routing::delete() {
     # Using ip command (modern approach)
     if utils::has ip; then
         if is::not_empty "${gateway}"; then
-            utils::attempt ip route del "${destination}" via "${gateway}"
+            system::routing::__run ip route del "${destination}" via "${gateway}" || return "${E_ERROR}"
         else
-            utils::attempt ip route del "${destination}"
+            system::routing::__run ip route del "${destination}" || return "${E_ERROR}"
         fi
         log::info "Static route deleted: ${destination}"
     else
         # Fallback to route command
         if is::not_empty "${gateway}"; then
-            utils::attempt route del -net "${destination}" gw "${gateway}"
+            system::routing::__run route del -net "${destination}" gw "${gateway}" || return "${E_ERROR}"
         else
-            utils::attempt route del -net "${destination}"
+            system::routing::__run route del -net "${destination}" || return "${E_ERROR}"
         fi
         log::info "Static route deleted: ${destination}"
     fi
@@ -83,8 +96,8 @@ system::routing::delete() {
 # @example
 #   system::routing::default "192.168.1.1" "eth0"
 system::routing::default() {
-    local gateway="${1}"
-    local interface="${2}"
+    local gateway="${1:-}"
+    local interface="${2:-}"
     
     if is::empty "${gateway}"; then
         log::warn "Gateway IP must be specified"
@@ -93,26 +106,28 @@ system::routing::default() {
     
     # Using ip command (modern approach)
     if utils::has ip; then
-        # Delete existing default route
-        utils::attempt ip route del default
-        
-        # Add new default route
+        # replace — атомарно: при неверном шлюзе прежний маршрут по умолчанию
+        # не теряется (del + add оставлял систему без маршрута)
+        # replace is atomic: with a bad gateway the previous default route is
+        # kept (del + add left the system without a route)
         if is::not_empty "${interface}"; then
-            utils::attempt ip route add default via "${gateway}" dev "${interface}"
+            system::routing::__run ip route replace default via "${gateway}" dev "${interface}" || return "${E_ERROR}"
         else
-            utils::attempt ip route add default via "${gateway}"
+            system::routing::__run ip route replace default via "${gateway}" || return "${E_ERROR}"
         fi
         log::info "Default gateway set to ${gateway}"
     else
         # Fallback to route command
         # Delete existing default route
+        # Старого маршрута может не быть: удаление — best-effort
+        # There may be no old route: the removal is best-effort
         utils::attempt route del default
         
         # Add new default route
         if is::not_empty "${interface}"; then
-            utils::attempt route add default gw "${gateway}" dev "${interface}"
+            system::routing::__run route add default gw "${gateway}" dev "${interface}" || return "${E_ERROR}"
         else
-            utils::attempt route add default gw "${gateway}"
+            system::routing::__run route add default gw "${gateway}" || return "${E_ERROR}"
         fi
         log::info "Default gateway set to ${gateway}"
     fi
@@ -137,7 +152,7 @@ system::routing::show() {
 # @example
 #   system::routing::table "100" "show"
 system::routing::table() {
-    local table="${1}"
+    local table="${1:-}"
     local action="${2:-show}"
     
     if is::empty "${table}"; then
@@ -164,7 +179,23 @@ system::routing::table() {
         delete)
             # Remove routing table entry from /etc/iproute2/rt_tables
             if is::writable "/etc/iproute2/rt_tables"; then
-                utils::attempt sed -i "/^${table} /d" /etc/iproute2/rt_tables
+                case "${table}" in
+                    0|253|254|255|unspec|default|main|local)
+                        log::error "Reserved routing table can not be removed: ${table}"
+                        return "${E_ERROR}"
+                        ;;
+                esac
+                # Точное совпадение первого поля (число или имя), не regex
+                # Exact match of the first field (number or name), not a regex
+                local rt_tmp
+                rt_tmp="$(mktemp)" || return "${E_ERROR}"
+                if ! awk -v t="${table}" '/^#/ || ($1 != t && $2 != t)' /etc/iproute2/rt_tables > "${rt_tmp}" \
+                    || ! cat -- "${rt_tmp}" > /etc/iproute2/rt_tables; then
+                    utils::ignore rm -f -- "${rt_tmp}"
+                    log::error "Failed to update /etc/iproute2/rt_tables"
+                    return "${E_ERROR}"
+                fi
+                utils::ignore rm -f -- "${rt_tmp}"
                 log::info "Routing table ${table} removed"
             else
                 log::warn "Cannot write to /etc/iproute2/rt_tables"
@@ -193,19 +224,26 @@ system::routing::table() {
 # @example
 #   system::routing::policy "from 192.168.1.0/24 table 100" "add"
 system::routing::policy() {
-    local rule="${1}"
+    local rule="${1:-}"
     local action="${2:-add}"
     
     if is::empty "${rule}"; then
         log::warn "Routing rule must be specified"
         return "${E_ERROR}"
     fi
+
+    # Делим правило по пробелам явно: в bs run IFS = перевод строки/табуляция,
+    # и неявное деление "${rule}" оставило бы одно слово
+    # Split the rule on spaces explicitly: in bs run IFS is newline/tab, and
+    # implicit splitting of "${rule}" would leave a single word
+    local -a rule_args=()
+    IFS=' ' read -ra rule_args <<< "${rule}"
     
     case "${action}" in
         add)
             # Add policy routing rule
             if utils::has ip; then
-                utils::attempt ip rule add ${rule}
+                system::routing::__run ip rule add "${rule_args[@]}" || return "${E_ERROR}"
                 log::info "Policy routing rule added: ${rule}"
             else
                 log::warn "ip command not available"
@@ -215,7 +253,7 @@ system::routing::policy() {
         delete)
             # Delete policy routing rule
             if utils::has ip; then
-                utils::attempt ip rule del ${rule}
+                system::routing::__run ip rule del "${rule_args[@]}" || return "${E_ERROR}"
                 log::info "Policy routing rule deleted: ${rule}"
             else
                 log::warn "ip command not available"

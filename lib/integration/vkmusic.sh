@@ -250,7 +250,7 @@ vkmusic::display_search_results() {
         duration_formatted=$(printf "%02d:%02d" $((duration / 60)) $((duration % 60)))
         
         echo "  ${index}. ${artist} - ${title} [${duration_formatted}] (ID: ${owner_id}_${id})"
-        ((index++))
+        index=$(( index + 1 ))
     done
 }
 
@@ -572,9 +572,9 @@ vkmusic::batch_download() {
     while IFS= read -r audio_info; do
         if is::not_empty "${audio_info}"; then
             if vkmusic::download "${audio_info}" "${output_dir}"; then
-                ((downloaded_count++))
+                downloaded_count=$(( downloaded_count + 1 ))
             else
-                ((failed_count++))
+                failed_count=$(( failed_count + 1 ))
             fi
         fi
     done <<< "${audio_list}"
@@ -668,7 +668,7 @@ vkmusic::create_playlist_file() {
             local count=0
             while IFS= read -r audio_id; do
                 if is::not_empty "${audio_id}"; then
-                    ((count++))
+                    count=$(( count + 1 ))
                     io::files::append "${playlist_file}" "File${count}=${audio_id}"
                     io::files::append "${playlist_file}" "Title${count}=${audio_id}"
                     io::files::append "${playlist_file}" "Length${count}=-1"

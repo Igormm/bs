@@ -19,6 +19,16 @@ main() {
     print_header "SSHd Unit Tests / Модульные тесты sshd"
     testframework::init
 
+    # Подставной systemctl: тесты не должны перезагружать настоящий sshd
+    # (у root это реальный reload, у обычного пользователя — запрос polkit)
+    # Fake systemctl: tests must not reload the real sshd (a real reload for
+    # root, a polkit prompt for a regular user)
+    local fake_bin
+    fake_bin="$(mktemp -d)"
+    printf '#!/bin/sh\nexit 0\n' > "${fake_bin}/systemctl"
+    chmod +x "${fake_bin}/systemctl"
+    export PATH="${fake_bin}:${PATH}"
+
     testframework::section "catalog shape / форма каталога"
     local name meta fields
     for name in "${SSHD_PARAM_ORDER[@]}"; do
@@ -214,6 +224,28 @@ EOF
     testframework::assert_equal "1" "$(grep -cF "${SSHD_MARK_BEGIN}" "${BS_SSHD_MAIN}")" "single begin marker"
     sshd::install_main "${mt}/block.conf" || true
     testframework::assert_equal "1" "$(grep -cF "${SSHD_MARK_BEGIN}" "${BS_SSHD_MAIN}")" "no duplicate block"
+
+    # sshd takes the FIRST value and a Match lasts to the next Match/EOF:
+    # global parameters must precede the old lines, our Match goes last
+    # sshd берёт ПЕРВОЕ значение, а Match действует до следующего Match/EOF:
+    # общие параметры идут перед старыми строками, наш Match — в конце
+    printf 'X11Forwarding yes\nMatch User bob\n    AllowTcpForwarding yes\n' > "${BS_SSHD_MAIN}"
+    chmod 644 "${BS_SSHD_MAIN}"
+    printf '%s\nX11Forwarding no\n\nMatch Group sftp\n    ForceCommand internal-sftp\n%s\n' \
+        "${SSHD_MARK_BEGIN}" "${SSHD_MARK_END}" > "${mt}/block2.conf"
+    mrc=0; sshd::install_main "${mt}/block2.conf" || mrc=$?
+    testframework::assert_equal "0" "${mrc}" "install_main with a Match section ok"
+    local ln_block ln_old ln_foreign ln_ours
+    ln_block="$(grep -n '^X11Forwarding no$' "${BS_SSHD_MAIN}" | cut -d: -f1)"
+    ln_old="$(grep -n '^X11Forwarding yes$' "${BS_SSHD_MAIN}" | cut -d: -f1)"
+    ln_foreign="$(grep -n '^Match User bob$' "${BS_SSHD_MAIN}" | cut -d: -f1)"
+    ln_ours="$(grep -n '^Match Group sftp$' "${BS_SSHD_MAIN}" | cut -d: -f1)"
+    testframework::assert_true "${ln_block} -lt ${ln_old}" "global block parameters precede the old lines"
+    testframework::assert_true "${ln_ours} -gt ${ln_foreign}" "our Match section goes after the foreign Match"
+    testframework::assert_equal "2" "$(grep -cF "${SSHD_MARK_BEGIN}" "${BS_SSHD_MAIN}")" "global part and Match part are both marked"
+    sshd::install_main "${mt}/block2.conf" || true
+    testframework::assert_equal "2" "$(grep -cF "${SSHD_MARK_BEGIN}" "${BS_SSHD_MAIN}")" "a rerun replaces the blocks, no duplicates"
+    testframework::assert_equal "644" "$(stat -c %a "${BS_SSHD_MAIN}")" "main config mode is preserved"
     rm -rf "${mt}"
 
     testframework::section "addr validation / валидация адресов"
@@ -320,6 +352,7 @@ EOF
     sshd::init >/dev/null 2>&1
     testframework::assert_equal "0" "$?" "init returns success"
 
+    rm -rf "${fake_bin}"
     testframework::summary
 }
 

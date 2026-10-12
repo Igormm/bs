@@ -51,6 +51,37 @@ main() {
         testframework::assert_true "true" "rules empty (no ip in env) — skipped"
     fi
 
+    testframework::section "mutators with a fake ip / изменяющие команды с подставным ip"
+    local fake_bin rc
+    fake_bin="$(mktemp -d)"
+    cat > "${fake_bin}/ip" <<FAKE
+#!/bin/sh
+echo "\$*" >> "${fake_bin}/calls"
+case "\$*" in
+  *999.999*) echo "Error: inet address is expected" >&2; exit 2 ;;
+esac
+exit 0
+FAKE
+    chmod +x "${fake_bin}/ip"
+    local old_path="${PATH}"
+    PATH="${fake_bin}:${PATH}"
+    rc=0; system::routing::default 999.999.0.1 >/dev/null 2>&1 || rc=$?
+    testframework::assert_true "${rc} -ne 0" "a failing default route is reported"
+    testframework::assert_command "! grep -q 'route del default' '${fake_bin}/calls'" "the old default route is never deleted first"
+    : > "${fake_bin}/calls"
+    rc=0; system::routing::default 10.0.0.1 eth0 >/dev/null 2>&1 || rc=$?
+    testframework::assert_equal "0" "${rc}" "default route set"
+    testframework::assert_equal "route replace default via 10.0.0.1 dev eth0" "$(cat "${fake_bin}/calls")" "one atomic 'ip route replace'"
+    : > "${fake_bin}/calls"
+    local IFS=$'\n\t'
+    rc=0; system::routing::policy "from 10.0.0.0/8 table 100" add >/dev/null 2>&1 || rc=$?
+    testframework::assert_equal "0" "${rc}" "policy rule added"
+    testframework::assert_equal "rule add from 10.0.0.0/8 table 100" "$(cat "${fake_bin}/calls")" "the rule is split into words even with IFS=newline"
+    rc=0; system::routing::add 10.1.0.0/16 999.999.0.1 >/dev/null 2>&1 || rc=$?
+    testframework::assert_true "${rc} -ne 0" "a failing route add is reported"
+    PATH="${old_path}"
+    rm -rf "${fake_bin}"
+
     testframework::summary
 }
 

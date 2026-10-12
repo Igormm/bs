@@ -97,6 +97,11 @@ sshd::revert /etc/ssh/sshd_config.d/99-bs.conf  # restore newest .bak.*
 
 `sshd::install` writes atomically and validates before and after the
 replace; on failure it restores the backup (or removes the new file).
+`sshd::install_main` puts the block's global parameters at the TOP of the main
+config (sshd uses the first value of a directive, so earlier lines would
+override them) and the block's own `Match` sections at the END (a `Match`
+lasts until the next `Match` or end of file). The file mode of the main config
+is kept.
 `BS_SSHD_DRY_RUN=1` prints the planned actions and writes nothing.
 
 ## Error codes

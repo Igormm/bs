@@ -117,6 +117,25 @@ bs run examples/logmonitorexample.sh
 bs run examples/quizgameexample.sh          # best in a real terminal
 ```
 
+### Media Examples (video / audio to a model server)
+
+- **send_video.sh** — describes a video with a vLLM vision model: cuts it with
+  `ffmpeg`, sends the chunks to `/v1/chat/completions`, finds the longest
+  chunk the server accepts (`--segment auto`, `--suggest`)
+- **send_audio.sh** — transcribes the audio track of a media file through
+  `/v1/audio/transcriptions` (Whisper-style server) with phrase timings
+- **send_common.sh** — helpers shared by both: the run directory
+  `<output>/<media name>/` (parameters, checkpoint, report, `*.jsonl`, logs)
+  and the lock that keeps two copies from writing one checkpoint
+
+A rerun of the same command continues from the checkpoint; `--restart` starts
+over. Needs `curl`, `jq`, `ffmpeg`/`ffprobe`.
+
+```bash
+bs run examples/send_video.sh --file clip.mp4 --host llm.local
+bs run examples/send_audio.sh --file talk.mp4 --language ru
+```
+
 ## How to Use Examples
 
 ### Running Examples

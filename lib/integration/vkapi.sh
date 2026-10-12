@@ -333,7 +333,7 @@ vkapi::api_request() {
         if [[ "${http_code}" == "429" ]]; then
             log::warn "Rate limited, waiting before retry..."
             sleep $((retry_count + 1))
-            ((retry_count++))
+            retry_count=$(( retry_count + 1 ))
             continue
         fi
         
@@ -341,7 +341,7 @@ vkapi::api_request() {
         if [[ "${http_code}" =~ ^5[0-9][0-9]$ ]]; then
             log::warn "Server error ${http_code}, retrying..."
             sleep $((retry_count + 1))
-            ((retry_count++))
+            retry_count=$(( retry_count + 1 ))
             continue
         fi
         

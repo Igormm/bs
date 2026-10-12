@@ -772,9 +772,9 @@ frameworks::shellspec::run() {
   
   for result in "${FRAMEWORKS_SHELLSPEC_RESULTS[@]}"; do
   if [[ "${result}" =~ ^PASS: ]]; then
-  ((passed++))
+  passed=$(( passed + 1 ))
   elif [[ "${result}" =~ ^FAIL: ]]; then
-  ((failed++))
+  failed=$(( failed + 1 ))
   fi
   done
   

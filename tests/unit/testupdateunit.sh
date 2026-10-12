@@ -13,6 +13,23 @@ export BS_SILENT=1
 source "${BS_PROJECT_ROOT}/bootstrap/init.sh"
 export BS_HOME="${BS_PROJECT_ROOT}"
 
+# Фейковый источник BS: bs печатает версию, как настоящий (smoke-test update).
+# Fake BS source: its bs prints a version like the real one (update smoke test).
+make_fake_src() {
+    local -r dir="$1" ver="${2:-9.9.9}"
+    mkdir -p "${dir}/core" "${dir}/lib" "${dir}/bootstrap"
+    printf '#!/usr/bin/env bash\ncase "${1:-}" in version) echo "BS Framework version: %s";; esac\n' "${ver}" > "${dir}/bs"
+    printf '#!/usr/bin/env bash\n' > "${dir}/bootstrap/init.sh"
+    printf '#!/usr/bin/env bash\n' > "${dir}/bootstrap/loader.sh"
+    printf 'export BS_VERSION="%s"\n' "${ver}" > "${dir}/core/version.sh"
+}
+
+# Фейковая установка: маркеры BS (bs + bootstrap/init.sh) — иначе update откажет.
+# Fake install with the BS markers (bs + bootstrap/init.sh) — else update refuses.
+make_fake_target() {
+    make_fake_src "$@"
+}
+
 test_update_basic() {
     local tmp_dir src target
     tmp_dir="$(mktemp -d)"
@@ -20,9 +37,9 @@ test_update_basic() {
     target="${tmp_dir}/installed"
 
     # Минимальный фейковый репозиторий и установка / Fake repo and install
-    mkdir -p "${src}/core" "${src}/lib/data" "${src}/bootstrap" "${target}/lib/data"
-    printf '#!/usr/bin/env bash\necho fake-bs\n' > "${src}/bs"
-    printf '#!/usr/bin/env bash\n' > "${src}/bootstrap/init.sh"
+    make_fake_src "${src}" 9.9.9
+    make_fake_target "${target}" 9.0.0
+    mkdir -p "${src}/lib/data" "${target}/lib/data"
     printf 'old_core() { :; }\n' > "${target}/old.sh"
     printf 'new_func() { :; }\n' > "${src}/core/new.sh"
     printf 'mod_func() { :; }\n' > "${src}/lib/data/mod.sh"
@@ -55,9 +72,9 @@ test_update_autodetect() {
     src="${tmp_dir}/repo"
     target="${tmp_dir}/custom/lib/bs"
 
-    mkdir -p "${src}/core" "${src}/lib" "${src}/bootstrap" "${target}/core" "${tmp_dir}/bin" "${tmp_dir}/home"
-    printf '#!/usr/bin/env bash\necho fake-bs\n' > "${src}/bs"
-    printf '#!/usr/bin/env bash\n' > "${src}/bootstrap/init.sh"
+    make_fake_src "${src}" 9.9.9
+    make_fake_target "${target}" 9.0.0
+    mkdir -p "${tmp_dir}/bin" "${tmp_dir}/home"
     printf 'new_func() { :; }\n' > "${src}/core/new.sh"
     printf '#!/usr/bin/env bash\nexport BS_ROOT="%s"\nexec "${BS_ROOT}/bs" "$@"\n' "${target}" > "${tmp_dir}/bin/bs"
     chmod +x "${tmp_dir}/bin/bs"
@@ -114,8 +131,7 @@ test_update_errors() {
     src="${tmp_dir}/repo"
     missing="${tmp_dir}/missing"
 
-    mkdir -p "${src}/core" "${src}/bootstrap"
-    printf 'x\n' > "${src}/core/a.sh"
+    make_fake_src "${src}" 9.9.9
 
     testframework::assert_false "bash '${BS_PROJECT_ROOT}/bs' sync --lib '${missing}' --from '${src}'" "bs update fails when target missing"
     testframework::assert_false "bash '${BS_PROJECT_ROOT}/bs' sync --lib '${tmp_dir}/x' --from '${tmp_dir}/not-a-repo'" "bs update fails when source is not a repo"
@@ -126,9 +142,7 @@ test_update_errors() {
 # Фейковый git-репозиторий BS с веткой main / Fake BS git repo on branch main
 make_git_repo() {
     local -r repo="$1"
-    mkdir -p "${repo}/core" "${repo}/lib" "${repo}/bootstrap"
-    printf '#!/usr/bin/env bash\necho remote-bs\n' > "${repo}/bs"
-    printf '#!/usr/bin/env bash\n' > "${repo}/bootstrap/init.sh"
+    make_fake_src "${repo}" 5.0.0
     printf 'remote_func() { :; }\n' > "${repo}/core/remote.sh"
     printf 'remote_lib() { :; }\n' > "${repo}/lib/remote.sh"
     git -C "${repo}" init --quiet --initial-branch=main
@@ -146,7 +160,7 @@ test_update_github() {
     repo="${tmp_dir}/remote"
     target="${tmp_dir}/installed"
     make_git_repo "${repo}"
-    mkdir -p "${target}"
+    make_fake_target "${target}" 4.0.0
 
     # Явный источник: --repo подразумевает --github / --repo implies --github
     bash "${BS_PROJECT_ROOT}/bs" update --lib "${target}" --repo "file://${repo}" >/dev/null 2>&1
@@ -174,7 +188,7 @@ test_update_github() {
     printf 'newer_func() { :; }\n' > "${repo}/core/newer.sh"
     git -C "${repo}" add -A
     git -C "${repo}" -c user.name=test -c user.email=test@example.com commit --quiet -m newer
-    rm -rf "${target}" && mkdir -p "${target}"
+    rm -rf "${target}" && make_fake_target "${target}" 4.0.0
     out="$(BS_UPDATE_REPO="file://${repo}" bash "${BS_PROJECT_ROOT}/bs" update --lib "${target}" --from "${clone}" 2>&1 </dev/null)"
     testframework::assert_equal "0" "$?" "bs update from a stale clone exits 0"
     testframework::assert_command "grep -q 'is behind' <<< '${out//\'/}'" "bs update warns when local repo is behind"

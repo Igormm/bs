@@ -120,7 +120,7 @@ test_score_calculation() {
     # Calculate score
     systemaudit::calculate_score
     
-    if [[ "${AUDIT_SCORE}" -eq 60 ]]; then  # 100 - 25 - 15 - 5 = 55, but minimum is 0
+    if [[ "${AUDIT_SCORE}" -eq 55 ]]; then  # 100 - 25 (critical) - 15 (high) - 5 (medium) = 55
         test_pass
     else
         test_fail
@@ -187,20 +187,13 @@ EOF
         elif [[ "$*" == *"PASS_MAX_DAYS"* ]]; then
             echo "PASS_MAX_DAYS 365"
         else
-            command grep "$@"
+            # builtin: иначе вызов снова попал бы в эту же функцию (бесконечная рекурсия)
+            # builtin: otherwise the call would hit this same function again (infinite recursion)
+            builtin command grep "$@"
         fi
     }
     
-    command() {
-        if [[ "$1" == "grep" ]]; then
-            shift
-            grep "$@"
-        else
-            command command "$@"
-        fi
-    }
-    
-    export -f grep command
+    export -f grep
     
     if utils::quiet systemaudit::run_full; then
         test_pass
@@ -209,7 +202,7 @@ EOF
     fi
     
     rm -rf /tmp/test_audit
-    unset -f grep command
+    unset -f grep
 }
 
 # Test 7: Report generation

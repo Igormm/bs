@@ -353,6 +353,7 @@ cleanup() {
     rm -f "/etc/wireguard/${TEST_INTERFACE}.conf"
     rm -f "/etc/wireguard/keys/${TEST_INTERFACE}_"*.key
     rm -f "/etc/wireguard/test_keys_"*.key
+    rm -f "/etc/wireguard/keys/test_keys_"*.key
     rm -f "/etc/wireguard/test_client_"*.conf
     rm -f "/etc/wireguard/keys/test_client_"*.key
     

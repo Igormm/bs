@@ -17,7 +17,7 @@
 #   user::create demo && user::lock_password demo
 #   user::add_group demo systemd-journal
 #   user::write_limits demo 128 4096
-#   user::write_sudoers demo "systemctl start demo.service" "firewall-cmd *"
+#   user::write_sudoers demo "systemctl start demo.service" "firewall-cmd *"   # names -> absolute paths
 #
 # @depends core/logger, core/utils
 
@@ -79,9 +79,9 @@ EOF
 }
 
 # @description Write and verify a sudoers file (chmod 440 + visudo -c);
-# on verification failure the file is removed and 1 is returned.
+# on verification failure the new file is dropped (a previous one is kept) and 1 is returned.
 # @description Записать и проверить файл sudoers (chmod 440 + visudo -c);
-# при неудаче проверки файл удаляется и возвращается 1.
+# при неудаче проверки новый файл удаляется (прежний сохраняется), возвращается 1.
 # @param $1 User name / Имя пользователя
 # @param $@ Sudo rule lines / Строки правил sudo
 # @return 0 written and verified, 1 verification failed / 0 записан и проверен,
@@ -90,18 +90,33 @@ user::write_sudoers() {
     local -r name="${1:?user name required}"
     shift
     local -r path="${BS_SUDOERS_DIR}/${name}"
+    # Сначала во временный файл: sudo игнорирует имена с точкой, а прежний
+    # рабочий файл не теряется, если новый не прошёл visudo -c
+    # Write to a temp file first: sudo ignores names with a dot, and a
+    # previous working file survives when the new one fails visudo -c
+    local -r tmp="${path}.tmp.$$"
     {
         printf '# Managed by ai_user_wizard / создано визардом\n'
         local line
+        local cmd abs
         for line in "$@"; do
+            # sudoers требует полный путь команды: "systemctl x" -> "/usr/bin/systemctl x"
+            # sudoers needs an absolute command path: "systemctl x" -> "/usr/bin/systemctl x"
+            cmd="${line%% *}"
+            if [[ "${cmd}" != /* && "${cmd}" != ALL ]]; then
+                abs="$(command -v -- "${cmd}" 2>/dev/null || :)"
+                if [[ "${abs}" == /* ]]; then
+                    line="${abs}${line#"${cmd}"}"
+                fi
+            fi
             printf '%s ALL=(root) NOPASSWD: %s\n' "${name}" "${line}"
         done
-    } > "${path}"
-    chmod 440 "${path}"
-    if ! visudo -c -f "${path}" >/dev/null 2>&1; then
-        rm -f "${path}"
+    } > "${tmp}"
+    chmod 440 "${tmp}"
+    if ! visudo -c -f "${tmp}" >/dev/null 2>&1; then
+        rm -f "${tmp}"
         log::error "user::write_sudoers: visudo -c не прошёл / failed — файл откачен / reverted: ${path}"
         return 1
     fi
-    return 0
+    mv -f -- "${tmp}" "${path}"
 }

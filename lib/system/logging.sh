@@ -17,13 +17,26 @@ bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/uti
 #   system::logging::configure "info"
 system::logging::configure() {
     local log_level="${1:-info}"
+
+    # Уровень попадает в sed-замену и в journald.conf: допустимы только имена
+    # уровней syslog / The level goes into a sed replacement and journald.conf:
+    # only syslog level names are allowed
+    case "${log_level}" in
+        emerg|alert|crit|err|warning|notice|info|debug) ;;
+        *)
+            log::error "Invalid log level: ${log_level} (emerg|alert|crit|err|warning|notice|info|debug)"
+            return "${E_INVALID}"
+            ;;
+    esac
     
     # For systemd-based systems / Для систем на базе systemd
     if utils::has journalctl; then
         # Set log level for journald / Установить уровень логирования для journald
         if is::file "/etc/systemd/journald.conf"; then
-            utils::attempt sed -i "s/^#MaxLevelStore=.*/MaxLevelStore=${log_level}/" /etc/systemd/journald.conf
-            utils::attempt sed -i "s/^#MaxLevelSyslog=.*/MaxLevelSyslog=${log_level}/" /etc/systemd/journald.conf
+            # "#?" — и закомментированная строка по умолчанию, и уже заданная ранее
+            # "#?" — both the commented default line and a value set earlier
+            utils::attempt sed -i -E "s/^#?MaxLevelStore=.*/MaxLevelStore=${log_level}/" /etc/systemd/journald.conf
+            utils::attempt sed -i -E "s/^#?MaxLevelSyslog=.*/MaxLevelSyslog=${log_level}/" /etc/systemd/journald.conf
             # Restart journald to apply changes / Перезапустить journald для применения
             # изменений
             if utils::has systemctl; then
@@ -135,7 +148,11 @@ system::logging::remote() {
     # For rsyslog
     if is::file "/etc/rsyslog.conf"; then
         # Add remote logging configuration
-        io::files::append /etc/rsyslog.conf "*.* @${server_ip}:${server_port}"
+        # Повторный вызов не должен дублировать строку
+        # A repeated call must not duplicate the line
+        if ! utils::quiet grep -qxF -- "*.* @${server_ip}:${server_port}" /etc/rsyslog.conf; then
+            io::files::append /etc/rsyslog.conf "*.* @${server_ip}:${server_port}"
+        fi
         
         # Restart rsyslog to apply changes
         if utils::has systemctl; then
@@ -175,6 +192,11 @@ system::logging::audit() {
         fi
         
         # Basic audit rules
+        if ! is::dir /etc/audit/rules.d; then
+            log::error "Audit rules directory /etc/audit/rules.d not found (is auditd installed?)"
+            return "${E_ERROR}"
+        fi
+
         cat > /etc/audit/rules.d/BS.rules << EOF
 # BS audit rules
 -w /etc/passwd -p wa -k identity
@@ -259,6 +281,13 @@ system::logging::clean() {
     if ! is::dir "${directory}"; then
         log::warn "Directory ${directory} not found"
         return "${E_ERROR}"
+    fi
+
+    # age идёт в find без кавычек: только число дней
+    # age goes to find unquoted: a number of days only
+    if ! [[ "${age}" =~ ^[0-9]+$ ]]; then
+        log::warn "Age must be a number of days: ${age}"
+        return "${E_INVALID}"
     fi
     
     # Find and remove old log files

@@ -887,7 +887,14 @@ send_video::__configure() {
     fi
     __map_cfg[prompt]="$(<"${prompt_file}")"
   fi
-  __map_cfg[ext]="${__map_cfg[file]##*.}"
+  # Extension of the file NAME (a dot in a directory name or no dot at all
+  # must not leak into the chunk path); mp4 when the name has none
+  # Расширение ИМЕНИ файла (точка в имени каталога или её отсутствие не
+  # должны попадать в путь фрагмента); без расширения — mp4
+  __map_cfg[ext]="mp4"
+  if [[ "${__map_cfg[file]##*/}" == ?*.* ]]; then
+    __map_cfg[ext]="${__map_cfg[file]##*.}"
+  fi
 
   # Run directory: looked up on every start, created only when missing
   __map_cfg[run_dir]="$(sendrun::dir_for "${__map_cfg[out_parent]}" \
@@ -1348,7 +1355,11 @@ says: data was lost. Pass --restart to start over." "${E_ERROR}"
 
   for (( i = 0; i < ${#chunks[@]}; i++ )); do
     if (( i < first )); then
-      utils::ignore rm -f "${chunks[i]}"
+      # segment 0: the "chunk" is the user's own file, never delete it
+      # segment 0: «фрагмент» — это файл пользователя, его не удаляем
+      if (( segment != 0 )); then
+        utils::ignore rm -f "${chunks[i]}"
+      fi
       continue
     fi
     # A chunk is written to buffers first: the report and the results get it

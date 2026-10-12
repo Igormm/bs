@@ -27,7 +27,8 @@ consistent code style and with zero external dependencies.
   локальный репозиторий или GitHub (`bs update --github [--ref REF]`); из
   установленной копии без репозитория рядом обновление идёт с GitHub. Если
   локальный репозиторий отстаёт от GitHub, `bs` предупредит и спросит,
-  какой источник взять
+  какой источник взять. Какие установки обновляются и что делает каждая
+  команда — в [documentation/ru/install.md](documentation/ru/install.md#обновление-bs-update)
 - **Загрузчик модулей** — `load "lib/io/streams"`, зависимости через
   `# @depends`, защита от циклов и повторной загрузки
 - **`core/args`** — декларативное дерево параметров: валидация, авто-help,
@@ -290,7 +291,9 @@ sudo ./install.sh
 
 Пути переопределяются переменными окружения `PREFIX`, `BIN_DIR` и
 `LIB_DIR`. Подробнее — в [documentation/ru/install.md](documentation/ru/install.md)
-/ [documentation/en/install.md](documentation/en/install.md).
+/ [documentation/en/install.md](documentation/en/install.md): виды установок,
+манифест `.install`, обновление (`bs update`, `--local`/`--system`/`--github`),
+удаление.
 
 ## Структура / Layout
 

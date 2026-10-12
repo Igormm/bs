@@ -13,7 +13,7 @@ bs::guard "VERSION" || return 0
 # Единственный источник BS_VERSION — этот модуль; bs и const.sh только используют
 # Single source of BS_VERSION is this module; bs and const.sh only use it
 if is::empty "${BS_VERSION:-}"; then
-  export BS_VERSION="0.7.0"
+  export BS_VERSION="0.7.1"
 fi
 
 # @global BS_NAME — Env: framework full name (category: env)
@@ -32,7 +32,7 @@ bs::version::print() {
 # @description Get version as string / Получить версию как строку
 # @return Version string / Строка версии
 # @example
-#   version=$(BS::version::get)
+#   version=$(bs::version::get)
 bs::version::get() {
     printf '%s\n' "${BS_VERSION}"
 }
@@ -67,7 +67,8 @@ bs::version::of() {
 # @param $2 Second version / Вторая версия
 # @return 0 if equal, 1 if first > second, 2 if first < second
 # @example
-#   if [[ $(BS::version::compare "0.1.0" "0.2.0") -eq 2 ]]; then
+#   rc=0; bs::version::compare "0.1.0" "0.2.0" || rc=$?   # the result is the exit code, not stdout
+#   if (( rc == 2 )); then
 #       echo "First version is older"
 #   fi
 bs::version::compare() {
@@ -99,12 +100,14 @@ bs::version::compare() {
         local part1="${v1_parts[i]:-0}"
         local part2="${v2_parts[i]:-0}"
 
-        # Нечисловые части (например, суффиксы "1.2.0-beta") заменяем на 0,
-        # чтобы числовое сравнение не падало.
-        # Non-numeric parts (e.g. suffixes like "1.2.0-beta") are replaced
-        # with 0 so the numeric comparison cannot fail.
-        part1="${part1//[^0-9]/0}"
-        part2="${part2//[^0-9]/0}"
+        # Нечисловой хвост части (суффикс "1.2.0-beta", "3rc1") отбрасываем с первой
+        # не-цифры: "0-beta" -> 0, "3rc1" -> 3; пустая часть = 0.
+        # The non-numeric tail of a part (a suffix like "1.2.0-beta", "3rc1") is
+        # cut at the first non-digit: "0-beta" -> 0, "3rc1" -> 3; empty = 0.
+        part1="${part1%%[!0-9]*}"
+        part2="${part2%%[!0-9]*}"
+        part1="${part1:-0}"
+        part2="${part2:-0}"
 
         if [[ 10#${part1} -gt 10#${part2} ]]; then
             return 1

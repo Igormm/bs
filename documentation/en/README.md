@@ -24,7 +24,7 @@ an I/O streams abstraction and a set of system modules.
 
 - [Examples](06-examples/README.md) — every script in `examples/` with run commands.
 - [Testing](07-testing/README.md) — test framework, validators, CI matrix.
-- [Installation](install.md) — system/local modes, PATH manager, uninstall.
+- [Installation](install.md) — installation types (system/local/custom), install manifest, `bs update` (local repo or GitHub), PATH manager, uninstall.
 
 ## For developers
 

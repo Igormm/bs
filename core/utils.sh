@@ -136,7 +136,7 @@ utils::__tmp_cleanup() {
   return 0
 }
 
-# Человеческий размер: байты или строка с суффиксом (12288K, 1.5G) → "12.0 KiB".
+# Человеческий размер: байты или строка с суффиксом (12288K, 3GiB) → "12.0 MiB".
 # @function utils::human_size
 # @description Human-readable size: bytes or suffixed string → "12.0 KiB".
 # @description Человеческий размер: байты или строка с суффиксом → "12.0 KiB".
@@ -146,6 +146,10 @@ utils::human_size() {
   local v="${1:-0}"
   local -i mult=1
   case "${v}" in
+    *TiB) v="${v%TiB}"; mult=$(( 1024 * 1024 * 1024 * 1024 )) ;;
+    *GiB) v="${v%GiB}"; mult=$(( 1024 * 1024 * 1024 )) ;;
+    *MiB) v="${v%MiB}"; mult=$(( 1024 * 1024 )) ;;
+    *KiB) v="${v%KiB}"; mult=1024 ;;
     *TB) v="${v%TB}"; mult=$(( 1024 * 1024 * 1024 * 1024 )) ;;
     *GB) v="${v%GB}"; mult=$(( 1024 * 1024 * 1024 )) ;;
     *MB) v="${v%MB}"; mult=$(( 1024 * 1024 )) ;;

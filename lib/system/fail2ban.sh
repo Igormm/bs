@@ -233,6 +233,9 @@ fail2ban::validate() {
             [[ "${value}" == "true" || "${value}" == "false" ]] || return "${LIB_ERROR_INVALID_INPUT}"
             ;;
         enum:*)
+            # Запятая — разделитель вариантов: "auto,pyinotify" не вариант
+            # A comma is the variant separator: "auto,pyinotify" is no variant
+            [[ "${value}" != *,* ]] || return "${LIB_ERROR_INVALID_INPUT}"
             [[ ",${type#enum:}," == *",${value},"* ]] || return "${LIB_ERROR_INVALID_INPUT}"
             ;;
         iplist)
@@ -390,7 +393,15 @@ fail2ban::reload() {
 fail2ban::backup() {
     local -r file="${1:?file required}"
     is::file "${file}" || return "${LIB_ERROR_FILE_NOT_FOUND}"
-    local -r dest="${file}.bak.$(date +%Y%m%d%H%M%S)"
+    # Разрешение по секундам: два backup подряд не должны перезаписать друг друга
+    # Second resolution: two backups in a row must not overwrite each other
+    local -r base="${file}.bak.$(date +%Y%m%d%H%M%S)"
+    local dest="${base}"
+    local -i n=1
+    while [[ -e "${dest}" ]]; do
+        dest="${base}.${n}"
+        (( n += 1 ))
+    done
     cp -a -- "${file}" "${dest}" || return "${LIB_ERROR_FILE_OPERATION}"
     printf '%s\n' "${dest}"
 }
@@ -438,9 +449,12 @@ fail2ban::revert() {
     local -r target="${1:?target required}"
     local -a baks=()
     local f
+    # Сохраняем чужой nullglob / Preserve the caller's nullglob
+    local nullglob_was=0
+    shopt -q nullglob && nullglob_was=1
     shopt -s nullglob
     for f in "${target}".bak.*; do baks+=("${f}"); done
-    shopt -u nullglob
+    (( nullglob_was == 1 )) || shopt -u nullglob
     (( ${#baks[@]} == 0 )) && return "${LIB_ERROR_FILE_NOT_FOUND}"
     local latest="${baks[0]}"
     for f in "${baks[@]}"; do [[ "${f}" > "${latest}" ]] && latest="${f}"; done

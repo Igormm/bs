@@ -547,6 +547,39 @@ sshd::install_main() {
     fi
     local tmp
     tmp="$(mktemp "${BS_SSHD_MAIN}.bs.XXXXXX")" || return "${LIB_ERROR_FILE_OPERATION}"
+    # sshd берёт ПЕРВОЕ значение директивы, а Match действует до следующего
+    # Match или конца файла. Поэтому общие параметры блока идут В НАЧАЛО файла
+    # (иначе их перекроют более ранние строки или поглотит чужой Match), а
+    # собственные Match-секции блока — в конец (иначе они захватят остаток).
+    # sshd uses the FIRST value of a directive, and a Match applies until the
+    # next Match or the end of the file. So the block's global parameters go
+    # to the TOP of the file (otherwise earlier lines override them or a
+    # foreign Match swallows them) and the block's own Match sections go to
+    # the END (otherwise they would capture the rest of the file).
+    local line in_match=0 has_begin=0
+    local -a head_lines=() match_lines=()
+    while IFS= read -r line || is::not_empty "${line}"; do
+        if [[ "${line}" == "${SSHD_MARK_BEGIN}" ]]; then
+            has_begin=1
+            continue
+        fi
+        if [[ "${line}" == "${SSHD_MARK_END}" ]]; then
+            continue
+        fi
+        if (( in_match == 0 )) && [[ "${line}" =~ ^[[:space:]]*Match[[:space:]] ]]; then
+            in_match=1
+        fi
+        if (( in_match == 1 )); then
+            match_lines+=("${line}")
+        else
+            head_lines+=("${line}")
+        fi
+    done < "${src}"
+    {
+        if (( has_begin == 1 )); then printf '%s\n' "${SSHD_MARK_BEGIN}"; fi
+        if (( ${#head_lines[@]} > 0 )); then printf '%s\n' "${head_lines[@]}"; fi
+        if (( has_begin == 1 )); then printf '%s\n' "${SSHD_MARK_END}"; fi
+    } > "${tmp}"
     if is::file "${BS_SSHD_MAIN}"; then
         # awk должен отработать: молчаливый провал чтения дал бы конфиг только
         # из нашего блока / awk must succeed: a silent read failure would leave
@@ -555,13 +588,22 @@ sshd::install_main() {
             $0 == b {skip=1; next}
             $0 == e {skip=0; next}
             !skip   {print}
-        ' "${BS_SSHD_MAIN}" > "${tmp}" 2>/dev/null; then
+        ' "${BS_SSHD_MAIN}" >> "${tmp}" 2>/dev/null; then
             rm -f -- "${tmp}"
             return "${LIB_ERROR_FILE_OPERATION}"
         fi
+        # Права основного конфига не должны меняться (mktemp даёт 0600)
+        # The main config's mode must not change (mktemp gives 0600)
+        utils::ignore chmod --reference="${BS_SSHD_MAIN}" -- "${tmp}"
     fi
-    printf '\n' >> "${tmp}"
-    cat -- "${src}" >> "${tmp}"
+    if (( ${#match_lines[@]} > 0 )); then
+        {
+            printf '\n'
+            if (( has_begin == 1 )); then printf '%s\n' "${SSHD_MARK_BEGIN}"; fi
+            printf '%s\n' "${match_lines[@]}"
+            if (( has_begin == 1 )); then printf '%s\n' "${SSHD_MARK_END}"; fi
+        } >> "${tmp}"
+    fi
     if ! sshd::test "${tmp}" >/dev/null 2>&1; then
         rm -f -- "${tmp}"
         return "${LIB_ERROR_INVALID_INPUT}"
