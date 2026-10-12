@@ -206,11 +206,14 @@ send_audio::__connect() {
 # @return 0 on success, 1 on a transport or server error
 send_audio::__request() {
   local -r chunk="${1:?chunk required}"
+  local -r label="${2:-}"
   local -n __map_cfg=__SEND_AUDIO_CFG
   local -r tmp="${__map_cfg[tmp]}"
   local -a form=(-F "file=@${chunk};type=audio/wav"
     -F 'response_format=verbose_json')
   local line code ttotal sent
+  local -i curl_pid rc=0 t_wait now_ms next_beat
+  local -ri beat="${SEND_AUDIO_HEARTBEAT_S:-20}"
 
   if is::not_empty "${__map_cfg[model]}"; then
     form+=(-F "model=${__map_cfg[model]}")
@@ -222,14 +225,37 @@ send_audio::__request() {
     "request: ${chunk} $(( $(wc -c < "${chunk}") )) B," \
     "language=${__map_cfg[language]:-auto}"
 
-  if ! line="$(curl -sS --max-time "${__map_cfg[timeout]}" "${form[@]}" \
+  # curl идёт в фоне: расшифровка часа звука на CPU занимает минуты, и без
+  # сообщений непонятно, жив ли процесс. Раз в SEND_AUDIO_HEARTBEAT_S секунд
+  # (по умолчанию 20) печатается, сколько уже ждём.
+  # curl runs in the background: transcribing audio on a CPU takes minutes and
+  # without messages it is unclear whether anything is happening. Every
+  # SEND_AUDIO_HEARTBEAT_S seconds (default 20) we print how long we wait.
+  curl -sS --max-time "${__map_cfg[timeout]}" "${form[@]}" \
     --stderr "${tmp}/curl.err" \
     -o "${tmp}/response.json" \
     -w '%{http_code} %{time_total} %{size_upload}' \
-    "${__map_cfg[base]}/v1/audio/transcriptions")"; then
+    "${__map_cfg[base]}/v1/audio/transcriptions" > "${tmp}/curl.out" &
+  curl_pid=$!
+  __map_cfg[curl_pid]="${curl_pid}"
+  t_wait="$(utils::now_ms)"
+  next_beat=$(( beat * 1000 ))
+  while kill -0 "${curl_pid}" 2>/dev/null; do
+    sleep 1
+    now_ms=$(( $(utils::now_ms) - t_wait ))
+    if (( beat > 0 && now_ms >= next_beat )); then
+      send_audio::__log info "ждём ответ сервера / waiting for the server:" \
+        "$(( now_ms / 1000 )) с${label:+, фрагмент ${label}} (расшифровка идёт, это нормально)"
+      next_beat=$(( next_beat + beat * 1000 ))
+    fi
+  done
+  wait "${curl_pid}" || rc=$?
+  __map_cfg[curl_pid]=""
+  if (( rc != 0 )); then
     send_audio::__log error "curl failed: $(<"${tmp}/curl.err")"
     return 1
   fi
+  line="$(<"${tmp}/curl.out")"
   IFS=' ' read -r code ttotal sent <<< "${line}"
   send_audio::__log debug \
     "response: HTTP ${code}, curl ${ttotal} s, uploaded ${sent} B"
@@ -513,6 +539,11 @@ send_audio::__interrupted() {
   local -n __map_cfg=__SEND_AUDIO_CFG
   local -n __map_state=__SEND_AUDIO_STATE
   trap - INT TERM HUP
+  # Фоновый curl неинтерактивный bash от Ctrl-C не защищает — гасим сами
+  # A background curl ignores SIGINT in a non-interactive bash — stop it here
+  if is::number "${__map_cfg[curl_pid]:-}"; then
+    utils::ignore kill "${__map_cfg[curl_pid]}"
+  fi
   if is::number "${__map_state[next_chunk]:-}"; then
     __map_state[status]=stopped
     __map_state[updated_at]="$(utils::log_stamp)"
@@ -708,6 +739,7 @@ send_audio::main() {
   local -a chunks=()
   local -i t_run t_start i dur_ms=0 offset_ms=0 chunk_ms segment
   local -i first=0 wall_before=0 count cut_bytes=0
+  local -i done_audio_ms=0 took_ms=0 speed10 left_ms eta_ms pct
   local key want pair
 
   # Decimal separators must not depend on the user's locale
@@ -807,7 +839,7 @@ checkpoint says: data was lost. Pass --restart to start over." "${E_ERROR}"
       "$(sendrun::timecode_ms "$(( offset_ms + chunk_ms ))"))"
 
     t_start="$(utils::now_ms)"
-    if ! send_audio::__request "${chunks[i]}" \
+    if ! send_audio::__request "${chunks[i]}" "$(( i + 1 ))/${#chunks[@]}" \
       || ! send_audio::__parse "${offset_ms}" "${chunk_ms}" \
         "${__map_cfg[tmp]}/chunk.jsonl" "${__map_cfg[tmp]}/chunk.txt"; then
       # Stop here: the checkpoint still points at this chunk
@@ -834,6 +866,23 @@ checkpoint says: data was lost. Pass --restart to start over." "${E_ERROR}"
       "${count} phrases"
 
     offset_ms=$(( offset_ms + chunk_ms ))
+    # Прогресс и оценка остатка по скорости ЭТОГО запуска (на CPU это
+    # главный вопрос: сколько ещё ждать)
+    # Progress and the remaining time from the speed of THIS run (on a CPU
+    # the main question is how long it will still take)
+    done_audio_ms+=chunk_ms
+    took_ms+=$(( $(utils::now_ms) - t_start ))
+    if (( took_ms > 0 && done_audio_ms > 0 && dur_ms > 0 )); then
+      speed10=$(( done_audio_ms * 10 / took_ms ))
+      left_ms=$(( dur_ms > offset_ms ? dur_ms - offset_ms : 0 ))
+      eta_ms=$(( left_ms * took_ms / done_audio_ms ))
+      pct=$(( offset_ms * 100 / dur_ms ))
+      (( pct <= 100 )) || pct=100
+      send_audio::__log info "прогресс / progress: ${pct}%" \
+        "($(sendrun::timecode_ms "${offset_ms}") из $(sendrun::timecode_ms "${dur_ms}")),"\
+" скорость $(( speed10 / 10 )).$(( speed10 % 10 ))x от реального времени,"\
+" осталось ≈ $(sendrun::timecode_ms "${eta_ms}")"
+    fi
     __map_state[next_chunk]=$(( i + 1 ))
     __map_state[offset_ms]="${offset_ms}"
     __map_state[wall_ms]=$(( wall_before + $(utils::now_ms) - t_run ))

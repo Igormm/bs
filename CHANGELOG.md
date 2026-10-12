@@ -2,6 +2,10 @@
 
 ## [0.7.2] - 2026-10-12
 
+### Added
+- examples: send_audio.sh — while a long request is processed (a Whisper chunk on a CPU takes minutes) it prints "waiting for the server: N s, chunk i/n" every `SEND_AUDIO_HEARTBEAT_S` seconds (default 20), and after each chunk the progress, the speed relative to real time and the estimated remaining time; Ctrl-C/SIGTERM now also stops the background `curl`
+- tests: unit/testsendaudioprogressunit.sh
+
 ### Changed
 - cli: bs update / bs uninstall — the running copy is described by exactly the rows of `bs version --full` (root, install, source, updated; for a checkout its commit and uncommitted changes): the "Запущен / Running: bs VERSION" block opens every run and every notice box, ERROR/WARN end with the same data in one line (before, a shorter summary built by separate code covered only part of the fields)
 
