@@ -332,6 +332,34 @@ t_already_installed() {
     has "PREFIX=" "already installed: another-PREFIX option"
     has "version" "already installed: shows the version"
     unchanged "${E}/home/.local/lib/bs/.install" "${before}" "already installed: install untouched"
+
+    # Совет должен быть выполнимым: команда из репозитория не требует PATH
+    # The advice must be runnable: the repository command needs no PATH
+    has "bs update --local" "already installed: the installed-copy command is listed"
+    has "Установлена та же версия" "already installed: the same version is reported"
+    has "не найдена в PATH" "already installed: tells that bs is not in the PATH of this shell"
+    has "update --local" "already installed: the repository command is listed"
+
+    # bs в PATH этой оболочки — предупреждения нет
+    INST_PATH="/usr/bin:/bin:${E}/home/.local/bin" run -- --local
+    rc_is 1 "bs is in PATH: still refuses to reinstall"
+    lacks "не найдена в PATH" "bs in PATH: no PATH warning"
+
+    # В PATH раньше идёт чужой bs — предупреждение о другой копии
+    mkdir -p "${E}/other"
+    printf '#!/bin/sh\nexit 0\n' > "${E}/other/bs"; chmod +x "${E}/other/bs"
+    INST_PATH="${E}/other:/usr/bin:/bin" run -- --local
+    has "запускается другая копия" "another bs first in PATH: the notice names it"
+    has "${E}/other/bs" "another bs first in PATH: its path is printed"
+
+    # Установленная версия старее / новее источника
+    sed -i 's/BS_VERSION="[0-9.]*"/BS_VERSION="0.0.1"/' "${E}/home/.local/lib/bs/core/version.sh"
+    INST_PATH="/usr/bin:/bin" run -- --local
+    has "Доступно обновление" "older install: an update is announced"
+    has "0.0.1 →" "older install: shows installed → source"
+    sed -i 's/BS_VERSION="[0-9.]*"/BS_VERSION="99.0.0"/' "${E}/home/.local/lib/bs/core/version.sh"
+    run -- --local
+    has "НОВЕЕ этого источника" "newer install: a downgrade warning"
 }
 
 t_half_install() {

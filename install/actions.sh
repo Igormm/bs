@@ -213,18 +213,47 @@ do_install() {
   # Уже установлено в это место.
   # Already installed at this location.
   if [[ "${lstate}" == "bs" && "${bstate}" == "here" ]]; then
-    local upd="bs update"
+    local upd="bs update" repo_upd="" inst_v src_v rc_cmp=0
+    local -a rows=()
     case "$(install_kind_of_target)" in
-      local)  upd="bs update --local" ;;
-      system) upd="sudo bs update --system" ;;
-      *)      upd="bs update --lib ${TARGET_LIB}" ;;
+      local)  upd="bs update --local";  repo_upd="update --local" ;;
+      system) upd="sudo bs update --system"; repo_upd="update --system" ;;
+      *)      upd="bs update --lib ${TARGET_LIB}"; repo_upd="update --lib ${TARGET_LIB}" ;;
     esac
-    install_box "УЖЕ УСТАНОВЛЕНО / ALREADY INSTALLED" \
-      "• ${TARGET_LIB} — версия / version $(install_version_of "${TARGET_LIB}") (источник / source: $(bs::version::get))" \
-      "Установка не выполнена, ничего не изменено / Nothing was changed" \
-      "Обновить / Update:" "  ${upd}" \
-      "Переустановить / Reinstall:" "  $(install_cmd uninstall)" "  $(install_cmd install)" \
-      "Другое место / Another location:" "  PREFIX=/opt/bs ./install.sh  (BIN_DIR=... LIB_DIR=...)"
+    inst_v="$(install_version_of "${TARGET_LIB}")"
+    src_v="$(bs::version::get)"
+    rows+=("• ${TARGET_LIB} — версия / version ${inst_v} (источник / source: ${src_v})")
+    # Сравнение версий: что именно предлагать пользователю
+    # Version comparison: what exactly to suggest
+    if [[ "${inst_v}" != "?" ]]; then
+      bs::version::compare "${inst_v}" "${src_v}" || rc_cmp=$?
+      case "${rc_cmp}" in
+        2) rows+=("Доступно обновление / An update is available: ${inst_v} → ${src_v}") ;;
+        0) rows+=("Установлена та же версия / The same version is installed") ;;
+        1) rows+=("Установленная версия НОВЕЕ этого источника / The installed version is NEWER than this source — обновление понизит её / updating would downgrade it") ;;
+      esac
+    fi
+    rows+=("Установка не выполнена, ничего не изменено / Nothing was changed")
+    # Команда из репозитория работает всегда: ей не нужен PATH
+    # The repository command always works: it does not need PATH
+    local repo_bs="./bs"
+    [[ "${SOURCE_ROOT}" == "${PWD}" ]] || repo_bs="${SOURCE_ROOT}/bs"
+    [[ "${repo_upd}" == "update --system" ]] && repo_bs="sudo ${repo_bs}"
+    rows+=("Обновить из этого репозитория / Update from this repository:" "  ${repo_bs} ${repo_upd}")
+    rows+=("Или установленной копией / Or with the installed copy:" "  ${upd}")
+    # Видна ли команда bs в PATH этой оболочки (а не в PATH установщика)
+    # Is the bs command visible in the PATH of this shell (not the installer's)
+    local seen
+    seen="$(PATH="${INSTALL_ORIG_PATH:-${PATH}}" command -v bs 2>/dev/null || true)"
+    if [[ -z "${seen}" ]]; then
+      rows+=("ВНИМАНИЕ / NOTE: команда bs не найдена в PATH этой оболочки / the bs command is not in the PATH of this shell (${BIN_DIR} отсутствует / is missing)")
+      rows+=("Исправить / Fix:  source ~/.zshrc  (или новый терминал / or a new terminal);" "  ./install.sh --local --update-path  — дописать строку в rc-файл / add the line to the rc file")
+    elif [[ "${seen}" != "${TARGET_BIN}" ]]; then
+      rows+=("ВНИМАНИЕ / NOTE: по команде bs запускается другая копия / the bs command runs another copy: ${seen}")
+    fi
+    rows+=("Переустановить / Reinstall:" "  $(install_cmd uninstall)" "  $(install_cmd install)")
+    rows+=("Другое место / Another location:" "  PREFIX=/opt/bs ./install.sh  (BIN_DIR=... LIB_DIR=...)")
+    install_box "УЖЕ УСТАНОВЛЕНО / ALREADY INSTALLED" "${rows[@]}"
     exit 1
   fi
 

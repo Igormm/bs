@@ -91,6 +91,17 @@ test_local_install() {
     has ".bashrc:" "local install: the PATH line in .bashrc is a trace"
     has "всё согласовано" "local install: nothing looks wrong"
 
+    # В PATH вызвавшей оболочки нет ~/.local/bin (сам bs дописывает его в PATH
+    # своего процесса — это не должно скрывать проблему)
+    P="/usr/bin:/bin"
+    run_where
+    has "bs не найдена в PATH этой оболочки" "no ~/.local/bin in the caller PATH: reported"
+    has "does NOT contain ${T}/home/.local/bin" "no ~/.local/bin in the caller PATH: the PATH row says so"
+    has 'export PATH="$HOME/.local/bin:$PATH"' "no ~/.local/bin in the caller PATH: the immediate fix is offered"
+    has "source ~/.zshrc" "no ~/.local/bin in the caller PATH: source is offered"
+    lacks "всё согласовано" "no ~/.local/bin in the caller PATH: not reported as consistent"
+    P="${T}/home/.local/bin:/usr/bin:/bin"
+
     # Установка старее репозитория — предлагается обновление
     sed -i 's/BS_VERSION="[0-9.]*"/BS_VERSION="0.0.1"/' "${T}/home/.local/lib/bs/core/version.sh"
     run_where

@@ -9,6 +9,14 @@
 #              core/, lib/ (опционально, но doctor ругается).
 #
 
+# PATH вызвавшей оболочки. Загрузка ядра дописывает ~/.local/bin в PATH
+# ЭТОГО процесса (bs::append_local_bin_to_path), поэтому `bs where` сверяется
+# с этой копией, а не с PATH процесса.
+# The PATH of the calling shell. Loading the core prepends ~/.local/bin to the
+# PATH of THIS process (bs::append_local_bin_to_path), so `bs where` checks
+# this copy, not the process PATH.
+BS_CALLER_PATH="${PATH}"
+
 # 1. Каталог entry-point'а — нужен до загрузки чего-либо
 BS_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 
@@ -2141,11 +2149,15 @@ where_cmd() {
 
   # --- bs в PATH ---
   printf '\n== Команда bs в PATH / The bs command in PATH ==\n'
-  mapfile -t hits < <(type -aP bs 2>/dev/null || true)
+  mapfile -t hits < <(PATH="${BS_CALLER_PATH:-${PATH}}" type -aP bs 2>/dev/null || true)
   if (( ${#hits[@]} == 0 )); then
     printf '  bs не найдена в PATH этой оболочки / bs is not in the PATH of this shell\n'
-    where_problem "bs не найдена в PATH / bs is not in PATH"
-    where_hint "source ~/.zshrc  (или новый терминал / or a new terminal);  ./install.sh --local --update-path"
+    where_problem "bs не найдена в PATH этой оболочки / bs is not in the PATH of this shell"
+    if [[ -x "${HOME}/.local/bin/bs" ]]; then
+      where_hint "export PATH=\"\$HOME/.local/bin:\$PATH\"   (в этом терминале сразу / in this terminal right away)"
+    fi
+    where_hint "source ~/.zshrc  (или новый терминал / or a new terminal)"
+    where_hint "./install.sh --local --update-path   (если строки PATH нет в rc-файле / if the rc file lacks the PATH line)"
   fi
   for hit in ${hits[@]+"${hits[@]}"}; do
     n=$(( n + 1 ))
@@ -2269,7 +2281,7 @@ where_cmd() {
     if [[ -f "${exp_bin}" ]]; then
       wrap="$(update_wrapper_root "${exp_bin}")"
       if [[ "$(readlink -f -- "${wrap:-/nonexistent}" 2>/dev/null)" == "${c}" ]]; then
-        where_row "wrapper:" "${exp_bin}$(case ":${PATH}:" in *":$(dirname -- "${exp_bin}"):"*) printf ' (каталог в PATH / directory in PATH)';; *) printf ' (каталога НЕТ в PATH / directory NOT in PATH)';; esac)"
+        where_row "wrapper:" "${exp_bin}$(case ":${BS_CALLER_PATH:-${PATH}}:" in *":$(dirname -- "${exp_bin}"):"*) printf ' (каталог в PATH / directory in PATH)';; *) printf ' (каталога НЕТ в PATH / directory NOT in PATH)';; esac)"
       else
         where_row "wrapper:" "${exp_bin} — указывает на ${wrap:-?}, не сюда / points to ${wrap:-?}, not here"
         if [[ -n "${wrap}" && -d "${wrap}" ]]; then
@@ -2326,7 +2338,7 @@ where_cmd() {
     done < <(grep -nE -- "${pat}" "${f}" 2>/dev/null | grep -vE '^[0-9]+:[[:space:]]*#' | sed "s|^|${f}:|" || true)
   done
   (( hitsn > 0 )) || printf '  в rc-файлах строк про BS нет / no BS lines in the rc files\n'
-  case ":${PATH}:" in
+  case ":${BS_CALLER_PATH:-${PATH}}:" in
     *":${HOME}/.local/bin:"*) printf '  PATH этой оболочки содержит / contains %s/.local/bin\n' "${HOME}" ;;
     *) printf '  PATH этой оболочки НЕ содержит / does NOT contain %s/.local/bin\n' "${HOME}" ;;
   esac
