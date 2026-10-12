@@ -92,6 +92,7 @@ Commands:
   repl                Interactive REPL (BS shell / интерактивная консоль)
   calc                RPN calculator on dc (обратная польская нотация)
   update              Update installed copies from a local repo or GitHub
+  where [--deep]      Find every trace of BS on this machine (installs, PATH, rc files, caches)
   uninstall           Remove installed BS copies (wrapper + lib tree)
   init-shell          Print snippet for ~/.bashrc or ~/.zshrc
 
@@ -2022,12 +2023,395 @@ ts_cmd() {
   esac
 }
 
+# ==========================================
+# bs where: следы BS в системе (только чтение, ничего не запускается)
+# bs where: traces of BS on this system (read-only, nothing is executed)
+# ==========================================
+
+# Строка отчёта: подпись выравнивается по СИМВОЛАМ (printf %-Ns считает байты и
+# ломает колонки с кириллицей).
+# A report row: the label is padded by CHARACTERS (printf %-Ns counts bytes and
+# breaks columns with Cyrillic).
+where_row() {
+  local -r label="$1"
+  local pad
+  # В локали C ${#x} считает байты: для длины берём UTF-8
+  # In the C locale ${#x} counts bytes: use UTF-8 for the length
+  local LC_ALL=C.UTF-8
+  printf -v pad '%*s' "$(( ${#label} < 15 ? 15 - ${#label} : 1 ))" ''
+  printf '    %s%s%s\n' "${label}" "${pad}" "$2"
+}
+
+# @private Состояние каталога как BS: missing | file | foreign | checkout |
+# install | nomanifest | badmanifest.
+# @private State of a directory as BS: missing | file | foreign | checkout |
+# install | nomanifest | badmanifest.
+# @param $1 Directory / Каталог
+where_classify() {
+  local -r d="$1"
+  if [[ ! -e "${d}" ]]; then printf 'missing'; return 0; fi
+  if [[ ! -d "${d}" ]]; then printf 'file'; return 0; fi
+  if [[ ! -f "${d}/bs" || ! -f "${d}/bootstrap/init.sh" ]]; then
+    printf 'foreign'; return 0
+  fi
+  if [[ -e "${d}/.git" || -d "${d}/tests" ]]; then printf 'checkout'; return 0; fi
+  if [[ ! -e "${d}/.install" ]]; then printf 'nomanifest'; return 0; fi
+  if update_manifest_valid "${d}/.install"; then
+    printf 'install'
+  else
+    printf 'badmanifest'
+  fi
+}
+
+# @private Вид установки по пути, если манифеста нет / install kind by path
+where_kind_by_path() {
+  local -r d="$1"
+  if [[ "${d}" == "${HOME}/.local/lib/bs" ]]; then printf 'local'
+  elif [[ "${d}" == "$(update_system_lib)" ]]; then printf 'system'
+  else printf 'custom'
+  fi
+}
+
+# @private Размер каталога в человекочитаемом виде (с ограничением по времени)
+# @private Directory size, human readable (with a time limit)
+where_size() {
+  local kb
+  kb="$(timeout 5 du -sk -- "$1" 2>/dev/null | cut -f1 || true)"
+  if [[ "${kb}" =~ ^[0-9]+$ ]]; then
+    if (( kb >= 1024 )); then printf '%d.%d MB' "$(( kb / 1024 ))" "$(( kb % 1024 * 10 / 1024 ))"
+    else printf '%d KB' "${kb}"; fi
+  else
+    printf '?'
+  fi
+}
+
+where_help() {
+  printf 'Usage: bs where [--deep]\n\n'
+  printf 'Show every trace of BS on this machine, read-only: the running copy,\n'
+  printf 'every `bs` found in PATH (wrappers and launchers), installs (local,\n'
+  printf 'system, custom) with version/manifest/owner/leftovers, source checkouts,\n'
+  printf 'lines in shell rc files, data and cache directories, environment\n'
+  printf 'variables, and a summary with the commands that fix what looks wrong.\n'
+  printf 'Nothing is changed and no found copy of bs is run.\n\n'
+  printf '  --deep   also search for BS copies under ~, /opt, /usr/local, /srv\n'
+  printf '           (depth-limited, 30 s at most)\n'
+  printf 'Показывает все следы BS на машине: запущенную копию, все `bs` в PATH,\n'
+  printf 'установки (local/system/custom), репозитории, строки в rc-файлах,\n'
+  printf 'каталоги данных и кэша, переменные окружения и итог с командами.\n'
+  printf 'Ничего не меняет и найденные копии bs не запускает.\n'
+}
+
+where_cmd() {
+  local deep=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --deep)    deep=1; shift ;;
+      -h|--help) where_help; return 0 ;;
+      *)         die "where: unknown argument: $1 (try: bs where --help)" ;;
+    esac
+  done
+
+  # В строгом режиме bs IFS = перевод строки/табуляция; здесь нужны пробелы
+  # In bs strict mode IFS is newline/tab; this function needs spaces
+  local IFS=' '
+  local -a cands=() problems=() hints=()
+  local -A seen=() pseen=()
+  local d real hit root cls n=0 first_root=""
+  local -a hits=()
+
+  # Замечание / подсказка без повторов
+  # A problem / hint, without duplicates
+  where_problem() { [[ -z "${pseen[P:$1]:-}" ]] || return 0; pseen["P:$1"]=1; problems+=("$1"); }
+  where_hint()    { [[ -z "${pseen[H:$1]:-}" ]] || return 0; pseen["H:$1"]=1; hints+=("$1"); }
+
+  # Кандидат в каталог BS (без повторов, по реальному пути)
+  # A candidate BS directory (deduplicated by real path)
+  where_add() {
+    local p="${1%/}" r
+    [[ -n "${p}" ]] || return 0
+    r="$(readlink -f -- "${p}" 2>/dev/null || printf '%s' "${p}")"
+    [[ -z "${seen[${r}]:-}" ]] || return 0
+    seen["${r}"]=1
+    cands+=("${r}")
+  }
+
+  printf '== Запущено сейчас / Running now ==\n'
+  bs_running_block
+  where_add "${BS_ROOT}"
+
+  # --- bs в PATH ---
+  printf '\n== Команда bs в PATH / The bs command in PATH ==\n'
+  mapfile -t hits < <(type -aP bs 2>/dev/null || true)
+  if (( ${#hits[@]} == 0 )); then
+    printf '  bs не найдена в PATH этой оболочки / bs is not in the PATH of this shell\n'
+    where_problem "bs не найдена в PATH / bs is not in PATH"
+    where_hint "source ~/.zshrc  (или новый терминал / or a new terminal);  ./install.sh --local --update-path"
+  fi
+  for hit in ${hits[@]+"${hits[@]}"}; do
+    n=$(( n + 1 ))
+    real="$(readlink -f -- "${hit}" 2>/dev/null || printf '%s' "${hit}")"
+    root="$(update_wrapper_root "${real}")"
+    local what=""
+    if [[ -n "${root}" ]]; then
+      if [[ -d "${root}" ]]; then
+        what="wrapper → ${root} (версия / version $(bs::version::of "${root}"))"
+        where_add "${root}"
+      else
+        what="wrapper → ${root} — КАТАЛОГ НЕ СУЩЕСТВУЕТ / DIRECTORY MISSING"
+        where_problem "обёртка ${hit} указывает на несуществующий ${root} / wrapper ${hit} points to a missing ${root}"
+        where_hint "rm ${hit}  (или переустановить / or reinstall: ./install.sh --local)"
+      fi
+    elif [[ -f "$(dirname -- "${real}")/bootstrap/init.sh" ]]; then
+      root="$(dirname -- "${real}")"
+      what="лаунчер каталога / launcher of ${root} (версия / version $(bs::version::of "${root}"))"
+      where_add "${root}"
+    else
+      what="не похоже на BS / does not look like BS"
+    fi
+    local mark=""
+    if (( n == 1 )); then
+      mark="   ← запускается по команде bs / runs as \`bs\`"
+      first_root="${root}"
+    fi
+    printf '  %d. %s — %s%s\n' "${n}" "${hit}" "${what}" "${mark}"
+  done
+
+  # --- Кандидаты из стандартных мест, манифестов, rc-файлов и (--deep) поиска ---
+  where_add "${HOME}/.local/lib/bs"
+  where_add "$(update_system_lib)"
+  [[ -z "${BS_HOME:-}" ]] || where_add "${BS_HOME}"
+
+  local -a rcfiles=("${HOME}/.bashrc" "${HOME}/.bash_profile" "${HOME}/.profile"
+    "${HOME}/.zshrc" "${HOME}/.zprofile" "${HOME}/.zshenv"
+    "${HOME}/.config/fish/config.fish" /etc/profile /etc/bashrc /etc/zshrc)
+  local f
+  for f in /etc/profile.d/*.sh; do [[ -f "${f}" ]] && rcfiles+=("${f}"); done
+
+  # Пути из строк вида source ".../bootstrap/init.sh"
+  local line path_re='([~/$][^"'"'"' ]*)/bootstrap/init\.sh'
+  for f in "${rcfiles[@]}"; do
+    [[ -r "${f}" ]] || continue
+    while IFS= read -r line; do
+      [[ "${line}" =~ ^[[:space:]]*# ]] && continue
+      if [[ "${line}" =~ ${path_re} ]]; then
+        path="${BASH_REMATCH[1]}"
+        path="${path/#\~/${HOME}}"; path="${path/#\$HOME/${HOME}}"; path="${path/#\$\{HOME\}/${HOME}}"
+        [[ "${path}" == /* && "${path}" != *'$'* ]] && where_add "${path}"
+      fi
+    done < "${f}"
+  done
+
+  if (( deep == 1 )); then
+    local -a droots=("${HOME}" /opt /usr/local /srv) found=()
+    local r
+    for r in "${droots[@]}"; do
+      [[ -d "${r}" ]] || continue
+      mapfile -t found < <(timeout 30 find "${r}" -xdev -maxdepth 5 \
+        \( -name .git -o -name node_modules -o -name .cache -o -name proc \) -prune -o \
+        -type f -path '*/bootstrap/init.sh' -print 2>/dev/null || true)
+      for f in ${found[@]+"${found[@]}"}; do
+        where_add "$(dirname -- "$(dirname -- "${f}")")"
+      done
+    done
+  fi
+
+  # Источники установок из манифестов (откуда ставили) — это тоже следы
+  local c src
+  for c in "${cands[@]}"; do
+    src="$(install_info_get "${c}" source)"
+    [[ -n "${src}" && -d "${src}" ]] && where_add "${src}"
+  done
+
+  # --- Установки ---
+  printf '\n== Установки BS / BS installs ==\n'
+  local n_inst=0 owner access wrap exp_bin mode versions=" "
+  local -a leftovers=() checkouts=() iv_paths=()
+  for c in "${cands[@]}"; do
+    cls="$(where_classify "${c}")"
+    case "${cls}" in
+      missing) continue ;;
+      checkout) checkouts+=("${c}"); continue ;;
+      foreign|file)
+        # Чужое показываем только в стандартных местах BS
+        # Foreign things are reported only at the standard BS places
+        if [[ "${c}" == "${HOME}/.local/lib/bs" || "${c}" == "$(update_system_lib)" ]]; then
+          printf '  %s\n' "${c}"
+          where_row "состояние:" "существует, но это НЕ установка BS / exists but is NOT a BS install (${cls})"
+          where_problem "${c} занят чужим / ${c} is occupied by something that is not BS"
+        fi
+        continue ;;
+    esac
+    n_inst=$(( n_inst + 1 ))
+    printf '  %s%s\n' "${c}" "$([[ "${c}" == "$(readlink -f -- "${BS_ROOT}")" ]] && printf '   ← запущена сейчас / running now')"
+    mode="$(install_info_get "${c}" mode)"
+    [[ -n "${mode}" ]] || mode="$(where_kind_by_path "${c}")"
+    where_row "вид / kind:" "${mode}, версия / version $(bs::version::of "${c}")"
+    versions+="$(bs::version::of "${c}") "
+    iv_paths+=("${c}")
+    case "${cls}" in
+      nomanifest)  where_row "манифест:" "нет (установлено старым установщиком) / none (older installer)"
+                   where_problem "${c}: нет манифеста / no manifest"
+                   where_hint "bs update --lib ${c}   (создаст манифест / creates the manifest)" ;;
+      badmanifest) where_row "манифест:" "ПОВРЕЖДЁН / CORRUPT: ${c}/.install"
+                   where_problem "${c}: повреждённый манифест / corrupt manifest"
+                   where_hint "bs update --lib ${c}   (пересоздаст манифест / recreates the manifest)" ;;
+      install)
+        where_row "установлено:" "$(install_info_get "${c}" installed_at) by $(install_info_get "${c}" installed_by)"
+        src="$(install_info_get "${c}" source)"
+        where_row "источник:" "${src:-?} @ $(short_sha "$(install_info_get "${c}" source_commit)")$([[ -n "${src}" && ! -d "${src}" ]] && printf '   (каталога больше нет / directory is gone)')"
+        if [[ -n "$(install_info_get "${c}" updated_at)" ]]; then
+          where_row "обновлено:" "$(install_info_get "${c}" updated_at) from $(install_info_get "${c}" updated_from) @ $(short_sha "$(install_info_get "${c}" updated_commit)")"
+        fi ;;
+    esac
+    # Обёртка этой установки
+    exp_bin="$(install_info_get "${c}" bin)"
+    [[ -n "${exp_bin}" ]] || exp_bin="${c%/lib/bs}/bin/bs"
+    if [[ -f "${exp_bin}" ]]; then
+      wrap="$(update_wrapper_root "${exp_bin}")"
+      if [[ "$(readlink -f -- "${wrap:-/nonexistent}" 2>/dev/null)" == "${c}" ]]; then
+        where_row "wrapper:" "${exp_bin}$(case ":${PATH}:" in *":$(dirname -- "${exp_bin}"):"*) printf ' (каталог в PATH / directory in PATH)';; *) printf ' (каталога НЕТ в PATH / directory NOT in PATH)';; esac)"
+      else
+        where_row "wrapper:" "${exp_bin} — указывает на ${wrap:-?}, не сюда / points to ${wrap:-?}, not here"
+        if [[ -n "${wrap}" && -d "${wrap}" ]]; then
+          where_problem "${exp_bin} ведёт не в ${c} / ${exp_bin} does not lead to ${c}"
+        else
+          where_problem "обёртка ${exp_bin} указывает на несуществующий ${wrap:-?} / wrapper ${exp_bin} points to a missing ${wrap:-?}"
+          where_hint "rm ${exp_bin}  (или переустановить / or reinstall: ./install.sh --local)"
+        fi
+      fi
+    else
+      where_row "wrapper:" "нет / none (ожидался / expected: ${exp_bin})"
+      if [[ "${cls}" != "checkout" ]]; then
+        where_problem "${c}: нет обёртки, команда bs её не найдёт / no wrapper"
+        where_hint "./install.sh $([[ "${mode}" == local ]] && printf -- '--local')   (починит обёртку / repairs the wrapper)"
+      fi
+    fi
+    owner="$(stat -c %U -- "${c}" 2>/dev/null || printf '?')"
+    if [[ -w "${c}" ]]; then access="доступна на запись / writable"
+    else access="только чтение, нужен sudo / read-only, needs sudo"; fi
+    where_row "владелец:" "${owner}, ${access}"
+    # Остатки упавших обновлений и установок
+    leftovers=()
+    for f in "${c}"/.update.* "${c}"/.update-old.* "${c}"/.update-lock "${c}"/.install.bad \
+             "$(dirname -- "${c}")"/.bs.install.*; do
+      [[ -e "${f}" ]] && leftovers+=("${f}")
+    done
+    if (( ${#leftovers[@]} > 0 )); then
+      where_row "остатки:" "${leftovers[*]}"
+      where_problem "${c}: остатки прерванных операций / leftovers of interrupted operations"
+      where_hint "bs update --lib ${c}   (очистит остатки / cleans the leftovers)"
+    fi
+  done
+  (( n_inst > 0 )) || printf '  установок не найдено / no installs found\n'
+
+  # --- Репозитории ---
+  printf '\n== Репозитории BS / BS source checkouts ==\n'
+  if (( ${#checkouts[@]} == 0 )); then
+    printf '  не найдено / none found\n'
+  fi
+  for c in ${checkouts[@]+"${checkouts[@]}"}; do
+    printf '  %s%s\n' "${c}" "$([[ "${c}" == "$(readlink -f -- "${BS_ROOT}")" ]] && printf '   ← запущен сейчас / running now')"
+    where_row "версия / ver.:" "$(bs::version::of "${c}")$(if [[ -e "${c}/.git" ]] && utils::has git; then printf ', commit %s' "$(git -C "${c}" rev-parse --short=7 HEAD 2>/dev/null || printf '?')"; fi)"
+  done
+
+  # --- Следы в оболочке ---
+  printf '\n== Следы в оболочке / Shell traces ==\n'
+  local -i hitsn=0
+  local pat='(bootstrap/init\.sh|BS_ROOT|\.local/lib/bs|/lib/bs/|bs init-shell|export PATH="\$HOME/\.local/bin:\$PATH")'
+  for f in "${rcfiles[@]}"; do
+    [[ -r "${f}" ]] || continue
+    while IFS= read -r line; do
+      printf '  %s\n' "${line:0:150}"
+      hitsn=$(( hitsn + 1 ))
+    done < <(grep -nE -- "${pat}" "${f}" 2>/dev/null | grep -vE '^[0-9]+:[[:space:]]*#' | sed "s|^|${f}:|" || true)
+  done
+  (( hitsn > 0 )) || printf '  в rc-файлах строк про BS нет / no BS lines in the rc files\n'
+  case ":${PATH}:" in
+    *":${HOME}/.local/bin:"*) printf '  PATH этой оболочки содержит / contains %s/.local/bin\n' "${HOME}" ;;
+    *) printf '  PATH этой оболочки НЕ содержит / does NOT contain %s/.local/bin\n' "${HOME}" ;;
+  esac
+
+  # --- Данные и кэш ---
+  printf '\n== Данные и кэш / Data and cache ==\n'
+  local -i datan=0
+  local -a ddirs=("${XDG_CONFIG_HOME:-${HOME}/.config}/bs" "${HOME}/.config/bs"
+    "${HOME}/.config/bs_frameworks" "${XDG_CACHE_HOME:-${HOME}/.cache}/bs"
+    "${XDG_STATE_HOME:-${HOME}/.local/state}/bs" "${XDG_DATA_HOME:-${HOME}/.local/share}/bs")
+  [[ -z "${BS_BUILD_CACHE_DIR:-}" ]] || ddirs+=("${BS_BUILD_CACHE_DIR}")
+  local -A dseen=()
+  for d in "${ddirs[@]}"; do
+    [[ -d "${d}" && -z "${dseen[${d}]:-}" ]] || continue
+    dseen["${d}"]=1
+    printf '  %s — %s\n' "${d}" "$(where_size "${d}")"
+    datan=$(( datan + 1 ))
+  done
+  (( datan > 0 )) || printf '  не найдено / none found\n'
+
+  # --- Переменные окружения ---
+  printf '\n== Переменные окружения / Environment ==\n'
+  local -i envn=0
+  local v
+  for v in BS_SYSTEM_PREFIX BS_UPDATE_REPO BS_BUILD_CACHE_DIR PREFIX BIN_DIR LIB_DIR; do
+    if [[ -n "${!v:-}" ]]; then printf '  %s=%s\n' "${v}" "${!v}"; envn=$(( envn + 1 )); fi
+  done
+  (( envn > 0 )) || printf '  не заданы (BS_ROOT/BS_HOME выставляет сам bs) / none set (BS_ROOT/BS_HOME are set by bs itself)\n'
+
+  # --- Итог ---
+  printf '\n== Итог / Summary ==\n'
+  printf '  установок / installs: %d,  репозиториев / checkouts: %d,  bs в PATH / bs in PATH: %d\n' \
+    "${n_inst}" "${#checkouts[@]}" "${#hits[@]}"
+  local -a vs=()
+  read -ra vs <<< "${versions}"
+  local -A vset=()
+  for v in ${vs[@]+"${vs[@]}"}; do vset["${v}"]=1; done
+  if (( ${#vset[@]} > 1 )); then
+    where_problem "установки разных версий / installs of different versions: ${!vset[*]}"
+    where_hint "bs update   (обновит все найденные установки / updates every detected install)"
+  fi
+  if [[ -n "${first_root}" && -d "${first_root}" && ! -d "${BS_ROOT}/tests" ]] \
+     && [[ "$(readlink -f -- "${first_root}")" != "$(readlink -f -- "${BS_ROOT}")" ]]; then
+    where_problem "сейчас запущена не та копия, что по команде bs: ${BS_ROOT} вместо ${first_root} / the running copy is not the one behind \`bs\`"
+  fi
+  # Установка старее найденного репозитория — обновление доступно
+  # An install older than a found checkout — an update is available
+  local ck iv cv
+  for c in ${iv_paths[@]+"${iv_paths[@]}"}; do
+    iv="$(bs::version::of "${c}")"
+    for ck in ${checkouts[@]+"${checkouts[@]}"}; do
+      cv="$(bs::version::of "${ck}")"
+      [[ -n "${iv}" && -n "${cv}" ]] || continue
+      cls=0; bs::version::compare "${iv}" "${cv}" || cls=$?
+      if (( cls == 2 )); then
+        where_problem "установка ${c} (${iv}) старее репозитория ${ck} (${cv}) / the install ${c} (${iv}) is older than the checkout ${ck} (${cv})"
+        where_hint "cd ${ck} && ./bs update --lib ${c}"
+      fi
+    done
+  done
+  if (( ${#problems[@]} == 0 )); then
+    printf '  ✓ всё согласовано / everything looks consistent\n'
+  else
+    local p
+    printf '  Что вызывает вопросы / What looks wrong:\n'
+    for p in "${problems[@]}"; do printf '   • %s\n' "${p}"; done
+    if (( ${#hints[@]} > 0 )); then
+      printf '  Что сделать / What to do:\n'
+      local -A hseen=()
+      for p in "${hints[@]}"; do
+        [[ -z "${hseen[${p}]:-}" ]] || continue
+        hseen["${p}"]=1
+        printf '   → %s\n' "${p}"
+      done
+    fi
+  fi
+  return 0
+}
+
 # 7. Shebang-режим
 # Если bs вызван как интерпретатор shebang'а (#!/usr/bin/env bs),
 # первый аргумент — путь к существующему скрипту, а не команда.
 if [[ $# -ge 1 && -f "$1" ]]; then
   case "$1" in
-    help|-h|--help|version|env|list|lang-doc|lsp|chat|sync|rfc|api|ts|audit|doctor|run|build|repl|calc|init-shell|update|uninstall) : ;;
+    help|-h|--help|version|env|list|lang-doc|lsp|chat|sync|rfc|api|ts|audit|doctor|run|build|repl|calc|init-shell|update|uninstall|where) : ;;
     *) BS_SHEBANG=1 ;;
   esac
 fi
@@ -2048,6 +2432,7 @@ case "${1:-help}" in
   chat)           shift; chat_cmd "$@" ;;
   update)         shift; update_cmd "$@" ;;
   uninstall)      shift; uninstall_cmd "$@" ;;
+  where)          shift; where_cmd "$@" ;;
   sync)           shift; log::warn "sync is deprecated — use: bs update" && update_cmd "$@" ;;
   rfc)            shift; rfc_cmd "$@" ;;
   api)            shift; api_cmd "$@" ;;

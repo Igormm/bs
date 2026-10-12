@@ -24,7 +24,7 @@ English version: [documentation/en/](../en/README.md)
 
 - [Примеры](06-examples/README.md) — все скрипты из `examples/` с командами запуска.
 - [Тестирование](07-testing/README.md) — тест-фреймворк, валидаторы, CI-матрица.
-- [Установка](install.md) — виды установок (system/local/custom), манифест установки, `bs update` (локальный репозиторий или GitHub), PATH-менеджер, uninstall.
+- [Установка](install.md) — виды установок (system/local/custom), манифест установки, `bs update` (локальный репозиторий или GitHub), `bs where` (следы BS на машине), PATH-менеджер, uninstall.
 
 ## Разработчикам
 

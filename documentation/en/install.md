@@ -89,7 +89,7 @@ The installer never deletes or overwrites anything that is not BS. Before changi
 | What is found | `install` | `uninstall` |
 | --- | --- | --- |
 | nothing | installs | "nothing to remove" notice, exit 0 |
-| a BS install (has `bs` and `bootstrap/init.sh`, or a BS manifest) | stops with the "ALREADY INSTALLED" notice (versions, `bs update`, uninstall + install, another `PREFIX`); exit 1 | removes it |
+| a BS install (has `bs` and `bootstrap/init.sh`, or a BS manifest) | stops with the "ALREADY INSTALLED" notice: both versions and whether an update is available, the same version, or the installed one is newer; the update command from the repository first (`./bs update --local`, it needs no `PATH`), then the one of the installed copy; a warning when `bs` is not in the `PATH` of this shell (with the fix) or when another copy of `bs` comes first; uninstall + install and another `PREFIX` as alternatives; exit 1 | removes it |
 | a lib without a wrapper, or a wrapper without a lib | repairs it by reinstalling, after the "PARTIAL INSTALL — REPAIRING" notice listing what was found | removes what exists, says what was missing |
 | a foreign directory, a file or a symlink as `TARGET_LIB`; a source checkout (`.git` or `tests/`) | ERROR "not a BS install", nothing deleted; exit 1 | "nothing to remove" / "part left in place" notice, the foreign data stays; exit 0 |
 | a foreign file as `TARGET_BIN` (no `export BS_ROOT=` line) | ERROR, the file is not overwritten; exit 1 | left in place, with a notice |
@@ -190,6 +190,30 @@ bs update --system            # only /usr/local/lib/bs
 bs update --lib /opt/bs/lib/bs --from ~/bs
 bs update --github --ref v0.7.1
 bs version --full             # check the result
+```
+
+## Finding BS on a machine: `bs where`
+
+`bs where` shows every trace of BS on the machine. It only reads: nothing is changed and no found copy of `bs` is run (versions are read from `core/version.sh`).
+
+| Section | What it shows |
+| --- | --- |
+| Running now | the same block as `bs version --full` |
+| The `bs` command in PATH | every `bs` found in `PATH`, in order: a wrapper (and the install it leads to, with its version; a missing target is flagged), a repository launcher, or something that is not BS; the first one is marked as the one that runs for the command `bs` |
+| BS installs | for every install found: kind (local/system/custom) and version, manifest data (installed when and by whom, source and commit, last update), its wrapper and whether the wrapper directory is in `PATH`, owner and write access (`needs sudo`), leftovers of interrupted operations (`.update.*`, `.update-old.*`, `.update-lock`, `.install.bad`, `.bs.install.*`); a directory at a standard place that is not BS is reported, not touched |
+| Source checkouts | repositories with their version and commit (also those named in manifests as the source) |
+| Shell traces | lines in `~/.bashrc`, `~/.bash_profile`, `~/.profile`, `~/.zshrc`, `~/.zprofile`, `~/.zshenv`, `fish` config and `/etc/profile*`, `/etc/zshrc` that mention BS or the installer's `PATH` line; whether `PATH` of this shell contains `~/.local/bin` |
+| Data and cache | `~/.config/bs`, `~/.cache/bs` (build cache, facts, API specs), `~/.local/state/bs`, `~/.local/share/bs`, `BS_BUILD_CACHE_DIR`, with sizes |
+| Environment | `BS_SYSTEM_PREFIX`, `BS_UPDATE_REPO`, `BS_BUILD_CACHE_DIR`, `PREFIX`, `BIN_DIR`, `LIB_DIR` when set |
+| Summary | the counts, then **what looks wrong** and **what to do** with exact commands: a broken wrapper, a lib without a wrapper, no manifest or a damaged one, leftovers, installs of different versions, `bs` missing from `PATH`, the running copy differing from the one behind `bs`, a standard place occupied by something that is not BS |
+
+Candidates are collected from the standard places (`~/.local/lib/bs`, `$BS_SYSTEM_PREFIX/lib/bs`), the running copy, the wrappers in `PATH`, the `source` paths of manifests, and `source ".../bootstrap/init.sh"` lines in the rc files. `--deep` additionally searches `~`, `/opt`, `/usr/local` and `/srv` (up to five levels deep, one filesystem, 30 seconds at most) for directories with `bootstrap/init.sh`.
+
+The exit code is 0: the command reports, it does not judge.
+
+```bash
+bs where           # everything BS knows about itself and its traces
+bs where --deep    # plus a search for copies in unusual places
 ```
 
 ## Uninstall
