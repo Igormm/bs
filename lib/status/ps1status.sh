@@ -339,12 +339,20 @@ ps1status::init_components() {
 ps1status::start_monitoring() {
     
 
-    # Check if monitoring is already running
-    local monitor_pid
-
-    monitor_pid=$(ps aux | grep "ps1status::monitor_loop" | grep -v grep | awk '{print $2}' || true)
-
-    
+    # Check if monitoring is already running: the loop is a subshell, so its command line
+    # never contains the function name; the PID file is the only reliable marker.
+    # Проверка, что мониторинг уже запущен: цикл — подоболочка, в её командной строке нет
+    # имени функции; надёжный признак — только PID-файл.
+    local monitor_pid=""
+    local pid_file="${PS1_STATUS_CONFIG_DIR}/monitor.pid"
+    if is::file "${pid_file}"; then
+        monitor_pid="$(<"${pid_file}")"
+    fi
+    if [[ "${monitor_pid}" =~ ^[0-9]+$ ]] && (( monitor_pid > 1 )) && utils::quiet_err kill -0 "${monitor_pid}"; then
+        :
+    else
+        monitor_pid=""
+    fi
 
     if is::not_empty "${monitor_pid}"; then
 
@@ -407,6 +415,14 @@ ps1status::stop_monitoring() {
         local monitor_pid
 
         monitor_pid=$(cat "${pid_file}")
+
+        # A damaged PID file must never turn into `kill 0` / `kill -1` (whole process group)
+        # Повреждённый PID-файл не должен превращаться в `kill 0` / `kill -1` (вся группа процессов)
+        if ! [[ "${monitor_pid}" =~ ^[0-9]+$ ]] || (( monitor_pid <= 1 )); then
+            rm -f "${pid_file}"
+            log::warn "Invalid PID file removed: ${pid_file}"
+            return 0
+        fi
 
         
 

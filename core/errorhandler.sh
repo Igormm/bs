@@ -343,6 +343,14 @@ error::try_with_fallback() {
 error::retry() {
     local -r max_retries="${1}"
     shift
+    # Число попыток — целое >= 1: иначе команда не запустится ни разу, а
+    # функция вернула бы 0 («успех» без выполнения).
+    # The attempt count is an integer >= 1: otherwise the command would never
+    # run while the function returned 0 (a "success" without running).
+    if ! [[ "${max_retries}" =~ ^[0-9]+$ ]] || (( 10#${max_retries} < 1 )); then
+        log::error "error::retry: attempts must be an integer >= 1, got: '${max_retries}'"
+        return "${E_INVALID:-2}"
+    fi
     local cmd=("$@")
     local -i attempt=1
     local -i result=0

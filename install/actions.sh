@@ -326,6 +326,14 @@ do_install() {
 
   printf "Готово.\n"
 
+  # Рамка о других установках — ДО настройки PATH: auto_update_path в терминале
+  # заменяет процесс новой оболочкой (exec), и всё, что стоит после неё,
+  # пользователь не увидел бы (предупреждение, что bs запускает другую копию).
+  # The "other installs" frame goes BEFORE the PATH setup: in a terminal
+  # auto_update_path replaces the process with a fresh shell (exec), so anything
+  # after it would never be seen (the warning that bs runs another copy).
+  install_report_others install
+
   # local: PATH в rc-файлах; иначе — подсказка, если BIN_DIR не в PATH.
   # local: PATH in the rc files; otherwise a hint when BIN_DIR is not in PATH.
   if [[ "${MODE}" == "local" ]]; then
@@ -334,7 +342,6 @@ do_install() {
     printf "\n"
     print_path_hint
   fi
-  install_report_others install
 }
 
 # Вид цели: local | system | custom (по стандартным местам).
@@ -429,17 +436,26 @@ do_uninstall() {
     uninstall_completion
   fi
 
+  # Сначала lib, потом wrapper: при сбое rm остаётся рабочая команда bs и
+  # удаление можно повторить (раньше wrapper исчезал, а lib оставалась
+  # частично удалённой; под set -e сбой был ещё и молчаливым).
+  # lib first, wrapper second: if rm fails, a working bs command stays and the
+  # removal can be repeated (the wrapper used to vanish while the lib was left
+  # half-deleted; under set -e the failure was also silent).
+  if (( rm_lib == 1 )); then
+    if ! rm -rf -- "${TARGET_LIB}"; then
+      install_error "Удаление не выполнено: не удалось удалить ${TARGET_LIB} (часть файлов могла быть удалена)"         "Uninstall failed: cannot remove ${TARGET_LIB} (some files may be gone)"         "Wrapper оставлен. Исправьте права и удалите остаток вручную / The wrapper is kept. Fix the permissions and remove the rest by hand: chmod -R u+w ${TARGET_LIB} && rm -rf ${TARGET_LIB}"
+      exit 1
+    fi
+    printf "Удален / Removed: %s\n" "${TARGET_LIB}"
+  else
+    printf "Нет каталога / No directory: %s\n" "${TARGET_LIB}"
+  fi
   if (( rm_bin == 1 )); then
     rm -f -- "${TARGET_BIN}"
     printf "Удален / Removed: %s\n" "${TARGET_BIN}"
   else
     printf "Нет wrapper / No wrapper: %s\n" "${TARGET_BIN}"
-  fi
-  if (( rm_lib == 1 )); then
-    rm -rf -- "${TARGET_LIB}"
-    printf "Удален / Removed: %s\n" "${TARGET_LIB}"
-  else
-    printf "Нет каталога / No directory: %s\n" "${TARGET_LIB}"
   fi
 
   if (( ${#kept[@]} > 0 )); then

@@ -43,13 +43,35 @@ main() {
     # ==========================================
     testframework::section "http::get / HTTP GET"
 
-    local response
-    response="$(http::get "https://api.github.com" 2>/dev/null || true)"
-    if [[ -n "${response}" ]]; then
-        testframework::assert_command "printf '%s' '${response}' | grep -q 'current_user_url'" "http::get fetches github api"
-    else
-        testframework::assert_true "true" "http::get skipped (network unavailable)"
-    fi
+    # Fake curl in PATH: no network is touched / Подставной curl в PATH: сеть не используется
+    local fakebin="${tmp_dir}/fakebin"
+    mkdir -p "${fakebin}"
+    cat > "${fakebin}/curl" <<'FAKE'
+#!/bin/sh
+case "$*" in
+  *notfound*) printf 'missing\n404' ;;
+  *boom*) exit 7 ;;
+  *) printf '{"current_user_url":"x"}\n200' ;;
+esac
+FAKE
+    chmod +x "${fakebin}/curl"
+    local old_path="${PATH}"
+    PATH="${fakebin}:${PATH}"
+
+    local response rc=0
+    response="$(http::get "https://example.test/ok")" || rc=$?
+    testframework::assert_equal "0" "${rc}" "http::get returns 0 on HTTP 200"
+    testframework::assert_equal '{"current_user_url":"x"}' "${response}" "http::get prints the body without the status line"
+
+    rc=0
+    response="$(http::get "https://example.test/notfound")" || rc=$?
+    testframework::assert_equal "${INTEGRATION_ERROR_HTTP}" "${rc}" "http::get returns error on HTTP 404"
+    testframework::assert_equal "missing" "${response}" "http::get still prints the 404 body"
+
+    rc=0
+    http::get "https://example.test/boom" >/dev/null || rc=$?
+    testframework::assert_equal "${INTEGRATION_ERROR_HTTP}" "${rc}" "http::get returns error when curl fails"
+    PATH="${old_path}"
 
     # ==========================================
     # http::post dry-run
@@ -57,7 +79,7 @@ main() {
     testframework::section "http::post dry-run / Сухой прогон http::post"
 
     export FRAMEWORK_DRY_RUN=true
-    local rc=0
+    rc=0
     http::post "https://example.com" '{"x":1}' || rc=$?
     testframework::assert_equal "0" "${rc}" "http::post dry-run returns 0"
     unset FRAMEWORK_DRY_RUN
@@ -82,12 +104,13 @@ main() {
     local retry_script="${tmp_dir}/retry.sh"
     cat > "${retry_script}" <<'EOF'
 #!/usr/bin/env bash
-if [[ -f /tmp/bs_http_retry_marker ]]; then
+marker="$(dirname "$0")/retry_marker"
+if [[ -f "${marker}" ]]; then
   echo "ok"
-  rm -f /tmp/bs_http_retry_marker
+  rm -f "${marker}"
   exit 0
 else
-  touch /tmp/bs_http_retry_marker
+  touch "${marker}"
   exit 1
 fi
 EOF
@@ -114,7 +137,7 @@ EOF
     # ==========================================
     # Cleanup and summary
     # ==========================================
-    rm -rf "${tmp_dir}"
+    rm -rf "${tmp_dir:?}"
 
     testframework::summary
 }

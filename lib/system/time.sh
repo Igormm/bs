@@ -17,26 +17,36 @@ bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/uti
 #   system::time::timezone "Europe/Moscow"
 system::time::timezone() {
     local timezone="${1:-UTC}"
+    local -r zoneinfo="${BS_ZONEINFO_DIR:-/usr/share/zoneinfo}"
     
-    # Validate timezone / Проверить валидность часового пояса
-    if ! is::file "/usr/share/zoneinfo/${timezone}"; then
+    # Validate timezone: a plain Region/City name, no "..", no absolute path
+    # Проверить часовой пояс: обычное имя Region/City, без "..", без абсолютного пути
+    if [[ ! "${timezone}" =~ ^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$ ]] \
+        || ! is::file "${zoneinfo}/${timezone}"; then
         log::warn "Invalid timezone: ${timezone}"
         return "${E_ERROR}"
     fi
     
     # For systemd-based systems / Для систем на базе systemd
     if utils::has timedatectl; then
-        utils::ignore timedatectl set-timezone "${timezone}"
+        if ! utils::quiet timedatectl set-timezone "${timezone}"; then
+            log::error "timedatectl failed to set timezone ${timezone}"
+            return "${E_ERROR}"
+        fi
     else
         # Fallback for non-systemd systems / Резервный вариант для систем без systemd
-        if is::file "/etc/localtime"; then
-            ln -sf "/usr/share/zoneinfo/${timezone}" /etc/localtime
+        if ! ln -sf "${zoneinfo}/${timezone}" "${BS_LOCALTIME:-/etc/localtime}"; then
+            log::error "Cannot link ${BS_LOCALTIME:-/etc/localtime}"
+            return "${E_ERROR}"
         fi
         
         # Set timezone in configuration file / Установить часовой пояс в файле
         # конфигурации
-        if is::file "/etc/timezone"; then
-            echo "${timezone}" > /etc/timezone
+        if is::file "${BS_TIMEZONE_FILE:-/etc/timezone}"; then
+            if ! printf '%s\n' "${timezone}" > "${BS_TIMEZONE_FILE:-/etc/timezone}"; then
+                log::error "Cannot write ${BS_TIMEZONE_FILE:-/etc/timezone}"
+                return "${E_ERROR}"
+            fi
         fi
     fi
     
@@ -52,36 +62,49 @@ system::time::timezone() {
 system::time::ntp() {
     local enable="${1:-true}"
     
+    # Only true/false: any other word used to switch NTP off silently
+    # Только true/false: любое другое слово раньше молча выключало NTP
+    if [[ "${enable}" != "true" && "${enable}" != "false" ]]; then
+        log::warn "Invalid value: ${enable} (use true or false)"
+        return "${E_INVALID}"
+    fi
+    
+    # For systemd-based systems / Для систем на базе systemd
     if utils::has timedatectl; then
+        if ! utils::quiet timedatectl set-ntp "${enable}"; then
+            log::error "timedatectl set-ntp ${enable} failed"
+            return "${E_ERROR}"
+        fi
         if [[ "${enable}" == "true" ]]; then
-            utils::ignore timedatectl set-ntp true
             log::info "NTP synchronization enabled"
         else
-            utils::ignore timedatectl set-ntp false
             log::info "NTP synchronization disabled"
         fi
+        return 0
+    fi
+    
+    # Fallback: ntpd or chronyd / Резервный вариант: ntpd или chronyd
+    local daemon=""
+    if utils::has ntpd; then
+        daemon="ntpd"
+    elif utils::has chronyd; then
+        daemon="chronyd"
     else
-        # Fallback for systems with ntpdate or chrony / Резервный вариант для систем с
-        # ntpdate или chrony
-        if [[ "${enable}" == "true" ]]; then
-            if utils::has ntpd; then
-                utils::ignore systemctl enable ntpd
-                utils::ignore systemctl start ntpd
-            elif utils::has chronyd; then
-                utils::ignore systemctl enable chronyd
-                utils::ignore systemctl start chronyd
-            fi
-            log::info "NTP service enabled"
-        else
-            if utils::has ntpd; then
-                utils::ignore systemctl stop ntpd
-                utils::ignore systemctl disable ntpd
-            elif utils::has chronyd; then
-                utils::ignore systemctl stop chronyd
-                utils::ignore systemctl disable chronyd
-            fi
-            log::info "NTP service disabled"
+        log::warn "No NTP service (ntpd/chronyd) found"
+        return "${E_ERROR}"
+    fi
+    if [[ "${enable}" == "true" ]]; then
+        if ! utils::quiet systemctl enable "${daemon}" || ! utils::quiet systemctl start "${daemon}"; then
+            log::error "Cannot enable ${daemon}"
+            return "${E_ERROR}"
         fi
+        log::info "NTP service enabled"
+    else
+        if ! utils::quiet systemctl stop "${daemon}" || ! utils::quiet systemctl disable "${daemon}"; then
+            log::error "Cannot disable ${daemon}"
+            return "${E_ERROR}"
+        fi
+        log::info "NTP service disabled"
     fi
 }
 
@@ -92,23 +115,28 @@ system::time::ntp() {
 # @example
 #   system::time::set "2026-01-04 12:00:00"
 system::time::set() {
-    local datetime="${1}"
+    local datetime="${1:-}"
     
     if is::empty "${datetime}"; then
         log::warn "Date and time not specified"
         return "${E_ERROR}"
     fi
     
-    # For systemd-based systems / Для систем на базе systemd
     if utils::has timedatectl; then
-        utils::ignore timedatectl set-time "${datetime}"
-    else
-        # Fallback for non-systemd systems / Резервный вариант для систем без systemd
-        if utils::has date; then
-            # Format depends on system, trying common formats / Формат зависит от системы,
-            # пробуем распространенные форматы
-            utils::ignore date -s "${datetime}"
+        # Fails while NTP synchronization is on — that is a real failure, not success
+        # Падает, пока включена NTP-синхронизация — это настоящий сбой, а не успех
+        if ! utils::quiet timedatectl set-time "${datetime}"; then
+            log::error "timedatectl set-time failed (is NTP on? try: system::time::ntp false)"
+            return "${E_ERROR}"
         fi
+    elif utils::has date; then
+        if ! utils::quiet date -s "${datetime}"; then
+            log::error "date -s failed for: ${datetime}"
+            return "${E_ERROR}"
+        fi
+    else
+        log::error "Neither timedatectl nor date available"
+        return "${E_ERROR}"
     fi
     
     log::info "System date and time set to ${datetime}"

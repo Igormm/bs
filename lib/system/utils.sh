@@ -203,7 +203,15 @@ system::utils::process_start() {
 # @example
 #   system::utils::process_stop 1234
 system::utils::process_stop() {
-    local pid="${1}"
+    local pid="${1:-}"
+    
+    # Only a real PID: "", "0" (own process group), "-1" (every process) and "1" (init)
+    # are refused / Только настоящий PID: "", "0" (своя группа процессов), "-1" (все
+    # процессы) и "1" (init) отвергаются
+    if [[ ! "${pid}" =~ ^[0-9]+$ ]] || (( pid <= 1 )); then
+        log::error "Invalid PID: '${pid}'"
+        return "${E_INVALID}"
+    fi
     kill "${pid}"
 }
 
@@ -212,8 +220,15 @@ system::utils::process_stop() {
 # @example
 #   system::utils::process_kill_by_name "sleep"
 system::utils::process_kill_by_name() {
-    local proc_name="${1}"
-    pkill -f "${proc_name}"
+    local proc_name="${1:-}"
+    
+    # An empty pattern matches EVERY process: pkill -f "" kills all of them
+    # Пустой шаблон совпадает с КАЖДЫМ процессом: pkill -f "" убивает их все
+    if [[ -z "${proc_name//[[:space:]]/}" ]]; then
+        log::error "Process name pattern required"
+        return "${E_INVALID}"
+    fi
+    pkill -f -- "${proc_name}"
 }
 
 # @description Find processes by name / Найти процессы по имени
@@ -405,25 +420,51 @@ system::utils::network_check_connectivity() {
 # @example
 #   system::utils::network_download "https://example.com/file.txt"
 system::utils::network_download() {
-    local url="${1}"
+    local url="${1:-}"
     local output_path="${2:-}"
     
+    if is::empty "${url}"; then
+        log::error "URL required"
+        return "${E_INVALID}"
+    fi
+    
+    local -a cmd=()
+    local target="${output_path}"
+    
+    # Download into a temporary file and rename on success: a failed download must
+    # neither leave an HTTP error page nor truncate an existing target
+    # Скачивать во временный файл и переименовывать при успехе: сбой загрузки не должен
+    # ни оставлять страницу ошибки HTTP, ни обрезать существующую цель
     if utils::has wget; then
         if is::not_empty "${output_path}"; then
-            wget "${url}" -O "${output_path}"
+            target="${output_path}.part.$$"
+            cmd=(wget "${url}" -O "${target}")
         else
-            wget "${url}"
+            cmd=(wget "${url}")
         fi
     elif utils::has curl; then
         if is::not_empty "${output_path}"; then
-            curl -L "${url}" -o "${output_path}"
+            target="${output_path}.part.$$"
+            cmd=(curl -fL "${url}" -o "${target}")
         else
-            curl -L "${url}" -O
+            cmd=(curl -fL "${url}" -O)
         fi
     else
         log::error "Neither wget nor curl available"
         return "${E_ERROR}"
     fi
+    
+    if ! "${cmd[@]}"; then
+        if is::not_empty "${output_path}"; then
+            utils::ignore rm -f -- "${target}"
+        fi
+        log::error "Download failed: ${url}"
+        return "${E_ERROR}"
+    fi
+    if is::not_empty "${output_path}"; then
+        mv -f -- "${target}" "${output_path}" || return "${E_ERROR}"
+    fi
+    return 0
 }
 
 # @description Generate random password / Генерация пароля
@@ -433,7 +474,22 @@ system::utils::network_download() {
 #   password=$(system::utils::security_generate_password 20)
 system::utils::security_generate_password() {
     local length="${1:-16}"
-    cat /dev/urandom | tr -dc 'A-Za-z0-9!@#$%^&*()_+-=' | fold -w "${length}" | head -n 1
+    
+    if [[ ! "${length}" =~ ^[0-9]+$ ]] || (( length < 1 )); then
+        log::error "Invalid password length: ${length}"
+        return "${E_INVALID}"
+    fi
+    
+    # No "producer | tr | head" pipeline: head closing the pipe killed tr/cat with
+    # SIGPIPE, so under pipefail the function returned 141. "-" is last in the set,
+    # otherwise "+-=" is a range / Без конвейера "producer | tr | head": закрытие
+    # канала head убивало tr/cat по SIGPIPE, и при pipefail функция возвращала 141.
+    # "-" стоит последним, иначе "+-=" — диапазон
+    local chars=""
+    while (( ${#chars} < length )); do
+        chars+="$(head -c $(( length * 16 )) /dev/urandom | LC_ALL=C tr -dc 'A-Za-z0-9!@#$%^&*()_+=-')"
+    done
+    printf '%s\n' "${chars:0:length}"
 }
 
 # @description Hash password with bcrypt / Хэширование пароля
@@ -531,7 +587,18 @@ system::utils::user_create() {
 # @example
 #   system::utils::user_delete "olduser"
 system::utils::user_delete() {
-    local username="${1}"
+    local username="${1:-}"
+    
+    # userdel -r also removes the home directory: refuse empty, root and UID 0
+    # userdel -r удаляет и домашний каталог: пустое имя, root и UID 0 отвергаются
+    if is::empty "${username}" || [[ "${username}" == -* ]]; then
+        log::error "User name required"
+        return "${E_INVALID}"
+    fi
+    if [[ "${username}" == "root" ]] || [[ "$(id -u -- "${username}" 2>/dev/null)" == "0" ]]; then
+        log::error "Refusing to delete a UID 0 account: ${username}"
+        return "${E_ERROR}"
+    fi
     userdel -r "${username}"
 }
 

@@ -149,7 +149,13 @@ k8s::context::use() {
 # @description Получить текущее пространство имён.
 # @stdout namespace name
 k8s::namespace::current() {
-  k8s::run config view --minify --output 'jsonpath={..namespace}' 2>/dev/null || printf '%s' "${K8S_NAMESPACE}"
+  # kubectl prints an empty string when the context has no namespace: that means "default".
+  # kubectl печатает пустую строку, если у контекста нет namespace: это значит «default».
+  local ns=""
+  if [[ "${FRAMEWORK_DRY_RUN:-false}" != "true" ]]; then
+    ns="$(k8s::run config view --minify --output 'jsonpath={..namespace}' 2>/dev/null)" || ns=""
+  fi
+  printf '%s' "${ns:-${K8S_NAMESPACE}}"
 }
 
 # Pod helpers / Работа с подами

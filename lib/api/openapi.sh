@@ -40,6 +40,16 @@ declare -g API_SPEC_CACHE_DIR="${XDG_CACHE_HOME:-${HOME}/.cache}/bs/api"
 # @global API_SPEC_REGISTRY — Openapi: файл реестра спецификаций (категория: constant)
 declare -g API_SPEC_REGISTRY="${API_SPEC_CACHE_DIR}/registry.tsv"
 
+# @private
+# @description Print registry rows except the one named $1 (literal match, not a regex).
+# @description Вывести строки реестра, кроме схемы $1 (буквальное сравнение, не регулярное выражение).
+# @param $1 spec name / имя схемы
+api::__registry_without() {
+  local -r name="${1:?spec name required}"
+  [[ -f "${API_SPEC_REGISTRY}" ]] || return 0
+  awk -F'\t' -v n="${name}" '$1 != n' "${API_SPEC_REGISTRY}"
+}
+
 # @description Load an OpenAPI spec from a file or URL.
 # @description Загрузить OpenAPI-схему из файла или URL.
 # @param $1 spec name / имя схемы
@@ -74,7 +84,7 @@ api::spec::load() {
   API_SPECS["${name}"]="${spec_file}"
   API_SPEC_AUTH["${name}"]=""
   mkdir -p -- "$(dirname -- "${API_SPEC_REGISTRY}")"
-  grep -v "^${name}"$'\t' "${API_SPEC_REGISTRY}" > "${API_SPEC_REGISTRY}.tmp" 2>/dev/null || true
+  api::__registry_without "${name}" > "${API_SPEC_REGISTRY}.tmp"
   printf '%s\t%s\n' "${name}" "${spec_file}" >> "${API_SPEC_REGISTRY}.tmp"
   mv -- "${API_SPEC_REGISTRY}.tmp" "${API_SPEC_REGISTRY}"
   log::debug "api::spec::load: loaded ${name} from ${spec_file}"
@@ -95,7 +105,7 @@ api::spec::drop() {
   fi
   unset "API_SPECS[${name}]" "API_SPEC_AUTH[${name}]"
   if [[ -f "${API_SPEC_REGISTRY}" ]]; then
-    grep -v "^${name}"$'\t' "${API_SPEC_REGISTRY}" > "${API_SPEC_REGISTRY}.tmp" 2>/dev/null || true
+    api::__registry_without "${name}" > "${API_SPEC_REGISTRY}.tmp"
     mv -- "${API_SPEC_REGISTRY}.tmp" "${API_SPEC_REGISTRY}"
   fi
   return 0

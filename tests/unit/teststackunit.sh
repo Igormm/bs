@@ -57,8 +57,10 @@ main() {
   testframework::assert_true "'${st}' =~ api.alive=no" "api dead after down"
   testframework::assert_false "kill -0 ${pid}" "pid gone"
 
-  ts::stack::down
-  testframework::assert_true "true" "down is idempotent"
+  local down_rc=0
+  ts::stack::down || down_rc=$?
+  testframework::assert_equal "0" "${down_rc}" "down is idempotent (second call returns 0)"
+  testframework::assert_true "'$(ts::stack::status)' =~ api.alive=no" "state is still stopped after a second down"
 
   testframework::section "logs missing / нет лога"
   local rc=0

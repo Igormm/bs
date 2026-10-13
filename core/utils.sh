@@ -117,20 +117,48 @@ utils::tempfile() {
   else
     path="$(mktemp "${TMPDIR:-/tmp}/${prefix}.XXXXXX")" || return 1
   fi
+  # Реестр лежит в общем TMPDIR под предсказуемым именем: чужой или
+  # подложенный симлинком файл не принимаем (иначе cleanup удалил бы
+  # чужие пути, а запись пошла бы по симлинку).
+  # The registry lives in the shared TMPDIR under a predictable name: a
+  # foreign or symlink-planted file is refused (else cleanup would delete
+  # someone else's paths and the append would follow the symlink).
+  if [[ ! -e "${UTILS_TMP_REGISTRY}" && ! -L "${UTILS_TMP_REGISTRY}" ]]; then
+    ( umask 077; set -C; : > "${UTILS_TMP_REGISTRY}" ) 2>/dev/null || true
+  fi
+  if ! utils::__tmp_registry_trusted; then
+    rm -rf -- "${path}"
+    log::error "utils::tempfile: temp registry is not ours, refusing: ${UTILS_TMP_REGISTRY}"
+    return 1
+  fi
   printf '%s\n' "${path}" >> "${UTILS_TMP_REGISTRY}"
   printf '%s\n' "${path}"
   return 0
 }
 
 # @private
+# @description The temp registry is a regular file owned by us (not a symlink).
+# @description Реестр временных файлов — обычный файл нашего владельца (не симлинк).
+utils::__tmp_registry_trusted() {
+  [[ ! -L "${UTILS_TMP_REGISTRY}" && -f "${UTILS_TMP_REGISTRY}" && -O "${UTILS_TMP_REGISTRY}" ]]
+}
+
+# @private
 # @description Remove all recorded temp paths (main process only).
 # @description Удалить все записанные временные пути (только главный процесс).
+#   A registry that is not ours is ignored; only paths inside the registry's own
+#   directory are removed.
+#   Чужой реестр игнорируется; удаляются только пути внутри каталога реестра.
 utils::__tmp_cleanup() {
   (( BASH_SUBSHELL == 0 )) || return 0
-  [[ -f "${UTILS_TMP_REGISTRY}" ]] || return 0
-  local p
+  [[ -e "${UTILS_TMP_REGISTRY}" || -L "${UTILS_TMP_REGISTRY}" ]] || return 0
+  utils::__tmp_registry_trusted || return 0
+  local p base="${UTILS_TMP_REGISTRY%/*}"
   while IFS= read -r p; do
-    [[ -n "${p}" ]] && rm -rf -- "${p}"
+    case "${p}" in
+      "${base}"/*/../*|"${base}"/../*|*/..|*"/../"*) continue ;;
+      "${base}"/?*) rm -rf -- "${p}" ;;
+    esac
   done < "${UTILS_TMP_REGISTRY}"
   rm -f -- "${UTILS_TMP_REGISTRY}"
   return 0
@@ -404,8 +432,11 @@ utils::detect_root() {
     local script_dir
     script_dir="$(dirname -- "${script_source}")"
 
-    # 5. Переход на уровень выше (если скрипт в bin/)
-    if [[ "$(basename -- "${script_dir}")" == "bin" ]]; then
+    # 5. Переход на уровень выше (если скрипт в bin/ или core/: BASH_SOURCE[0]
+    #    внутри этой функции — сам core/utils.sh, а не вызывающий скрипт)
+    #    One level up (if the script is in bin/ or core/: BASH_SOURCE[0] inside
+    #    this function is core/utils.sh itself, not the calling script)
+    if [[ "$(basename -- "${script_dir}")" == "bin" || "$(basename -- "${script_dir}")" == "core" ]]; then
         script_dir="$(dirname -- "${script_dir}")"
     fi
 

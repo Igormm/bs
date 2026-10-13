@@ -2,13 +2,13 @@
 # shellcheck shell=bash
 # permissions.sh — File permissions management for system setup / Управление правами
 # доступа к файлам для настройки системы
-# @depends core/const, core/logger, core/utils
+# @depends core/const, core/logger, core/utils, lib/system/safety
 
 # Source Guard / Защита от повторной загрузки
 bs::guard "SYSTEM_PERMISSIONS" || return 0
 
 # Зависимости / Dependencies
-bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "safety.sh"
 
 # @description Change file permissions / Изменить права доступа к файлу
 # @param $1 File or directory path / Путь к файлу или директории
@@ -191,6 +191,13 @@ system::permissions::recursive() {
     
     if ! is::dir "${target}"; then
         log::warn "Directory '${target}' does not exist"
+        return "${E_ERROR}"
+    fi
+    
+    # Never run a recursive chmod over "/", "/etc", "/usr" and other system roots
+    # Никогда не запускать рекурсивный chmod над "/", "/etc", "/usr" и другими корнями системы
+    if ! safety::validate_path "${target}"; then
+        log::error "Refusing recursive chmod on ${target}"
         return "${E_ERROR}"
     fi
     

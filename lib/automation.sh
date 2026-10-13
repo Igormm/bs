@@ -177,19 +177,32 @@ automation::locale::check_timezone() {
 #   automation::locale::set_timezone "Europe/Moscow"
 automation::locale::set_timezone() {
     local timezone="${1:-UTC}"
+    local -r zoneinfo="${BS_ZONEINFO_DIR:-/usr/share/zoneinfo}"
     
-    if utils::has timedatectl; then
-        timedatectl set-timezone "${timezone}"
-        timedatectl set-ntp true
-    else
-        # Manual method for systems without timedatectl
-        ln -sf "/usr/share/zoneinfo/${timezone}" /etc/localtime
-        if utils::has hwclock; then
-            hwclock --systohc
-        fi
+    # Plain Region/City name that exists: otherwise /etc/localtime would dangle or
+    # point outside zoneinfo / Обычное имя Region/City, которое существует: иначе
+    # /etc/localtime повиснет или поведёт мимо zoneinfo
+    if [[ ! "${timezone}" =~ ^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$ ]] || ! is::file "${zoneinfo}/${timezone}"; then
+        log::warn "Invalid timezone: ${timezone}"
+        return "${E_ERROR}"
     fi
     
-    log::info "Timezone set to ${timezone} and NTP synchronization enabled"
+    if utils::has timedatectl; then
+        if ! timedatectl set-timezone "${timezone}" || ! timedatectl set-ntp true; then
+            log::error "timedatectl failed (timezone ${timezone})"
+            return "${E_ERROR}"
+        fi
+        log::info "Timezone set to ${timezone} and NTP synchronization enabled"
+    else
+        if ! ln -sf "${zoneinfo}/${timezone}" "${BS_LOCALTIME:-/etc/localtime}"; then
+            log::error "Cannot link ${BS_LOCALTIME:-/etc/localtime}"
+            return "${E_ERROR}"
+        fi
+        if utils::has hwclock; then
+            hwclock --systohc || log::warn "hwclock --systohc failed"
+        fi
+        log::info "Timezone set to ${timezone} (no timedatectl: NTP not changed)"
+    fi
 }
 
 # @description Verify time and timezone correctness / Проверить корректность времени и
@@ -307,7 +320,10 @@ automation::hardware::set_display_mode() {
     local orientation="${3:-normal}"
     
     if utils::has xrandr; then
-        xrandr --output "${monitor}" --mode "${resolution}" --rotate "${orientation}"
+        if ! xrandr --output "${monitor}" --mode "${resolution}" --rotate "${orientation}"; then
+            log::error "xrandr failed for ${monitor} (${resolution}, ${orientation})"
+            return "${E_ERROR}"
+        fi
         log::info "Set ${monitor} to ${resolution} with ${orientation} orientation"
     else
         log::warn "xrandr not available"
@@ -359,14 +375,23 @@ automation::network::manage_interface() {
     
     case "${action}" in
         "up")
-            ip link set "${interface}" up
+            if ! ip link set "${interface}" up; then
+                log::error "ip link set ${interface} up failed"
+                return "${E_ERROR}"
+            fi
             if is::not_empty "${ip_addr}"; then
-                ip addr add "${ip_addr}" dev "${interface}"
+                if ! ip addr add "${ip_addr}" dev "${interface}"; then
+                    log::error "ip addr add ${ip_addr} dev ${interface} failed"
+                    return "${E_ERROR}"
+                fi
             fi
             log::info "Interface ${interface} brought up"
             ;;
         "down")
-            ip link set "${interface}" down
+            if ! ip link set "${interface}" down; then
+                log::error "ip link set ${interface} down failed"
+                return "${E_ERROR}"
+            fi
             log::info "Interface ${interface} brought down"
             ;;
         *)
@@ -422,13 +447,26 @@ automation::network::manage_route() {
     local gateway="${3}"
     local interface="${4:-}"
     
+    # Only route-changing verbs: "flush" or any other word is not accepted
+    # Только глаголы изменения маршрутов: "flush" и любые другие слова не принимаются
+    case "${action}" in
+        add|del|delete|replace|change) ;;
+        *)
+            log::warn "Invalid action: ${action}. Use add, del, replace or change."
+            return "${E_INVALID}"
+            ;;
+    esac
+    
+    local -a cmd=(ip route "${action}" "${dest_network}" via "${gateway}")
     if is::not_empty "${interface}"; then
-        ip route "${action}" "${dest_network}" via "${gateway}" dev "${interface}"
-    else
-        ip route "${action}" "${dest_network}" via "${gateway}"
+        cmd+=(dev "${interface}")
+    fi
+    if ! "${cmd[@]}"; then
+        log::error "${cmd[*]} failed"
+        return "${E_ERROR}"
     fi
     
-    log::info "Route ${action}ed: ${dest_network} via ${gateway} ${interface:+dev ${interface}}"
+    log::info "Route ${action} done: ${dest_network} via ${gateway} ${interface:+dev ${interface}}"
 }
 
 # @description Check gateway availability / Проверка доступности шлюза
@@ -709,17 +747,19 @@ automation::display::install_display_manager() {
     
     # Install the display manager
     if system::distro::is_family "debian"; then
-        system::distro::install_package "${dm}"
+        system::distro::install_package "${dm}" || return "${E_ERROR}"
     elif system::distro::is_family "redhat"; then
-        system::distro::install_package "${dm}"
+        system::distro::install_package "${dm}" || return "${E_ERROR}"
     else
         log::warn "Unsupported distribution for display manager installation"
         return "${E_ERROR}"
     fi
     
     # Enable the display manager
-    systemctl enable "${dm}.service"
-    systemctl start "${dm}.service"
+    if ! systemctl enable "${dm}.service" || ! systemctl start "${dm}.service"; then
+        log::error "Cannot enable/start ${dm}.service"
+        return "${E_ERROR}"
+    fi
     
     log::info "${dm} display manager installed and enabled"
 }
@@ -786,8 +826,11 @@ automation::system::control_service() {
     
     case "${action}" in
         "start"|"stop"|"restart"|"reload"|"enable"|"disable")
-            systemctl "${action}" "${service_name}"
-            log::info "${action^}ed service: ${service_name}"
+            if ! systemctl "${action}" "${service_name}"; then
+                log::error "systemctl ${action} ${service_name} failed"
+                return "${E_ERROR}"
+            fi
+            log::info "Service ${service_name}: ${action} done"
             ;;
         *)
             log::warn "Invalid action: ${action}. Use start, stop, restart, reload, enable, or disable."
@@ -827,19 +870,19 @@ automation::system::verify_service_status() {
 #   automation::system::detect_package_manager
 automation::system::detect_package_manager() {
     if utils::has apt; then
-        log::info "Detected package manager: APT (Debian/Ubuntu based)"
+        log::info "Detected package manager: APT (Debian/Ubuntu based)" >&2
         echo "apt"
     elif utils::has dnf; then
-        log::info "Detected package manager: DNF (Fedora/RHEL based)"
+        log::info "Detected package manager: DNF (Fedora/RHEL based)" >&2
         echo "dnf"
     elif utils::has yum; then
-        log::info "Detected package manager: YUM (older RHEL based)"
+        log::info "Detected package manager: YUM (older RHEL based)" >&2
         echo "yum"
     elif utils::has zypper; then
-        log::info "Detected package manager: Zypper (openSUSE based)"
+        log::info "Detected package manager: Zypper (openSUSE based)" >&2
         echo "zypper"
     elif utils::has pacman; then
-        log::info "Detected package manager: Pacman (Arch based)"
+        log::info "Detected package manager: Pacman (Arch based)" >&2
         echo "pacman"
     else
         log::warn "Could not detect package manager"
@@ -851,21 +894,27 @@ automation::system::detect_package_manager() {
 # @example
 #   automation::system::update_package_cache
 automation::system::update_package_cache() {
+    local rc=0
+    
     case "$(utils::quiet_err automation::system::detect_package_manager)" in
         "apt")
-            apt update
+            apt update || rc=$?
             ;;
         "dnf")
-            dnf check-update
+            # check-update exits 100 when updates are available: that is success
+            # check-update возвращает 100, когда есть обновления: это успех
+            dnf check-update || rc=$?
+            (( rc == 100 )) && rc=0
             ;;
         "yum")
-            yum check-update
+            yum check-update || rc=$?
+            (( rc == 100 )) && rc=0
             ;;
         "zypper")
-            zypper refresh
+            zypper refresh || rc=$?
             ;;
         "pacman")
-            pacman -Sy
+            pacman -Sy || rc=$?
             ;;
         *)
             log::warn "Unsupported package manager"
@@ -873,6 +922,10 @@ automation::system::update_package_cache() {
             ;;
     esac
     
+    if (( rc != 0 )); then
+        log::error "Package cache update failed (exit ${rc})"
+        return "${E_ERROR}"
+    fi
     log::info "Package cache updated"
 }
 
@@ -882,56 +935,27 @@ automation::system::update_package_cache() {
 # @example
 #   automation::system::manage_packages "install" "curl" "wget"
 automation::system::manage_packages() {
-    local action="${1}"
+    local action="${1:-}"
     shift
     local packages=("$@")
+    local manager
+    manager="$(utils::quiet_err automation::system::detect_package_manager)"
     
-    case "${action}" in
-        "install")
-            case "$(utils::quiet_err automation::system::detect_package_manager)" in
-                "apt")
-                    apt install -y "${packages[@]}"
-                    ;;
-                "dnf")
-                    dnf install -y "${packages[@]}"
-                    ;;
-                "yum")
-                    yum install -y "${packages[@]}"
-                    ;;
-                "zypper")
-                    zypper install -y "${packages[@]}"
-                    ;;
-                "pacman")
-                    pacman -S --noconfirm "${packages[@]}"
-                    ;;
-                *)
-                    log::warn "Unsupported package manager"
-                    return "${E_ERROR}"
-                    ;;
-            esac
-            ;;
-        "remove")
-            case "$(utils::quiet_err automation::system::detect_package_manager)" in
-                "apt")
-                    apt remove -y "${packages[@]}"
-                    ;;
-                "dnf")
-                    dnf remove -y "${packages[@]}"
-                    ;;
-                "yum")
-                    yum remove -y "${packages[@]}"
-                    ;;
-                "zypper")
-                    zypper remove -y "${packages[@]}"
-                    ;;
-                "pacman")
-                    pacman -R --noconfirm "${packages[@]}"
-                    ;;
-                *)
-                    log::warn "Unsupported package manager"
-                    return "${E_ERROR}"
-                    ;;
-            esac
+    local -a cmd=()
+    case "${action}:${manager}" in
+        install:apt)      cmd=(apt install -y) ;;
+        install:dnf)      cmd=(dnf install -y) ;;
+        install:yum)      cmd=(yum install -y) ;;
+        install:zypper)   cmd=(zypper install -y) ;;
+        install:pacman)   cmd=(pacman -S --noconfirm) ;;
+        remove:apt)       cmd=(apt remove -y) ;;
+        remove:dnf)       cmd=(dnf remove -y) ;;
+        remove:yum)       cmd=(yum remove -y) ;;
+        remove:zypper)    cmd=(zypper remove -y) ;;
+        remove:pacman)    cmd=(pacman -R --noconfirm) ;;
+        install:*|remove:*)
+            log::warn "Unsupported package manager"
+            return "${E_ERROR}"
             ;;
         *)
             log::warn "Invalid action: ${action}. Use install or remove."
@@ -939,7 +963,21 @@ automation::system::manage_packages() {
             ;;
     esac
     
-    log::info "${action^}ed packages: ${packages[*]}"
+    if (( ${#packages[@]} == 0 )); then
+        log::warn "No packages specified"
+        return "${E_INVALID}"
+    fi
+    
+    if ! "${cmd[@]}" "${packages[@]}"; then
+        log::error "Package ${action} failed: ${packages[*]}"
+        return "${E_ERROR}"
+    fi
+    
+    if [[ "${action}" == "install" ]]; then
+        log::info "Installed packages: ${packages[*]}"
+    else
+        log::info "Removed packages: ${packages[*]}"
+    fi
 }
 
 # @description Check installed package version / Проверка установленной версии пакета
@@ -1003,10 +1041,10 @@ automation::system::add_repository() {
     
     case "$(utils::quiet_err automation::system::detect_package_manager)" in
         "apt")
-            add-apt-repository "${repo}" -y
+            add-apt-repository "${repo}" -y || { log::error "add-apt-repository failed: ${repo}"; return "${E_ERROR}"; }
             ;;
         "dnf")
-            dnf config-manager --add-repo "${repo}"
+            dnf config-manager --add-repo "${repo}" || { log::error "dnf config-manager failed: ${repo}"; return "${E_ERROR}"; }
             ;;
         *)
             log::warn "Adding repositories is not supported for this package manager"
@@ -1021,12 +1059,15 @@ automation::system::add_repository() {
 # @example
 #   automation::system::check_repository_validity
 automation::system::check_repository_validity() {
+    local rc=0
+    
     case "$(utils::quiet_err automation::system::detect_package_manager)" in
         "apt")
-            apt update --dry-run
+            apt update --dry-run || rc=$?
             ;;
         "dnf")
-            dnf check-update
+            dnf check-update || rc=$?
+            (( rc == 100 )) && rc=0
             ;;
         *)
             log::warn "Repository validity check not supported for this package manager"
@@ -1034,6 +1075,10 @@ automation::system::check_repository_validity() {
             ;;
     esac
     
+    if (( rc != 0 )); then
+        log::error "Repository validity check failed (exit ${rc})"
+        return "${E_ERROR}"
+    fi
     log::info "Repository validity checked"
 }
 
@@ -1067,21 +1112,23 @@ automation::security::check_firewall_status() {
 #   automation::security::configure_firewall "allow" "80/tcp"
 automation::security::configure_firewall() {
     local action="${1}"
-    local rule="${2}"
+    local rule="${2:-}"
     
     if utils::has ufw; then
         case "${action}" in
             "allow")
-                ufw allow "${rule}"
+                ufw allow "${rule}" || { log::error "ufw allow ${rule} failed"; return "${E_ERROR}"; }
                 ;;
             "deny")
-                ufw deny "${rule}"
+                ufw deny "${rule}" || { log::error "ufw deny ${rule} failed"; return "${E_ERROR}"; }
                 ;;
             "enable")
-                ufw enable
+                # --force: no interactive prompt, the function is meant for scripts
+                # --force: без интерактивного вопроса, функция рассчитана на скрипты
+                ufw --force enable || { log::error "ufw enable failed"; return "${E_ERROR}"; }
                 ;;
             "disable")
-                ufw disable
+                ufw disable || { log::error "ufw disable failed"; return "${E_ERROR}"; }
                 ;;
             *)
                 log::warn "Invalid UFW action: ${action}"
@@ -1091,16 +1138,22 @@ automation::security::configure_firewall() {
     elif utils::has firewall-cmd; then
         case "${action}" in
             "allow")
-                firewall-cmd --permanent --add-port="${rule}"
-                firewall-cmd --reload
+                if ! firewall-cmd --permanent --add-port="${rule}" || ! firewall-cmd --reload; then
+                    log::error "firewall-cmd allow ${rule} failed"
+                    return "${E_ERROR}"
+                fi
                 ;;
             "enable")
-                systemctl enable firewalld
-                systemctl start firewalld
+                if ! systemctl enable firewalld || ! systemctl start firewalld; then
+                    log::error "Cannot enable firewalld"
+                    return "${E_ERROR}"
+                fi
                 ;;
             "disable")
-                systemctl disable firewalld
-                systemctl stop firewalld
+                if ! systemctl disable firewalld || ! systemctl stop firewalld; then
+                    log::error "Cannot disable firewalld"
+                    return "${E_ERROR}"
+                fi
                 ;;
             *)
                 log::warn "Invalid Firewalld action: ${action}"
@@ -1122,7 +1175,11 @@ automation::security::configure_firewall() {
 automation::security::check_sudo_access() {
     local username="${1:-$USER}"
     
-    if utils::quiet_err sudo -l -U "${username}" | grep -q "(ALL : ALL)"; then
+    # sudo -l prints "(ALL : ALL) ALL" on Debian, "(ALL) ALL" on Fedora and
+    # "(root) NOPASSWD: ..." for restricted rules; the old pattern knew only the first
+    # sudo -l печатает "(ALL : ALL) ALL" в Debian, "(ALL) ALL" в Fedora и
+    # "(root) NOPASSWD: ..." для ограниченных правил; прежний шаблон знал только первое
+    if utils::quiet_err sudo -l -U "${username}" | grep -Eq '\((ALL|root)( *: *(ALL|root))?\)'; then
         log::info "[OK] User ${username} has sudo access"
         return 0
     else
@@ -1159,13 +1216,34 @@ automation::security::check_logging_service() {
 # @example
 #   automation::security::configure_log_rotation "/var/log/myapp.log"
 automation::security::configure_log_rotation() {
-    local log_file="${1}"
-    local log_dir=$(dirname "${log_file}")
-    local base_name=$(basename "${log_file}")
+    local log_file="${1:-}"
+    local -r conf_dir="${BS_LOGROTATE_DIR:-/etc/logrotate.d}"
+    local -r marker="# Managed by BS (automation::security::configure_log_rotation)"
     
-    # Create a basic logrotate configuration
-    local config_file="/etc/logrotate.d/${base_name}"
-    cat > "${config_file}" << EOF
+    if is::empty "${log_file}"; then
+        log::warn "Log file path required"
+        return "${E_INVALID}"
+    fi
+    
+    local base_name
+    base_name="$(basename -- "${log_file}")"
+    local config_file="${conf_dir}/bs-${base_name}"
+    
+    # Own prefix: "dpkg.log" -> /etc/logrotate.d/dpkg used to be overwritten, and with
+    # it the distribution's own rotation rules; a foreign file with our name is never
+    # replaced / Свой префикс: "dpkg.log" -> /etc/logrotate.d/dpkg раньше перезаписывался
+    # вместе с правилами самого дистрибутива; чужой файл с нашим именем не заменяется
+    if is::file "${config_file}" && ! grep -qF -- "${marker}" "${config_file}"; then
+        log::error "${config_file} exists and is not managed by BS: not overwriting"
+        return "${E_ERROR}"
+    fi
+    
+    local owner group
+    owner="$(utils::quiet_err stat -c "%U" "${log_file}" || echo "root")"
+    group="$(utils::quiet_err stat -c "%G" "${log_file}" || echo "adm")"
+    
+    if ! cat > "${config_file}" << EOF
+${marker}
 ${log_file} {
     daily
     missingok
@@ -1173,12 +1251,16 @@ ${log_file} {
     compress
     delaycompress
     notifempty
-    create 640 $(utils::quiet_err stat -c "%U" "${log_file}" || echo "root") $(utils::quiet_err stat -c "%G" "${log_file}" || echo "adm")
+    create 640 ${owner} ${group}
     postrotate
         systemctl reload rsyslog > /dev/null 2>&1 || true
     endscript
 }
 EOF
+    then
+        log::error "Cannot write ${config_file}"
+        return "${E_ERROR}"
+    fi
     
     log::info "Log rotation configured for ${log_file} in ${config_file}"
 }

@@ -12,7 +12,7 @@ Central place for everything AI-facing in the repo (replaces the old `ai/` direc
 └── guides/     human-facing guides: MCP, using BS with AI, toolchain, TS dev
 ```
 
-## skills/ — reusable workflows (12)
+## skills/ — reusable workflows (22)
 
 | Skill | Purpose |
 |---|---|
@@ -24,6 +24,16 @@ Central place for everything AI-facing in the repo (replaces the old `ai/` direc
 | `bs-commit-style` | commit message conventions + history safety |
 | `bs-commit-pro` | professional commit engineering (atomic intent, staging) |
 | `bs-review-module` | skeptical critic pass (bash pitfalls, §11 lens) |
+| `bs-audit` | full project audit chain: validation, docs snippets, artifacts, en/ru sync, module review |
+| `bs-check-docs-code` | code snippets in docs vs framework reality |
+| `bs-check-ansi` | ANSI escape usage across the project |
+| `bs-cli-flags-style` | flags/values structure of CLI scripts on top of `core/args` (RU) |
+| `bs-cli-noop-output` | framed bilingual «nothing to do» output for CLI commands |
+| `bs-debug-logging` | debugging interactive scripts, never-without-a-log guarantee (RU) |
+| `bs-pre-kernel-namespace` | functions in `bootstrap/bs.sh` usable before the loader |
+| `bs-pre-kernel-boundary` | pre-loader code must not use core/lib abstractions |
+| `bs-variable-docs` | bilingual `# @global` snippets for module-level variables |
+| `bs-scenario-audit` | scenario-driven logic audit: six-part scenario card, actual vs expected, function inventory by risk |
 | `bs-check-artifacts` | AI-generation traces + request-text leakage scan |
 | `bs-cli-markdown-style` | markdown-simplicity principle for CLI/output/docs (RU) |
 | `bs-device-module` | Linux device/hardware modules (evdev/sysfs) |

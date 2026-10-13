@@ -106,6 +106,12 @@ Reusable workflow skills live in `.agents/skills/` (Kimi Code / agents-compatibl
 - `bs-review-module` — skeptical critic pass over a module (bash-pitfalls checklist, §11 lens, prioritized doubt report).
 - `bs-check-artifacts` — scan for traces of unfinished AI generation and leakage of request/prompt text into code and docs.
 - `bs-cli-markdown-style` — apply the «markdown simplicity» principle to CLI/interface/output/docs design (7-criteria test, Russian).
+- `bs-audit` — full project audit as a chain of stages: validation cycle, docs-code snippets, AI-artifact scan, en/ru docs sync, skeptical module review, triaged verdict (report first, fix only on request).
+- `bs-check-docs-code` — verify that bash snippets in README, `documentation/` and `examples/*.md` match framework reality (conventions, `load` paths, real module APIs, matching example files); backs `tests/validatedocscode.sh`.
+- `bs-check-ansi` — verify ANSI escape usage across the project: no literal `\033` in `printf %s` arguments, correct `$'\033'` quoting, no fragile `echo -e`.
+- `bs-cli-flags-style` — design the flags/values structure and code style of BS CLI scripts in the docker/podman/go conventions on top of `core/args` (RU).
+- `bs-debug-logging` — debug interactive BS scripts (wizards, TUI) and guarantee that a script cannot end without a log: the `lib/ui/steplog` component, debugging techniques (RU).
+- `bs-scenario-audit` — scenario-driven logic audit of library functions and CLI commands: a six-part scenario card per function (user, main, alternative, parameters, half-scenario, parameter groups), actual-vs-expected runs in a sandbox, a read-only inventory of public functions by risk and test coverage (`scripts/inventory.sh`), classes of logic errors found in this project.
 - `bs-cli-noop-output` — «nothing to do» output for BS CLI commands: framed bilingual «…НЕТ / NO …» box with per-item reasons and next-step hints instead of raw WARN/ERROR; up-to-date detection before redoing work; character-based frame padding (printf %-*s pads by bytes and breaks Cyrillic borders); exit 0 for no-ops, exit 1 for real failures.
 - `bs-device-module` — write Linux device/hardware modules (evdev/sysfs, binary decoding, test hooks, graceful degradation).
 - `bs-ai-toolchain` — operate BS as an AI toolbox (discovery ladder, verification loops, generation contracts).

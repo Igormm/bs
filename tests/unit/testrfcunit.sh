@@ -69,10 +69,7 @@ test_uuid() {
     testframework::assert_command "uuid::validate '${u}'" "uuid::gen produces valid uuid"
     testframework::assert_command "uuid::validate '${u}' 4" "uuid::gen is version 4"
     testframework::assert_equal "4" "${u:14:1}" "uuid version nibble is 4"
-    case "${u:19:1}" in
-        8|9|a|b) testframework::assert_true "true" "uuid variant is 10xx" ;;
-        *) testframework::assert_true "false" "uuid variant is 10xx" ;;
-    esac
+    testframework::assert_command "[[ '${u:19:1}' =~ ^[89ab]$ ]]" "uuid variant is 10xx"
 
     local u7
     u7="$(uuid::gen_v7)"

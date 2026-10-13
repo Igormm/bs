@@ -210,8 +210,12 @@ systemaudit::run() {
             ;;
     esac
     
+    # Single-category audits did not score: the report said 100/100 with findings in it
+    # Аудиты одной категории не считали оценку: отчёт показывал 100/100 при наличии находок
+    systemaudit::calculate_score
+
     # Generate report
-    systemaudit::generate_report "${output_format}"
+    systemaudit::generate_report "${output_format}" || return "${E_ERROR}"
     
     log::info "System audit completed. Score: ${AUDIT_SCORE}/100"
 }
@@ -282,8 +286,8 @@ systemaudit::security::run() {
 systemaudit::security::check_root_login() {
     local finding=""
     
-    if is::file /etc/ssh/sshd_config; then
-        if grep -q "^PermitRootLogin yes" /etc/ssh/sshd_config; then
+    if is::file "${BS_SSHD_MAIN:-/etc/ssh/sshd_config}"; then
+        if grep -qE "^[[:space:]]*PermitRootLogin[[:space:]]+yes" "${BS_SSHD_MAIN:-/etc/ssh/sshd_config}"; then
             finding=$(systemaudit::create_finding \
                 "Root login enabled via SSH" \
                 "Root login should be disabled for security" \
@@ -302,9 +306,14 @@ systemaudit::security::check_password_policy() {
     local finding=""
     
     # Check password expiration
-    if is::file /etc/login.defs; then
+    if is::file "${BS_LOGIN_DEFS:-/etc/login.defs}"; then
         local pass_max_days
-        pass_max_days=$(grep "^PASS_MAX_DAYS" /etc/login.defs | awk '{print $2}' || echo "99999")
+        pass_max_days=$(grep "^PASS_MAX_DAYS" "${BS_LOGIN_DEFS:-/etc/login.defs}" | awk '{print $2}' | head -n 1 || :)
+        # No PASS_MAX_DAYS line means "never expires" (99999), not "fine"; the empty
+        # value used to be read as 0
+        # Нет строки PASS_MAX_DAYS — значит «не истекает» (99999), а не «в порядке»; пустое
+        # значение раньше читалось как 0
+        [[ "${pass_max_days}" =~ ^[0-9]+$ ]] || pass_max_days=99999
         
         if [[ "${pass_max_days}" -gt 365 ]]; then
             finding=$(systemaudit::create_finding \
@@ -324,9 +333,16 @@ systemaudit::security::check_password_policy() {
 systemaudit::security::check_ssh_config() {
     local finding=""
     
-    if is::file /etc/ssh/sshd_config; then
-        # Check for protocol version
-        if ! grep -q "^Protocol 2" /etc/ssh/sshd_config; then
+    local -r sshd_config="${BS_SSHD_MAIN:-/etc/ssh/sshd_config}"
+
+    if is::file "${sshd_config}"; then
+        # Check for protocol version: the Protocol keyword is gone since OpenSSH 7.4
+        # (only version 2 exists), so an absent line is NOT a finding; only an explicit
+        # Protocol that lists 1 is
+        # Проверка версии протокола: ключевое слово Protocol удалено в OpenSSH 7.4
+        # (существует только версия 2), поэтому отсутствие строки — НЕ находка; находка —
+        # только явный Protocol со значением 1
+        if grep -qE "^[[:space:]]*Protocol[[:space:]]+.*1" "${sshd_config}"; then
             finding=$(systemaudit::create_finding \
                 "SSH Protocol 1 may be enabled" \
                 "Only SSH Protocol 2 should be used" \
@@ -337,7 +353,7 @@ systemaudit::security::check_ssh_config() {
         fi
         
         # Check for empty passwords
-        if grep -q "^PermitEmptyPasswords yes" /etc/ssh/sshd_config; then
+        if grep -qE "^[[:space:]]*PermitEmptyPasswords[[:space:]]+yes" "${sshd_config}"; then
             finding=$(systemaudit::create_finding \
                 "Empty passwords allowed via SSH" \
                 "Empty passwords should be disabled" \
@@ -372,7 +388,11 @@ systemaudit::security::check_firewall_status() {
     
     # Check iptables
     if utils::has iptables; then
-        if utils::quiet_err iptables -L | grep -q "ACCEPT\|DROP\|REJECT"; then
+        # Chain headers always print "policy ACCEPT": judge by rules (-A) or a
+        # restrictive default policy, not by those words
+        # Заголовки цепочек всегда печатают "policy ACCEPT": судим по правилам (-A) или
+        # ограничивающей политике по умолчанию, а не по этим словам
+        if utils::quiet_err iptables -S | grep -qE '^-A |^-P [A-Z]+ (DROP|REJECT)'; then
             firewall_active=true
         fi
     fi
@@ -455,10 +475,17 @@ systemaudit::security::check_suid_files() {
     
     # Find SUID files
     local suid_files
-    suid_files=$(utils::quiet_err find / -type f -perm -4000 | head -20)
-    
-    local suid_count
-    suid_count=$(echo "${suid_files}" | wc -l)
+    suid_files=$(utils::quiet_err find / -type f -perm -4000)
+
+    # Count them all: "head -20" capped the number, and the title then said "20" for
+    # any system with 20 or more SUID files
+    # Считаем все: "head -20" обрезал число, и заголовок говорил «20» для любой системы
+    # с 20 и более SUID-файлами
+    local suid_count=0
+    if is::not_empty "${suid_files}"; then
+        suid_count=$(printf '%s
+' "${suid_files}" | wc -l)
+    fi
     
     if [[ "${suid_count}" -gt 10 ]]; then
         finding=$(systemaudit::create_finding \
@@ -479,7 +506,7 @@ systemaudit::security::check_world_writable_dirs() {
     
     # Find world-writable directories
     local world_writable
-    world_writable=$(utils::quiet_err find / -type d -perm -o+w | grep -v "/proc\|/sys\|/tmp" | head -10)
+    world_writable=$(utils::quiet_err find / -type d -perm -o+w ! -perm -1000 | grep -v "/proc\|/sys\|/tmp" | head -10 || :)
     
     if is::not_empty "${world_writable}"; then
         finding=$(systemaudit::create_finding \
@@ -500,7 +527,13 @@ systemaudit::security::check_processes() {
     
     # Check for processes running as root that shouldn't be
     local suspicious_processes
-    suspicious_processes=$(ps aux | grep -E "(nc|netcat|python.*-m.*http)" | grep -v grep)
+    # Match the command NAME, not any "nc" inside a command line: the old pattern hit
+    # irqbalance, dbus-broker-launch, kworker/sync_wq... on every system, so the audit
+    # always reported "suspicious processes"
+    # Сравниваем ИМЯ команды, а не любое "nc" в командной строке: прежний шаблон цеплял
+    # irqbalance, dbus-broker-launch, kworker/sync_wq... в любой системе, и аудит всегда
+    # сообщал о «подозрительных процессах»
+    suspicious_processes=$(ps -eo comm=,args= | grep -E '^(nc|ncat|netcat) |^python[0-9.]* .*-m +(http\.server|SimpleHTTPServer)' || :)
     
     if is::not_empty "${suspicious_processes}"; then
         finding=$(systemaudit::create_finding \
@@ -696,9 +729,9 @@ systemaudit::network::check_open_ports() {
     # Check for insecure services
     local insecure_ports
     if utils::has ss; then
-        insecure_ports=$(ss -tuln | grep -E ":23|:21|:135|:139|:445" | wc -l)
+        insecure_ports=$(ss -tuln | grep -E "[:.](23|21|135|139|445)[[:space:]]" | wc -l)
     elif utils::has netstat; then
-        insecure_ports=$(netstat -tuln | grep -E ":23|:21|:135|:139|:445" | wc -l)
+        insecure_ports=$(netstat -tuln | grep -E "[:.](23|21|135|139|445)[[:space:]]" | wc -l)
     else
         insecure_ports=0
     fi
@@ -1197,22 +1230,37 @@ systemaudit::generate_report() {
     local format="${1:-text}"
     local timestamp="$(date '+%Y%m%d_%H%M%S')"
     local report_file="${AUDIT_REPORT_DIR}/audit_${timestamp}.${format}"
-    
+
+    # init creates the directory but run() does not call init; and a failed write used
+    # to be reported as "Audit report generated"
+    # init создаёт каталог, но run() init не вызывает; а сбой записи раньше выдавался за
+    # "Audit report generated"
+    if ! mkdir -p "${AUDIT_REPORT_DIR}"; then
+        log::error "Cannot create report directory: ${AUDIT_REPORT_DIR}"
+        return "${E_ERROR}"
+    fi
+
+    local rc=0
     case "${format}" in
         json)
-            systemaudit::generate_json_report "${report_file}"
+            systemaudit::generate_json_report "${report_file}" || rc=$?
             ;;
         csv)
-            systemaudit::generate_csv_report "${report_file}"
+            systemaudit::generate_csv_report "${report_file}" || rc=$?
             ;;
         xml)
-            systemaudit::generate_xml_report "${report_file}"
+            systemaudit::generate_xml_report "${report_file}" || rc=$?
             ;;
         *)
-            systemaudit::generate_text_report "${report_file}"
+            systemaudit::generate_text_report "${report_file}" || rc=$?
             ;;
     esac
-    
+
+    if (( rc != 0 )); then
+        log::error "Cannot write audit report: ${report_file}"
+        return "${E_ERROR}"
+    fi
+
     log::info "Audit report generated: ${report_file}"
 }
 

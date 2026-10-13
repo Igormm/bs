@@ -292,6 +292,14 @@ system::devices::display() {
     
     case "${setting}" in
         brightness)
+            # Integer percent 1..100: the value goes into shell arithmetic below (a
+            # crafted string would run commands) and 0 would blank the screen
+            # Целые проценты 1..100: значение попадает в арифметику shell ниже (подделанная
+            # строка выполнила бы команды), а 0 погасил бы экран
+            if [[ ! "${value}" =~ ^[0-9]+$ ]] || (( 10#${value} < 1 || 10#${value} > 100 )); then
+                log::warn "Brightness must be an integer from 1 to 100 (got: ${value})"
+                return "${E_ERROR}"
+            fi
             # Set display brightness
             # Try xrandr first
             if utils::has xrandr; then

@@ -487,8 +487,9 @@ io::process::guard() {
 
     io::process::__diagnose "${pid}" "${reason}" "${diag_dir}"
     io::process::__terminate "${pid}"
-    wait "${pid}"
-    cmd_rc=$?
+    # `|| cmd_rc=$?`: a killed child returns non-zero, which must not abort a `set -e` caller here
+    # `|| cmd_rc=$?`: убитый потомок возвращает не 0, это не должно прерывать вызывающего под `set -e`
+    wait "${pid}" || cmd_rc=$?
 
     log::warn "Process ${pid} stopped due to ${reason}; diagnostics: ${diag_dir}"
 
@@ -509,8 +510,9 @@ io::process::guard() {
   fi
 
   # Collect exit code of naturally finished process / Собираем код завершения
-  wait "${pid}"
-  cmd_rc=$?
+  # Without `|| cmd_rc=$?` a failing command aborts a `set -e` caller before its output is replayed
+  # Без `|| cmd_rc=$?` упавшая команда прерывает вызывающего под `set -e` до показа её вывода
+  wait "${pid}" || cmd_rc=$?
 
   # Replay captured output / Проигрываем захваченный вывод
   if is::file_not_empty "${stdout_log}"; then
@@ -528,7 +530,11 @@ io::process::guard() {
   # Итоговая сводка по времени выполнения / Final timing summary
   local elapsed_ms
   elapsed_ms=$(( $(utils::now_ms) - start_ms ))
-  log::info "ok in $(( elapsed_ms / 1000 )).$(( (elapsed_ms % 1000) / 100 ))s"
+  if (( cmd_rc == 0 )); then
+    log::info "ok in $(( elapsed_ms / 1000 )).$(( (elapsed_ms % 1000) / 100 ))s"
+  else
+    log::warn "failed (exit ${cmd_rc}) in $(( elapsed_ms / 1000 )).$(( (elapsed_ms % 1000) / 100 ))s"
+  fi
 
   IO_PROCESS_CURRENT_PID=""
   return "${cmd_rc}"

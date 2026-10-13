@@ -44,7 +44,7 @@ system::processes::find() {
         local pids
         pids=$(utils::quiet_err pgrep -f "${pattern}")
         if is::not_empty "${pids}"; then
-            utils::quiet_err ps -p "${pids}" -o pid,user,comm,args
+            utils::quiet_err ps -p "${pids//$'\n'/,}" -o pid,user,comm,args
         else
             log::info "No processes found matching '${pattern}'"
             return "${E_ERROR}"
@@ -74,10 +74,14 @@ system::processes::is_running() {
     fi
 
     if utils::has pgrep; then
-        utils::quiet pgrep -x "${name}"
+        # comm holds only the first 15 characters: a longer name never matches pgrep -x
+        # comm хранит только первые 15 символов: более длинное имя никогда не совпадёт
+        utils::quiet pgrep -x "${name:0:15}"
     else
         # Fallback without pgrep / Резервный вариант без pgrep
-        utils::quiet ps -eo comm | utils::quiet grep -qx "${name}"
+        # (utils::quiet on ps threw its output away, so grep never saw a process)
+        # (utils::quiet на ps выбрасывал вывод, и grep не видел ни одного процесса)
+        ps -eo comm 2>/dev/null | grep -qx -- "${name:0:15}"
     fi
 }
 
@@ -148,6 +152,13 @@ system::processes::kill_by_name() {
     
     local killed=0
     for pid in ${pids}; do
+        # pgrep -f also finds the calling shell (its command line holds the pattern):
+        # never signal ourselves or our parent
+        # pgrep -f находит и вызывающую оболочку (в её командной строке есть шаблон):
+        # сигнал себе и родителю не посылаем
+        if [[ "${pid}" == "$$" || "${pid}" == "${BASHPID}" || "${pid}" == "${PPID}" ]]; then
+            continue
+        fi
         if utils::quiet_err system::processes::kill "${pid}" "${signal}"; then
             killed=$((killed + 1))
         fi
