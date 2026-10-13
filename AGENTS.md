@@ -116,6 +116,11 @@ Reusable workflow skills live in `.agents/skills/` (Kimi Code / agents-compatibl
 - `bs-device-module` — write Linux device/hardware modules (evdev/sysfs, binary decoding, test hooks, graceful degradation).
 - `bs-ai-toolchain` — operate BS as an AI toolbox (discovery ladder, verification loops, generation contracts).
 
+### Imported shell-safety skills (external)
+
+- `bash-defensive-patterns` — defensive Bash patterns (strict mode, quoting, traps, temp files, idempotency); [wshobson/agents](https://github.com/wshobson/agents), MIT, verbatim + `UPSTREAM.md` with BS notes (BS rules win: strict mode only in entry points).
+- `bs-code-review-security` — security-first review (injection, quoting, paths, temp files, privilege, tests, P0–P3 report); adapted from [DataDog/rshell](https://github.com/DataDog/rshell) `code-review`, Apache-2.0; report-only.
+
 ### Imported methodology skills (external, verbatim)
 
 General agent-workflow skills imported from [obra/superpowers](https://github.com/obra/superpowers)
