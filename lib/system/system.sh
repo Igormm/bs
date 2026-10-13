@@ -23,19 +23,8 @@ bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/uti
 # @example
 #   system::keyboard_layout "us"
 system::keyboard_layout() {
-    local layout="${1:-us}"
-    
-    # For systemd-based systems / Для систем на базе systemd
-    if utils::has localectl; then
-        utils::attempt localectl set-keymap "${layout}"
-    fi
-    
-    # For X11 systems / Для систем X11
-    if utils::has setxkbmap; then
-        utils::attempt setxkbmap "${layout}"
-    fi
-    
-    log::info "Keyboard layout set to ${layout}"
+    load "lib/system/keyboard"
+    system::keyboard::layout "$@"
 }
 
 # @description Set system locale / Установить системную локаль
@@ -44,14 +33,8 @@ system::keyboard_layout() {
 # @example
 #   system::localization "en_US.UTF-8"
 system::localization() {
-    local locale="${1:-en_US.UTF-8}"
-    
-    # For systemd-based systems / Для систем на базе systemd
-    if utils::has localectl; then
-        utils::attempt localectl set-locale "${locale}"
-    fi
-    
-    log::info "System locale set to ${locale}"
+    load "lib/system/locale"
+    system::locale::set "$@"
 }
 
 # @description Set system timezone / Установить системный часовой пояс
@@ -60,14 +43,8 @@ system::localization() {
 # @example
 #   system::date_time "Europe/Moscow"
 system::date_time() {
-    local timezone="${1:-UTC}"
-    
-    # For systemd-based systems / Для систем на базе systemd
-    if utils::has timedatectl; then
-        utils::attempt timedatectl set-timezone "${timezone}"
-    fi
-    
-    log::info "System timezone set to ${timezone}"
+    load "lib/system/time"
+    system::time::timezone "$@"
 }
 
 # @description Configure display server / Настроить сервер отображения

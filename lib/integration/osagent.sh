@@ -220,8 +220,9 @@ osagent::__round() {
   reply="$(llm::chat "${provider}" "${model}" "$(jq -r '.system + "\n\nUser: " + .user' <<< "${prompt}")")" || return 4
 
   local parsed
-  if ! parsed="$(printf '%s' "${reply}" | jq -c 'select(type == "object") // empty' 2>/dev/null)"; then
-    printf '{"answer": "%s"}' "$(printf '%s' "${reply}" | jq -Rs .)"
+  if ! parsed="$(printf '%s' "${reply}" | jq -c 'select(type == "object") // empty' 2>/dev/null)" || [[ -z "${parsed}" ]]; then
+    # Plain-text (or non-object) reply: wrap it as an answer / обычный текст или не-объект: обернуть как ответ
+    jq -nc --arg a "${reply}" '{answer: $a}'
     return 0
   fi
 

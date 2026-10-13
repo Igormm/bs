@@ -379,7 +379,11 @@ platformcheck::show_report() {
         echo -e "  ${ok}✓ All dependencies satisfied / Все зависимости удовлетворены${reset}"
     else
         echo -e "  ${fail}✗ Some dependencies missing / Некоторые зависимости отсутствуют${reset}"
-        platformcheck::install_dependencies
+        # A report must not change the system: it used to run the package manager (and,
+        # on macOS, pipe a downloaded script into bash) on its own
+        # Отчёт не должен менять систему: раньше он сам запускал пакетный менеджер (а на
+        # macOS — передавал скачанный скрипт в bash)
+        echo "  -> platformcheck::install_dependencies"
     fi
 
     echo

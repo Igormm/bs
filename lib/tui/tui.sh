@@ -161,7 +161,20 @@ tui::init() {
   tui::detect_color
   tui::size
   tui::buf::clear
-  trap 'tui::quit' EXIT
+  # Chain the caller's EXIT trap instead of replacing it (and do not chain ourselves twice)
+  # Дополнить EXIT-обработчик вызывающего, а не заменять его (и не цеплять себя дважды)
+  local __tui_prev_trap=""
+  local -a __tui_t=()
+  eval "__tui_t=($(trap -p EXIT))"
+  (( ${#__tui_t[@]} >= 3 )) && __tui_prev_trap="${__tui_t[2]}"
+  if [[ "${__tui_prev_trap}" == *"tui::quit"* ]]; then
+    :
+  elif [[ -n "${__tui_prev_trap}" ]]; then
+    # shellcheck disable=SC2064
+    trap "tui::quit; ${__tui_prev_trap}" EXIT
+  else
+    trap 'tui::quit' EXIT
+  fi
   trap 'TUI_RESIZED=1' WINCH
   TUI_ACTIVE=1
 }

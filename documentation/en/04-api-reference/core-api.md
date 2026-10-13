@@ -392,6 +392,31 @@ Note: internally this checks `command -v timeout >/dev/null 2>&1`; in your own c
 
 ---
 
+## Configuration — `core/config.sh`
+
+`config::load` fills `BS_CONFIG` from four sources, from the lowest priority to the highest:
+
+1. built-in defaults;
+2. `~/.config/bs/config.sh` — your own file, trusted: any key is accepted;
+3. `./.bsrc` in the **current directory** — a project file, **untrusted** (it can come from a repository you have just downloaded): only the keys listed below are accepted, any other key is ignored with a warning;
+4. environment variables of the same name.
+
+A file holds `KEY=value` lines (quotes are optional, `#` starts a comment). Loaded keys are exported to the environment.
+
+The keys a project-local `./.bsrc` may set are listed in `BS_CONFIG_LOCAL_KEYS`: `BS_LOG_LEVEL`, `BS_SILENT`, `BS_FRAMEWORK_DRY_RUN`, `BS_FRAMEWORK_DEBUG`, `BS_FILES_ATOMIC`, `BS_FILES_BACKUP_SUFFIX`, `BS_FILES_ATOMIC_FALLBACK`, `BS_LLM_PROVIDER`, `BS_LLM_MODEL`. Keys that choose a program, a path or a server (`LD_PRELOAD`, `PATH`, `BS_UPDATE_REPO`, `BS_LLM_BASE_URL`, `BS_LLM_API_KEY`) are deliberately not on the list: a foreign `./.bsrc` must not be able to make `bs` run foreign code. Put such settings into `~/.config/bs/config.sh` or the environment.
+
+#### `config::load`
+- Reads all four sources; returns 0.
+
+#### `config::get <key> [default]`
+- Prints the value, or the default; returns `E_INVALID` if there is neither.
+
+#### `config::set <key> <value>`
+- Sets the value in `BS_CONFIG` and exports the variable.
+
+#### `config::list`, `config::user_file`, `config::local_file`
+- `list` prints `KEY=value` pairs sorted by key; the other two print the path of the user file and the name of the local file.
+
 ## Version — `core/version.sh`
 
 - `BS_VERSION` — current version (e.g. `0.7.4`); the single place where the number is written; exported only if empty.

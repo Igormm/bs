@@ -59,13 +59,27 @@ __config::set_defaults() {
   BS_CONFIG["BS_LLM_API_KEY"]=""
 }
 
+# @global BS_CONFIG_LOCAL_KEYS — Config: keys a project-local ./.bsrc may set (category: constant)
+# @global BS_CONFIG_LOCAL_KEYS — Config: ключи, которые может задать локальный ./.bsrc (категория: constant)
+# ./.bsrc лежит в текущем каталоге и может прийти из чужого репозитория, а
+# загруженные ключи экспортируются в окружение: произвольный ключ (LD_PRELOAD,
+# PATH, BS_UPDATE_REPO, BS_LLM_BASE_URL) был бы выполнением чужого кода.
+# ./.bsrc lives in the current directory and may come from a foreign
+# repository, while loaded keys are exported to the environment: an arbitrary
+# key (LD_PRELOAD, PATH, BS_UPDATE_REPO, BS_LLM_BASE_URL) would be foreign
+# code execution.
+readonly BS_CONFIG_LOCAL_KEYS=" BS_LOG_LEVEL BS_SILENT BS_FRAMEWORK_DRY_RUN BS_FRAMEWORK_DEBUG BS_FILES_ATOMIC BS_FILES_BACKUP_SUFFIX BS_FILES_ATOMIC_FALLBACK BS_LLM_PROVIDER BS_LLM_MODEL "
+
 # @private
 # @description Load a configuration file if it exists.
 # @description Загрузить файл конфигурации, если он существует.
 # @param $1 File path / Путь к файлу
+# @param $2 [optional] "local": accept only BS_CONFIG_LOCAL_KEYS (untrusted file)
+#   / "local": принимать только BS_CONFIG_LOCAL_KEYS (недоверенный файл)
 # @return 0 if file loaded or does not exist, 1 on load error
 __config::load_file() {
   local file="${1:-}"
+  local -r trust="${2:-user}"
   is::not_empty "${file}" && is::file "${file}" || return 0
 
   log::debug "Loading config file: ${file}"
@@ -82,6 +96,11 @@ __config::load_file() {
     if [[ "${line}" =~ ^([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*=[[:space:]]*(.*)$ ]]; then
       key="${BASH_REMATCH[1]}"
       value="${BASH_REMATCH[2]}"
+
+      if [[ "${trust}" == "local" && "${BS_CONFIG_LOCAL_KEYS}" != *" ${key} "* ]]; then
+        log::warn "config: ${file}: key ${key} is not allowed in a project-local file, ignored"
+        continue
+      fi
 
       # Remove surrounding quotes / Убираем окружающие кавычки
       if [[ "${value}" =~ ^\"(.*)\"$ ]]; then
@@ -134,7 +153,7 @@ config::load() {
 
   # Load project-local config / Локальный конфиг проекта
   if is::file "${BS_CONFIG_LOCAL_FILE}"; then
-    __config::load_file "${BS_CONFIG_LOCAL_FILE}"
+    __config::load_file "${BS_CONFIG_LOCAL_FILE}" local
   fi
 
   # Environment variables override / Переменные окружения имеют приоритет

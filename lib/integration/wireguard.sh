@@ -272,6 +272,24 @@ EOF
     log::info "Configuration file: ${config_file}"
 }
 
+# @private
+# @description Copy an interface config to WIREGUARD_BACKUP_DIR under a unique name (mode 600). Prints the path.
+# @description Скопировать конфигурацию интерфейса в WIREGUARD_BACKUP_DIR под уникальным именем (права 600). Печатает путь.
+# @param $1 interface / интерфейс
+# @param $2 config file / файл конфигурации
+wireguard::__backup_before_edit() {
+    local -r interface="${1:?interface required}" config_file="${2:?config file required}"
+    mkdir -p -- "${WIREGUARD_BACKUP_DIR}" || return 1
+    local dest
+    dest="$(mktemp "${WIREGUARD_BACKUP_DIR}/${interface}_$(utils::now_s)_XXXXXX.conf")" || return 1
+    if ! cp -- "${config_file}" "${dest}"; then
+        rm -f -- "${dest}"
+        return 1
+    fi
+    chmod 600 "${dest}"
+    printf '%s' "${dest}"
+}
+
 # Add peer to interface
 # @description Add a peer to a WireGuard interface with public key, allowed IPs, endpoint and keepalive. Добавить пир к интерфейсу WireGuard с публичным ключом, разрешёнными IP, endpoint и keepalive.
 wireguard::add_peer() {
@@ -295,8 +313,12 @@ wireguard::add_peer() {
     
     log::info "Adding peer to interface: ${interface}"
     
-    # Backup original config
-    cp "${config_file}" "${config_file}.backup.$(utils::now_s)"
+    # Backup original config (unique name, backup dir, mode 600)
+    # Резервная копия (уникальное имя, каталог копий, права 600)
+    wireguard::__backup_before_edit "${interface}" "${config_file}" >/dev/null || {
+        error::throw "Failed to back up configuration" \
+            "${LIB_ERROR_FILE_OPERATION}" || return "$?"
+    }
     
     # Add peer configuration
     cat >> "${config_file}" << EOF
@@ -340,23 +362,48 @@ wireguard::remove_peer() {
     
     log::info "Removing peer from interface: ${interface}"
     
-    # Backup original config
-    cp "${config_file}" "${config_file}.backup.$(utils::now_s)"
+    # Nothing to remove: report it and leave the file and backups untouched
+    # Нечего удалять: сообщить и не трогать ни файл, ни копии
+    if ! awk -v pubkey="${peer_pubkey}" '/^\[Peer\]/{p=1;next} /^\[/{p=0} p && $1=="PublicKey" && $3==pubkey {f=1} END{exit !f}' "${config_file}"; then
+        log::warn "Peer ${peer_pubkey} not found in ${interface}; nothing removed / пир не найден в ${interface}, ничего не удалено"
+        return 1
+    fi
+
+    # Backup original config (unique name, backup dir, mode 600)
+    # Резервная копия (уникальное имя, каталог копий, права 600)
+    wireguard::__backup_before_edit "${interface}" "${config_file}" >/dev/null || {
+        error::throw "Failed to back up configuration" \
+            "${LIB_ERROR_FILE_OPERATION}" || return "$?"
+    }
     
     # Create temporary file
     local temp_file
     temp_file=$(mktemp)
     
     # Remove peer section
+    # Each [Peer] block is buffered whole (header included) and dropped only when
+    # its PublicKey matches; every other section is copied verbatim.
+    # Каждый блок [Peer] буферизуется целиком (с заголовком) и отбрасывается, только
+    # если его PublicKey совпал; остальные секции копируются без изменений.
     awk -v pubkey="${peer_pubkey}" '
-        /^\[Peer\]/ { in_peer=1; skip=0; next }
-        /^\[.*\]/ { in_peer=0 }
-        in_peer && /PublicKey/ && $3 == pubkey { skip=1 }
-        !skip { print }
-    ' "${config_file}" > "${temp_file}"
+        function flush() { if (buf != "" && !drop) printf "%s", buf; buf = ""; drop = 0 }
+        /^\[.*\]/ { flush(); in_peer = ($0 ~ /^\[Peer\]/) }
+        in_peer {
+            buf = buf $0 "\n"
+            if ($1 == "PublicKey" && $3 == pubkey) drop = 1
+            next
+        }
+        { print }
+        END { flush() }
+    ' "${config_file}" > "${temp_file}" || {
+        rm -f -- "${temp_file}"
+        error::throw "Failed to rewrite configuration (original kept)" \
+            "${LIB_ERROR_FILE_OPERATION}" || return "$?"
+    }
     
     # Replace original file
     mv "${temp_file}" "${config_file}"
+    chmod 600 "${config_file}"
     
     log::success "Peer removed from ${interface} successfully"
 }

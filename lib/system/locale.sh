@@ -17,27 +17,50 @@ bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/uti
 #   system::locale::set "en_US.UTF-8"
 system::locale::set() {
     local locale="${1:-en_US.UTF-8}"
+    local -r locale_gen="${BS_LOCALE_GEN:-/etc/locale.gen}"
+    local -r default_locale="${BS_DEFAULT_LOCALE:-/etc/default/locale}"
     
-    # For systemd-based systems / Для систем на базе systemd
+    if [[ ! "${locale}" =~ ^[A-Za-z0-9_.@-]+$ ]]; then
+        log::warn "Invalid locale name: ${locale}"
+        return "${E_ERROR}"
+    fi
+    
     if utils::has localectl; then
-        utils::attempt localectl set-locale "${locale}"
+        if ! utils::quiet localectl set-locale "${locale}"; then
+            log::error "localectl failed to set locale ${locale}"
+            return "${E_ERROR}"
+        fi
     else
-        # Fallback for non-systemd systems / Резервный вариант для систем без systemd
-        if is::file "/etc/locale.gen"; then
-            # Uncomment the locale in /etc/locale.gen / Раскомментировать локаль в
-            # /etc/locale.gen
-            utils::attempt sed -i "s/^#${locale}/${locale}/" /etc/locale.gen
-            # Generate the locale / Сгенерировать локаль
-            if utils::has locale-gen; then
-                utils::attempt locale-gen
+        if is::file "${locale_gen}"; then
+            # The name is a literal, not a regex: dots are escaped / Имя — литерал,
+            # а не регулярное выражение: точки экранируются
+            local -r pattern="${locale//./\\.}"
+            if ! sed -i "s/^#[[:space:]]*\(${pattern}\([[:space:]]\|\$\)\)/\1/" "${locale_gen}"; then
+                log::error "Cannot edit ${locale_gen}"
+                return "${E_ERROR}"
+            fi
+            if utils::has locale-gen && ! utils::quiet locale-gen; then
+                log::error "locale-gen failed"
+                return "${E_ERROR}"
             fi
         fi
         
-        # Set the system locale / Установить системную локаль
-        if is::file "/etc/default/locale"; then
-            echo "LANG=${locale}" > /etc/default/locale
+        if is::file "${default_locale}"; then
+            # Change only LANG: other settings (LC_*, LANGUAGE) stay / Меняем только LANG:
+            # остальные настройки (LC_*, LANGUAGE) остаются
+            if grep -q '^LANG=' "${default_locale}"; then
+                if ! sed -i "s/^LANG=.*/LANG=${locale}/" "${default_locale}"; then
+                    log::error "Cannot edit ${default_locale}"
+                    return "${E_ERROR}"
+                fi
+            elif ! printf 'LANG=%s\n' "${locale}" >> "${default_locale}"; then
+                log::error "Cannot write ${default_locale}"
+                return "${E_ERROR}"
+            fi
         else
             export LANG="${locale}"
+            log::warn "No ${default_locale}: locale set for this session only"
+            return 0
         fi
     fi
     

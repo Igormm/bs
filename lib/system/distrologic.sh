@@ -147,10 +147,15 @@ system::distrologic::pkg_update_all() {
             apt-get update && apt-get upgrade -y
             ;;
         "redhat")
+            # "check-update && upgrade" never upgraded: check-update exits 100 when
+            # updates ARE available, and && stopped there. upgrade refreshes metadata
+            # itself / "check-update && upgrade" не обновлял никогда: check-update
+            # возвращает 100, когда обновления ЕСТЬ, и && на этом останавливался. upgrade
+            # сам обновляет метаданные
             if utils::has dnf; then
-                dnf check-update && dnf upgrade -y
+                dnf upgrade -y
             else
-                yum check-update && yum update -y
+                yum update -y
             fi
             ;;
         "arch")
@@ -295,15 +300,26 @@ system::distrologic::service_manage_openrc() {
     local service="${1}"
     local action="${2}"
     
-    if utils::has rc-service; then
-        rc-service "${service}" "${action}"
-        if [[ "${action}" == "enable" ]] || [[ "${action}" == "disable" ]]; then
-            rc-update "${action}" "${service}"
-        fi
-    else
+    if ! utils::has rc-service; then
         log::warn "OpenRC not available"
         return "${E_ERROR}"
     fi
+    
+    # enable/disable are rc-update add/del; "rc-service X enable" does not exist. The
+    # status of the real command is the status of the function
+    # enable/disable — это rc-update add/del; "rc-service X enable" не существует.
+    # Код возврата функции — код настоящей команды
+    case "${action}" in
+        "enable")
+            rc-update add "${service}" default
+            ;;
+        "disable")
+            rc-update del "${service}" default
+            ;;
+        *)
+            rc-service "${service}" "${action}"
+            ;;
+    esac
 }
 
 # @description Mask a service (make it impossible to start) / Замаскировать сервис
@@ -397,41 +413,56 @@ system::distrologic::security_configure_selinux() {
 # @example
 #   system::distrologic::security_configure_apparmor "enforce" "nginx"
 system::distrologic::security_configure_apparmor() {
-    local action="${1}"
+    local action="${1:-}"
     local profile="${2:-}"
     
-    if utils::has apparmor_parser; then
-        case "${action}" in
-            "enable")
-                if is::not_empty "${profile}"; then
-                    utils::quiet_err ln -s "/etc/apparmor.d/${profile}" "/etc/apparmor.d/force-enabled/${profile}" || :
-                fi
-                systemctl start apparmor
-                ;;
-            "disable")
-                if is::not_empty "${profile}"; then
-                    utils::quiet_err rm -f "/etc/apparmor.d/force-enabled/${profile}" || :
-                fi
-                ;;
-            "complain")
-                if is::not_empty "${profile}"; then
-                    aa-complain "${profile}"
-                fi
-                ;;
-            "enforce")
-                if is::not_empty "${profile}"; then
-                    aa-enforce "${profile}"
-                fi
-                ;;
-            *)
-                log::warn "Unknown AppArmor action: ${action}"
-                return "${E_ERROR}"
-                ;;
-        esac
-    else
+    if ! utils::has apparmor_parser; then
         log::warn "AppArmor not available"
         return "${E_ERROR}"
     fi
+    
+    case "${action}" in
+        "enable"|"disable")
+            # The profile becomes a file name under force-enabled/: "../../x" would
+            # make "disable" delete /etc/x
+            # Профиль становится именем файла в force-enabled/: "../../x" заставил бы
+            # "disable" удалить /etc/x
+            if is::not_empty "${profile}" && [[ ! "${profile}" =~ ^[A-Za-z0-9._+-]+$ || "${profile}" == .* ]]; then
+                log::error "Invalid AppArmor profile name: ${profile}"
+                return "${E_INVALID}"
+            fi
+            ;;
+        "complain"|"enforce")
+            if is::empty "${profile}"; then
+                log::error "AppArmor action '${action}' needs a profile name"
+                return "${E_INVALID}"
+            fi
+            ;;
+        *)
+            log::warn "Unknown AppArmor action: ${action}"
+            return "${E_ERROR}"
+            ;;
+    esac
+    
+    case "${action}" in
+        "enable")
+            if is::not_empty "${profile}"; then
+                utils::quiet_err ln -s "/etc/apparmor.d/${profile}" "/etc/apparmor.d/force-enabled/${profile}" || :
+            fi
+            systemctl start apparmor
+            ;;
+        "disable")
+            if is::not_empty "${profile}"; then
+                utils::quiet_err rm -f "/etc/apparmor.d/force-enabled/${profile}" || :
+            fi
+            ;;
+        "complain")
+            aa-complain "${profile}"
+            ;;
+        "enforce")
+            aa-enforce "${profile}"
+            ;;
+    esac
 }
 
 # @description Configure firewall using firewalld / Настроить firewall с помощью firewalld
@@ -569,12 +600,47 @@ system::distrologic::sysctl_persist() {
     io::files::append "${config_file}" "${line}"
 }
 
+# @description Check a device before formatting: set, not an option, not mounted;
+# honors FRAMEWORK_DRY_RUN / Проверить устройство перед форматированием: задано, не
+# опция, не смонтировано; учитывает FRAMEWORK_DRY_RUN
+# Env: BS_PROC_MOUNTS — mount table (default /proc/mounts) / таблица монтирования
+# @param $1 Device path / Путь к устройству
+# @param $2 Filesystem name for messages / Имя файловой системы для сообщений
+# @return 0 go ahead, 1 refuse, 2 dry-run (do nothing, report success) / 0 можно, 1
+# отказ, 2 сухой запуск
+system::distrologic::__format_guard() {
+    local -r device="${1:-}" fs="${2:-fs}"
+    local -r mounts="${BS_PROC_MOUNTS:-/proc/mounts}"
+
+    if is::empty "${device}" || [[ "${device}" == -* ]]; then
+        log::error "Device path required (got: '${device}')"
+        return 1
+    fi
+    if is::file "${mounts}" && grep -qE "^$(printf '%s' "${device}" | sed 's/[][\.*^$/]/\\&/g')[[:space:]]" "${mounts}"; then
+        log::error "${device} is mounted: refusing to format"
+        return 1
+    fi
+    if [[ "${FRAMEWORK_DRY_RUN:-false}" == "true" ]]; then
+        log::warn "[DRY-RUN] mkfs.${fs} ${device}"
+        return 2
+    fi
+    return 0
+}
+
 # @description Format filesystem as ext4 / Форматировать файловую систему в ext4
 # @param $1 Device path / Путь к устройству
 # @example
 #   system::distrologic::fs_format_ext4 "/dev/sdb1"
 system::distrologic::fs_format_ext4() {
-    local device="${1}"
+    local device="${1:-}"
+    
+    local guard=0
+    system::distrologic::__format_guard "${device}" ext4 || guard=$?
+    if (( guard == 2 )); then
+        return 0
+    elif (( guard != 0 )); then
+        return "${E_ERROR}"
+    fi
     
     if utils::has mkfs.ext4; then
         mkfs.ext4 "${device}"
@@ -589,7 +655,15 @@ system::distrologic::fs_format_ext4() {
 # @example
 #   system::distrologic::fs_format_xfs "/dev/sdb1"
 system::distrologic::fs_format_xfs() {
-    local device="${1}"
+    local device="${1:-}"
+    
+    local guard=0
+    system::distrologic::__format_guard "${device}" xfs || guard=$?
+    if (( guard == 2 )); then
+        return 0
+    elif (( guard != 0 )); then
+        return "${E_ERROR}"
+    fi
     
     if utils::has mkfs.xfs; then
         mkfs.xfs "${device}"

@@ -123,9 +123,18 @@ system::users::set_password() {
         return "${E_ERROR}"
     fi
     
+    # chpasswd reads "user:password" lines: a newline in the password would set the
+    # password of ANOTHER user, a colon in the name shifts the fields
+    # chpasswd читает строки "user:password": перевод строки в пароле задал бы пароль
+    # ДРУГОМУ пользователю, двоеточие в имени сдвигает поля
+    if [[ "${password}" == *$'\n'* || "${password}" == *$'\r'* || "${username}" == *:* ]]; then
+        log::error "Password must not contain a newline; user name must not contain ':'"
+        return "${E_INVALID}"
+    fi
+    
     if utils::has chpasswd; then
         if is::not_empty "${password}"; then
-            echo "${username}:${password}" | utils::quiet_err chpasswd
+            printf '%s:%s\n' "${username}" "${password}" | utils::quiet_err chpasswd
             if [[ $? -eq 0 ]]; then
                 log::info "Password for ${username} changed successfully"
                 return 0
@@ -145,7 +154,9 @@ system::users::set_password() {
         fi
     elif utils::has passwd; then
         if is::not_empty "${password}"; then
-            echo "${username}:${password}" | utils::quiet_err passwd --stdin "${username}" || {
+            # passwd --stdin reads the bare password, not "user:password"
+            # passwd --stdin читает голый пароль, а не "user:password"
+            printf '%s\n' "${password}" | utils::quiet_err passwd --stdin "${username}" || {
                 log::warn "passwd --stdin not supported, using interactive mode"
                 log::warn "passwd --stdin не поддерживается, используется интерактивный режим"
                 utils::quiet_err passwd "${username}"

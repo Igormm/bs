@@ -44,7 +44,7 @@
 bs::guard "INTEGRATION_VK_MUSIC" || return 0
 
 # Зависимости / Dependencies
-bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/errorhandler.sh" "../system/platformcheck.sh" "vkapi.sh" "../io/files.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/errorhandler.sh" "../system/platformcheck.sh" "vkapi.sh" "../io/files.sh" "../rfc/uri.sh"
 
 # @global VK_MUSIC_CACHE_DIR — Hook: vk music cache directory (category: constant)
 # @global VK_MUSIC_CACHE_DIR — Хук: каталог кэша VK-музыки (категория: constant)
@@ -499,8 +499,23 @@ vkmusic::download() {
     # Generate filename if not provided
     if is::empty "${filename}"; then
         filename="${artist} - ${title}.mp3"
-        # Clean filename
-        filename=$(echo "${filename}" | sed 's/[^a-zA-Z0-9._-]/_/g')
+        # Clean filename (letters of any alphabet are kept, not turned into "_")
+        # Очистка имени файла (буквы любого алфавита сохраняются, а не превращаются в "_")
+        filename="${filename//[^[:alnum:]._-]/_}"
+    else
+        # A caller-supplied name must stay inside output_dir (no "../", no "/")
+        # Имя от вызывающего должно остаться внутри output_dir (без "../" и "/")
+        filename="${filename##*/}"
+        if [[ -z "${filename}" || "${filename}" == "." || "${filename}" == ".." ]]; then
+            error::throw "Invalid output file name" \
+                "${LIB_ERROR_INVALID_ARGS}" || return "$?"
+        fi
+    fi
+
+    # Never overwrite a different, already downloaded track
+    # Не затирать другой, уже скачанный трек
+    if [[ -e "${output_dir}/${filename}" ]] && is::not_empty "${owner_id}" && is::not_empty "${id}"; then
+        filename="${filename%.mp3}_${owner_id}_${id}.mp3"
     fi
     
     local output_file="${output_dir}/${filename}"
@@ -512,6 +527,7 @@ vkmusic::download() {
     # Download audio file
     curl -L -s -o "${output_file}" --max-filesize "${VK_MUSIC_MAX_DOWNLOAD_SIZE}" \
         --connect-timeout 30 --max-time 300 "${url}" || {
+        rm -f -- "${output_file}"
         error::throw "Failed to download audio file" \
             "${LIB_ERROR_DOWNLOAD_FAILED}"
     }
@@ -710,7 +726,7 @@ vkmusic::get_audio_count() {
 # @description Получить URL сервера VK для загрузки аудиофайлов
 vkmusic::get_upload_server() {
     
-    log::info "Getting audio upload server..."
+    log::info "Getting audio upload server..." >&2
     
     local response
     response=$(vkapi::api_call "audio.getUploadServer")
@@ -728,7 +744,7 @@ vkmusic::upload_audio() {
     
     if ! is::file "${file_path}"; then
         error::throw "File not found: ${file_path}" \
-            "${LIB_ERROR_FILE_NOT_FOUND}"
+            "${LIB_ERROR_FILE_NOT_FOUND}" || return "$?"
     fi
     
     log::info "Uploading audio: ${file_path}"
@@ -742,27 +758,38 @@ vkmusic::upload_audio() {
     
     if is::empty "${upload_url}" || [[ "${upload_url}" == "null" ]]; then
         error::throw "Failed to get upload server" \
-            "${LIB_ERROR_API_RESPONSE}"
+            "${LIB_ERROR_API_RESPONSE}" || return "$?"
     fi
     
     # Upload file
     local upload_response
-    upload_response=$(curl -s -F "file=@${file_path}" "${upload_url}")
+    upload_response=$(curl -s -f --connect-timeout 30 --max-time "${VK_MUSIC_UPLOAD_TIMEOUT:-600}" \
+        -F "file=@${file_path}" "${upload_url}") || {
+        error::throw "Audio upload failed (network error or HTTP error)" \
+            "${LIB_ERROR_API_REQUEST}" || return "$?"
+    }
     
-    # Save audio
+    # Save audio: all three fields must come back, otherwise audio.save would get empty values
+    # Сохранение: должны прийти все три поля, иначе audio.save получит пустые значения
     local server
-    server=$(echo "${upload_response}" | utils::quiet_err jq -r '.server')
+    server=$(echo "${upload_response}" | utils::quiet_err jq -r '.server // empty' || true)
     local audio_hash
-    audio_hash=$(echo "${upload_response}" | utils::quiet_err jq -r '.audio')
+    audio_hash=$(echo "${upload_response}" | utils::quiet_err jq -r '.audio // empty' || true)
     local hash
-    hash=$(echo "${upload_response}" | utils::quiet_err jq -r '.hash')
+    hash=$(echo "${upload_response}" | utils::quiet_err jq -r '.hash // empty' || true)
+
+    if is::empty "${server}" || is::empty "${audio_hash}" || is::empty "${hash}"; then
+        error::throw "Upload server returned an invalid response (server/audio/hash missing)" \
+            "${LIB_ERROR_INVALID_RESPONSE}" || return "$?"
+    fi
     
-    local params="server=${server}&audio=${audio_hash}&hash=${hash}"
+    local params
+    params="server=$(uri::encode "${server}")&audio=$(uri::encode "${audio_hash}")&hash=$(uri::encode "${hash}")"
     if is::not_empty "${title}"; then
-        params="${params}&title=${title}"
+        params="${params}&title=$(uri::encode "${title}")"
     fi
     if is::not_empty "${artist}"; then
-        params="${params}&artist=${artist}"
+        params="${params}&artist=$(uri::encode "${artist}")"
     fi
     
     local save_response

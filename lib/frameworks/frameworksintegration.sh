@@ -1008,7 +1008,13 @@ frameworks::mbfl::dir::create() {
 # @description Удалить каталог (rm -rf).
 frameworks::mbfl::dir::remove() {
   local dir="${1:-}"
-  rm -rf "${dir}"
+  # Refuse empty and root paths: `rm -rf ""` reports success without doing anything
+  # Отказ для пустого пути и корня: `rm -rf ""` «успешно» ничего не делает
+  if is::empty "${dir}" || [[ "${dir}" == "/" ]]; then
+    log::error "frameworks::mbfl::dir::remove: refusing to remove '${dir}' / отказ удалять '${dir}'"
+    return "${E_INVALID}"
+  fi
+  rm -rf -- "${dir}"
 }
 
 # ============================================================================

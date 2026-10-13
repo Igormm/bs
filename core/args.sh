@@ -607,8 +607,22 @@ args::parse() {
     # Объявленные флаги help/h имеют приоритет — их обработает цикл ниже.
     # Help request: -h/--help at any position, not only argv[0].
     # Declared flags named help/h take precedence — the loop below handles them.
-    local arg key help_requested="false"
+    # Просмотр останавливается на "--" (дальше сырые аргументы) и пропускает
+    # значение объявленного флага со значением (--pattern -h).
+    # The scan stops at "--" (raw arguments follow) and skips the value of a
+    # declared value flag (--pattern -h).
+    local arg key help_requested="false" skip_value=0
     for arg in "$@"; do
+        [[ "${arg}" == "--" ]] && break
+        if (( skip_value == 1 )); then
+            skip_value=0
+            continue
+        fi
+        if [[ "${arg}" == --* && "${arg}" != *=* ]] \
+           && [[ "${__ARGS_FLAGS["${arg#--}"]:-}" == "value" ]]; then
+            skip_value=1
+            continue
+        fi
         if [[ "${arg}" == "-h" ]] || [[ "${arg}" == "--help" ]]; then
             key="${arg#--}"
             [[ "${arg}" == "-h" ]] && key="h"

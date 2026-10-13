@@ -2068,10 +2068,25 @@ uninstall_cmd() {
     # Обёртка — из манифеста, иначе выводится из пути .../lib/bs.
     # The wrapper comes from the manifest, else from a .../lib/bs path.
     wrapper="$(update_install_wrapper "${target}")"
+    # lib задан симлинком и манифест без bin=: путь обёртки выводится из него
+    # lib given as a symlink and a manifest without bin=: derive it from the link
+    [[ -n "${wrapper}" ]] || wrapper="$(update_install_wrapper "${tin}")"
     bin_dir="${wrapper%/*}"
     local wrapper_mine=0
-    if [[ -n "${wrapper}" && -f "${wrapper}" ]] && grep -Fq "BS_ROOT=\"${target}\"" "${wrapper}" 2>/dev/null; then
-      wrapper_mine=1
+    if [[ -n "${wrapper}" && -f "${wrapper}" ]]; then
+      if grep -Fq "BS_ROOT=\"${target}\"" "${wrapper}" 2>/dev/null; then
+        wrapper_mine=1
+      else
+        # Обёртка может называть lib через симлинк (~/.local/lib/bs -> ...):
+        # сравниваем и заданный путь, и реальный.
+        # The wrapper may name the lib through a symlink: compare both the
+        # given path and the real one.
+        local wroot
+        wroot="$(update_wrapper_root "${wrapper}")"
+        if [[ -n "${wroot}" ]] && [[ "${wroot%/}" == "${tin}" || "$(update_realpath "${wroot}")" == "${target}" ]]; then
+          wrapper_mine=1
+        fi
+      fi
     fi
     local denied=0
     [[ -w "${target%/*}" ]] || denied=1
@@ -2085,26 +2100,35 @@ uninstall_cmd() {
       log::info "uninstall: удаляется копия, из которой запущен bs — это нормально / removing the copy bs runs from — this is fine"
     fi
     removed_wrapper=0
+    if (( wrapper_mine == 0 )) && [[ -n "${wrapper}" && -f "${wrapper}" ]]; then
+      update_warn "uninstall: wrapper not matching this install, left in place: ${wrapper} / обёртка не от этой установки, оставлена"
+    fi
+
+    # rm -rf на защищённый target безопасен: выше проверено, что это настоящая
+    # BS-установка, не чекаут и записываемый каталог.
+    # Обёртку удаляем ПОСЛЕ каталога: при сбое rm остаётся рабочая команда bs,
+    # и удаление можно повторить.
+    # rm -rf on the guarded target is safe: it is a real BS install, not a
+    # checkout, and writable. The wrapper goes AFTER the directory: if rm
+    # fails, a working bs command is left and the removal can be retried.
+    if ! rm -rf -- "${target}"; then
+      skipped+=("• ${target} — удаление не удалось (часть файлов могла быть удалена; обёртка оставлена; остаток удалите вручную) / removal failed (some files may be gone; the wrapper is kept; remove the rest by hand)")
+      continue
+    fi
+    if (( verbose == 1 )); then
+      log::info "  removed: ${target}"
+    fi
+    # Симлинк на каталог установки больше никуда не ведёт: убираем и его
+    # The symlink to the install directory points nowhere now: drop it too
+    if [[ -L "${tin}" ]]; then
+      rm -f -- "${tin}" || true
+    fi
     if (( wrapper_mine == 1 )); then
       rm -f -- "${wrapper}"
       removed_wrapper=1
       if (( verbose == 1 )); then
         log::info "  removed: ${wrapper}"
       fi
-    elif [[ -n "${wrapper}" && -f "${wrapper}" ]]; then
-      update_warn "uninstall: wrapper not matching this install, left in place: ${wrapper} / обёртка не от этой установки, оставлена"
-    fi
-
-    # rm -rf на защищённый target безопасен: выше проверено, что это настоящая
-    # BS-установка, не чекаут и записываемый каталог.
-    # rm -rf on the guarded target is safe: it is a real BS install, not a
-    # checkout, and writable.
-    if ! rm -rf -- "${target}"; then
-      skipped+=("• ${target} — удаление не удалось / removal failed")
-      continue
-    fi
-    if (( verbose == 1 )); then
-      log::info "  removed: ${target}"
     fi
     # rmdir удаляет только пустой bin_dir; чужие файлы не трогаются.
     # rmdir removes only an empty bin_dir; foreign files are never touched.

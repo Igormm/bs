@@ -325,7 +325,9 @@ vkapi::api_request() {
         log::debug "Making API request to ${method} (attempt $((retry_count + 1)))"
         
         # Make curl request
-        response=$(utils::quiet_err curl -s -w "%{http_code}" -d "${data}" "${url}")
+        # The body carries access_token: send it via stdin, not argv (hidden from ps)
+        # Тело содержит access_token: отправляем через stdin, а не argv (не видно в ps)
+        response=$(printf '%s' "${data}" | utils::quiet_err curl -s -w "%{http_code}" --data-binary @- "${url}")
         http_code=$(echo "${response}" | tail -n1)
         response=$(echo "${response}" | head -n-1)
         

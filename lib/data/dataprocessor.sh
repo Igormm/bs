@@ -889,18 +889,34 @@ dataprocessor::stream::process() {
             "${LIB_ERROR_FILE_NOT_FOUND}"
     fi
     
-    # Process file in chunks
+    if ! [[ "${chunk_size}" =~ ^[1-9][0-9]*$ ]]; then
+        error::throw "Chunk size must be a positive integer: ${chunk_size}" \
+            "${LIB_ERROR_INVALID_ARGS}" || return "$?"
+    fi
+
+    if ! declare -F -- "${processor}" >/dev/null 2>&1 && ! utils::has "${processor}"; then
+        error::throw "Processor not found: ${processor}" \
+            "${LIB_ERROR_INVALID_ARGS}" || return "$?"
+    fi
+    
+    # Process file in chunks; stop at the first failing chunk and always clean up
+    # Обработка по частям; остановка на первой упавшей части и всегда уборка
     local temp_file
     temp_file=$(mktemp)
     
-    split -l "${chunk_size}" "${file_path}" "${temp_file}.chunk."
+    local rc=0 chunk
+    if split -l "${chunk_size}" -- "${file_path}" "${temp_file}.chunk."; then
+        for chunk in "${temp_file}.chunk."*; do
+            [[ -e "${chunk}" ]] || continue
+            "${processor}" "${chunk}" || { rc=$?; break; }
+        done
+    else
+        rc=$?
+        log::error "dataprocessor::stream::process: split failed for ${file_path}"
+    fi
     
-    for chunk in "${temp_file}.chunk."*; do
-        "${processor}" "${chunk}"
-        rm -f "${chunk}"
-    done
-    
-    rm -f "${temp_file}"
+    rm -f -- "${temp_file}.chunk."* "${temp_file}"
+    return "${rc}"
 }
 
 # Validate data structure

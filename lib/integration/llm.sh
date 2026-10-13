@@ -223,14 +223,14 @@ __llm::request() {
   local rc=0
 
   # Build curl args manually to support multiple headers
-  local -a curl_args=(-s -L -m "${LLM_TIMEOUT}" -X POST)
-  local header
-  for header in "${headers[@]}"; do
-    curl_args+=(-H "${header}")
-  done
+  # Headers (they carry the API key) go through stdin (-H @-), never through argv,
+  # so the key is not visible in `ps` / /proc/PID/cmdline.
+  # Заголовки (в них ключ API) передаются через stdin (-H @-), а не через argv:
+  # ключ не виден в `ps` и /proc/PID/cmdline.
+  local -a curl_args=(-s -L -m "${LLM_TIMEOUT}" -X POST -H @-)
   curl_args+=(-d "${body}" -- "${url}")
 
-  response="$(curl "${curl_args[@]}" 2>/dev/null)" || rc=$?
+  response="$(printf '%s\n' "${headers[@]}" | curl "${curl_args[@]}" 2>/dev/null)" || rc=$?
 
   if [[ "${rc}" -ne 0 ]]; then
     log::error "llm: request failed (curl exit ${rc}; check LLM_OPENAI_URL/LLM_OLLAMA_HOST and network) / запрос не удался (код curl ${rc}; проверьте LLM_OPENAI_URL/LLM_OLLAMA_HOST и сеть)"

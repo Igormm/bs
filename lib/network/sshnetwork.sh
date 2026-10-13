@@ -188,7 +188,8 @@ sshnetwork::discover_devices() {
     
     if is::empty "${network_range}"; then
         # Auto-detect local network
-        network_range=$(sshnetwork::get_local_network)
+        # Plain value even when BS_OUTPUT_FORMAT=json/... / Простое значение даже при BS_OUTPUT_FORMAT=json
+        network_range=$(BS_OUTPUT_FORMAT=string sshnetwork::get_local_network)
         if is::empty "${network_range}"; then
             error::throw "Could not detect local network range" \
                 "${LIB_ERROR_NETWORK}"
@@ -288,9 +289,13 @@ sshnetwork::test_connection() {
     log::debug "Testing SSH connection to ${host}:${port}..."
     
     # Test with timeout
-    utils::quiet_err timeout "${SSH_NETWORK_CONNECT_TIMEOUT}" bash -c "</dev/tcp/${host}/${port}"
-    
-    if [[ "$?" -eq 0 ]]; then
+    # Host and port go in as positional parameters, never spliced into the code string
+    # Хост и порт передаются позиционными параметрами, а не подставляются в строку кода
+    if ! [[ "${port}" =~ ^[0-9]+$ ]] || ! [[ "${host}" =~ ^[A-Za-z0-9._:-]+$ ]]; then
+        log::debug "Invalid host or port: ${host}:${port}"
+        return 1
+    fi
+    if utils::quiet_err timeout "${SSH_NETWORK_CONNECT_TIMEOUT}" bash -c 'exec 3<>"/dev/tcp/$1/$2"' _ "${host}" "${port}"; then
         log::debug "Connection successful to ${host}:${port}"
         return 0
     else
@@ -366,9 +371,11 @@ sshnetwork::execute_remote() {
         -i "${SSH_NETWORK_SSH_KEY_PATH}"
     )
     
+    # `|| exit_code=$?` keeps a `set -e` caller alive long enough to log the failure
+    # `|| exit_code=$?` не даёт `set -e` прервать вызывающего до записи ошибки в журнал
     local output
-    output=$(ssh "${ssh_options[@]}" "${user}@${host}" "${command}" 2>&1)
-    local exit_code=$?
+    local exit_code=0
+    output=$(ssh "${ssh_options[@]}" "${user}@${host}" "${command}" 2>&1) || exit_code=$?
     
     if [[ "${exit_code}" -eq 0 ]]; then
         log::success "Command executed successfully on ${host}"
@@ -620,8 +627,17 @@ sshnetwork::get_remote_info() {
 # @description Monitor network connectivity of hosts (monitor, ping, uptime, мониторинг сети)
 # @description Мониторить связь с хостами (мониторинг сети, ping, проверка доступности)
 sshnetwork::monitor_network() {
+    # A leading integer is the interval (seconds); everything else is a host.
+    # Ведущее целое число — интервал (секунды); всё остальное — хосты.
+    local interval="${SSH_NETWORK_MONITOR_INTERVAL:-60}"
+    if [[ "${1:-}" =~ ^[0-9]+$ ]]; then
+        interval="$1"
+        shift
+    fi
+    if ! [[ "${interval}" =~ ^[0-9]+$ ]] || (( interval < 1 )); then
+        interval=60
+    fi
     local hosts=("$@")
-    local interval="${1:-60}"
     
     if [[ ${#hosts[@]} -eq 0 ]]; then
         # Use discovered devices
@@ -751,11 +767,22 @@ sshnetwork::close_tunnel() {
     log::info "Closing SSH tunnel on port ${local_port}"
     
     # Find and kill the SSH process
-    local ssh_pid
-    ssh_pid=$(ps aux | grep "ssh.*-L.*${local_port}:" | grep -v grep | awk '{print $2}' || true)
+    # Only own processes, only `ssh ... -L [bind:]PORT:host:hostport` with the exact port
+    # Только свои процессы и только `ssh ... -L [bind:]PORT:host:hostport` с точным портом
+    if ! [[ "${local_port}" =~ ^[0-9]+$ ]]; then
+        error::throw "Local port must be a number: ${local_port}" \
+            "${LIB_ERROR_INVALID_ARGS}" || return "$?"
+    fi
+
+    local -a ssh_pids=()
+    local pid args
+    local re="^([^[:space:]]*/)?ssh[[:space:]].*-L[[:space:]]*([^[:space:]:]+:)?${local_port}:"
+    while read -r pid args; do
+        [[ "${args}" =~ ${re} ]] && ssh_pids+=("${pid}")
+    done < <(utils::quiet_err ps -u "$(id -u)" -o pid= -o args=)
     
-    if is::not_empty "${ssh_pid}"; then
-        utils::ignore kill "${ssh_pid}"
+    if (( ${#ssh_pids[@]} > 0 )); then
+        utils::ignore kill "${ssh_pids[@]}"
         log::success "SSH tunnel closed on port ${local_port}"
     else
         log::warn "No SSH tunnel found on port ${local_port}"

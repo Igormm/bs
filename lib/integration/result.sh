@@ -58,6 +58,22 @@ __integration_result::json_escape() {
   s="${s//$'\n'/\\n}"
   s="${s//$'\r'/\\r}"
   s="${s//$'\t'/\\t}"
+  # Remaining control characters (ESC from colored output, etc.) must be \u00XX escaped
+  # Остальные управляющие символы (ESC из цветного вывода и т.п.) нужно писать как \u00XX
+  if [[ "${s}" =~ [[:cntrl:]] ]]; then
+    local out="" ch hex i
+    local LC_ALL=C
+    for (( i = 0; i < ${#s}; i++ )); do
+      ch="${s:i:1}"
+      if [[ "${ch}" =~ [[:cntrl:]] ]]; then
+        printf -v hex '\\u%04x' "'${ch}"
+        out+="${hex}"
+      else
+        out+="${ch}"
+      fi
+    done
+    s="${out}"
+  fi
   printf '%s' "${s}"
 }
 
@@ -69,7 +85,9 @@ __integration_result::json_escape() {
 __integration_result::args_to_json() {
   if utils::has jq; then
     local json
-    json=$(printf '%s\n' "$@" | jq -R . | jq -s .)
+    # $ARGS.positional keeps arguments that contain newlines intact
+    # $ARGS.positional сохраняет аргументы с переводами строк целыми
+    json=$(jq -nc '$ARGS.positional' --args -- "$@")
     if [[ "${json: -1}" == $'\n' ]]; then
       json="${json%?}"
     fi
@@ -300,6 +318,10 @@ result::ok() {
 #   result::error "${LIB_ERROR_FILE_NOT_FOUND}" "Source not found"
 result::error() {
   local code="${1:-${E_ERROR}}"
+  # An error result must carry a non-zero numeric code / Результат-ошибка несёт ненулевой числовой код
+  if ! [[ "${code}" =~ ^[0-9]+$ ]] || (( code == 0 )); then
+    code="${E_ERROR}"
+  fi
   local message="${2:-Error}"
   local data="${3:-null}"
   local timestamp

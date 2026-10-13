@@ -23,11 +23,9 @@ load "lib/ui/presentation"
 # Test table renders header, separator and rows
 test_table_basic() {
     local out
-    out="$(presentation::table "Name:Age" "John:25" "Jane:30" 2>&1)" || {
-        testframework::assert_true "false" "table runs without error"
-        return 0
-    }
-    testframework::assert_true "true" "table runs without error"
+    local rc=0
+    out="$(presentation::table "Name:Age" "John:25" "Jane:30" 2>&1)" || rc=$?
+    testframework::assert_equal "0" "${rc}" "table runs without error"
 
     local first_line
     first_line="$(printf '%s\n' "${out}" | sed -n '1p')"
@@ -39,21 +37,19 @@ test_table_basic() {
 
     local john_line
     john_line="$(printf '%s\n' "${out}" | sed -n '3p')"
-    testframework::assert_true "'${john_line}' =~ John" "table renders data rows"
+    testframework::assert_equal "| John | 25  |" "${john_line}" "table pads data cells to column width"
 }
 
 # Test table tolerates differing column widths
 test_table_ragged_columns() {
     local out
-    out="$(presentation::table "a:bbb" "cccc:d" 2>&1)" || {
-        testframework::assert_true "false" "ragged columns run without error"
-        return 0
-    }
-    testframework::assert_true "true" "ragged columns run without error"
+    local rc=0
+    out="$(presentation::table "a:bbb" "cccc:d" 2>&1)" || rc=$?
+    testframework::assert_equal "0" "${rc}" "ragged columns run without error"
 
     local cccc_line
     cccc_line="$(printf '%s\n' "${out}" | sed -n '3p')"
-    testframework::assert_true "'${cccc_line}' =~ cccc" "wide cell kept intact"
+    testframework::assert_equal "| cccc | d   |" "${cccc_line}" "wide cell kept intact, narrow cells padded"
 }
 
 # Test table returns 0 with empty input (no crash)
@@ -66,11 +62,10 @@ test_table_empty() {
 # Test table runs in strict mode (set -u regression)
 test_table_under_set_u() {
     local out
-    out="$(presentation::table "X:Y" "1:2" 2>&1)" || {
-        testframework::assert_true "false" "table survives set -u"
-        return 0
-    }
-    testframework::assert_true "true" "table survives set -u"
+    local rc=0
+    out="$( set -u; presentation::table "X:Y" "1:2" 2>&1 )" || rc=$?
+    testframework::assert_equal "0" "${rc}" "table survives set -u"
+    testframework::assert_equal "| 1 | 2 |" "$(printf '%s\n' "${out}" | sed -n '3p')" "table output under set -u is complete"
 }
 
 main() {
