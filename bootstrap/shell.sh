@@ -364,6 +364,45 @@ bs_shell_tier() {
   fi
 }
 
+# @description Tier of a file: the first word of its "# @shell" line (default bash4).
+# @description Tier файла: первое слово его строки "# @shell" (по умолчанию bash4).
+# @param $1 file / файл
+# @stdout tier / tier
+bs_shell_file_tier() {
+  __bs_ft=bash4
+  __bs_fn=0
+  if [ -r "${1:-}" ]; then
+    while [ "$__bs_fn" -lt 40 ] && IFS= read -r __bs_fl; do
+      __bs_fn=$((__bs_fn + 1))
+      case $__bs_fl in
+        '# @shell '*)
+          __bs_ft=${__bs_fl#'# @shell '}
+          __bs_ft=${__bs_ft%% *}
+          break ;;
+      esac
+    done < "$1"
+  fi
+  printf '%s\n' "$__bs_ft"
+}
+
+# @description May a file of this tier run when BS was started from this shell?
+#   posix — from any; bash4 — only from bash 4.2+; any other word (zsh, fish,
+#   nu, ...) — only from the shell of that name. The tier may be a list: a,b.
+# @description Можно ли исполнять файл этого tier, если BS запущен из этой оболочки?
+#   posix — из любой; bash4 — только из bash 4.2+; любое другое слово (zsh,
+#   fish, nu, ...) — только из оболочки с этим именем. Tier может быть списком: a,b.
+# @param $1 tier / tier
+# @param $2 origin shell family / семейство исходной оболочки
+# @return 0 allowed, 1 not allowed / 0 можно, 1 нельзя
+bs_shell_tier_allows() {
+  case ",${1:-bash4}," in *,posix,*) return 0 ;; esac
+  case ",${1:-bash4}," in *",${2:-},"*) return 0 ;; esac
+  if [ "${2:-}" = bash ]; then
+    case ",${1:-bash4}," in *,bash4,*) return 0 ;; esac
+  fi
+  return 1
+}
+
 # @description One-line bilingual description of a tier.
 # @description Однострочное двуязычное описание tier.
 # @param $1 tier / tier
@@ -389,7 +428,8 @@ bs_shell_tier_desc() {
 # eval: dash must not parse "::" in names even in a branch that is not taken
 if [ -n "${BASH_VERSION:-}" ] || [ -n "${ZSH_VERSION:-}" ]; then
   for __bs_fn in of_name family login parent user rc_file rc_scan all_rc_files \
-      path_line reload_hint fresh_flags known host_ok host_find tier tier_desc; do
+      path_line reload_hint fresh_flags known host_ok host_find tier tier_desc \
+      file_tier tier_allows; do
     eval "bs::shell::${__bs_fn}() { bs_shell_${__bs_fn} \"\$@\"; }"
   done
 fi

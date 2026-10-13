@@ -136,6 +136,7 @@ Maintenance / Обслуживание:
   uninstall [opts]    Remove installed BS copies / удаление
   where [--deep]      Find every trace of BS on this machine / все следы BS на машине
   init-shell [SHELL]  PATH snippet for your shell: bash zsh ash dash ksh fish nu / snippet для вашей оболочки
+  --strict-shell      (before the command) refuse lib/ modules whose @shell tier does not fit the shell bs was started from / отказывать модулям lib/, чей tier @shell не подходит оболочке запуска
 
 Shebang mode:
   #!/usr/bin/env bs
@@ -2736,6 +2737,15 @@ where_cmd() {
   fi
   return 0
 }
+
+# 6b. Глобальный флаг --strict-shell: tier модулей lib/ против оболочки запуска
+# Global flag --strict-shell: lib/ module tiers against the shell BS was started from
+: "${BS_ORIGIN_SHELL:=bash}"
+export BS_ORIGIN_SHELL
+if [[ "${1:-}" == "--strict-shell" ]]; then
+  export BS_SHELL_STRICT=1
+  shift
+fi
 
 # 7. Shebang-режим
 # Если bs вызван как интерпретатор shebang'а (#!/usr/bin/env bs),

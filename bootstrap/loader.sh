@@ -122,6 +122,25 @@ load::__load_dependencies() {
 # ОСНОВНАЯ ФУНКЦИЯ ЗАГРУЗКИ / MAIN LOADING FUNCTION
 # 
 
+# @description --strict-shell: refuse a lib/ module whose @shell tier does not
+#   fit the shell BS was started from. core/ is the kernel and always allowed.
+# @description --strict-shell: отказать модулю lib/, чей tier @shell не подходит
+#   оболочке, из которой запущен BS. core/ — ядро, ему можно всегда.
+load::__strict_shell_check() {
+    local module_path="${1}"
+    [[ "${BS_SHELL_STRICT:-0}" == "1" ]] || return 0
+    [[ "${module_path}" == lib/* ]] || return 0
+    declare -F bs_shell_file_tier >/dev/null || return 0
+    local tier origin="${BS_ORIGIN_SHELL:-bash}"
+    tier="$(bs_shell_file_tier "${BS_ROOT}/${module_path}.sh")"
+    bs_shell_tier_allows "${tier}" "${origin}" && return 0
+    printf '%s\n' \
+        "BS: модуль '${module_path}' (@shell ${tier}) нельзя исполнять из оболочки '${origin}' (--strict-shell)" \
+        "BS: module '${module_path}' (@shell ${tier}) cannot run from shell '${origin}' (--strict-shell)" \
+        "    Запустите из подходящей оболочки или уберите --strict-shell / Run from a fitting shell or drop --strict-shell" >&2
+    return 1
+}
+
 # @description Загрузить модуль по пути относительно BS_ROOT
 # @description Load module by path relative to BS_ROOT
 # @param $1 Путь к модулю без расширения .sh (например: "core/logger")
@@ -148,6 +167,9 @@ load() {
         return 0
     fi
     
+    # --strict-shell: tier модуля против исходной оболочки / module tier vs the origin shell
+    load::__strict_shell_check "${module_path}" || return 1
+
     # Проверка циклических зависимостей / Check for circular dependencies
     if ! load::__check_circular_dependency "${module_path}"; then
         return 1

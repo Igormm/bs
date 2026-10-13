@@ -70,6 +70,28 @@ families `bash zsh dash ash sh ksh mksh oksh osh fish nu` and answers:
 nushell: if `env.nu` does not exist the installer does not invent it; it
 prints the exact line to add.
 
+## Strict mode — `bs --strict-shell`
+
+By default the trampoline lets any shell use any module (the code always runs
+in bash). `--strict-shell` (or `BS_SHELL_STRICT=1`, needed for the shebang
+mode) makes the `@shell` tier binding: a `lib/` module loads only if its tier
+fits the shell BS was **started from** (`BS_ORIGIN_SHELL`, exported by the
+trampoline; a bash that reached the trampoline counts as `sh`).
+
+| tier of the module | allowed from |
+|---|---|
+| `posix` | any shell |
+| `bash4` (default) | bash 4.2+ |
+| another word (`zsh`, `fish`, `nu`, …) | the shell of that name |
+| a list `zsh,bash4` | any of them |
+
+`core/` (the kernel) is always allowed; otherwise nothing could start. A
+refusal names the module, its tier and the origin shell, and exits 1:
+
+```bash
+dash ./bs --strict-shell run script.sh   # module lib/io/streams (@shell bash4) cannot run from 'dash'
+```
+
 ## Priorities
 
 1. bash, zsh, ash/dash, nushell — full path: install, uninstall, `bs where`,

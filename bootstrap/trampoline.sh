@@ -79,8 +79,14 @@ if [ -n "$__bs_t_host" ]; then
   # Режим POSIX у нового bash не нужен: он запускается под своим именем
   # The new bash must not be in POSIX mode: it starts under its own name
   unset POSIXLY_CORRECT
+  # Откуда запустили: bash, дошедший до трамплина (старый или в режиме POSIX),
+  # ведёт себя как sh. Нужно для --strict-shell.
+  # Where it was started from: a bash that reached the trampoline (old or in
+  # POSIX mode) behaves as sh. Needed by --strict-shell.
+  BS_ORIGIN_SHELL=$(bs_shell_family)
+  [ "$BS_ORIGIN_SHELL" = bash ] && BS_ORIGIN_SHELL="sh"
   __BS_TRAMPOLINE=1
-  export __BS_TRAMPOLINE
+  export __BS_TRAMPOLINE BS_ORIGIN_SHELL
   exec "$__bs_t_host" "$__bs_t_self" "$@"
 fi
 
