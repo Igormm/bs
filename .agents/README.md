@@ -34,6 +34,7 @@ Central place for everything AI-facing in the repo (replaces the old `ai/` direc
 | `bs-pre-kernel-boundary` | pre-loader code must not use core/lib abstractions |
 | `bs-variable-docs` | bilingual `# @global` snippets for module-level variables |
 | `bs-scenario-audit` | scenario-driven logic audit: six-part scenario card, actual vs expected, function inventory by risk |
+| `doc-coauthoring` | co-authoring docs in three stages: context, section-by-section refinement, reader testing (imported from anthropics/skills) |
 | `bash-defensive-patterns` | defensive Bash patterns (imported from wshobson/agents, MIT): strict mode, quoting, traps, temp files, idempotency |
 | `bs-code-review-security` | security-first review: injection, quoting, paths, temp files, privilege, `@shell` tier, tests, P0–P3 report (adapted from DataDog/rshell, Apache-2.0) |
 | `bs-shell-portability` | shell-independence of BS: host/user/script shell, `@shell` tiers, trampoline, `tier_scan.sh`, `probe_shells.sh` |
