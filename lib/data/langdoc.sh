@@ -5,6 +5,7 @@
 
 # @depends core/lang, core/const, core/errorhandler
 # @tier core
+# @shell bash4 — нужны конструкции bash: local/declare flags, process substitution, case/replace expansion / needs bash constructs: local/declare flags, process substitution, case/replace expansion
 
 # Source Guard
 bs::guard "LIB_DATA_LANGDOC" || return 0

@@ -5,6 +5,7 @@
 
 # @depends lib/tui/tui
 # @tier core
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags
 
 # Source Guard
 bs::guard "LIB_TUI_APP" || return 0

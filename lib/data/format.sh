@@ -12,6 +12,7 @@
 #
 # @depends core/lang, core/const
 # @tier core
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags
 
 # Source Guard / Защита от повторной загрузки
 bs::guard "LIB_DATA_FORMAT" || return 0

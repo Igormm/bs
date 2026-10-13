@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, nameref / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, nameref
 # lib/ui/wizard.sh — full-screen wizard engine: centered frames, menus,
 # checkboxes, y/n, editable text/password input, intro, framed errors
 # lib/ui/wizard.sh — движок полноэкранных визардов: центрированные рамки,

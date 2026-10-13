@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], local/declare flags / needs bash constructs: double-bracket [[ ]], local/declare flags
 # lib/system/schedule.sh — Task scheduling helpers / Помощники планирования задач
 #
 # Linguistic wrappers over `at` and `crontab`.

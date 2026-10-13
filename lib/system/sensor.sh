@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, nameref / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, nameref
 # lib/system/sensor.sh — Touch/sensor input device access via evdev+sysfs
 # lib/system/sensor.sh — доступ к сенсорным устройствам ввода через evdev и sysfs
 #

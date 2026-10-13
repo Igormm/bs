@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags
 # lib/ui/elements/input.sh — centered input field with a block cursor
 # lib/ui/elements/input.sh — центрированное поле ввода с блочным курсором
 #

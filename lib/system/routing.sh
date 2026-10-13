@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: array, local/declare flags, read -a/-d/-n / needs bash constructs: array, local/declare flags, read -a/-d/-n
 # routing.sh — Routing table configuration for system setup
 # @depends core/const, core/logger, core/utils, lib/io/files
 

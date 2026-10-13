@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags
 # lib/ui/elements/confirm.sh — centered yes/no confirmation dialog
 # lib/ui/elements/confirm.sh — центрированный диалог подтверждения да/нет
 #

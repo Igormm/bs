@@ -5,6 +5,7 @@
 
 # @depends core/lang
 # @tier core
+# @shell bash4 — нужны конструкции bash: bash-only syntax / needs bash constructs: bash-only syntax
 
 # Source Guard
 bs::guard "LIB_RFC_1925" || return 0

@@ -7,6 +7,7 @@
 #
 # @depends core/lang, core/const
 # @tier gnu-linux
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags
 
 # Source Guard / Защита от повторной загрузки
 bs::guard "LIB_SYSTEM_SSHD" || return 0

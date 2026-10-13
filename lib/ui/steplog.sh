@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: arithmetic command (( )), array, local/declare flags / needs bash constructs: arithmetic command (( )), array, local/declare flags
 # lib/ui/steplog.sh — step log component: always-on file log + optional --verbose
 # lib/ui/steplog.sh — компонент журнала шагов: файл журнала всегда + опциональный --verbose
 #

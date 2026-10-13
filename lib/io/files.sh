@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], array, nameref, local/declare flags / needs bash constructs: double-bracket [[ ]], array, nameref, local/declare flags
 #
 # lib/io/files.sh — File System Helper (FSH) for BS
 # lib/io/files.sh — FSH: высокоуровневые файловые операции с dry-run,

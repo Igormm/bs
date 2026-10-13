@@ -5,6 +5,7 @@
 
 # @depends core/lang, core/const, core/logger, core/errorhandler, lib/data/langdoc
 # @tier gnu-linux
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags
 
 # Source Guard
 bs::guard "LIB_DATA_LSP" || return 0

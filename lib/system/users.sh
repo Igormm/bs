@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], ANSI-C quoting $'..' / needs bash constructs: double-bracket [[ ]], ANSI-C quoting $'..'
 # users.sh — User and group management for system setup / Управление пользователями и
 # группами для настройки системы
 # @depends core/const, core/logger, core/utils

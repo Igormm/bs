@@ -4,6 +4,7 @@
 
 # @depends core/lang, core/utils, core/errorhandler
 # @tier core
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, nameref / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, nameref
 
 # Source Guard
 bs::guard "LIB_DATA_REGEX" || return 0

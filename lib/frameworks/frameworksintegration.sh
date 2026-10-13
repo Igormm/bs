@@ -10,6 +10,7 @@
 
 # @depends core/const, core/logger, core/utils, core/errorhandler
 # @tier core
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], array, process substitution, regex =~ / needs bash constructs: double-bracket [[ ]], array, process substitution, regex =~
 
 # Source Guard / Защита от повторной загрузки
 bs::guard "FRAMEWORKS_INTEGRATION" || return 0

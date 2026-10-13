@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], array, local/declare flags, case/replace expansion / needs bash constructs: double-bracket [[ ]], array, local/declare flags, case/replace expansion
 #
 # core/prereq.sh — базовые примитивы ядра BS, доступные априори
 # core/prereq.sh — core primitives available a priori to all BS modules

@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], case/replace expansion, ANSI-C quoting $'..' / needs bash constructs: double-bracket [[ ]], case/replace expansion, ANSI-C quoting $'..'
 # processes.sh — Process management for system setup / Управление процессами для настройки
 # системы
 # @depends core/const, core/logger, core/utils

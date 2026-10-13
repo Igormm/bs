@@ -5,6 +5,7 @@
 
 # @depends core/lang, core/const, core/logger, core/utils, lib/platform/facts, lib/system/hw, lib/api/openapi, lib/integration/llm
 # @tier gnu-linux
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags
 
 bs::guard "LIB_INTEGRATION_OSAGENT" || return 0
 

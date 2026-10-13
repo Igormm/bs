@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags
 # lib/ui/elements/table.sh — centered table with header and aligned columns
 # lib/ui/elements/table.sh — центрированная таблица с шапкой и выровненными колонками
 #

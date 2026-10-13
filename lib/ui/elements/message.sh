@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags
 # lib/ui/elements/message.sh — centered info/success/warning/error banner
 # lib/ui/elements/message.sh — центрированный баннер info/success/warning/error
 #

@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: bash-only syntax / needs bash constructs: bash-only syntax
 # bosatheme.sh — BS theme for BS bash-it integration
 # @depends core/const, core/logger, core/utils
 

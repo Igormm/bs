@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags
 # lib/io/tree.sh — create a project file tree from yaml/yml/txt/ini/csv
 # lib/io/tree.sh — создать дерево файлов проекта из yaml/yml/txt/ini/csv
 # @depends core/const, core/logger, core/utils, core/lang, core/errorhandler, lib/io/files, lib/rfc/csv

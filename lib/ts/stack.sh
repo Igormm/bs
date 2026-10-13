@@ -9,6 +9,7 @@
 #
 # @depends core/const, core/logger, core/utils, core/lang, core/errorhandler, lib/ts/toolchain, lib/io/files
 # @tier core
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags
 
 bs::guard "TS_STACK" || return 0
 

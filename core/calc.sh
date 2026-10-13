@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], local/declare flags, ANSI-C quoting $'..' / needs bash constructs: double-bracket [[ ]], local/declare flags, ANSI-C quoting $'..'
 #
 # core/calc.sh — RPN calculator on dc / RPN-калькулятор на dc
 # Обратная польская нотация: числа кладутся на стек, операторы берут их

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags
 #
 # core/args.sh — модуль объявления и валидации параметров скриптов BS
 # core/args.sh — script parameter declaration and validation module for BS

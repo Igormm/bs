@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], array, local/declare flags, BASH_* / FUNCNAME / PIPESTATUS / needs bash constructs: double-bracket [[ ]], array, local/declare flags, BASH_* / FUNCNAME / PIPESTATUS
 #
 # core/guard.sh — compatibility alias for core/prereq.sh
 # core/guard.sh — обратносовместимая обёртка над core/prereq.sh

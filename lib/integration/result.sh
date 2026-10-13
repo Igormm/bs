@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, nameref / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, nameref
 #
 # lib/integration/result.sh — JSON result contract for BS integrations
 # lib/integration/result.sh — JSON-контракт результата для интеграций BS

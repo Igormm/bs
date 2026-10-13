@@ -5,6 +5,7 @@
 
 # @depends core/lang, core/utils, core/const, core/logger, core/errorhandler, lib/integration/llm
 # @tier gnu-linux
+# @shell bash4 — нужны конструкции bash: arithmetic command (( )), array, local/declare flags / needs bash constructs: arithmetic command (( )), array, local/declare flags
 
 # Source Guard
 bs::guard "LIB_INTEGRATION_CHAT" || return 0

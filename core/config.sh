@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], array, local/declare flags, indirect expansion ${!x} / needs bash constructs: double-bracket [[ ]], array, local/declare flags, indirect expansion ${!x}
 #
 # core/config.sh — Unified configuration loader for BS
 # core/config.sh — единый загрузчик конфигурации BS

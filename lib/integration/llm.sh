@@ -18,6 +18,7 @@
 #
 # @depends core/const, core/logger, core/utils, lib/integration/result
 # @tier core
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], array, local/declare flags, case/replace expansion / needs bash constructs: double-bracket [[ ]], array, local/declare flags, case/replace expansion
 # @optdeps jq
 
 # Source Guard / Защита от повторной загрузки

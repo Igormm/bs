@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# @shell bash4 — нужны конструкции bash: array, local/declare flags, function keyword, ANSI-C quoting $'..' / needs bash constructs: array, local/declare flags, function keyword, ANSI-C quoting $'..'
 #
 # core/const.sh 
 # — константы ошибок и кодов возврата фреймворка BS

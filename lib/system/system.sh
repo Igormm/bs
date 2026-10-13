@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: bash-only syntax / needs bash constructs: bash-only syntax
 # system.sh — System configuration module for BS / Модуль системной конфигурации для BS
 #
 # This module provides functions to configure Linux system settings. / Этот модуль

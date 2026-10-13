@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], array, local/declare flags, regex =~ / needs bash constructs: double-bracket [[ ]], array, local/declare flags, regex =~
 # shellcheck disable=SC2155
 
 # wireguard.sh — WireGuard Integration Module for BS Framework

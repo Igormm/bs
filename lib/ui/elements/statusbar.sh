@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], array, local/declare flags, BASH_* / FUNCNAME / PIPESTATUS / needs bash constructs: double-bracket [[ ]], array, local/declare flags, BASH_* / FUNCNAME / PIPESTATUS
 # lib/ui/elements/statusbar.sh — full-width status bar at the bottom
 # lib/ui/elements/statusbar.sh — строка статуса на всю ширину снизу
 #

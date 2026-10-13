@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], array, local/declare flags, BASH_* / FUNCNAME / PIPESTATUS / needs bash constructs: double-bracket [[ ]], array, local/declare flags, BASH_* / FUNCNAME / PIPESTATUS
 # lib/ui/elements/titlebar.sh — full-width title bar at the top
 # lib/ui/elements/titlebar.sh — строка заголовка на всю ширину сверху
 #

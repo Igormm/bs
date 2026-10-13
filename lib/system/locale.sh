@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], local/declare flags, case/replace expansion, regex =~ / needs bash constructs: double-bracket [[ ]], local/declare flags, case/replace expansion, regex =~
 # locale.sh — Localization configuration for system setup / Конфигурация локализации для
 # настройки системы
 # @depends core/const, core/logger, core/utils

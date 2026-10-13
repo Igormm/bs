@@ -5,6 +5,7 @@
 
 # @depends core/lang, core/const, core/utils
 # @tier gnu-linux
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], array, local/declare flags, case/replace expansion / needs bash constructs: double-bracket [[ ]], array, local/declare flags, case/replace expansion
 
 # Source Guard
 bs::guard "LIB_MATH" || return 0

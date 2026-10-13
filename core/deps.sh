@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], array, nameref, local/declare flags / needs bash constructs: double-bracket [[ ]], array, nameref, local/declare flags
 #
 # core/deps.sh — Dependency checker for BS modules
 # core/deps.sh — проверка зависимостей для модулей BS

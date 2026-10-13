@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: bash-only syntax / needs bash constructs: bash-only syntax
 # services.sh — Service management for system setup / Управление сервисами для настройки
 # системы
 # @depends core/const, core/logger, core/utils, lib/system/distro

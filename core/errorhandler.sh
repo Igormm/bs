@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags
 #
 # errorhandler.sh — единый EXIT-хендлер и cleanup-хуки / unified EXIT handler and cleanup
 # hooks

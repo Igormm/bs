@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, process substitution / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, process substitution
 # shellcheck disable=SC2155
 
 # ps1status.sh — PS1 Status Monitoring Module for BS Framework

@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], local/declare flags, process substitution / needs bash constructs: double-bracket [[ ]], local/declare flags, process substitution
 # packages.sh — Package management for system setup / Управление пакетами для настройки
 # системы
 # @depends core/const, core/logger, core/utils, lib/io/files

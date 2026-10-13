@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], array, local/declare flags, pipefail/shopt/ERR trap / needs bash constructs: double-bracket [[ ]], array, local/declare flags, pipefail/shopt/ERR trap
 # lib/ui/ps1config.sh — Advanced PS1 configuration module for BS
 # lib/ui/ps1config.sh — Модуль расширенной конфигурации PS1 для BS
 #

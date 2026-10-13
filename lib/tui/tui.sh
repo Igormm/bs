@@ -5,6 +5,7 @@
 
 # @depends core/lang, core/utils
 # @tier core
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, nameref / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, nameref
 
 # Source Guard
 bs::guard "LIB_TUI" || return 0

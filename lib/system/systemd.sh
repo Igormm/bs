@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: local/declare flags / needs bash constructs: local/declare flags
 # lib/system/systemd.sh — systemd unit helpers: paths, existence, unit file
 # content, write + daemon-reload, enable/start/stop/restart/status
 # lib/system/systemd.sh — помощники systemd: пути, наличие юнита, содержимое

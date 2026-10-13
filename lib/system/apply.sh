@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: arithmetic command (( )), array, local/declare flags / needs bash constructs: arithmetic command (( )), array, local/declare flags
 # lib/system/apply.sh — apply-step runner: run commands with a clear failure
 # report (step, command, log hint); tool pre-checks
 # lib/system/apply.sh — выполнение шагов применения: запуск команд с

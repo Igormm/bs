@@ -5,6 +5,7 @@
 
 # @depends core/lang
 # @tier core
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], local/declare flags, regex =~, printf -v / needs bash constructs: double-bracket [[ ]], local/declare flags, regex =~, printf -v
 
 # Source Guard
 bs::guard "LIB_RFC_UUID" || return 0

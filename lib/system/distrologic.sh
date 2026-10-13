@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), local/declare flags, regex =~ / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), local/declare flags, regex =~
 # distrologic.sh — Distribution-specific logic for BS / Логика для конкретного
 # дистрибутива для BS
 #

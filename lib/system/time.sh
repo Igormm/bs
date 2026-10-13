@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], local/declare flags, regex =~ / needs bash constructs: double-bracket [[ ]], local/declare flags, regex =~
 # time.sh — Date and time configuration for system setup / Конфигурация даты и времени для
 # настройки системы
 # @depends core/const, core/logger, core/utils

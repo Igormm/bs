@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], array, process substitution, case/replace expansion / needs bash constructs: double-bracket [[ ]], array, process substitution, case/replace expansion
 # shellcheck disable=SC2155
 
 # vkmusic.sh — VK Music Integration Module for BS Framework

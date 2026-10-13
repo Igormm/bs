@@ -5,6 +5,7 @@
 
 # @depends core/lang
 # @tier core
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags
 
 # Source Guard
 bs::guard "LIB_RFC_URI" || return 0

@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), local/declare flags, process substitution / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), local/declare flags, process substitution
 # keyboard.sh — Keyboard layout configuration for system setup / Конфигурация раскладки
 # клавиатуры для настройки системы
 # @depends core/const, core/logger, core/utils

@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], regex =~ / needs bash constructs: double-bracket [[ ]], regex =~
 # logging.sh — Logging configuration for system setup / Конфигурация логирования для
 # настройки системы
 # @depends core/const, core/logger, core/utils, lib/io/files

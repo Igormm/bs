@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags
 # lib/ts/toolchain.sh — TypeScript dev-toolchain detection and validation gates
 # lib/ts/toolchain.sh — обнаружение TS-инструментария и верификационные гейты
 #

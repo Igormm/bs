@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: source keyword / needs bash constructs: source keyword
 # info.sh — System information for system setup / Системная информация для настройки
 # системы
 # @depends core/const, core/logger, core/utils

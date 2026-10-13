@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags
 # lib/system/gpu.sh — GPU diagnostics and stress testing (vendor-agnostic)
 # lib/system/gpu.sh — диагностика и нагрузочное тестирование видеокарты (вендор-агностик)
 #

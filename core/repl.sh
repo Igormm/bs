@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags
 #
 # core/repl.sh — Interactive BS REPL
 # Интерактивная консоль BS: загруженное ядро + оценка выражений на лету.

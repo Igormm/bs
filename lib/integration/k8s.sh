@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], array, local/declare flags, process substitution / needs bash constructs: double-bracket [[ ]], array, local/declare flags, process substitution
 #
 # lib/integration/k8s.sh — Kubernetes client for BS
 # lib/integration/k8s.sh — Kubernetes-клиент для BS

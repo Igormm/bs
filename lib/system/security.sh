@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags
 # security.sh — Security configuration for system setup / Конфигурация безопасности для
 # настройки системы
 # @depends core/const, core/logger, core/utils, lib/io/files

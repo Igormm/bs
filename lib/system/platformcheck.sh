@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], array, local/declare flags / needs bash constructs: double-bracket [[ ]], array, local/declare flags
 # lib/system/platformcheck.sh — Platform compatibility checker for BS
 # lib/system/platformcheck.sh — Модуль проверки совместимости платформ для BS
 #

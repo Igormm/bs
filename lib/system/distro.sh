@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], array, local/declare flags / needs bash constructs: double-bracket [[ ]], array, local/declare flags
 # distro.sh — Distribution detection and compatibility / Определение дистрибутива и
 # совместимость
 # @depends core/const, core/logger, core/utils

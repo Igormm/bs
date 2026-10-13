@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, nameref / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, nameref
 #
 # core/lang.sh — языковые примитивы BS поверх встроенных возможностей Bash
 # core/lang.sh — BS language primitives over Bash built-ins

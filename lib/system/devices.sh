@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), regex =~ / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), regex =~
 # devices.sh — Input/output devices configuration for system setup / Конфигурация
 # устройств ввода/вывода для настройки системы
 # @depends core/const, core/logger, core/utils

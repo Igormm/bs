@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: local/declare flags / needs bash constructs: local/declare flags
 # lib/network/avahi.sh — mDNS/Avahi helpers for BS
 # lib/network/avahi.sh — вспомогательные функции mDNS/Avahi для BS
 #

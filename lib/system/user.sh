@@ -1,5 +1,6 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], array, local/declare flags / needs bash constructs: double-bracket [[ ]], array, local/declare flags
 # lib/system/user.sh — restricted system user provisioning: create, lock the
 # password, add groups, write resource limits and verified sudoers files
 # lib/system/user.sh — провижининг ограниченного системного пользователя:

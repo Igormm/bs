@@ -5,6 +5,7 @@
 
 # @depends core/lang, core/const, core/utils, core/logger
 # @tier core
+# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags
 
 # Source Guard
 bs::guard "LIB_NETWORK_SSH" || return 0
