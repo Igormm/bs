@@ -17,6 +17,7 @@ confirm() {
 # Print PATH hint after local install / Подсказка про PATH после локальной установки
 print_path_hint() {
   cat <<EOF
+Каталога ${BIN_DIR} нет в PATH — команда bs не найдётся / ${BIN_DIR} is not in PATH — the bs command will not be found.
 Добавьте каталог с bs в PATH / Add the bs bin directory to PATH:
 
   export PATH="${BIN_DIR}:\$PATH"
@@ -24,10 +25,12 @@ print_path_hint() {
 Например, для bash / For bash, for example:
   echo 'export PATH="${BIN_DIR}:\$PATH"' >> ~/.bashrc
   source ~/.bashrc
-
-Или выполните авто-настройку / Or run the automatic setup:
-  ./install.sh --local --update-path
 EOF
+  # Авто-настройка умеет только стандартный ~/.local/bin.
+  # The automatic setup handles only the standard ~/.local/bin.
+  if [[ "${MODE:-}" == "local" && "${BIN_DIR}" == "${HOME:-}/.local/bin" ]]; then
+    printf '\nИли выполните авто-настройку / Or run the automatic setup:\n  ./install.sh --local --update-path\n'
+  fi
 }
 
 # Update ~/.bashrc with PATH line (with confirmation)
@@ -80,23 +83,29 @@ remove_path_entry() {
   fi
 
   # grep -Fvx исключает только точные совпадения; при пустом результате
-  # (файл состоял лишь из этой строки) оставляем пустой файл.
-  # utils::attempt сохраняет stdout — в отличие от utils::ignore.
-  # tmp-файл создаётся рядом с rc-файлом: mv в пределах одного каталога —
-  # атомарный rename, не копирование через файловые системы.
-  # The tmp file lives next to the rc file: mv within one directory is an
-  # atomic rename, not a cross-filesystem copy.
-  tmp_file="${rc_file}.bs.$$.tmp"
+  # (файл состоял лишь из этой строки) остаётся пустой файл.
+  # Перезапись на месте (cat >), а не mv: сохраняет владельца, права и
+  # симлинк (rc-файл из dotfiles-репозитория) — mv заменил бы их, а под
+  # sudo сделал бы файл root-овым. Временный файл — в TMPDIR.
+  # Rewrite in place (cat >), not mv: keeps owner, mode and symlink (an rc
+  # file managed by a dotfiles repo) — mv would replace them and, under
+  # sudo, make the file root-owned. The temporary file lives in TMPDIR.
+  tmp_file="$(mktemp 2>/dev/null)" || tmp_file=""
+  if [[ -z "${tmp_file}" ]]; then
+    printf "Не удалось создать временный файл для %s\n" "${rc_file}" >&2
+    return 1
+  fi
   if ! utils::attempt grep -Fvx "${line}" "${rc_file}" > "${tmp_file}"; then
     rm -f "${tmp_file}"
     printf "Не удалось прочитать %s\n" "${rc_file}" >&2
     return 1
   fi
-  if ! mv "${tmp_file}" "${rc_file}"; then
+  if ! cat -- "${tmp_file}" > "${rc_file}" 2>/dev/null; then
     rm -f "${tmp_file}"
-    printf "Не удалось изменить %s (нет прав записи?)\n" "${rc_file}" >&2
+    printf "Не удалось изменить %s (нет прав записи?) — удалите строку PATH вручную\nCannot modify %s (read-only?) — remove the PATH line by hand\n" "${rc_file}" "${rc_file}" >&2
     return 1
   fi
+  rm -f "${tmp_file}"
   printf "Удалена строка PATH из %s\nPath line removed from %s\n" "${rc_file}" "${rc_file}"
 }
 
@@ -106,23 +115,77 @@ auto_update_path() {
   local zshrc="${HOME}/.zshrc"
   local line='export PATH="$HOME/.local/bin:$PATH"'
 
+  # Авто-настройка пишет строку с $HOME/.local/bin. Для другого BIN_DIR она
+  # была бы неверной (и её не снял бы uninstall) — объясняем и отдаём подсказку.
+  # The auto setup writes a $HOME/.local/bin line. For another BIN_DIR it
+  # would be wrong (and uninstall would not remove it) — explain and hint.
+  if [[ "${BIN_DIR}" != "${HOME}/.local/bin" ]]; then
+    install_box "АВТО-НАСТРОЙКА PATH НЕ ВЫПОЛНЕНА / PATH AUTO-SETUP SKIPPED" \
+      "• BIN_DIR=${BIN_DIR} — не стандартный ~/.local/bin / is not the standard ~/.local/bin" \
+      "Авто-настройка знает только ~/.local/bin; rc-файлы не изменены / The auto setup knows only ~/.local/bin; rc files are untouched"
+    if ! install_in_path "${BIN_DIR}"; then
+      print_path_hint
+    fi
+    return 0
+  fi
+
   # bashrc
   if is::file "${bashrc}" || ! is::file "${zshrc}"; then
-    if ! utils::quiet_err grep -Fqx "${line}" "${bashrc}"; then
-      printf "\n%s\n" "${line}" >> "${bashrc}"
-      printf "Автоматически добавлено ~/.local/bin в PATH в %s\n" "${bashrc}"
-    else
-      printf "PATH уже настроен в %s\n" "${bashrc}"
-    fi
+    path_manager_add_line "${bashrc}" "${line}"
   fi
 
   # zshrc
   if is::file "${zshrc}"; then
-    if ! utils::quiet_err grep -Fqx "${line}" "${zshrc}"; then
-      printf "\n%s\n" "${line}" >> "${zshrc}"
-      printf "Автоматически добавлено ~/.local/bin в PATH в %s\n" "${zshrc}"
-    else
-      printf "PATH уже настроен в %s\n" "${zshrc}"
-    fi
+    path_manager_add_line "${zshrc}" "${line}"
   fi
+
+  # Установщик — дочерний процесс и не может изменить PATH запустившей его
+  # оболочки: rc-файл подхватит только новый терминал. Подсказываем команду
+  # для текущего.
+  # The installer is a child process and cannot change the PATH of the shell
+  # that started it: only a new terminal reads the rc file. Hint the command
+  # for the current one.
+  if ! install_in_path "${BIN_DIR}"; then
+    local shell_name="${SHELL:-}"
+    shell_name="${shell_name##*/}"
+    local rc_hint="${bashrc}"
+    [[ "${shell_name}" == "zsh" ]] && is::file "${zshrc}" && rc_hint="${zshrc}"
+
+    # В терминале применяем сами: заменяем установщик новой оболочкой
+    # пользователя — она читает rc-файл, как при source. Сделать source в
+    # уже запущенной оболочке дочерний процесс не может.
+    # In a terminal apply it ourselves: replace the installer with a fresh
+    # user shell — it reads the rc file, just like source would. A child
+    # process cannot source into the shell that is already running.
+    if [[ -t 0 && -t 1 && -x "${SHELL:-}" && ( "${shell_name}" == "zsh" || "${shell_name}" == "bash" ) ]]; then
+      log::header "PATH ПРИМЕНЁН / PATH APPLIED"
+      log::success "выполнено: source ${rc_hint} — запущена новая оболочка ${shell_name}, bs доступен"
+      log::success "done: source ${rc_hint} — a fresh ${shell_name} is started, bs is available"
+      log::info "exit — вернуться в прежнюю оболочку / back to the previous shell"
+      exec "${SHELL}"
+    fi
+
+    printf "\nВ ЭТОМ терминале bs появится после / In THIS terminal run:\n"
+    printf "  source %s\n" "${rc_hint}"
+    printf "или откройте новый терминал / or open a new terminal.\n"
+  fi
+}
+
+# Добавить строку PATH в rc-файл $1 (идемпотентно, только точное совпадение
+# строки). Нельзя записать — объясняем и не обрываем установку.
+# Add the PATH line $2 to rc file $1 (idempotent, exact line match only).
+# If it cannot be written, explain instead of aborting the install.
+path_manager_add_line() {
+  local -r rc="$1" line="$2"
+  if utils::quiet_err grep -Fqx "${line}" "${rc}"; then
+    printf "PATH уже настроен в %s\n" "${rc}"
+    return 0
+  fi
+  if printf "\n%s\n" "${line}" >> "${rc}" 2>/dev/null; then
+    printf "Автоматически добавлено ~/.local/bin в PATH в %s\n" "${rc}"
+  else
+    printf "ВНИМАНИЕ: не удалось записать в %s (нет прав?). Добавьте строку вручную:\nNOTE: cannot write to %s (read-only?). Add the line by hand:\n  %s\n" \
+      "${rc}" "${rc}" "${line}"
+  fi
+  return 0
 }

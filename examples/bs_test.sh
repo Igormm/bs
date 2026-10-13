@@ -12,7 +12,7 @@
 
 # Проверка версии фреймворка / Framework version check
 if load "core/version"; then
-    log::info "Версия BS фреймворка: ${BS_VERSION:-unknown}"
+    log::info "Версия BS фреймворка: $(bs::version::get)"
 else
     echo "Модуль версии не найден или не удалось загрузить" >&2
 fi

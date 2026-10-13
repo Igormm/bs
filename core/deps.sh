@@ -207,8 +207,13 @@ deps::missing_tools() {
 
     if [[ "${found}" -ne 0 ]]; then
       local p
-      # Deliberate word splitting: pkg may hold several package names
-      for p in ${pkg}; do
+      local -a pkgs=()
+      # pkg may hold several space-separated package names; split on spaces
+      # explicitly: under bs strict mode IFS is newline/tab and a bare
+      # `for p in ${pkg}` would keep "net-tools iproute2" as ONE name
+      # pkg может содержать несколько имён через пробел; делим по пробелам явно
+      IFS=' ' read -r -a pkgs <<< "${pkg}"
+      for p in "${pkgs[@]}"; do
         __deps_out+=("${p}")
       done
     fi

@@ -104,7 +104,7 @@ systemaudit::check_dependencies() {
     log::debug "Checking System Audit dependencies..."
 
     deps::missing_tools missing_deps \
-        uname:coreutils ps:procps netstat|ss:"net-tools iproute2" lsof find:findutils awk:gawk sed
+        uname:coreutils ps:procps "netstat|ss:net-tools iproute2" lsof find:findutils awk:gawk sed
     
     # Install missing dependencies
     if [[ ${#missing_deps[@]} -gt 0 ]]; then
@@ -1248,19 +1248,19 @@ systemaudit::generate_text_report() {
             
             case "${severity}" in
                 "${AUDIT_SEVERITY_CRITICAL}")
-                    ((critical_count++))
+                    critical_count=$(( critical_count + 1 ))
                     ;;
                 "${AUDIT_SEVERITY_HIGH}")
-                    ((high_count++))
+                    high_count=$(( high_count + 1 ))
                     ;;
                 "${AUDIT_SEVERITY_MEDIUM}")
-                    ((medium_count++))
+                    medium_count=$(( medium_count + 1 ))
                     ;;
                 "${AUDIT_SEVERITY_LOW}")
-                    ((low_count++))
+                    low_count=$(( low_count + 1 ))
                     ;;
                 *)
-                    ((info_count++))
+                    info_count=$(( info_count + 1 ))
                     ;;
             esac
         done
@@ -1284,7 +1284,7 @@ systemaudit::generate_text_report() {
             echo "  Recommendation: $(echo "${finding_json}" | sed 's/.*"recommendation": "\([^"]*\)".*/\1/')"
             echo "  Timestamp: $(echo "${finding_json}" | sed 's/.*"timestamp": "\([^"]*\)".*/\1/')"
             echo "--------------------------------------------------------------------------------"
-            ((index++))
+            index=$(( index + 1 ))
         done
         
         echo ""
@@ -1378,7 +1378,7 @@ systemaudit::generate_xml_report() {
             echo "      <description>$(echo "${finding_json}" | sed 's/.*"description": "\([^"]*\)".*/\1/')</description>"
             echo "      <recommendation>$(echo "${finding_json}" | sed 's/.*"recommendation": "\([^"]*\)".*/\1/')</recommendation>"
             echo "    </finding>"
-            ((index++))
+            index=$(( index + 1 ))
         done
         
         echo "  </findings>"

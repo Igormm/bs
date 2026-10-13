@@ -18,7 +18,7 @@ bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/uti
 #   system::users::create "newuser"
 #   system::users::create "newuser" "/home/newuser" "/bin/bash"
 system::users::create() {
-    local username="${1}"
+    local username="${1:-}"
     local home_dir="${2:-/home/${username}}"
     local shell="${3:-/bin/bash}"
     
@@ -66,7 +66,7 @@ system::users::create() {
 #   system::users::delete "olduser"
 #   system::users::delete "olduser" "yes"
 system::users::delete() {
-    local username="${1}"
+    local username="${1:-}"
     local remove_home="${2:-no}"
     
     if is::empty "${username}"; then
@@ -110,7 +110,7 @@ system::users::delete() {
 # @example
 #   system::users::set_password "username" "newpassword"
 system::users::set_password() {
-    local username="${1}"
+    local username="${1:-}"
     local password="${2:-}"
     
     if is::empty "${username}"; then
@@ -172,8 +172,8 @@ system::users::set_password() {
 # @example
 #   system::users::add_to_group "username" "sudo"
 system::users::add_to_group() {
-    local username="${1}"
-    local group="${2}"
+    local username="${1:-}"
+    local group="${2:-}"
     
     if is::empty "${username}" || is::empty "${group}"; then
         log::warn "Username and group must be specified"
@@ -231,7 +231,7 @@ system::users::list() {
 # @example
 #   system::users::info "username"
 system::users::info() {
-    local username="${1}"
+    local username="${1:-}"
     
     if is::empty "${username}"; then
         log::warn "Username not specified"
@@ -270,7 +270,7 @@ system::users::info() {
 # @example
 #   system::users::lock "username"
 system::users::lock() {
-    local username="${1}"
+    local username="${1:-}"
     
     if is::empty "${username}"; then
         log::warn "Username not specified"
@@ -309,7 +309,7 @@ system::users::lock() {
 # @example
 #   system::users::unlock "username"
 system::users::unlock() {
-    local username="${1}"
+    local username="${1:-}"
     
     if is::empty "${username}"; then
         log::warn "Username not specified"
@@ -348,7 +348,7 @@ system::users::unlock() {
 # @example
 #   system::users::group_create "developers"
 system::users::group_create() {
-    local groupname="${1}"
+    local groupname="${1:-}"
     
     if is::empty "${groupname}"; then
         log::warn "Group name not specified"
@@ -379,7 +379,7 @@ system::users::group_create() {
 # @example
 #   system::users::group_delete "oldgroup"
 system::users::group_delete() {
-    local groupname="${1}"
+    local groupname="${1:-}"
     
     if is::empty "${groupname}"; then
         log::warn "Group name not specified"

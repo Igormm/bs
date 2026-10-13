@@ -18,8 +18,8 @@ bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/uti
 #   system::permissions::chmod "/path/to/file" "755"
 #   system::permissions::chmod "/path/to/file" "u+x"
 system::permissions::chmod() {
-    local target="${1}"
-    local permissions="${2}"
+    local target="${1:-}"
+    local permissions="${2:-}"
     
     if is::empty "${target}" || is::empty "${permissions}"; then
         log::warn "File path and permissions must be specified"
@@ -48,8 +48,8 @@ system::permissions::chmod() {
 #   system::permissions::chown "/path/to/file" "username"
 #   system::permissions::chown "/path/to/file" "username:groupname"
 system::permissions::chown() {
-    local target="${1}"
-    local owner="${2}"
+    local target="${1:-}"
+    local owner="${2:-}"
     
     if is::empty "${target}" || is::empty "${owner}"; then
         log::warn "File path and owner must be specified"
@@ -75,7 +75,7 @@ system::permissions::chown() {
 # @example
 #   system::permissions::readable "/path/to/file"
 system::permissions::readable() {
-    local target="${1}"
+    local target="${1:-}"
     
     if is::empty "${target}"; then
         log::warn "File path must be specified"
@@ -90,7 +90,7 @@ system::permissions::readable() {
 # @example
 #   system::permissions::writable "/path/to/file"
 system::permissions::writable() {
-    local target="${1}"
+    local target="${1:-}"
     
     if is::empty "${target}"; then
         log::warn "File path must be specified"
@@ -105,7 +105,7 @@ system::permissions::writable() {
 # @example
 #   system::permissions::executable "/path/to/script.sh"
 system::permissions::executable() {
-    local target="${1}"
+    local target="${1:-}"
     
     if is::empty "${target}"; then
         log::warn "File path must be specified"
@@ -125,7 +125,7 @@ system::permissions::executable() {
 # @example
 #   system::permissions::view "/path/to/file"
 system::permissions::view() {
-    local target="${1}"
+    local target="${1:-}"
     
     if is::empty "${target}"; then
         log::warn "File path must be specified"
@@ -181,8 +181,8 @@ system::permissions::view() {
 # @example
 #   system::permissions::recursive "/path/to/dir" "755"
 system::permissions::recursive() {
-    local target="${1}"
-    local permissions="${2}"
+    local target="${1:-}"
+    local permissions="${2:-}"
     
     if is::empty "${target}" || is::empty "${permissions}"; then
         log::warn "Directory path and permissions must be specified"
@@ -239,7 +239,7 @@ system::permissions::default() {
 # @example
 #   system::permissions::sticky "/tmp/shared"
 system::permissions::sticky() {
-    local target="${1}"
+    local target="${1:-}"
     
     if is::empty "${target}"; then
         log::warn "Directory path must be specified"
@@ -265,7 +265,7 @@ system::permissions::sticky() {
 # @example
 #   system::permissions::setuid "/usr/bin/passwd"
 system::permissions::setuid() {
-    local target="${1}"
+    local target="${1:-}"
     
     if is::empty "${target}"; then
         log::warn "File path must be specified"
@@ -292,7 +292,7 @@ system::permissions::setuid() {
 # @example
 #   system::permissions::setgid "/usr/bin/wall"
 system::permissions::setgid() {
-    local target="${1}"
+    local target="${1:-}"
     
     if is::empty "${target}"; then
         log::warn "File or directory path must be specified"

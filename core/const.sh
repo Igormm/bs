@@ -123,11 +123,11 @@ declare -g FRAMEWORK_DEBUG=false
 declare -g FRAMEWORK_DRY_RUN=false
 
 # Версия фреймворка / Framework version
-# Владелец переменной — core/version.sh; здесь задаём только если пусто
-# Owner of the variable is core/version.sh; set here only if empty
-if is::empty "${BS_VERSION:-}"; then
-  declare -g BS_VERSION="0.6.0"
-fi
+# Единственный источник — core/version.sh; здесь он только подключается,
+# своего номера у const.sh нет (иначе два номера рано или поздно разойдутся).
+# The only source is core/version.sh; it is just pulled in here, const.sh has
+# no number of its own (two numbers always drift apart sooner or later).
+bs::source_relative "version.sh"
 
 # 
 # Константы для цветового вывода / Color output constants

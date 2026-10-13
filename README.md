@@ -23,7 +23,17 @@ consistent code style and with zero external dependencies.
   самодостаточный файл (фреймворк внутри, извлекается в кэш при первом
   запуске): работает в любом дистрибутиве без установки BS
 - **`bs update`** — применить изменения репозитория к установленным копиям
-  без переустановки (local/system/custom): `./bs update --local`
+  без переустановки (local/system/custom): `./bs update --local`. Источник —
+  локальный репозиторий или GitHub (`bs update --github [--ref REF]`); из
+  установленной копии без репозитория рядом обновление идёт с GitHub. Если
+  локальный репозиторий отстаёт от GitHub, `bs` предупредит и спросит,
+  какой источник взять. Какие установки обновляются и что делает каждая
+  команда — в [documentation/ru/install.md](documentation/ru/install.md#обновление-bs-update)
+- **`bs where`** — все следы BS на машине без изменений: запущенная копия,
+  каждый `bs` в `PATH`, установки (local/system/custom) с версией, манифестом,
+  владельцем и остатками, репозитории, строки в rc-файлах, каталоги данных и
+  кэша; в конце — что вызывает вопросы и какими командами это исправить
+  (`bs where --deep` ищет копии и в необычных местах)
 - **Загрузчик модулей** — `load "lib/io/streams"`, зависимости через
   `# @depends`, защита от циклов и повторной загрузки
 - **`core/args`** — декларативное дерево параметров: валидация, авто-help,
@@ -85,7 +95,7 @@ consistent code style and with zero external dependencies.
 
 load "lib/io/streams"
 
-io::streams::print "hello from BS ${BS_VERSION}"
+io::streams::print "hello from BS $(bs::version::get)"
 ```
 
 Запуск / Run: `./bs run examples/hello.sh`
@@ -286,7 +296,9 @@ sudo ./install.sh
 
 Пути переопределяются переменными окружения `PREFIX`, `BIN_DIR` и
 `LIB_DIR`. Подробнее — в [documentation/ru/install.md](documentation/ru/install.md)
-/ [documentation/en/install.md](documentation/en/install.md).
+/ [documentation/en/install.md](documentation/en/install.md): виды установок,
+манифест `.install`, обновление (`bs update`, `--local`/`--system`/`--github`),
+удаление.
 
 ## Структура / Layout
 

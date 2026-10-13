@@ -54,10 +54,28 @@ main() {
     testframework::section "write_sudoers / sudoers с проверкой"
     local rc=0
     user::write_sudoers demo "systemctl start demo.service" >/dev/null 2>&1 || rc=$?
-    if (( rc == 0 )); then
+    if utils::has visudo && utils::has systemctl; then
+        # A relative command is resolved to an absolute path, otherwise visudo rejects it
+        # Относительная команда приводится к абсолютному пути, иначе visudo её отклонит
+        testframework::assert_equal "0" "${rc}" "sudoers with a bare command name passes visudo / sudoers с именем команды проходит visudo"
+        testframework::assert_command "grep -q 'NOPASSWD: /.*/systemctl start demo.service' '${tmp}/demo'" "command path is absolute / путь команды абсолютный"
+    elif (( rc == 0 )); then
         testframework::assert_true "-f '${tmp}/demo'" "sudoers written and verified / sudoers записан и проверен"
     else
         testframework::assert_false "-f '${tmp}/demo'" "sudoers reverted on visudo failure / sudoers откачен при неудаче visudo"
+    fi
+
+    testframework::section "write_sudoers keeps the old file / прежний файл сохраняется"
+    if utils::has visudo; then
+        printf '# old\nkeep ALL=(root) NOPASSWD: /bin/true\n' > "${tmp}/keep"
+        chmod 440 "${tmp}/keep"
+        rc=0
+        user::write_sudoers keep "(((not a rule" >/dev/null 2>&1 || rc=$?
+        testframework::assert_true "${rc} -ne 0" "invalid sudoers is rejected / неверный sudoers отклонён"
+        testframework::assert_command "grep -q 'NOPASSWD: /bin/true' '${tmp}/keep'" "previous sudoers file survives / прежний файл цел"
+        testframework::assert_command "test -z \"\$(ls '${tmp}' | grep '\\.tmp\\.')\"" "no temp file left / временный файл не остался"
+    else
+        printf 'SKIP: visudo is missing / нет visudo\n'
     fi
 
     rm -rf "${tmp}"

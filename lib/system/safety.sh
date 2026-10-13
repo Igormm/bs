@@ -97,7 +97,7 @@ safety::needs_confirmation() {
 # @param $1 Operation description / Описание операции
 # @return 0 if confirmed, 1 if not / 0 если подтверждено, 1 если нет
 safety::confirm() {
-    local description="${1}"
+    local description="${1:-}"
 
     if [[ "${SAFETY_DRY_RUN}" == "true" ]]; then
         log::info "[DRY-RUN] Would execute: ${description}"
@@ -116,8 +116,8 @@ safety::confirm() {
 # @param $@ Command to execute / Команда для выполнения
 # @return exit code of command / код выхода команды
 safety::execute() {
-    local risk="${1}"
-    local description="${2}"
+    local risk="${1:-}"
+    local description="${2:-}"
     shift 2
 
     if safety::needs_confirmation "${risk}"; then
@@ -139,7 +139,29 @@ safety::execute() {
 # @param $1 Path to validate / Путь для проверки
 # @return 0 if safe, 1 if not / 0 если безопасно, 1 если нет
 safety::validate_path() {
-    local path="${1}"
+    local path="${1:-}"
+
+    # Пустой путь небезопасен: следом за проверкой обычно идёт rm/mv
+    # An empty path is unsafe: rm/mv usually follows the check
+    if is::empty "${path}"; then
+        log::error "Empty path"
+        return "${E_ERROR}"
+    fi
+
+    # Нормализуем: "/etc/", "//", "/etc/." и "/tmp/../etc" — тот же "/etc"
+    # Normalize: "/etc/", "//", "/etc/." and "/tmp/../etc" are the same "/etc"
+    # Проверяются обе формы: лексическая и после realpath (/bin -> /usr/bin)
+    # Both forms are checked: lexical and after realpath (/bin -> /usr/bin)
+    local canon="${path}" real="" dangerous
+    while [[ "${canon}" == *//* ]]; do
+        canon="${canon//\/\///}"
+    done
+    while [[ "${canon}" != "/" && "${canon}" == */ ]]; do
+        canon="${canon%/}"
+    done
+    if utils::has realpath; then
+        real="$(realpath -m -- "${path}" 2>/dev/null)" || real=""
+    fi
 
     # Check for dangerous paths / Проверить на опасные пути
     local dangerous_paths=(
@@ -157,7 +179,7 @@ safety::validate_path() {
     )
 
     for dangerous in "${dangerous_paths[@]}"; do
-        if [[ "${path}" == "${dangerous}" ]]; then
+        if [[ "${canon}" == "${dangerous}" || "${real}" == "${dangerous}" ]]; then
             log::error "Dangerous path: ${path} (system directory)"
             return "${E_ERROR}"
         fi

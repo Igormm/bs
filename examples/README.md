@@ -150,6 +150,42 @@ primitives. Run them with `./bs run examples/output_contract/<name>.sh`.
 - `table.sh` — plain and framed tables / таблицы
 - `tui_elements.sh` — full-screen TUI elements / полноэкранные TUI-элементы
 
+### Media examples: video and audio to a model server / Видео и аудио на сервер модели
+
+- `send_video.sh` — describes a video with a vLLM vision model: cuts it with
+  `ffmpeg`, sends the chunks to `/v1/chat/completions`, finds the longest
+  chunk the server accepts (`--segment auto`, `--suggest`) /
+  описывает видео моделью vLLM по фрагментам, подбирает длину фрагмента
+- `send_audio.sh` — transcribes the audio track of a media file through
+  `/v1/audio/transcriptions` (Whisper-style server) with phrase timings /
+  расшифровывает звуковую дорожку с таймкодами фраз
+- `send_common.sh` — helpers shared by both: the run directory
+  `<output>/<media name>/` (parameters, checkpoint, report, `*.jsonl`, logs) and
+  the lock that keeps two copies from writing one checkpoint / общий каталог
+  прогона и замок от двух одновременных запусков
+
+A rerun of the same command continues from the checkpoint; `--restart` starts
+over. Needs `curl`, `jq`, `ffmpeg`/`ffprobe`. /
+Повторный запуск той же команды продолжает с точки остановки; `--restart` —
+заново.
+
+```bash
+bs run examples/send_video.sh --file clip.mp4 --host llm.local
+bs run examples/send_audio.sh --file talk.mp4 --language ru
+```
+
+If the vision model answers in English although the prompt (`--prompt` or
+`--prompt-file`) asks for another language: give it a system message
+(`--system 'Always answer in Russian…'`) and preset the start of the answer
+with `--prefill 'Описание на русском: '` — the model then continues that text
+instead of starting over in English (`continue_final_message` of vLLM, which
+returns only the continuation; the report shows the prefix plus the
+continuation). A changed prompt, `--system` or `--prefill` is a different run:
+use `--restart` or another `--output`. /
+Если модель отвечает по-английски, несмотря на русский промпт, задайте
+`--system` и начало ответа через `--prefill`; изменённые промпт, `--system` или
+`--prefill` — это другой прогон (`--restart` или другой `--output`).
+
 ## Creating new examples / Создание новых примеров
 
 When adding an example, follow the existing conventions:

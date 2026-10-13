@@ -28,11 +28,14 @@
 |--------|-------|
 | `logger::` | `log::` |
 
-```bash
-# Было (BOSA): logger::info "Message"
-# Было (BOSA): logger::debug "Debug info"
+```text
+# Было:
+logger::info "Message"
+logger::debug "Debug info"
+```
 
-# Стало (BS):
+```bash
+# Стало:
 log::info "Message"
 log::debug "Debug info"
 ```

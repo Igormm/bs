@@ -136,7 +136,7 @@ utils::__tmp_cleanup() {
   return 0
 }
 
-# Человеческий размер: байты или строка с суффиксом (12288K, 1.5G) → "12.0 KiB".
+# Человеческий размер: байты или строка с суффиксом (12288K, 3GiB) → "12.0 MiB".
 # @function utils::human_size
 # @description Human-readable size: bytes or suffixed string → "12.0 KiB".
 # @description Человеческий размер: байты или строка с суффиксом → "12.0 KiB".
@@ -146,6 +146,10 @@ utils::human_size() {
   local v="${1:-0}"
   local -i mult=1
   case "${v}" in
+    *TiB) v="${v%TiB}"; mult=$(( 1024 * 1024 * 1024 * 1024 )) ;;
+    *GiB) v="${v%GiB}"; mult=$(( 1024 * 1024 * 1024 )) ;;
+    *MiB) v="${v%MiB}"; mult=$(( 1024 * 1024 )) ;;
+    *KiB) v="${v%KiB}"; mult=1024 ;;
     *TB) v="${v%TB}"; mult=$(( 1024 * 1024 * 1024 * 1024 )) ;;
     *GB) v="${v%GB}"; mult=$(( 1024 * 1024 * 1024 )) ;;
     *MB) v="${v%MB}"; mult=$(( 1024 * 1024 )) ;;
@@ -205,7 +209,26 @@ utils::now_s() {
 # @description Текущее время в миллисекундах (epoch).
 # @stdout миллисекунды с начала эпохи
 utils::now_ms() {
-  date +%s%3N
+  # bash 5+: EPOCHREALTIME = секунды<разделитель>микросекунды, разделитель
+  # зависит от локали (точка или запятая) — берём только цифры.
+  # bash 5+: EPOCHREALTIME = seconds<separator>microseconds, the separator
+  # is locale-dependent (dot or comma) — keep the digits only.
+  local now="${EPOCHREALTIME:-}"
+  now="${now//[!0-9]/}"
+  if (( ${#now} > 6 )); then
+    printf '%s\n' "${now:0:${#now}-3}"
+    return 0
+  fi
+  # %3N — расширение GNU date; другие date (BSD, busybox) печатают его
+  # буквально («...3N» или «...N»), поэтому вывод проверяется.
+  # %3N is a GNU date extension; other dates (BSD, busybox) print it
+  # literally ("...3N" or "...N"), so the output is validated.
+  now="$(date +%s%3N 2>/dev/null)" || now=""
+  if [[ "${now}" =~ ^[0-9]+$ ]]; then
+    printf '%s\n' "${now}"
+  else
+    printf '%s000\n' "$(date +%s)"
+  fi
 }
 
 # Текущее время в секундах с дробной частью (для интервалов через bc/awk).

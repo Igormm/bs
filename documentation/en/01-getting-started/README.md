@@ -77,6 +77,7 @@ sudo ./install.sh uninstall      # system
 ./bs doctor    # framework integrity check
 ./bs list      # list modules
 ./bs version   # framework version
+./bs version --full   # + where this copy is from
 ```
 
 - `bs doctor` checks that `bootstrap/init.sh`, the core modules, and the
@@ -96,7 +97,7 @@ Runnable copy: [examples/hello.sh](../../../examples/hello.sh).
 
 load "lib/io/streams"
 
-io::streams::print "hello from BS ${BS_VERSION}"
+io::streams::print "hello from BS $(bs::version::get)"
 ```
 
 - `#!/usr/bin/env bs` — runs the script through the `bs` interpreter; the
@@ -110,7 +111,8 @@ io::streams::print "hello from BS ${BS_VERSION}"
 - `load "lib/io/streams"` — path relative to `BS_ROOT`, no `.sh`. Never
   `source` framework modules directly in a new script.
 - `io::streams::print` — safe output: a `printf '%s\n'` wrapper that does
-  not break on values like `-n` or `-e`. `BS_VERSION` is set by core.
+  not break on values like `-n` or `-e`. The version comes from the core
+  function `bs::version::get`.
 
 ## Running scripts
 

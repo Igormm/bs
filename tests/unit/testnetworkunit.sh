@@ -71,6 +71,45 @@ main() {
         testframework::assert_equal "${LIB_ERROR_FILE_NOT_FOUND}" "${rc}" "no IPv4 → LIB_ERROR_FILE_NOT_FOUND"
     fi
 
+    testframework::section "deterministic: fake ip / детерминированно: подставной ip"
+    local fake_bin dns_tmp
+    fake_bin="$(mktemp -d)"
+    cat > "${fake_bin}/ip" <<'FAKE'
+#!/bin/sh
+case "$*" in
+  "link show")
+    echo "1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536"
+    echo "2: enp3s0: <BROADCAST,MULTICAST,UP> mtu 1500"
+    echo "3: wlo1: <BROADCAST,MULTICAST,UP> mtu 1500"
+    echo "4: veth12@if11: <BROADCAST,MULTICAST,UP> mtu 1500"
+    ;;
+  *bad0*) echo "Cannot find device bad0" >&2; exit 1 ;;
+esac
+exit 0
+FAKE
+    chmod +x "${fake_bin}/ip"
+    local old_path="${PATH}"
+    PATH="${fake_bin}:${PATH}"
+    testframework::assert_equal "enp3s0 wlo1 veth12" "$(BS_OUTPUT_FORMAT=string system::network::list_interfaces | tr '\n' ' ' | sed 's/ $//')" "wlo1 is listed, only lo is skipped, @ifN suffix is cut"
+    rc=0; system::network::interface bad0 up >/dev/null 2>&1 || rc=$?
+    testframework::assert_true "${rc} -ne 0" "a failed 'ip link set' is reported"
+    rc=0; system::network::interface eth0 up >/dev/null 2>&1 || rc=$?
+    testframework::assert_equal "0" "${rc}" "a successful 'ip link set' returns 0"
+    PATH="${old_path}"
+    rm -rf "${fake_bin}"
+
+    testframework::section "prefix and dns / префикс и dns"
+    testframework::assert_equal "255.255.255.252" "$(system::network::__netmask 30)" "netmask of /30"
+    testframework::assert_equal "255.255.128.0" "$(system::network::__netmask 17)" "netmask of /17"
+    testframework::assert_false "system::network::__netmask 33" "prefix 33 is invalid"
+    dns_tmp="$(mktemp)"
+    printf 'search example.org\nnameserver 9.9.9.9\noptions edns0\n' > "${dns_tmp}"
+    BS_RESOLV_CONF="${dns_tmp}" FRAMEWORK_DRY_RUN=true system::network::dns 1.1.1.1 >/dev/null 2>&1
+    testframework::assert_command "grep -q '^nameserver 9.9.9.9$' '${dns_tmp}'" "dry-run leaves resolv.conf untouched"
+    BS_RESOLV_CONF="${dns_tmp}" system::network::dns 1.1.1.1 8.8.8.8 >/dev/null 2>&1
+    testframework::assert_equal "search example.org|options edns0|nameserver 1.1.1.1|nameserver 8.8.8.8" "$(paste -sd'|' "${dns_tmp}")" "dns replaces nameservers and keeps other lines"
+    rm -f "${dns_tmp}"
+
     testframework::summary
 }
 

@@ -31,7 +31,12 @@ mk_isolated_home() {
 run_installer() {
     local isolated_home="$1"
     shift
-    env HOME="${isolated_home}" bash "${INSTALLER}" "$@" 2>&1
+    # BS_SYSTEM_PREFIX внутри TMP_ROOT: «системная» установка никогда не
+    # попадает в реальный /usr/local. PATH без ~/.local/bin пользователя.
+    # BS_SYSTEM_PREFIX inside TMP_ROOT: a "system" install never reaches the
+    # real /usr/local. PATH without the user's ~/.local/bin.
+    env HOME="${isolated_home}" PATH="/usr/bin:/bin" BS_SYSTEM_PREFIX="${isolated_home}/sysprefix" \
+        bash "${INSTALLER}" "$@" 2>&1
 }
 
 # Установка по умолчанию (local-режим): пути в ~/.local изолированного HOME
@@ -40,7 +45,8 @@ test_help_flag() {
     iso="$(mk_isolated_home)"
     out="$(run_installer "${iso}" --help)" || rc=$?
     testframework::assert_equal "0" "${rc}" "install.sh --help exits 0"
-    testframework::assert_true "'${out}' =~ BS\ installer" "help output mentions install command"
+    testframework::assert_command "grep -qF 'BS installer' <<< \"\${out}\"" "help output mentions install command"
+    testframework::assert_command "grep -qF 'Установщик BS' <<< \"\${out}\"" "help output is bilingual (RU)"
 }
 
 test_unknown_flag() {
@@ -77,6 +83,15 @@ test_local_install() {
         testframework::assert_true "false" "wrapper exports BS_ROOT"
     fi
 
+    # Манифест установки: как и куда поставлена копия / install manifest
+    testframework::assert_file_exists "${lib}/.install" "install manifest written"
+    testframework::assert_command "grep -qx 'mode=local' '${lib}/.install'" "manifest records the install mode"
+    testframework::assert_command "grep -qx 'lib=${lib}' '${lib}/.install'" "manifest records the lib directory"
+    testframework::assert_command "grep -qx 'bin=${bin}' '${lib}/.install'" "manifest records the wrapper path"
+    local env_out
+    env_out="$(env HOME="${iso}" "${bin}" env)"
+    testframework::assert_true "'${env_out}' =~ mode=local" "bs env shows the install manifest"
+
     local version_out
     version_out="$(env HOME="${iso}" "${bin}" version)"
     # Версия берётся из core/version.sh (единственный источник BS_VERSION), а не хардкодится
@@ -107,7 +122,7 @@ test_reinstall_blocked() {
 
     out="$(run_installer "${iso}" --local)" || rc=$?
     testframework::assert_equal "1" "${rc}" "second install while present exits 1"
-    testframework::assert_true "'${out}' =~ Предупреждение" "reinstall prints warning"
+    testframework::assert_command "grep -qF 'ALREADY INSTALLED' <<< \"\${out}\"" "reinstall prints the bilingual already-installed frame"
 }
 
 test_custom_paths() {
@@ -332,17 +347,48 @@ test_installer_uninstall_safety() {
     testframework::assert_command "test -f '${BS_PROJECT_ROOT}/bs'" "repo survives when TARGET_LIB == SOURCE_ROOT"
 }
 
-test_system_mode_requires_root() {
+# uninstall без --local сам находит локальную установку и не требует root
+# uninstall without --local finds the local install itself, no root needed
+test_uninstall_detects_local() {
+    # Системный префикс изолирован (BS_SYSTEM_PREFIX в run_installer): реальная
+    # /usr/local не влияет на автоопределение.
+    # The system prefix is isolated (BS_SYSTEM_PREFIX in run_installer): the
+    # real /usr/local cannot affect the autodetection.
+    local iso rc=0 out
+    iso="$(mk_isolated_home)"
+    run_installer "${iso}" --local >/dev/null 2>&1 || true
+
+    out="$(run_installer "${iso}" uninstall)" || rc=$?
+    testframework::assert_equal "0" "${rc}" "uninstall without --local exits 0 for a local install"
+    testframework::assert_command "grep -qF 'mode=local' <<< \"\${out}\"" "uninstall reads the mode from the install manifest"
+    testframework::assert_command "test ! -e '${iso}/.local/lib/bs'" "uninstall without --local removes the local install"
+
+    rc=0
+    out="$(run_installer "${iso}" uninstall)" || rc=$?
+    testframework::assert_equal "0" "${rc}" "uninstall with nothing installed exits 0"
+    testframework::assert_command "grep -qF 'не установлена' <<< \"\${out}\"" "uninstall reports that BS is not installed"
+}
+
+test_system_mode_requires_write_access() {
     if [[ "$(id -u)" -eq 0 ]]; then
-        printf "  ⊘ Skipping system-mode root check: running as root\n"
+        printf "  ⊘ Skipping system-mode write-access check: running as root\n"
         return 0
     fi
 
-    local iso rc=0 out
+    # Системный префикс без прав записи (внутри TMP_ROOT): проверяются права
+    # на каталоги, а не EUID. Подробные сценарии — testinstallnegative.sh.
+    # A system prefix without write access (inside TMP_ROOT): directory
+    # permissions are checked, not the EUID. Details: testinstallnegative.sh.
+    local iso rc=0 out ro
     iso="$(mk_isolated_home)"
-    out="$(run_installer "${iso}")" || rc=$?
-    testframework::assert_equal "1" "${rc}" "system install without root exits 1"
-    testframework::assert_true "'${out}' =~ Нужны\ права\ root" "system mode asks for root"
+    ro="${iso}/ro"
+    mkdir -p "${ro}"; chmod 555 "${ro}"
+    out="$(env HOME="${iso}" PATH="/usr/bin:/bin" BS_SYSTEM_PREFIX="${ro}" bash "${INSTALLER}" 2>&1)" || rc=$?
+    chmod 755 "${ro}"
+    testframework::assert_equal "1" "${rc}" "system install without write access exits 1"
+    testframework::assert_command "grep -qF 'Нет прав записи' <<< \"\${out}\"" "system mode explains the missing write access"
+    testframework::assert_command "grep -qF 'sudo ./install.sh' <<< \"\${out}\"" "system mode suggests sudo"
+    testframework::assert_command "grep -qF 'install.sh --local' <<< \"\${out}\"" "system mode suggests --local"
 }
 
 main() {
@@ -373,7 +419,8 @@ main() {
     test_uninstall_readonly_rc
 
     testframework::section "System mode / Системная установка"
-    test_system_mode_requires_root
+    test_uninstall_detects_local
+    test_system_mode_requires_write_access
 
     testframework::summary
 }

@@ -113,7 +113,7 @@ main() {
 
     testframework::section "Раздел"
     testframework::assert_true "true" "True condition"
-    testframework::assert_false "some::failing_command" "Command fails"
+    testframework::assert_false "false" "Command fails"
     testframework::assert_equal "expected" "${result}" "Equality"
     testframework::assert_file_exists "${BS_PROJECT_ROOT}/bs" "File exists"
     testframework::assert_command "ls /tmp" "Command succeeds"

@@ -78,6 +78,7 @@ sudo ./install.sh uninstall      # system
 ./bs doctor    # framework integrity check
 ./bs list      # list modules
 ./bs version   # framework version
+./bs version --full   # + where this copy is from
 ```
 
 - `bs doctor` проверяет наличие `bootstrap/init.sh`, core-модулей и каталогов
@@ -97,7 +98,7 @@ sudo ./install.sh uninstall      # system
 
 load "lib/io/streams"
 
-io::streams::print "hello from BS ${BS_VERSION}"
+io::streams::print "hello from BS $(bs::version::get)"
 ```
 
 - `#!/usr/bin/env bs` — запускает скрипт через интерпретатор `bs`; ядро
@@ -110,8 +111,8 @@ io::streams::print "hello from BS ${BS_VERSION}"
 - `load "lib/io/streams"` — путь относительно `BS_ROOT`, без `.sh`. Не
   подключайте модули фреймворка через `source` в новых скриптах.
 - `io::streams::print` — безопасный вывод: обёртка над `printf '%s\n'`,
-  которая не ломается на значениях вроде `-n` или `-e`. `BS_VERSION`
-  задаёт ядро.
+  которая не ломается на значениях вроде `-n` или `-e`. Версию отдаёт
+  функция ядра `bs::version::get`.
 
 ## Запуск скриптов
 

@@ -27,11 +27,14 @@ Notes on current state:
 |-----|-----|
 | `logger::` | `log::` |
 
-```bash
-# Was (BOSA): logger::info "Message"
-# Was (BOSA): logger::debug "Debug info"
+```text
+# Was:
+logger::info "Message"
+logger::debug "Debug info"
+```
 
-# Now (BS):
+```bash
+# Now:
 log::info "Message"
 log::debug "Debug info"
 ```

@@ -10,6 +10,47 @@ bs::guard "SYSTEM_NETWORK" || return 0
 # Зависимости / Dependencies
 bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../io/files.sh" "../data/format.sh"
 
+# @private Run a network command; log success, or the output on failure
+# @private Выполнить сетевую команду; записать успех или вывод при ошибке
+# @param $1 Success message / Сообщение об успехе
+# @param $@ Command and arguments / Команда и аргументы
+# @return 0 on success, E_ERROR otherwise / 0 при успехе, иначе E_ERROR
+system::network::__run() {
+    local -r message="${1:?message required}"
+    shift
+    local out
+    if out="$("$@" 2>&1)"; then
+        log::info "${message}"
+        return 0
+    fi
+    log::error "Command failed / Команда не удалась: $* ${out:+(${out})}"
+    return "${E_ERROR}"
+}
+
+# @private Dotted netmask for a prefix length 0..32
+# @private Маска сети в виде a.b.c.d для длины префикса 0..32
+# @param $1 Prefix length / Длина префикса
+# @stdout Netmask / Маска сети
+# @return 0 ok, 1 invalid prefix / 1 неверный префикс
+system::network::__netmask() {
+    local -r prefix="${1:-}"
+    [[ "${prefix}" =~ ^[0-9]+$ ]] || return 1
+    local -i bits=$(( 10#${prefix} )) i octet
+    (( bits <= 32 )) || return 1
+    local -a octets=()
+    for (( i = 0; i < 4; i++ )); do
+        if (( bits >= 8 )); then
+            octet=255; bits=$(( bits - 8 ))
+        elif (( bits > 0 )); then
+            octet=$(( 256 - (1 << (8 - bits)) )); bits=0
+        else
+            octet=0
+        fi
+        octets+=("${octet}")
+    done
+    printf '%s.%s.%s.%s\n' "${octets[@]}"
+}
+
 # @description Configure network interface / Настроить сетевой интерфейс
 # @param $1 Interface name (e.g., "eth0", "wlan0") / Имя интерфейса (например, "eth0",
 # "wlan0")
@@ -17,7 +58,7 @@ bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/uti
 # @example
 #   system::network::interface "eth0" "up"
 system::network::interface() {
-    local interface="${1}"
+    local interface="${1:-}"
     local action="${2:-up}"
     
     if is::empty "${interface}"; then
@@ -29,18 +70,15 @@ system::network::interface() {
     if utils::has ip; then
         case "${action}" in
             up)
-                utils::attempt ip link set "${interface}" up
-                log::info "Interface ${interface} brought up"
+                system::network::__run "Interface ${interface} brought up" ip link set "${interface}" up || return "${E_ERROR}"
                 ;;
             down)
-                utils::attempt ip link set "${interface}" down
-                log::info "Interface ${interface} brought down"
+                system::network::__run "Interface ${interface} brought down" ip link set "${interface}" down || return "${E_ERROR}"
                 ;;
             restart)
                 utils::attempt ip link set "${interface}" down
                 sleep 1
-                utils::attempt ip link set "${interface}" up
-                log::info "Interface ${interface} restarted"
+                system::network::__run "Interface ${interface} restarted" ip link set "${interface}" up || return "${E_ERROR}"
                 ;;
             *)
                 log::warn "Unknown action: ${action}"
@@ -51,18 +89,15 @@ system::network::interface() {
         # Fallback to ifconfig / Резервный вариант ifconfig
         case "${action}" in
             up)
-                utils::attempt ifconfig "${interface}" up
-                log::info "Interface ${interface} brought up"
+                system::network::__run "Interface ${interface} brought up" ifconfig "${interface}" up || return "${E_ERROR}"
                 ;;
             down)
-                utils::attempt ifconfig "${interface}" down
-                log::info "Interface ${interface} brought down"
+                system::network::__run "Interface ${interface} brought down" ifconfig "${interface}" down || return "${E_ERROR}"
                 ;;
             restart)
                 utils::attempt ifconfig "${interface}" down
                 sleep 1
-                utils::attempt ifconfig "${interface}" up
-                log::info "Interface ${interface} restarted"
+                system::network::__run "Interface ${interface} restarted" ifconfig "${interface}" up || return "${E_ERROR}"
                 ;;
             *)
                 log::warn "Unknown action: ${action}"
@@ -80,8 +115,8 @@ system::network::interface() {
 # @example
 #   system::network::static_ip "eth0" "192.168.1.100/24"
 system::network::static_ip() {
-    local interface="${1}"
-    local ip_address="${2}"
+    local interface="${1:-}"
+    local ip_address="${2:-}"
     
     if is::empty "${interface}" || is::empty "${ip_address}"; then
         log::warn "Interface name and IP address must be specified"
@@ -90,25 +125,23 @@ system::network::static_ip() {
     
     # Using ip command / Использование команды ip
     if utils::has ip; then
-        utils::attempt ip addr add "${ip_address}" dev "${interface}"
-        log::info "Static IP ${ip_address} assigned to ${interface}"
+        system::network::__run "Static IP ${ip_address} assigned to ${interface}" ip addr add "${ip_address}" dev "${interface}" || return "${E_ERROR}"
     else
         # Fallback to ifconfig / Резервный вариант ifconfig
         # Extract IP and netmask from CIDR / Извлечь IP и маску сети из CIDR
         local ip=$(echo "${ip_address}" | cut -d'/' -f1)
         local cidr=$(echo "${ip_address}" | cut -d'/' -f2)
         
-        # Convert CIDR to netmask (simplified) / Преобразовать CIDR в маску сети
-        # (упрощенно)
-        local netmask="255.255.255.0"
-        if [[ "${cidr}" -eq 16 ]]; then
-            netmask="255.255.0.0"
-        elif [[ "${cidr}" -eq 8 ]]; then
-            netmask="255.0.0.0"
-        fi
+        # CIDR -> маска сети; без "/N" считаем /24
+        # CIDR -> netmask; without "/N" assume /24
+        if [[ "${ip_address}" != */* ]]; then cidr=24; fi
+        local netmask
+        netmask="$(system::network::__netmask "${cidr}")" || {
+            log::warn "Invalid prefix length: ${cidr}"
+            return "${E_INVALID}"
+        }
         
-        utils::attempt ifconfig "${interface}" "${ip}" netmask "${netmask}"
-        log::info "Static IP ${ip} with netmask ${netmask} assigned to ${interface}"
+        system::network::__run "Static IP ${ip} with netmask ${netmask} assigned to ${interface}" ifconfig "${interface}" "${ip}" netmask "${netmask}" || return "${E_ERROR}"
     fi
 }
 
@@ -117,7 +150,7 @@ system::network::static_ip() {
 # @example
 #   system::network::gateway "192.168.1.1"
 system::network::gateway() {
-    local gateway="${1}"
+    local gateway="${1:-}"
     
     if is::empty "${gateway}"; then
         log::warn "Gateway IP address not specified"
@@ -126,12 +159,10 @@ system::network::gateway() {
     
     # Using ip command / Использование команды ip
     if utils::has ip; then
-        utils::attempt ip route add default via "${gateway}"
-        log::info "Default gateway set to ${gateway}"
+        system::network::__run "Default gateway set to ${gateway}" ip route add default via "${gateway}" || return "${E_ERROR}"
     else
         # Fallback to route / Резервный вариант route
-        utils::attempt route add default gw "${gateway}"
-        log::info "Default gateway set to ${gateway}"
+        system::network::__run "Default gateway set to ${gateway}" route add default gw "${gateway}" || return "${E_ERROR}"
     fi
 }
 
@@ -146,16 +177,27 @@ system::network::dns() {
     fi
     
     # Create or overwrite resolv.conf / Создать или перезаписать resolv.conf
-    local resolv_conf="/etc/resolv.conf"
+    # Путь переопределяется для тестов / The path is overridable for tests
+    local resolv_conf="${BS_RESOLV_CONF:-/etc/resolv.conf}"
     if is::writable "${resolv_conf}"; then
-        # Clear existing nameservers / Очистить существующие nameserver
-        utils::attempt sed -i '/^nameserver/d' "${resolv_conf}"
-        
-        # Add new nameservers / Добавить новые nameserver
+        if [[ "${FRAMEWORK_DRY_RUN:-false}" == "true" ]]; then
+            log::info "[DRY-RUN] DNS servers would be set in ${resolv_conf}: $*"
+            return "${E_SUCCESS}"
+        fi
+        # Новое содержимое собираем заранее и пишем одним разом (с сохранением
+        # symlink): при сбое старые nameserver не пропадают, а dry-run ничего не трогает
+        # The new content is built first and written in one go (keeps a
+        # symlink): on failure the old nameservers stay, and dry-run touches nothing
+        local dns content
+        content="$(utils::attempt awk '!/^nameserver/' "${resolv_conf}")" || content=""
         for dns in "$@"; do
-            io::files::append "${resolv_conf}" "nameserver ${dns}"
+            content+="${content:+$'\n'}nameserver ${dns}"
         done
-        
+        if ! printf '%s\n' "${content}" > "${resolv_conf}"; then
+            log::error "Failed to write ${resolv_conf}"
+            return "${E_ERROR}"
+        fi
+
         log::info "DNS servers configured: $*"
     else
         log::warn "Cannot write to ${resolv_conf}"
@@ -169,10 +211,12 @@ system::network::dns() {
 system::network::list_interfaces() {
     local names=""
     if utils::has ip; then
-        names="$(utils::quiet_err ip link show | awk -F': ' '/^[0-9]+: / {print $2}' | grep -v 'lo')"
+        # Имя без суффикса "@ifN" (veth/vlan); исключается ровно "lo", а не всё с "lo" в имени (wlo1)
+        # Name without the "@ifN" suffix (veth/vlan); exactly "lo" is skipped, not every name containing "lo" (wlo1)
+        names="$(utils::quiet_err ip link show | awk -F': ' '/^[0-9]+: / {n = $2; sub(/@.*/, "", n); if (n != "lo") print n}')"
     else
         # Fallback to ifconfig / Резервный вариант ifconfig
-        names="$(utils::quiet_err ifconfig -a | awk '/^[a-zA-Z]/ {print $1}' | grep -v 'lo' | sed 's/://')"
+        names="$(utils::quiet_err ifconfig -a | awk '/^[a-zA-Z]/ {n = $1; sub(/:$/, "", n); if (n != "lo") print n}')"
     fi
     local name
     while IFS= read -r name; do

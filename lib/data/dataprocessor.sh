@@ -424,7 +424,7 @@ dataprocessor::csv::validate() {
                 return 1
             fi
         fi
-        ((line_num++))
+        line_num=$(( line_num + 1 ))
     done <<< "$(echo "${csv_data}" | tail -n +2)"
     
     return 0
