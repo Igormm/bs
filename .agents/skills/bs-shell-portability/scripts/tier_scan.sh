@@ -8,6 +8,7 @@
 # "# @shell <tier>" annotation of the file header:
 #   posix  - valid POSIX sh: dash, ash/busybox, bash, zsh, ksh can source it
 #   bash4  - needs bash 4.2+ as the host (the default of an unannotated file)
+#   synonyms: sh, shell = posix; bash = bash4 (others: bs_shell_tier_word)
 # За каждым файлом перечисляются конструкции, существующие только в bash (или
 # в немногих оболочках), считается минимальный tier и сравнивается с
 # аннотацией "# @shell <tier>" в заголовке файла.
@@ -89,6 +90,7 @@ scan_file() {
   local -r f="$1"
   local declared computed="posix" found raw stripped found_code
   declared="$(declared_of "${f}")"
+  case "${declared}" in sh|shell) declared="posix" ;; bash) declared="bash4" ;; esac
   # Текст без комментариев; и он же без строковых литералов (конструкция в
   # сообщении или в строке для `bash -c` — не конструкция этого файла)
   # Text without comments; and the same without string literals (a construct

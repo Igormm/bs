@@ -385,21 +385,55 @@ bs_shell_file_tier() {
   printf '%s\n' "$__bs_ft"
 }
 
+# @description Canonical form of one tier word. Synonyms: sh, shell, posix ->
+#   posix; bash, bash4 -> bash4; fs, fish -> fish; nu, nushell -> nu; the names
+#   of other shells go through bs_shell_of_name; an unknown word stays as is.
+# @description Каноническая форма одного слова tier. Синонимы: sh, shell, posix ->
+#   posix; bash, bash4 -> bash4; fs, fish -> fish; nu, nushell -> nu; имена
+#   других оболочек проходят через bs_shell_of_name; неизвестное слово остаётся.
+# @param $1 word / слово
+# @stdout canonical word / каноническое слово
+bs_shell_tier_word() {
+  case "${1:-}" in
+    posix|sh|shell) printf 'posix\n' ;;
+    bash4|bash)     printf 'bash4\n' ;;
+    fs|fish)        printf 'fish\n' ;;
+    *)
+      __bs_tw=$(bs_shell_of_name "${1:-}")
+      if [ "$__bs_tw" = unknown ]; then printf '%s\n' "${1:-}"; else printf '%s\n' "$__bs_tw"; fi ;;
+  esac
+}
+
 # @description May a file of this tier run when BS was started from this shell?
 #   posix — from any; bash4 — only from bash 4.2+; any other word (zsh, fish,
-#   nu, ...) — only from the shell of that name. The tier may be a list: a,b.
+#   nu, ...) — only from the shell of that name. The tier may be a list: a,b;
+#   words may be synonyms (see bs_shell_tier_word), the shell too (fs, nushell).
 # @description Можно ли исполнять файл этого tier, если BS запущен из этой оболочки?
 #   posix — из любой; bash4 — только из bash 4.2+; любое другое слово (zsh,
-#   fish, nu, ...) — только из оболочки с этим именем. Tier может быть списком: a,b.
+#   fish, nu, ...) — только из оболочки с этим именем. Tier может быть списком: a,b;
+#   слова могут быть синонимами (см. bs_shell_tier_word), оболочка — тоже (fs, nushell).
 # @param $1 tier / tier
-# @param $2 origin shell family / семейство исходной оболочки
+# @param $2 origin shell / исходная оболочка
 # @return 0 allowed, 1 not allowed / 0 можно, 1 нельзя
 bs_shell_tier_allows() {
-  case ",${1:-bash4}," in *,posix,*) return 0 ;; esac
-  case ",${1:-bash4}," in *",${2:-},"*) return 0 ;; esac
-  if [ "${2:-}" = bash ]; then
-    case ",${1:-bash4}," in *,bash4,*) return 0 ;; esac
-  fi
+  case "${2:-}" in
+    fs) __bs_to=fish ;;
+    *)
+      __bs_to=$(bs_shell_of_name "${2:-}")
+      [ "$__bs_to" != unknown ] || __bs_to=${2:-} ;;
+  esac
+  __bs_tl=${1:-bash4}
+  __bs_tifs=$IFS
+  IFS=,
+  for __bs_tk in $__bs_tl; do
+    IFS=$__bs_tifs
+    __bs_tk=$(bs_shell_tier_word "$__bs_tk")
+    [ "$__bs_tk" != posix ] || return 0
+    [ "$__bs_tk" != "$__bs_to" ] || return 0
+    if [ "$__bs_tk" = bash4 ] && [ "$__bs_to" = bash ]; then return 0; fi
+    IFS=,
+  done
+  IFS=$__bs_tifs
   return 1
 }
 
@@ -429,7 +463,7 @@ bs_shell_tier_desc() {
 if [ -n "${BASH_VERSION:-}" ] || [ -n "${ZSH_VERSION:-}" ]; then
   for __bs_fn in of_name family login parent user rc_file rc_scan all_rc_files \
       path_line reload_hint fresh_flags known host_ok host_find tier tier_desc \
-      file_tier tier_allows; do
+      file_tier tier_word tier_allows; do
     eval "bs::shell::${__bs_fn}() { bs_shell_${__bs_fn} \"\$@\"; }"
   done
 fi

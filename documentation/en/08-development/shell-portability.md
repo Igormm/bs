@@ -85,6 +85,8 @@ trampoline; a bash that reached the trampoline counts as `sh`).
 | another word (`zsh`, `fish`, `nu`, …) | the shell of that name |
 | a list `zsh,bash4` | any of them |
 
+Synonyms (tier words and shell names): `sh`, `shell`, `posix` = `posix`; `bash`, `bash4` = `bash4`; `fs`, `fish` = `fish`; `nu`, `nushell` = `nu`. An unknown word is kept as is.
+
 `core/` (the kernel) is always allowed; otherwise nothing could start. A
 refusal names the module, its tier and the origin shell, and exits 1:
 

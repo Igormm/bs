@@ -56,6 +56,26 @@ test_rules() {
     eq "no" "$(allows '' dash)" "no tier means bash4: refused from dash"
 }
 
+test_synonyms() {
+    local w
+    for w in sh shell posix; do eq "posix" "$(bs_shell_tier_word "${w}")" "tier word ${w} = posix"; done
+    for w in bash bash4; do eq "bash4" "$(bs_shell_tier_word "${w}")" "tier word ${w} = bash4"; done
+    for w in fs fish; do eq "fish" "$(bs_shell_tier_word "${w}")" "tier word ${w} = fish"; done
+    for w in nu nushell; do eq "nu" "$(bs_shell_tier_word "${w}")" "tier word ${w} = nu"; done
+    eq "zsh" "$(bs_shell_tier_word zsh)" "tier word zsh stays"
+    eq "weird" "$(bs_shell_tier_word weird)" "an unknown tier word stays as is"
+    eq "yes" "$(allows sh dash)" "tier sh = posix: allowed from dash"
+    eq "yes" "$(allows shell zsh)" "tier shell = posix: allowed from zsh"
+    eq "yes" "$(allows nushell nu)" "tier nushell: allowed from nu"
+    eq "yes" "$(allows nu nushell)" "tier nu: allowed from the origin nushell"
+    eq "yes" "$(allows fs fish)" "tier fs: allowed from fish"
+    eq "yes" "$(allows fish fs)" "tier fish: allowed from the origin fs"
+    eq "no" "$(allows nushell fish)" "tier nushell: refused from fish"
+    eq "yes" "$(allows bash bash)" "tier bash: allowed from bash"
+    eq "no" "$(allows bash dash)" "tier bash: refused from dash"
+    eq "yes" "$(allows fs,nushell nu)" "a list of synonyms"
+}
+
 test_file_tier() {
     printf '#!/bin/sh\n# @shell posix — fine\necho a\n' > "${T}/a.sh"
     printf '#!/bin/bash\n# @shell zsh,bash4 — both\n' > "${T}/b.sh"
@@ -104,6 +124,8 @@ main() {
 
     testframework::section "Rules / Правила"
     test_rules
+    testframework::section "Synonyms / Синонимы"
+    test_synonyms
     testframework::section "File tier / Tier файла"
     test_file_tier
     testframework::section "bs --strict-shell"
