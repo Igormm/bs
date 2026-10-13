@@ -260,3 +260,5 @@ dc> 4 *                    # → 5, then 20
 Exit interactive mode with `:q` or Ctrl-D. Implementation:
 `core/calc.sh` ([calc.sh](../../../core/calc.sh)), tests:
 `tests/integration/testcalc.sh`.
+
+- [Shell portability](shell-portability.md) — host / user / script shell, `@shell` tiers, trampoline.

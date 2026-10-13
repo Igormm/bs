@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# @shell bash4 — installer code: runs in bash 4.2+, writes PATH/rc for the shell of the USER (bootstrap/shell.sh)
+# @shell bash4 — код установщика: исполняется в bash 4.2+, пишет PATH/rc для оболочки ПОЛЬЗОВАТЕЛЯ (bootstrap/shell.sh)
 # shellcheck disable=SC2034  # INSTALL_ACTION is read by notice.sh / читается в notice.sh
 
 # Installation and uninstallation functions
@@ -278,7 +280,7 @@ do_install() {
     seen="$(PATH="${INSTALL_ORIG_PATH:-${PATH}}" command -v bs 2>/dev/null || true)"
     if [[ -z "${seen}" ]]; then
       rows+=("ВНИМАНИЕ / NOTE: команда bs не найдена в PATH этой оболочки / the bs command is not in the PATH of this shell (${BIN_DIR} отсутствует / is missing)")
-      rows+=("Исправить / Fix:  source ~/.zshrc  (или новый терминал / or a new terminal);" "  ./install.sh --local --update-path  — дописать строку в rc-файл / add the line to the rc file")
+      rows+=("Исправить / Fix:  $(bs_shell_reload_hint "$(install_user_shell)")  (или новый терминал / or a new terminal);" "  ./install.sh --local --update-path  — дописать строку в rc-файл / add the line to the rc file")
     elif [[ "${seen}" != "${TARGET_BIN}" ]]; then
       rows+=("ВНИМАНИЕ / NOTE: по команде bs запускается другая копия / the bs command runs another copy: ${seen}")
     fi
@@ -464,8 +466,7 @@ do_uninstall() {
       printf "PATH-строка в rc-файлах оставлена: жива локальная установка %s\nPATH line kept in rc files: the local install %s still exists\n" \
         "${HOME}/.local/bin/bs" "${HOME}/.local/bin/bs"
     else
-      remove_path_entry "${HOME}/.bashrc" || true
-      remove_path_entry "${HOME}/.zshrc" || true
+      remove_path_entries_all
     fi
   fi
 

@@ -219,7 +219,7 @@ platform::__ensure() {
 
 # @description Get one fact (capability vector entry).
 # @description Получить один факт (запись вектора возможностей).
-# @param $1 Key: kernel/arch/distro/family/repo/userland/libc/bash/shell_version/shell/shell_ok/tier/
+# @param $1 Key: kernel/arch/distro/family/repo/userland/libc/bash/shell_version/shell/shell_ok/user_shell/shell_tier/tier/
 #        procfs/sysfs/dmi/tool_* / Ключ
 # @param $2 [optional] Default / Значение по умолчанию
 # @stdout the fact / факт
@@ -228,8 +228,16 @@ platform::__ensure() {
 #   platform::get repo        # dnf
 #   platform::get tool_grep_p # 1
 platform::get() {
-  platform::__ensure
   local -r key="${1:?key required}"
+  # Контекстные факты зависят от того, кто и откуда запустил bs, поэтому не
+  # кэшируются: оболочка пользователя и tier BS для неё (bootstrap/shell.sh).
+  # Context facts depend on who started bs and from where, so they are not
+  # cached: the user's shell and the BS tier for it (bootstrap/shell.sh).
+  case "${key}" in
+    user_shell) bs_shell_user; return 0 ;;
+    shell_tier) bs_shell_tier; return 0 ;;
+  esac
+  platform::__ensure
   if [[ -v PF_FACTS["${key}"] ]]; then
     printf '%s\n' "${PF_FACTS[${key}]}"
     return 0

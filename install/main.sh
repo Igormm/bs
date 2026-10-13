@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# @shell bash4 — installer code: runs in bash 4.2+, writes PATH/rc for the shell of the USER (bootstrap/shell.sh)
+# @shell bash4 — код установщика: исполняется в bash 4.2+, пишет PATH/rc для оболочки ПОЛЬЗОВАТЕЛЯ (bootstrap/shell.sh)
 # shellcheck disable=SC2034  # globals are shared between install/*.sh (sourced files)
 # shellcheck disable=SC2034  # глобальные переменные общие для install/*.sh (подключаемые файлы)
 #
@@ -18,7 +20,7 @@ usage() {
 BS installer / Установщик BS
 
 Usage / Использование:
-  ./install.sh [--local] [install|uninstall] [--path|--update-path]
+  ./install.sh [--local] [install|uninstall] [--path|--update-path] [--shell NAME]
   sudo ./install.sh [install|uninstall]
 
 Modes / Режимы:
@@ -32,6 +34,15 @@ Modes / Режимы:
              files would become root-owned.
 
 Overrides / Переопределения: PREFIX=... BIN_DIR=... LIB_DIR=...  (абсолютные пути / absolute paths)
+
+Shell of the user / Оболочка пользователя:
+  PATH и подсказки настраиваются под ВАШУ оболочку (не под ту, что исполняет
+  установщик: он всегда bash). Определяется по родительскому процессу, затем
+  по $SHELL; задать явно: --shell NAME или BS_USER_SHELL=NAME.
+  NAME: bash zsh ash dash sh ksh mksh oksh osh fish nu.
+  PATH and hints are set up for YOUR shell (not the one running the installer:
+  that is always bash). Detected from the parent process, then $SHELL; set it
+  explicitly with --shell NAME or BS_USER_SHELL=NAME.
 
 Safety / Безопасность:
   Установщик не перезаписывает и не удаляет чужое: каталог lib, не являющийся
@@ -57,6 +68,7 @@ Examples / Примеры:
   PREFIX=$HOME/opt/bs ./install.sh        # custom prefix, no root if writable
   ./install.sh --local --path
   ./install.sh --local --update-path
+  ./install.sh --local --update-path --shell fish    # PATH для fish / for fish
 HELP
 }
 
@@ -77,6 +89,14 @@ while [[ $# -gt 0 ]]; do
       FLAG_PATH="1"; shift ;;
     --update-path)
       FLAG_UPDATE_PATH="1"; shift ;;
+    --shell)
+      if [[ $# -lt 2 || -z "${2:-}" || "$(bs_shell_of_name "$2")" == "unknown" ]]; then
+        printf "ERROR: --shell требует имя оболочки: bash zsh ash dash sh ksh mksh oksh osh fish nu\n" >&2
+        printf "       --shell needs a shell name: bash zsh ash dash sh ksh mksh oksh osh fish nu\n" >&2
+        exit 1
+      fi
+      BS_USER_SHELL="$(bs_shell_of_name "$2")"; export BS_USER_SHELL
+      shift 2 ;;
     -h|--help)
       usage; exit 0 ;;
     install|uninstall|remove)

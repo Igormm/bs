@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# @shell bash4 — bash 4.2+ file behind a POSIX prologue: sh/dash/zsh/bash 3.2 re-run it in bash (bootstrap/trampoline.sh)
+# @shell bash4 — файл bash 4.2+ за POSIX-прологом: sh/dash/zsh/bash 3.2 перезапускают его в bash (bootstrap/trampoline.sh)
 #
 # BS installer (Linux) / Установщик BS (Linux)
 #
@@ -38,8 +40,28 @@
 #   BS_SYSTEM_PREFIX=...                 (system prefix, default /usr/local)
 #
 
+# --- POSIX-пролог (валиден в sh/dash/ash/zsh/bash) / POSIX prologue ---------
+# Если запущены не bash 4+ (sh install.sh, zsh ./bs, bash 3.2, bash как sh),
+# перезапускаемся в подходящем bash или объясняем, что поставить. В bash 4+
+# это одна проверка. Текст пролога одинаков во всех точках входа (тест).
+# Unless run by bash 4+ (sh install.sh, zsh ./bs, bash 3.2, bash as sh), re-run
+# in a capable bash or explain what to install. In bash 4+ it is one test.
+if [ -z "${BASH_VERSION:-}" ] || [ "${BASH_VERSINFO:-0}" -lt 4 ] \
+   || { case ":${SHELLOPTS:-}:" in *:posix:*) true ;; *) false ;; esac; }; then
+  # zsh меняет $0 внутри подключаемого файла — путь точки входа запоминаем здесь
+  # zsh changes $0 inside a sourced file — the entry point path is saved here
+  __bs_s=$0
+  __bs_p=$0
+  __bs_r=$(readlink -f -- "$0" 2>/dev/null) && [ -n "$__bs_r" ] && __bs_p=$__bs_r
+  case $__bs_p in */*) __bs_p=${__bs_p%/*} ;; *) __bs_p=. ;; esac
+  # shellcheck disable=SC1091
+  . "$__bs_p/bootstrap/trampoline.sh"
+fi
+unset __BS_TRAMPOLINE __bs_p __bs_r __bs_s
+# --- конец пролога / end of the prologue ------------------------------------
+
 # Определить каталог запуска скрипта
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd -- "$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}" 2>/dev/null || printf '%s' "${BASH_SOURCE[0]}")")" && pwd)"
 
 # Определить каталог с файлами установки
 INSTALLER_DIR="${SCRIPT_DIR}/install"

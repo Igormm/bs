@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- shells: BS entry points (`bs`, `install.sh`, `boot.sh`) start with a POSIX prologue and re-run themselves in a capable bash via `bootstrap/trampoline.sh` (`sh install.sh`, `dash ./bs`, `zsh ./bs`, bash as `sh`); `BS_HOST_BASH` overrides the search; without bash 4.2+ a bilingual message with install hints
+- shells: `bootstrap/shell.sh` — POSIX registry of shells (bash zsh dash ash sh ksh mksh oksh osh fish nu): rc file, PATH line, reload command, host search, tier; `bs::shell::*` aliases in bash/zsh
+- shells: `@shell posix|bash4` annotation, `platform::get user_shell|shell_tier` (native / hosted / unsupported)
+- install: PATH is set up for the user's shell (`--shell NAME`, `BS_USER_SHELL`), uninstall cleans every family; `bs init-shell [SHELL|--list]`; `bs where` shows the shell section
+- skill: bs-shell-portability (tier_scan.sh, probe_shells.sh, shell matrix); docs: 08-development/shell-portability.md
+- tests: unit/testshellunit.sh, testtrampolineunit.sh, testshelltierunit.sh, integration/testinstallshells.sh
+
+### Not verified
+- ash/busybox, ksh, mksh, oksh, osh, fish, nu were not run on real interpreters; only generated texts are tested
+
 ## [0.7.4] - 2026-10-12
 
 ### Added

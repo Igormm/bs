@@ -32,6 +32,7 @@ sandbox() {
 run_where() {
     RC=0
     OUT="$(cd "${T}" && env -i HOME="${T}/home" PATH="${P}" BS_SYSTEM_PREFIX="${T}/sys" \
+        ${BS_USER_SHELL:+BS_USER_SHELL="${BS_USER_SHELL}"} \
         bash "${BS_PROJECT_ROOT}/bs" where "$@" 2>&1)" || RC=$?
 }
 
@@ -98,7 +99,17 @@ test_local_install() {
     has "bs не найдена в PATH этой оболочки" "no ~/.local/bin in the caller PATH: reported"
     has "does NOT contain ${T}/home/.local/bin" "no ~/.local/bin in the caller PATH: the PATH row says so"
     has 'export PATH="$HOME/.local/bin:$PATH"' "no ~/.local/bin in the caller PATH: the immediate fix is offered"
-    has "source ~/.zshrc" "no ~/.local/bin in the caller PATH: source is offered"
+    # Подсказка перезагрузки — для оболочки пользователя (реестр bootstrap/shell.sh)
+    # The reload hint is for the user's shell (the registry in bootstrap/shell.sh)
+    has "source ~/.bashrc" "no ~/.local/bin in the caller PATH: the reload command of the user's shell"
+    BS_USER_SHELL=zsh run_where
+    has "source ~/.zshrc" "BS_USER_SHELL=zsh: the zsh reload command is offered"
+    BS_USER_SHELL=fish run_where
+    has "source ~/.config/fish/conf.d/bs.fish" "BS_USER_SHELL=fish: the fish reload command is offered"
+    has 'contains -- "$HOME/.local/bin"' "BS_USER_SHELL=fish: the PATH line is in fish syntax"
+    BS_USER_SHELL=nu run_where
+    has "exec nu" "BS_USER_SHELL=nu: the nushell reload command is offered"
+    P="/usr/bin:/bin"
     lacks "всё согласовано" "no ~/.local/bin in the caller PATH: not reported as consistent"
     P="${T}/home/.local/bin:/usr/bin:/bin"
 

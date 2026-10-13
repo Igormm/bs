@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# @shell bash4 — bash 4.2+ file behind a POSIX prologue: sh/dash/zsh/bash 3.2 re-run it in bash (bootstrap/trampoline.sh)
+# @shell bash4 — файл bash 4.2+ за POSIX-прологом: sh/dash/zsh/bash 3.2 перезапускают его в bash (bootstrap/trampoline.sh)
 #
 #  BS Framework – STAGE-2 UNIFIED ENTRY-POINT / INTERPRETER
 #  Назначение / Purpose:
@@ -9,6 +11,26 @@
 #              core/, lib/ (опционально, но doctor ругается).
 #
 
+# --- POSIX-пролог (валиден в sh/dash/ash/zsh/bash) / POSIX prologue ---------
+# Если запущены не bash 4+ (sh install.sh, zsh ./bs, bash 3.2, bash как sh),
+# перезапускаемся в подходящем bash или объясняем, что поставить. В bash 4+
+# это одна проверка. Текст пролога одинаков во всех точках входа (тест).
+# Unless run by bash 4+ (sh install.sh, zsh ./bs, bash 3.2, bash as sh), re-run
+# in a capable bash or explain what to install. In bash 4+ it is one test.
+if [ -z "${BASH_VERSION:-}" ] || [ "${BASH_VERSINFO:-0}" -lt 4 ] \
+   || { case ":${SHELLOPTS:-}:" in *:posix:*) true ;; *) false ;; esac; }; then
+  # zsh меняет $0 внутри подключаемого файла — путь точки входа запоминаем здесь
+  # zsh changes $0 inside a sourced file — the entry point path is saved here
+  __bs_s=$0
+  __bs_p=$0
+  __bs_r=$(readlink -f -- "$0" 2>/dev/null) && [ -n "$__bs_r" ] && __bs_p=$__bs_r
+  case $__bs_p in */*) __bs_p=${__bs_p%/*} ;; *) __bs_p=. ;; esac
+  # shellcheck disable=SC1091
+  . "$__bs_p/bootstrap/trampoline.sh"
+fi
+unset __BS_TRAMPOLINE __bs_p __bs_r __bs_s
+# --- конец пролога / end of the prologue ------------------------------------
+
 # PATH вызвавшей оболочки. Загрузка ядра дописывает ~/.local/bin в PATH
 # ЭТОГО процесса (bs::append_local_bin_to_path), поэтому `bs where` сверяется
 # с этой копией, а не с PATH процесса.
@@ -18,7 +40,8 @@
 BS_CALLER_PATH="${PATH}"
 
 # 1. Каталог entry-point'а — нужен до загрузки чего-либо
-BS_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+# readlink -f: bs можно вызвать по символической ссылке (~/bin/bs -> .../bs)
+BS_DIR=$(cd -- "$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}" 2>/dev/null || printf '%s' "${BASH_SOURCE[0]}")")" &>/dev/null && pwd)
 
 # 2. Pre-kernel root namespace: shell version gate (bash 3.2-compatible)
 #    Строгий режим включается именованной pre-kernel функцией bs::strict.
@@ -112,7 +135,7 @@ Maintenance / Обслуживание:
   update [opts]       Update installed copies from a local repo or GitHub / обновление
   uninstall [opts]    Remove installed BS copies / удаление
   where [--deep]      Find every trace of BS on this machine / все следы BS на машине
-  init-shell          Print snippet for ~/.bashrc or ~/.zshrc / snippet для shell
+  init-shell [SHELL]  PATH snippet for your shell: bash zsh ash dash ksh fish nu / snippet для вашей оболочки
 
 Shebang mode:
   #!/usr/bin/env bs
@@ -154,7 +177,7 @@ help_cmd() {
     update|sync)    update_cmd --help ;;
     uninstall)      uninstall_cmd --help ;;
     where)          where_cmd --help ;;
-    init-shell)     printf 'Usage: bs init-shell\n\nPrint snippet for ~/.bashrc or ~/.zshrc.\n' ;;
+    init-shell)     init_shell_usage ;;
     rfc)            rfc_cmd --help ;;
     *)              die "help: unknown command: ${cmd}" ;;
   esac
@@ -460,7 +483,7 @@ doctor_cmd() {
   # (bootstrap/bs.sh::bs::shell::ensure_version) — повторная проверка не нужна.
 
   # Required core files / Обязательные файлы ядра
-  local req=(bootstrap/init.sh bootstrap/loader.sh bootstrap/bs.sh core/prereq.sh core/lang.sh core/const.sh core/logger.sh core/errorhandler.sh core/version.sh core/utils.sh core/config.sh core/deps.sh core/repl.sh core/calc.sh)
+  local req=(bootstrap/init.sh bootstrap/loader.sh bootstrap/bs.sh bootstrap/shell.sh bootstrap/trampoline.sh core/prereq.sh core/lang.sh core/const.sh core/logger.sh core/errorhandler.sh core/version.sh core/utils.sh core/config.sh core/deps.sh core/repl.sh core/calc.sh)
   local f
   for f in "${req[@]}"; do
     if is::file "${BS_ROOT}/${f}"; then
@@ -483,6 +506,22 @@ doctor_cmd() {
       fail=1
     fi
   done
+
+  # Оболочка: кто исполняет BS, чья оболочка у пользователя, tier, аннотации модулей
+  # The shell: who runs BS, whose shell the user has, the tier, module annotations
+  local dfam duser dtier
+  dfam="$(bs_shell_family)"
+  duser="$(bs_shell_user)"
+  dtier="$(bs_shell_tier "${duser}")"
+  log::success "$(printf '  %-8s | %-30s | %s' "OK" "shell (host)" "${dfam} ${BASH_VERSION}")"
+  log::success "$(printf '  %-8s | %-30s | %s' "OK" "shell (yours)" "${duser}, tier ${dtier}")"
+  log::info "$(printf '  %-8s | %-30s | %s' "" "" "$(bs_shell_tier_desc "${dtier}")")"
+  pass=$(( pass + 2 ))
+  local ann_posix ann_bash4
+  ann_posix="$(grep -rlE '^# @shell posix' "${BS_ROOT}/bootstrap" "${BS_ROOT}/core" "${BS_ROOT}/lib" 2>/dev/null | wc -l || true)"
+  ann_bash4="$(grep -rlE '^# @shell bash4' "${BS_ROOT}/bootstrap" "${BS_ROOT}/core" "${BS_ROOT}/lib" 2>/dev/null | wc -l || true)"
+  log::success "$(printf '  %-8s | %-30s | %s' "OK" "module shell tiers" "posix=${ann_posix} bash4=${ann_bash4} (без аннотации = bash4 / unmarked = bash4)")"
+  pass=$(( pass + 1 ))
 
   # Optional external tools / Опциональные внешние инструменты
   local opt
@@ -816,12 +855,81 @@ audit_cmd() {
   return 0
 }
 
+# @private Каталог с командой bs для PATH: из манифеста (bin=), иначе рядом с
+# установкой (<prefix>/bin), иначе сам BS_ROOT (репозиторий с лаунчером bs).
+# Для ~/.local/bin возвращается буквальный $HOME/.local/bin — как в установщике.
+# @private The directory with the bs command for PATH: from the manifest
+# (bin=), else next to the install (<prefix>/bin), else BS_ROOT itself (a
+# repository with the bs launcher). ~/.local/bin is returned as a literal
+# $HOME/.local/bin — as the installer writes it.
+init_shell_bin_dir() {
+  local bin dir
+  bin="$(install_info_get "${BS_ROOT}" bin)"
+  if [[ -n "${bin}" ]]; then
+    dir="$(dirname -- "${bin}")"
+  elif [[ -f "${BS_ROOT%/lib/bs}/bin/bs" ]]; then
+    dir="${BS_ROOT%/lib/bs}/bin"
+  else
+    dir="${BS_ROOT}"
+  fi
+  if [[ "${dir}" == "${HOME}/.local/bin" ]]; then
+    printf '%s' '$HOME/.local/bin'
+  else
+    printf '%s' "${dir}"
+  fi
+}
+
+init_shell_usage() {
+  printf 'Usage: bs init-shell [SHELL | --list]\n\n'
+  printf 'Print what to add to the rc file of your shell so that the bs command is found,\n'
+  printf 'in the syntax of that shell, and how to apply it in the current terminal.\n'
+  printf 'SHELL: bash zsh ash dash sh ksh mksh oksh osh fish nu (default: your shell).\n'
+  printf '--list  show every known shell: rc file, reload command, BS tier.\n\n'
+  printf 'Tiers: native (bash 4.2+: library and commands), hosted (other shells: the bs\n'
+  printf 'command, run by a bash 4.2+), unsupported (no bash 4.2+ on the machine).\n'
+  printf 'Печатает, что добавить в rc-файл вашей оболочки, чтобы находилась команда bs,\n'
+  printf 'в синтаксисе этой оболочки, и как применить это в текущем терминале.\n'
+}
+
 init_shell_cmd() {
-  cat <<EOF
-# Add to ~/.bashrc or ~/.zshrc
-export BS_ROOT="${BS_ROOT}"
-source "\${BS_ROOT}/bootstrap/init.sh"
-EOF
+  local fam="" arg="${1:-}"
+  case "${arg}" in
+    -h|--help) init_shell_usage; return 0 ;;
+    --list)
+      local f
+      printf '%-6s %-9s %-52s %s\n' "shell" "tier" "rc file" "reload"
+      for f in bash zsh ash dash sh ksh mksh oksh osh fish nu; do
+        printf '%-6s %-9s %-52s %s\n' "${f}" "$(bs_shell_tier "${f}")" \
+          "$(bs_shell_rc_file "${f}")" "$(bs_shell_reload_hint "${f}")"
+      done
+      return 0 ;;
+    "") fam="$(bs_shell_user)" ;;
+    *)
+      fam="$(bs_shell_of_name "${arg}")"
+      [[ "${fam}" != "unknown" ]] \
+        || die "init-shell: unknown shell: ${arg} (known: bash zsh ash dash sh ksh mksh oksh osh fish nu; see: bs init-shell --list)"
+      ;;
+  esac
+  bs_shell_known "${fam}" \
+    || die "init-shell: no rc recipe for the shell '${fam}' (see: bs init-shell --list)"
+
+  local rc tier dir
+  rc="$(bs_shell_rc_file "${fam}")"
+  tier="$(bs_shell_tier "${fam}")"
+  dir="$(init_shell_bin_dir)"
+  printf '# BS for %s (tier: %s) - add to %s\n' "${fam}" "${tier}" "${rc}"
+  if [[ "${fam}" == "bash" ]]; then
+    # Только bash 4.2+ может подключить BS как библиотеку (source)
+    # Only bash 4.2+ can source BS as a library
+    printf 'export BS_ROOT="%s"\n' "${BS_ROOT}"
+    # shellcheck disable=SC2016  # ${BS_ROOT} раскроет rc-файл, не мы
+    printf 'source "${BS_ROOT}/bootstrap/init.sh"\n'
+  fi
+  bs_shell_path_line "${fam}" "${dir}"
+  printf '# apply in this terminal: %s\n' "$(bs_shell_reload_hint "${fam}")"
+  if [[ "${fam}" != "bash" ]]; then
+    printf '# %s\n' "$(bs_shell_tier_desc "${tier}")"
+  fi
 }
 
 # ==========================================
@@ -2320,6 +2428,17 @@ where_cmd() {
   bs_running_block
   where_add "${BS_ROOT}"
 
+  # Оболочка: кто исполняет код BS, чья оболочка у пользователя, tier
+  # The shell: who runs the BS code, whose shell the user has, the tier
+  local ushell utier
+  ushell="$(bs_shell_user)"
+  utier="$(bs_shell_tier "${ushell}")"
+  printf '\n== Оболочка / Shell ==\n'
+  where_row "хозяин:" "$(bs_shell_family) ${BASH_VERSION} (исполняет код BS / runs the BS code)"
+  where_row "ваша:" "${ushell}  (login: $(bs_shell_login), parent: $(bs_shell_parent))"
+  where_row "tier:" "${utier}"
+  printf '    %s\n' "$(bs_shell_tier_desc "${utier}")"
+
   # --- bs в PATH ---
   printf '\n== Команда bs в PATH / The bs command in PATH ==\n'
   mapfile -t hits < <(PATH="${BS_CALLER_PATH:-${PATH}}" type -aP bs 2>/dev/null || true)
@@ -2327,9 +2446,9 @@ where_cmd() {
     printf '  bs не найдена в PATH этой оболочки / bs is not in the PATH of this shell\n'
     where_problem "bs не найдена в PATH этой оболочки / bs is not in the PATH of this shell"
     if [[ -x "${HOME}/.local/bin/bs" ]]; then
-      where_hint "export PATH=\"\$HOME/.local/bin:\$PATH\"   (в этом терминале сразу / in this terminal right away)"
+      where_hint "$(bs_shell_path_line "${ushell}" '$HOME/.local/bin')   (в этом терминале сразу / in this terminal right away; shell: ${ushell})"
     fi
-    where_hint "source ~/.zshrc  (или новый терминал / or a new terminal)"
+    where_hint "$(bs_shell_reload_hint "${ushell}")  (или новый терминал / or a new terminal)"
     where_hint "./install.sh --local --update-path   (если строки PATH нет в rc-файле / if the rc file lacks the PATH line)"
   fi
   for hit in ${hits[@]+"${hits[@]}"}; do
@@ -2366,9 +2485,12 @@ where_cmd() {
   where_add "$(update_system_lib)"
   [[ -z "${BS_HOME:-}" ]] || where_add "${BS_HOME}"
 
-  local -a rcfiles=("${HOME}/.bashrc" "${HOME}/.bash_profile" "${HOME}/.profile"
-    "${HOME}/.zshrc" "${HOME}/.zprofile" "${HOME}/.zshenv"
-    "${HOME}/.config/fish/config.fish" /etc/profile /etc/bashrc /etc/zshrc)
+  # rc-файлы ВСЕХ известных оболочек (bash, zsh, sh/ash/dash, ksh, osh, fish, nu)
+  # из реестра bootstrap/shell.sh, плюс /etc/profile.d
+  # rc files of ALL known shells (bash, zsh, sh/ash/dash, ksh, osh, fish, nu)
+  # from the registry bootstrap/shell.sh, plus /etc/profile.d
+  local -a rcfiles=()
+  mapfile -t rcfiles < <(bs_shell_all_rc_files)
   local f
   for f in /etc/profile.d/*.sh; do [[ -f "${f}" ]] && rcfiles+=("${f}"); done
 
@@ -2502,7 +2624,7 @@ where_cmd() {
   # --- Следы в оболочке ---
   printf '\n== Следы в оболочке / Shell traces ==\n'
   local -i hitsn=0
-  local pat='(bootstrap/init\.sh|BS_ROOT|\.local/lib/bs|/lib/bs/|bs init-shell|export PATH="\$HOME/\.local/bin:\$PATH")'
+  local pat='(bootstrap/init\.sh|BS_ROOT|\.local/lib/bs|/lib/bs/|bs init-shell|export PATH="\$HOME/\.local/bin:\$PATH"|contains -- "\$HOME/\.local/bin"|path join "\.local" "bin")'
   for f in "${rcfiles[@]}"; do
     [[ -r "${f}" ]] || continue
     while IFS= read -r line; do
@@ -2643,6 +2765,6 @@ case "${1:-help}" in
                     die "calc: core/calc.sh not found"
                   fi
                   calc::main "$@" ;;
-  init-shell)     init_shell_cmd ;;
+  init-shell)     shift; init_shell_cmd "$@" ;;
   *)              die "unknown command: $1" ;;
 esac

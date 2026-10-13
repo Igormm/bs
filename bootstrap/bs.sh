@@ -4,6 +4,8 @@
 # bootstrap/bs.sh — корневой namespace bs::, доступный ДО загрузки loader'а
 # @tier core — pure Bash 4+, no GNU tools: works everywhere
 # @tier core — чистый Bash 4+, без GNU-инструментов: работает везде
+# @shell bash4 — pre-kernel bash layer; the POSIX part is bootstrap/shell.sh
+# @shell bash4 — pre-kernel слой на bash; POSIX-часть — bootstrap/shell.sh
 #
 # This file has no dependencies and must stay bash-3.2-compatible (pure
 # builtins, no associative arrays): it is sourced by entry points and by
@@ -20,6 +22,15 @@
 # loader — этот файл выполняется раньше, поэтому использовать её нельзя.
 [[ -n "${__BS_SH_SOURCED:-}" ]] && return 0
 readonly __BS_SH_SOURCED=1
+
+# POSIX-реестр оболочек (bootstrap/shell.sh): определение семейства, rc-файлы,
+# строки PATH, tier. Его же подключают оболочки, не являющиеся bash.
+# The POSIX shell registry (bootstrap/shell.sh): family detection, rc files,
+# PATH lines, tier. Shells other than bash source it too.
+if [[ -n "${BASH_SOURCE[0]:-}" && -f "$(dirname -- "${BASH_SOURCE[0]}")/shell.sh" ]]; then
+  # shellcheck source=bootstrap/shell.sh
+  source "$(dirname -- "${BASH_SOURCE[0]}")/shell.sh"
+fi
 
 # ==========================================
 # Strict mode / Строгий режим
@@ -87,14 +98,16 @@ bs::script_dir() {
 # pure builtins, available a priori, before the kernel loads.
 # ==========================================
 
-# @description Current shell name: bash/zsh/unknown.
-# @description Имя текущей оболочки: bash/zsh/unknown.
+# @description Current shell name: bash, zsh, dash, ash, ksh, ... or unknown.
+# @description Имя текущей оболочки: bash, zsh, dash, ash, ksh, ... или unknown.
 # @stdout shell name / имя оболочки
 bs::shell::name() {
   if [[ -n "${BASH_VERSION:-}" ]]; then
     printf 'bash\n'
   elif [[ -n "${ZSH_VERSION:-}" ]]; then
     printf 'zsh\n'
+  elif declare -F bs_shell_family >/dev/null 2>&1; then
+    bs_shell_family
   else
     printf 'unknown\n'
   fi
@@ -168,6 +181,15 @@ bs::shell::ensure_version() {
   name="$(bs::shell::name)"
   major="$(bs::shell::version)"
   minor="0"
+  # Библиотека BS (source) — только bash; прочие оболочки работают через
+  # команду bs (tier hosted), и здесь им говорят об этом прямо.
+  # The BS library (source) is bash only; other shells work through the bs
+  # command (tier hosted), and they are told so plainly here.
+  if [[ "${name}" != "bash" ]]; then
+    printf 'ERROR: BS as a library needs bash %s.%s+, found %s (tier: hosted) — use the bs command: it runs BS in bash for you\n' \
+      "${required_major}" "${required_minor}" "${name}" >&2
+    return 1
+  fi
   if [[ "${name}" == "bash" ]]; then
     minor="${BASH_VERSINFO[1]:-0}"
   elif [[ "${name}" == "zsh" ]]; then

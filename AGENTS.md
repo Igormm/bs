@@ -109,6 +109,7 @@ Reusable workflow skills live in `.agents/skills/` (Kimi Code / agents-compatibl
 - `bs-cli-noop-output` — «nothing to do» output for BS CLI commands: framed bilingual «…НЕТ / NO …» box with per-item reasons and next-step hints instead of raw WARN/ERROR; up-to-date detection before redoing work; character-based frame padding (printf %-*s pads by bytes and breaks Cyrillic borders); exit 0 for no-ops, exit 1 for real failures.
 - `bs-device-module` — write Linux device/hardware modules (evdev/sysfs, binary decoding, test hooks, graceful degradation).
 - `bs-ai-toolchain` — operate BS as an AI toolbox (discovery ladder, verification loops, generation contracts).
+- `bs-shell-portability` — shell-independence of BS: host/user/script shell, `@shell posix|bash4` tiers, POSIX layer (`bootstrap/shell.sh`, trampoline), `tier_scan.sh` and `probe_shells.sh`.
 
 ### Imported methodology skills (external, verbatim)
 

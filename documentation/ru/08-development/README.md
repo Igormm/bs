@@ -262,3 +262,5 @@ dc> 4 *                    # → 5, затем 20
 Выход из интерактивного режима — `:q` или Ctrl-D. Реализация:
 `core/calc.sh` ([calc.sh](../../../core/calc.sh)), тесты:
 `tests/integration/testcalc.sh`.
+
+- [Переносимость между оболочками](shell-portability.md) — host / оболочка пользователя / скрипта, tier `@shell`, трамплин.

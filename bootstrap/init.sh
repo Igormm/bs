@@ -5,6 +5,25 @@
 # Назначение: определить корень проекта, экспортировать BS_ROOT и загрузить ядро через loader.
 #
 
+# @shell bash4 — the library (source) mode needs bash 4.2+; the gate below is
+# @shell bash4 — POSIX, so other shells get a clear answer instead of a syntax error
+# @shell bash4 — режим библиотеки (source) требует bash 4.2+; гейт ниже написан
+# @shell bash4 — на POSIX, чтобы другие оболочки получали ответ, а не ошибку синтаксиса
+
+# POSIX-гейт (валиден в sh/dash/ash/zsh/ksh/bash): подключать BS как библиотеку
+# можно только из bash 4+. Из другой оболочки — объяснение и возврат, без
+# «Bad substitution». Команда bs работает из любой оболочки.
+# POSIX gate: BS can be sourced as a library only from bash 4+. From another
+# shell: an explanation and a return, no "Bad substitution". The bs command
+# works from any shell.
+if [ -z "${BASH_VERSION:-}" ] || [ "${BASH_VERSINFO:-0}" -lt 4 ]; then
+  printf '%s\n' "BS: bootstrap/init.sh подключается (source) только из bash 4.2+; эта оболочка — не он." \
+    "BS: bootstrap/init.sh can be sourced only from bash 4.2+; this shell is not." \
+    "Команда bs работает из любой оболочки и сама запускает BS в bash: bs help" \
+    "The bs command works from any shell and starts BS in bash itself: bs help" >&2
+  return 1 2>/dev/null || exit 1
+fi
+
 # Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа,
 # этот файл подключается через source и не должен менять настройки чужого shell
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points;
@@ -27,15 +46,14 @@ HELP
 }
 
 # Load pre-kernel helpers first: they are dependency-free and bash-3.2-compatible.
-# Bash: BASH_SOURCE[0]; zsh: funcsourcetrace[1] (BASH_SOURCE is empty in zsh).
-__bs_init_file__="${BASH_SOURCE[0]:-${funcsourcetrace[1]%:*}}"
+__bs_init_file__="${BASH_SOURCE[0]}"
 if [[ -f "$(dirname -- "${__bs_init_file__}")/bs.sh" ]]; then
   # shellcheck disable=SC1090
   source "$(dirname -- "${__bs_init_file__}")/bs.sh"
 fi
 
-# If executed directly, warn and exit. We only support bash/zsh.
-# При прямом исполнении — предупредить и выйти. Поддерживаем только bash/zsh.
+# If executed directly, warn and exit. Library mode is bash 4.2+ only.
+# При прямом исполнении — предупредить и выйти. Режим библиотеки — только bash 4.2+.
 if ! bs::shell::is_sourced; then
   printf 'ERROR: This script must be sourced, not executed.\n' >&2
   usage
@@ -70,9 +88,9 @@ else
 fi
 
 # Shell version gate before any kernel code runs: runtime detection via
-# BASH_VERSION/ZSH_VERSION, NOT $SHELL (login shell lies when sourcing).
+# BASH_VERSION (NOT $SHELL: the login shell lies when sourcing).
 # Гейт версии оболочки до любого кода ядра: рантайм-детект через
-# BASH_VERSION/ZSH_VERSION, а не $SHELL (логин-оболочка врёт при source).
+# BASH_VERSION, а не $SHELL (логин-оболочка врёт при source).
 bs::shell::ensure_version 4 || return 1
 
 # Add local bin to PATH

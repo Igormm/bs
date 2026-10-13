@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # @tier core — bash 4+ only (gated by bootstrap/bs.sh), works everywhere
 # @tier core — только bash 4+ (гейт в bootstrap/bs.sh), работает везде
+# @shell bash4 — installer code: runs in bash 4.2+, writes PATH/rc for the shell of the USER (bootstrap/shell.sh)
+# @shell bash4 — код установщика: исполняется в bash 4.2+, пишет PATH/rc для оболочки ПОЛЬЗОВАТЕЛЯ (bootstrap/shell.sh)
 
 # Installer notices and install-state classification.
 # Уведомления установщика и классификация состояния установки.
@@ -337,8 +339,8 @@ install_require_writable() {
 # HOME for local mode: set, absolute, exists.
 install_require_home() {
   if [[ -z "${HOME:-}" ]]; then
-    install_error "Переменная HOME не задана или пуста: --local ставит в \$HOME/.local и правит \$HOME/.bashrc" \
-      "HOME is unset or empty: --local installs into \$HOME/.local and edits \$HOME/.bashrc" \
+    install_error "Переменная HOME не задана или пуста: --local ставит в \$HOME/.local и правит rc-файл вашей оболочки" \
+      "HOME is unset or empty: --local installs into \$HOME/.local and edits the rc file of your shell" \
       "Задайте / Set it:  HOME=/home/you ./install.sh --local" \
       "Либо системная установка / Or a system install:  sudo ./install.sh"
     return 1
