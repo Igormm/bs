@@ -55,6 +55,13 @@ report() {
     echo -e "${color}✗ ${file}:${line} [${sev}] ${msg}${NC}"
 }
 
+# @description Имена функций файла: определения, `bs_shell_alias real ns::name` и eval-определения
+# @description Function names of a file: definitions, `bs_shell_alias real ns::name` and eval definitions
+list_functions() {
+    grep -E '^[a-zA-Z_][a-zA-Z0-9_:]*[[:space:]]*\(\s*\)?[[:space:]]*\{' "$1" | sed -E 's/^([a-zA-Z_][a-zA-Z0-9_:]*).*/\1/' || true
+    sed -nE "s/^[[:space:]]*bs_shell_alias[[:space:]]+[a-zA-Z0-9_]+[[:space:]]+([a-zA-Z_][a-zA-Z0-9_:]*).*/\1/p; s/^[[:space:]]*eval '([a-zA-Z_][a-zA-Z0-9_:]*)\(\) \{.*/\1/p" "$1"
+}
+
 # @description Добавить в KNOWN_FUNCS все определения функций файла
 # @description Add every function definition of a file to KNOWN_FUNCS
 index_module() {
@@ -63,7 +70,7 @@ index_module() {
     local name
     while IFS= read -r name; do
         [[ -n "${name}" ]] && KNOWN_FUNCS["${name}"]=1
-    done < <(grep -E '^[a-zA-Z_][a-zA-Z0-9_:]*[[:space:]]*\(\s*\)?[[:space:]]*\{' "${file}" | sed -E 's/^([a-zA-Z_][a-zA-Z0-9_:]*).*/\1/')
+    done < <(list_functions "${file}")
     return 0
 }
 
@@ -275,7 +282,7 @@ main() {
         local name
         while IFS= read -r name; do
             [[ -n "${name}" ]] && FULL_FUNCS["${name}"]=1
-        done < <(grep -E '^[a-zA-Z_][a-zA-Z0-9_:]*[[:space:]]*\(\s*\)?[[:space:]]*\{' "${mod_file}" | sed -E 's/^([a-zA-Z_][a-zA-Z0-9_:]*).*/\1/')
+        done < <(list_functions "${mod_file}")
     done < <(find core lib -name '*.sh' -type f | sort)
 
     local doc

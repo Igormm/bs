@@ -572,6 +572,42 @@ bs_shell_tier_desc() {
 }
 
 # ==========================================
+# Read-only variables / Переменные только для чтения
+# ==========================================
+
+# @description Make variables read-only in the GLOBAL scope (NAME or NAME=value).
+#   Plain `readonly` inside a function is function-local in zsh, so zsh gets its
+#   own branch (`readonly -g`); bash, dash and the rest use `readonly`.
+# @description Сделать переменные read-only в ГЛОБАЛЬНОЙ области (NAME или NAME=значение).
+#   Обычный `readonly` внутри функции в zsh локален для функции, поэтому у zsh своя
+#   ветка (`readonly -g`); bash, dash и остальные — `readonly`.
+# @param $@ NAME or NAME=value / NAME или NAME=значение
+bs_shell_readonly() {
+  if [ -n "${ZSH_VERSION:-}" ]; then
+    # shellcheck disable=SC3045  # -g есть только в zsh; ветка выполняется только там / -g exists only in zsh; the branch runs only there
+    readonly -g "$@"
+  else
+    readonly "$@"
+  fi
+}
+
+# ==========================================
+# Namespaced aliases / Имена с пространством имён
+# ==========================================
+
+# @description Make NS::name an alias of a POSIX function in bash and zsh (dash and
+#   other shells reject "::" in function names, so there the alias is skipped).
+# @description Сделать NS::name псевдонимом POSIX-функции в bash и zsh (dash и
+#   прочие отвергают "::" в именах функций, там псевдоним пропускается).
+# @param $1 real function name, e.g. bs_guard / настоящее имя функции
+# @param $2 namespaced name, e.g. bs::guard / имя с пространством имён
+bs_shell_alias() {
+  if [ -n "${BASH_VERSION:-}" ] || [ -n "${ZSH_VERSION:-}" ]; then
+    eval "$2() { $1 \"\$@\"; }"
+  fi
+}
+
+# ==========================================
 # bs::shell::* names for bash and zsh / имена bs::shell::* для bash и zsh
 # ==========================================
 

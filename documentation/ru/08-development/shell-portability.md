@@ -124,6 +124,19 @@ dash ./bs --strict-shell run script.sh   # модуль lib/io/streams (@shell b
 - `bash .agents/skills/bs-shell-portability/scripts/probe_shells.sh` — проба
   возможностей установленных оболочек.
 
+## POSIX-модули ядра
+
+Файлы `core/` с меткой `@shell posix` переводятся по одному (порядок: `prereq`,
+`guard`, `const`, `version`, `logger`, ...). Такой модуль следует контракту
+реестра: настоящие функции имеют допустимые идентификаторы (`bs_guard`,
+`bs_source_relative`), имена вида `bs::guard` — псевдонимы, которые
+`bs_shell_alias` создаёт только в bash и zsh, поэтому все прежние вызовы
+работают. Помощники слоя для этих модулей: `bs_shell_alias`,
+`bs_shell_readonly` (глобальный `readonly`: в zsh `readonly` внутри функции
+локален, поэтому у zsh `readonly -g`). Каталог подключаемого файла берётся из
+`BS_CURRENT_FILE`, который загрузчик ставит на время подключения модуля; bash
+дополнительно читает его из стека вызовов.
+
 ## Не сделано
 
 Автодополнение для zsh/fish/nushell (есть только bash); аннотации `@shell`

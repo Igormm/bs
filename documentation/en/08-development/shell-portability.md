@@ -123,6 +123,19 @@ text (rc file, line, reload command) is tested. Treat those as unverified.
 - `bash .agents/skills/bs-shell-portability/scripts/probe_shells.sh` — probes
   installed shells for language features.
 
+## POSIX modules of the kernel
+
+`@shell posix` files in `core/` are converted one at a time (order: `prereq`,
+`guard`, `const`, `version`, `logger`, ...). A posix module follows the same
+contract as the registry: the real functions have valid identifiers
+(`bs_guard`, `bs_source_relative`), the `bs::guard`-style names are aliases made
+by `bs_shell_alias` in bash and zsh only, so every existing caller keeps
+working. Helpers of the layer used by these modules: `bs_shell_alias`,
+`bs_shell_readonly` (a global `readonly`: in zsh `readonly` inside a function is
+local, so zsh gets `readonly -g`). The directory of a sourced file comes from
+`BS_CURRENT_FILE`, which the loader sets while it sources a module; bash
+additionally reads it from the call stack.
+
 ## Not done yet
 
 Completions for zsh/fish/nushell (only bash completion exists); `@shell`

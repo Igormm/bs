@@ -51,9 +51,10 @@ test_cache() {
     local tier1 tier2
     tier1="$(platform::get tier)"
     tier2="$(
-        PLATFORM_CACHE_FILE="${cache_dir}/facts" "${TEST_BASH}" -c '
+        # shellcheck disable=SC2016  # переменные раскрывает дочерний bash / the child bash expands the variables
+        BS_TEST_ROOT="${BS_PROJECT_ROOT}" PLATFORM_CACHE_FILE="${cache_dir}/facts" "${TEST_BASH}" -c '
             unset BS_INITIALIZED
-            source /home/igor/bs/bootstrap/init.sh >/dev/null 2>&1
+            source "${BS_TEST_ROOT}"/bootstrap/init.sh >/dev/null 2>&1
             export BS_SILENT=1
             load "lib/platform/facts"
             platform::get tier

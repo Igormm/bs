@@ -29,6 +29,10 @@ declare -g -A BS_LOADED_MODULES
 # @global BS_LOAD_STACK — Loader: стек загрузки для обнаружения циклов (категория: env)
 declare -g -a BS_LOAD_STACK=()
 
+# @global BS_CURRENT_FILE — Loader: file being sourced right now; POSIX modules take their directory from it (category: env)
+# @global BS_CURRENT_FILE — Loader: файл, подключаемый прямо сейчас; POSIX-модули берут каталог из него (категория: env)
+declare -g BS_CURRENT_FILE="${BS_CURRENT_FILE:-}"
+
 # ============================================================================
 # ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ / HELPER FUNCTIONS
 # ============================================================================
@@ -187,13 +191,18 @@ load() {
     
     # Загружаем файл модуля / Load module file
     local module_file="${BS_ROOT}/${module_path}.sh"
+    local prev_current_file="${BS_CURRENT_FILE:-}"
+    BS_CURRENT_FILE="${module_file}"
     if ! source "${module_file}"; then
+        BS_CURRENT_FILE="${prev_current_file}"
         echo "BS: error: failed to load module '${module_path}'" >&2
         # Убираем модуль из стека загрузки при ошибке / Pop module from loading stack on error
         BS_LOAD_STACK=("${BS_LOAD_STACK[@]:0:${#BS_LOAD_STACK[@]}-1}")
         return 1
     fi
     
+    BS_CURRENT_FILE="${prev_current_file}"
+
     # Удаляем модуль из стека загрузки / Remove module from loading stack
     BS_LOAD_STACK=("${BS_LOAD_STACK[@]:0:${#BS_LOAD_STACK[@]}-1}")
     
