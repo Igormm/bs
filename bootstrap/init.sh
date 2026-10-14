@@ -60,8 +60,13 @@ if ! bs::shell::is_sourced; then
   exit 1
 fi
 
-# Idempotency: skip if already initialized
-if [[ -n "${BS_INITIALIZED:-}" ]]; then
+# Idempotency: skip if already initialized. The marker is exported, so a child
+# process inherits it without the functions; trust it only where the kernel is
+# really loaded (bs::guard exists).
+# Идемпотентность: пропуск, если уже инициализировано. Маркер экспортируется, и
+# дочерний процесс наследует его без функций; верим ему, только если ядро
+# действительно загружено (есть bs::guard).
+if [[ -n "${BS_INITIALIZED:-}" ]] && declare -F bs::guard >/dev/null 2>&1; then
   # Best-effort debug if logger is available
   [[ "${BS_DEBUG:-0}" == 1 ]] && printf 'DEBUG: BS already initialized, skipping\n' >&2
   return 0

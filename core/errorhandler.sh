@@ -210,9 +210,10 @@ error::exit_with_backtrace() {
     
     # Print backtrace excluding this function
     local frame
-    local bash_source_length=${#BASH_SOURCE[@]}
-    for ((frame=1; frame<${bash_source_length}-1; frame++)); do
-        log::error "  ${BASH_SOURCE[$frame+1]}:${BASH_LINENO[$frame]} ${FUNCNAME[$frame+1]}(...)"
+    local -i depth
+    depth="$(bs::stack_depth)"
+    for ((frame=1; frame<depth-1; frame++)); do
+        log::error "  $(bs::stack_file $((frame+1))):$(bs::stack_line $((frame+1))) $(bs::stack_func $((frame+1)))(...)"
     done
     
     bs::exit "${exit_code}"

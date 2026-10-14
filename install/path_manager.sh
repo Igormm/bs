@@ -210,17 +210,18 @@ auto_update_path() {
   # for the current one.
   if ! install_in_path "${BIN_DIR}" && bs_shell_known "${user}"; then
     reload="$(bs_shell_reload_hint "${user}")"
-    local login_bin="${SHELL:-}" flags
+    local login_bin flags
+    login_bin="$(bs_shell_login_path)"
     flags="$(bs_shell_fresh_flags "${user}")"
 
     # В терминале применяем сами: заменяем установщик новой оболочкой
     # пользователя — она читает rc-файл, как при source. Сделать source в
-    # уже запущенной оболочке дочерний процесс не может. Только если $SHELL —
+    # уже запущенной оболочке дочерний процесс не может. Только если логин-оболочка —
     # именно та оболочка, для которой мы писали PATH.
     # In a terminal apply it ourselves: replace the installer with a fresh
     # user shell — it reads the rc file, just like source would. A child
     # process cannot source into the shell that is already running. Only when
-    # $SHELL is exactly the shell we wrote the PATH for.
+    # the login shell is exactly the shell we wrote the PATH for.
     if [[ -t 0 && -t 1 && -x "${login_bin}" \
           && "$(bs_shell_of_name "${login_bin}")" == "${user}" ]]; then
       log::header "PATH ПРИМЕНЁН / PATH APPLIED"

@@ -195,7 +195,7 @@ system::utils::process_start() {
     local cmd="${1}"
     # Split command into arguments (no eval) / Разбиваем команду на аргументы (без eval)
     local -a cmd_args
-    read -ra cmd_args <<< "${cmd}"
+    IFS=' ' read -ra cmd_args <<< "${cmd}"
     "${cmd_args[@]}" &
 }
 

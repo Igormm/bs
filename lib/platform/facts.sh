@@ -44,7 +44,7 @@ declare -g PF_BUILT=0
 # @stdout hash / хеш
 platform::__env_hash() {
   local sig
-  sig="$(uname -s 2>/dev/null | tr '\n' '|')$(uname -m 2>/dev/null | tr '\n' '|')${BASH_VERSION}|$(cat /etc/os-release 2>/dev/null | tr '\n' '|')"
+  sig="$(uname -s 2>/dev/null | tr '\n' '|')$(uname -m 2>/dev/null | tr '\n' '|')$(bs::shell::version_string)|$(cat /etc/os-release 2>/dev/null | tr '\n' '|')"
   printf '%s' "${sig}" | __platform::sha
 }
 
@@ -98,7 +98,7 @@ platform::__build() {
   arch="$(uname -m 2>/dev/null)"
   PF_FACTS[kernel]="${kernel:-unknown}"
   PF_FACTS[arch]="${arch:-unknown}"
-  PF_FACTS[bash]="${BASH_VERSION}"
+  PF_FACTS[bash]="$(bs::shell::version_string)"
   # Оболочка как capability — единый источник: bootstrap/bs.sh (bs::shell::*).
   # Shell as a capability — single source: bootstrap/bs.sh (bs::shell::*).
   PF_FACTS[shell]="$(bs::shell::name)"

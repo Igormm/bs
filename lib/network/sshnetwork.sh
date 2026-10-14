@@ -778,7 +778,7 @@ sshnetwork::close_tunnel() {
     local -a ssh_pids=()
     local pid args
     local re="^([^[:space:]]*/)?ssh[[:space:]].*-L[[:space:]]*([^[:space:]:]+:)?${local_port}:"
-    while read -r pid args; do
+    while IFS=" " read -r pid args; do
         [[ "${args}" =~ ${re} ]] && ssh_pids+=("${pid}")
     done < <(utils::quiet_err ps -u "$(id -u)" -o pid= -o args=)
     

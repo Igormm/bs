@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-readonly TEST_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly TEST_SCRIPT_DIR="$(bs::script_dir)"
 readonly BS_PROJECT_ROOT="$(cd "${TEST_SCRIPT_DIR}/../.." && pwd)"
 
 source "${TEST_SCRIPT_DIR}/../testframework.sh"
@@ -71,7 +71,7 @@ test_source_relative() {
     # Use a wrapper function so BASH_SOURCE[1] points to this file's directory
     helper::source_relative() {
         # shellcheck disable=SC1090
-        source "$(dirname -- "${BASH_SOURCE[0]}")/helper.sh"
+        source "$(bs::script_dir)/helper.sh"
     }
 
     # Actually test bs::source_relative by temporarily symlinking helper next to this script

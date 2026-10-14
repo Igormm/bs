@@ -109,6 +109,7 @@ wireguard::install_dependencies() {
         apt-get update
         apt-get install -y "${deps[@]}"
     elif platformcheck::is_alma || platformcheck::is_fedora; then
+        local IFS=' '  # "${deps[*]}" склеивает по первому символу IFS / joins on the first char of IFS
         if [[ " ${deps[*]} " =~ " wireguard-tools " ]]; then
             dnf install -y wireguard-tools
         fi

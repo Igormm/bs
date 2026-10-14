@@ -41,7 +41,7 @@ BS_CALLER_PATH="${PATH}"
 
 # 1. Каталог entry-point'а — нужен до загрузки чего-либо
 # readlink -f: bs можно вызвать по символической ссылке (~/bin/bs -> .../bs)
-BS_DIR=$(cd -- "$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}" 2>/dev/null || printf '%s' "${BASH_SOURCE[0]}")")" &>/dev/null && pwd)
+BS_DIR=$(cd -- "$(dirname -- "$(readlink -f -- "$0" 2>/dev/null || printf '%s' "$0")")" &>/dev/null && pwd)
 
 # 2. Pre-kernel root namespace: shell version gate (bash 3.2-compatible)
 #    Строгий режим включается именованной pre-kernel функцией bs::strict.

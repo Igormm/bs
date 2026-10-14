@@ -617,7 +617,7 @@ io::files::copy_dir() {
     fi
   else
     local -a cp_flags=()
-    read -ra cp_flags <<< "$(io::files::__cp_dir_flags)"
+    IFS=' ' read -ra cp_flags <<< "$(io::files::__cp_dir_flags)"
 
     if ! io::files::__exec cp "${cp_flags[@]}" -- "${src}" "${dst}"; then
       log::error "Failed to copy directory: ${src} -> ${dst}"
@@ -670,7 +670,7 @@ io::files::sync_dir() {
 
   # Fallback: cp + optional manual cleanup / Fallback: cp + ручная очистка
   local -a cp_flags=()
-  read -ra cp_flags <<< "$(io::files::__cp_dir_flags)"
+  IFS=' ' read -ra cp_flags <<< "$(io::files::__cp_dir_flags)"
 
   if ! io::files::__exec cp "${cp_flags[@]}" -- "${src}/." "${dst}/"; then
     log::error "Failed to copy contents: ${src} -> ${dst}"
@@ -729,7 +729,7 @@ io::files::copy_matching() {
 
   if is::not_empty "${include}"; then
     local -a include_patterns=()
-    read -ra include_patterns <<< "${include}"
+    IFS=' ' read -ra include_patterns <<< "${include}"
     local pattern
     local first=1
     for pattern in "${include_patterns[@]}"; do
@@ -745,7 +745,7 @@ io::files::copy_matching() {
 
   if is::not_empty "${exclude}"; then
     local -a exclude_patterns=()
-    read -ra exclude_patterns <<< "${exclude}"
+    IFS=' ' read -ra exclude_patterns <<< "${exclude}"
     local pattern
     local first=1
     for pattern in "${exclude_patterns[@]}"; do
@@ -877,7 +877,7 @@ io::files::move() {
         return "${LIB_ERROR_FILE_OPERATION}"
       fi
     else
-      read -ra cp_flags <<< "$(io::files::__cp_dir_flags)"
+      IFS=' ' read -ra cp_flags <<< "$(io::files::__cp_dir_flags)"
       if ! cp "${cp_flags[@]}" -- "${src}" "${dst}"; then
         log::error "Failed to copy directory in move fallback: ${src} -> ${dst}"
         return "${LIB_ERROR_FILE_OPERATION}"

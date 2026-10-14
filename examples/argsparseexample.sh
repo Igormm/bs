@@ -115,9 +115,9 @@ main() {
     # ==========================================
     log::header "Bash completion / Автодополнение Bash"
 
-    # BASH_SOURCE[0]: под 'bs run' $0 — это "bash", а не путь скрипта
-    # BASH_SOURCE[0]: under 'bs run' $0 is "bash", not the script path
-    log::info "Install: source <(bs run ${BASH_SOURCE[0]} --emit-completion)"
+    # bs::script_path: под 'bs run' $0 — это "bash", а не путь скрипта
+    # bs::script_path: under 'bs run' $0 is "bash", not the script path
+    log::info "Install: source <(bs run $(bs::script_path) --emit-completion)"
     # Показываем первые строки сгенерированного кода
     # sed читает весь поток до EOF — в отличие от head не закрывает pipe
     # раньше времени и не ловит SIGPIPE под pipefail

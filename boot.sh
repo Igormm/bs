@@ -34,7 +34,7 @@ unset __BS_TRAMPOLINE __bs_p __bs_r __bs_s
 # --- конец пролога / end of the prologue ------------------------------------
 
 # 1. Определяем каталог, где лежит boot.sh
-BOOT_DIR=$(cd -- "$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}" 2>/dev/null || printf '%s' "${BASH_SOURCE[0]}")")" &>/dev/null && pwd)
+BOOT_DIR=$(cd -- "$(dirname -- "$(readlink -f -- "$0" 2>/dev/null || printf '%s' "$0")")" &>/dev/null && pwd)
 
 # 2. Pre-kernel root namespace: shell version gate (bash 3.2-compatible)
 #    Строгий режим — через pre-kernel хелпер bs::strict (bootstrap/bs.sh).

@@ -141,6 +141,7 @@ deps::list_missing() {
   done
 
   if [[ ${#missing[@]} -gt 0 ]]; then
+    local IFS=' '  # склейка пробелом независимо от строгого IFS / space-joined whatever the strict IFS
     printf '%s\n' "${missing[*]}"
     return 1
   fi

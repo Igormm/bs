@@ -232,13 +232,13 @@ testframework::summary() {
 }
 
 # Пример использования
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+if declare -F bs::is_main >/dev/null 2>&1 && bs::is_main; then
   # Этот файл запущен напрямую, демонстрируем использование
   # This file is run directly, demonstrate usage
 
   # Пути от расположения скрипта, чтобы демо работало из любого каталога
   # Paths relative to the script location so the demo works from any directory
-  TESTFRAMEWORK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  TESTFRAMEWORK_DIR="$(bs::script_dir)"
   BS_ROOT_DIR="$(cd "${TESTFRAMEWORK_DIR}/.." && pwd)"
 
   print_header "Test Framework Demo / Демонстрация тестового фреймворка"

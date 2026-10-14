@@ -5,14 +5,21 @@
 
 set -euo pipefail
 
-readonly TEST_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly TEST_SCRIPT_DIR="$(bs::script_dir)"
 readonly BS_PROJECT_ROOT="$(cd "${TEST_SCRIPT_DIR}/../.." && pwd)"
 
 source "${TEST_SCRIPT_DIR}/../testframework.sh"
 
-# Isolate HOME before loading the framework so config module picks up the temp dir.
-readonly TEST_HOME="$(mktemp -d)"
-export HOME="${TEST_HOME}"
+# The config module fixes its paths (readonly) when the framework loads. `bs run`
+# has already loaded it with the real HOME, so the test starts itself once more
+# under an isolated HOME: the framework then loads fresh and picks up the temp dir.
+# Модуль config фиксирует пути (readonly) при загрузке фреймворка. `bs run` уже
+# загрузил его с настоящим HOME, поэтому тест запускает сам себя ещё раз под
+# изолированным HOME: фреймворк загрузится заново и возьмёт временный каталог.
+if [[ "${CONFIG_TEST_ISOLATED:-}" != "1" ]]; then
+    exec env CONFIG_TEST_ISOLATED=1 HOME="$(mktemp -d)" bash "${BS_PROJECT_ROOT}/bs" run "$(bs::script_path)" "$@"
+fi
+readonly TEST_HOME="${HOME}"
 export BS_SILENT=1
 source "${BS_PROJECT_ROOT}/bootstrap/init.sh"
 export BS_HOME="${BS_PROJECT_ROOT}"

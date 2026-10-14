@@ -38,10 +38,10 @@ Overrides / Переопределения: PREFIX=... BIN_DIR=... LIB_DIR=...  
 Shell of the user / Оболочка пользователя:
   PATH и подсказки настраиваются под ВАШУ оболочку (не под ту, что исполняет
   установщик: он всегда bash). Определяется по родительскому процессу, затем
-  по $SHELL; задать явно: --shell NAME или BS_USER_SHELL=NAME.
+  по логин-оболочке; задать явно: --shell NAME или BS_USER_SHELL=NAME.
   NAME: bash zsh ash dash sh ksh mksh oksh osh fish nu.
   PATH and hints are set up for YOUR shell (not the one running the installer:
-  that is always bash). Detected from the parent process, then $SHELL; set it
+  that is always bash). Detected from the parent process, then the login shell; set it
   explicitly with --shell NAME or BS_USER_SHELL=NAME.
 
 Safety / Безопасность:

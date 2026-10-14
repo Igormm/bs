@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-readonly TEST_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly TEST_SCRIPT_DIR="$(bs::script_dir)"
 readonly BS_PROJECT_ROOT="$(cd "${TEST_SCRIPT_DIR}/../.." && pwd)"
 
 source "${TEST_SCRIPT_DIR}/../testframework.sh"
@@ -68,7 +68,7 @@ main() {
     testframework::section "set -u isolation / изоляция set -u"
     local iso
     iso="$(bash -c '
-        unset BASH_EXECUTION_STRING BS_INITIALIZED
+        unset BS_INITIALIZED BS_RUN_SCRIPT
         source "$1/bootstrap/init.sh"
         bs::strict
         export BS_HOME="$1" BS_FAIL2BAN_DIR="$2"

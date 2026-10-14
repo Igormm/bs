@@ -18,7 +18,7 @@ set -euo pipefail
 
 # Каталог скрипта: прогон работает из любого текущего каталога
 # Script directory: the run works from any current directory
-readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 readonly PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${PROJECT_ROOT}"
 

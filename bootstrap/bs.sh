@@ -87,6 +87,57 @@ bs::script_dir() {
   (cd -- "$(dirname -- "${BASH_SOURCE[${idx}]}")" >/dev/null 2>&1 && pwd -P)
 }
 
+# @description Print the absolute (physical) path of the caller's file.
+# @description Вывести абсолютный (физический) путь файла вызывающего.
+# @stdout Absolute file path / Абсолютный путь файла
+# @returns 0 on success; 1 if the file cannot be resolved.
+bs::script_path() {
+  (( ${#BASH_SOURCE[@]} > 1 )) || return 1
+  readlink -f -- "${BASH_SOURCE[1]}" 2>/dev/null || printf '%s\n' "${BASH_SOURCE[1]}"
+}
+
+# Стек вызовов. Уровень 0 — вызывающий хелпер (его файл, строка вызова, функция),
+# 1 — его вызывающий и так далее. Единственное место, знающее про BASH_SOURCE,
+# BASH_LINENO и FUNCNAME для трассировок.
+# The call stack. Level 0 is the caller of the helper (its file, the line of the
+# call, its function), 1 is its caller, and so on. The only place that knows
+# BASH_SOURCE, BASH_LINENO and FUNCNAME for backtraces.
+
+# @description Number of frames above the helper (levels 0 .. depth-1).
+# @description Число кадров стека над хелпером (уровни 0 .. depth-1).
+# @stdout depth / глубина
+bs::stack_depth() {
+  printf '%d\n' "$(( ${#FUNCNAME[@]} - 1 ))"
+}
+
+# @description File of the stack frame at LEVEL ("unknown" if absent).
+# @description Файл кадра стека на уровне LEVEL («unknown», если нет).
+# @param $1 level / уровень
+bs::stack_file() {
+  printf '%s\n' "${BASH_SOURCE[$(( ${1:-0} + 1 ))]:-unknown}"
+}
+
+# @description Line (of the call) of the stack frame at LEVEL (0 if absent).
+# @description Строка (вызова) кадра стека на уровне LEVEL (0, если нет).
+# @param $1 level / уровень
+bs::stack_line() {
+  printf '%s\n' "${BASH_LINENO[${1:-0}]:-0}"
+}
+
+# @description Function of the stack frame at LEVEL ("main" if absent).
+# @description Функция кадра стека на уровне LEVEL («main», если нет).
+# @param $1 level / уровень
+bs::stack_func() {
+  printf '%s\n' "${FUNCNAME[$(( ${1:-0} + 1 ))]:-main}"
+}
+
+# @description Make `set -x` traces show "file:line:" (PS4).
+# @description Трассировка `set -x` показывает «файл:строка:» (PS4).
+bs::trace_prefix() {
+  # shellcheck disable=SC2016  # PS4 раскрывается при трассировке / PS4 expands at trace time
+  PS4='+ ${BASH_SOURCE##*/}:${LINENO}: '
+}
+
 # ==========================================
 # Shell detection / Определение оболочки
 #
@@ -108,6 +159,20 @@ bs::shell::name() {
     printf 'zsh\n'
   elif declare -F bs_shell_family >/dev/null 2>&1; then
     bs_shell_family
+  else
+    printf 'unknown\n'
+  fi
+  return 0
+}
+
+# @description Full version string of the running shell (bash: BASH_VERSION).
+# @description Полная строка версии работающей оболочки (bash: BASH_VERSION).
+# @stdout version / версия
+bs::shell::version_string() {
+  if [[ -n "${BASH_VERSION:-}" ]]; then
+    printf '%s\n' "${BASH_VERSION}"
+  elif [[ -n "${ZSH_VERSION:-}" ]]; then
+    printf '%s\n' "${ZSH_VERSION}"
   else
     printf 'unknown\n'
   fi
@@ -158,15 +223,15 @@ bs::shell::is_sourced() {
   return $?
 }
 
-# @description Is the caller's file the program being run (not sourced)? Replaces
-#   the copy-pasted guard: [[ -n "${BASH_EXECUTION_STRING:-}" || "${BASH_SOURCE[0]}" == "$0" ]].
-# @description Файл вызывающего — запускаемая программа (а не подключённый через
-#   source)? Заменяет копируемый охранник: [[ -n "${BASH_EXECUTION_STRING:-}" || "${BASH_SOURCE[0]}" == "$0" ]].
+# @description Is the caller's file the program being run (executed directly or
+#   by `bs run`), not a module sourced by it? Replaces the copy-pasted guard.
+# @description Файл вызывающего — запускаемая программа (напрямую или через
+#   `bs run`), а не подключённый ею модуль? Заменяет копируемый охранник.
 # @example
 #   if bs::is_main; then main "$@"; fi
-# @return 0 the caller's file is run directly (or bash -c) / запущен напрямую (или bash -c); 1 sourced
+# @return 0 the caller's file is the running program / запускаемая программа; 1 sourced module
 bs::is_main() {
-  [[ -n "${BASH_EXECUTION_STRING:-}" || "${BASH_SOURCE[1]:-}" == "$0" ]]
+  [[ "${BASH_SOURCE[1]:-}" == "$0" || "${BASH_SOURCE[1]:-}" == "${BS_RUN_SCRIPT:-}" ]]
 }
 
 # @description Gate: ensure the runtime shell meets a version requirement.
@@ -676,7 +741,7 @@ bs::cli::run_cmd() {
   is::file "$script" || bs::cli::die "run: file not found: $script"
   # Запускаем скрипт в новом bash с уже загруженным BS-окружением
   # Сбрасываем унаследованный BS_INITIALIZED, иначе init.sh пропустит загрузку
-  exec bash -c '
+  BS_RUN_SCRIPT="$script" exec bash -c '
     unset BS_INITIALIZED
     source "'"${BS_ROOT}/bootstrap/init.sh"'"
     bs::strict

@@ -123,7 +123,7 @@ cd tests/unit && bash testloggerunit.sh  # или из каталога тест
 #!/usr/bin/env bs
 set -euo pipefail
 
-readonly TEST_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly TEST_SCRIPT_DIR="$(bs::script_dir)"
 readonly BS_PROJECT_ROOT="$(cd "${TEST_SCRIPT_DIR}/../.." && pwd)"
 
 source "${TEST_SCRIPT_DIR}/../testframework.sh"
@@ -179,3 +179,10 @@ bash -x tests/unit/testloggerunit.sh
 ## License
 
 Tests are part of the BS framework and follow the same licensing terms.
+
+## Running a single test / Запуск одного теста
+
+Tests find their directory through `bs::script_dir`, so they run under the framework:
+`./bs run tests/unit/testshellunit.sh` (or all of them: `bash tests/runalltests.sh`). A bare `bash tests/unit/testX.sh` is not supported.
+Тесты находят свой каталог через `bs::script_dir`, поэтому запускаются под фреймворком:
+`./bs run tests/unit/testshellunit.sh` (или все: `bash tests/runalltests.sh`). Голый `bash tests/unit/testX.sh` не поддерживается.

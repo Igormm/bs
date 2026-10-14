@@ -38,9 +38,10 @@ bs::func_name() {
 # @description Текущий стек вызовов, по фрейму на строку.
 # @stdout lines "function (file:line)", caller first
 bs::call_stack() {
-  local i
-  for ((i = 1; i < ${#FUNCNAME[@]}; i++)); do
-    printf '%s (%s:%s)\n' "${FUNCNAME[i]}" "${BASH_SOURCE[i]}" "${BASH_LINENO[i - 1]}"
+  local i depth
+  depth="$(bs::stack_depth)"
+  for ((i = 1; i <= depth; i++)); do
+    printf '%s (%s:%s)\n' "$(bs::stack_func "${i}")" "$(bs::stack_file "${i}")" "$(bs::stack_line "${i}")"
   done
 }
 
@@ -224,7 +225,7 @@ str::words() {
   __str_out=()
   if is::not_empty "${__str_s}"; then
     local -a __str_tmp=()
-    read -ra __str_tmp <<< "${__str_s}"
+    IFS=$' \t\n' read -ra __str_tmp <<< "${__str_s}"
     __str_out=("${__str_tmp[@]}")
   fi
 }
@@ -1631,7 +1632,7 @@ bs::eval() {
   local -r code="${1:?code required}"
   if ! eval "${code}"; then
     printf 'bs::eval: code failed (%s:%s): %s\n' \
-      "${BASH_SOURCE[1]:-unknown}" "${BASH_LINENO[0]:-0}" "${code}" >&2
+      "$(bs::stack_file 0)" "$(bs::stack_line 0)" "${code}" >&2
     return 1
   fi
   return 0

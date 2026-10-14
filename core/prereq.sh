@@ -43,7 +43,7 @@ bs::guard_loaded() {
 # @description Source files relative to the caller's directory.
 # @param $@ Relative file paths from the caller's directory.
 bs::source_relative() {
-  local -r caller_dir="$(dirname -- "${BASH_SOURCE[1]}")"
+  local -r caller_dir="$(dirname -- "$(bs::stack_file 1)")"
   local file
   for file in "$@"; do
     # shellcheck disable=SC1090

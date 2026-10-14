@@ -20,7 +20,7 @@ set -euo pipefail
 shopt -s expand_aliases
 
 # Test framework setup
-readonly TEST_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly TEST_SCRIPT_DIR="$(bs::script_dir)"
 readonly BS_PROJECT_ROOT="$(cd "${TEST_SCRIPT_DIR}/../.." && pwd)"
 
 # Source test framework
@@ -564,6 +564,6 @@ main() {
 }
 
 # Run tests if executed directly
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+if bs::is_main; then
     main "$@"
 fi

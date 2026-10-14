@@ -18,5 +18,5 @@ readonly __GUARD_SOURCED=1
 # shellcheck disable=SC1090
 # Load core prerequisites if not already available
 if ! declare -f bs::guard >/dev/null 2>&1; then
-    source "$(dirname -- "${BASH_SOURCE[0]}")/prereq.sh"
+    source "$(bs::script_dir)/prereq.sh"
 fi

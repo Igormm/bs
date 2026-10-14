@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-TEST_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TEST_SCRIPT_DIR="$(bs::script_dir)"
 readonly TEST_SCRIPT_DIR
 BS_PROJECT_ROOT="$(cd "${TEST_SCRIPT_DIR}/../.." && pwd)"
 readonly BS_PROJECT_ROOT

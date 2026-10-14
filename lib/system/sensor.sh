@@ -368,7 +368,9 @@ sensor::events() {
     local line
     while IFS= read -r line; do
         # od выводит по 16 unsigned-байт на строку / od prints 16 bytes per line
-        for b in ${line}; do
+        local -a fields=()
+        IFS=' ' read -ra fields <<< "${line}"
+        for b in "${fields[@]}"; do
             bytes+=("${b}")
             (( ${#bytes[@]} == size )) || continue
             sensor::__decode_record bytes || return "${E_INVALID}"
@@ -509,7 +511,7 @@ sensor::__diag_axes() {
     local line t c v i
     local -i touches=0
     for line in "$@"; do
-        read -r _ _ t c v <<< "${line}"
+        IFS=" " read -r _ _ t c v <<< "${line}"
         case "${t}" in
             1) [[ "${c}" == 330 ]] && (( v == 1 )) && touches+=1 ;;
             3)

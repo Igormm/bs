@@ -101,6 +101,7 @@ frameworks::bashit::load_plugin() {
   log::info "Loading Bash-it plugin: ${plugin_name}"
   
   # Check if plugin is already loaded
+  local IFS=' '  # "${arr[*]}" склеивает по первому символу IFS / joins on the first char of IFS
   if [[ " ${FRAMEWORKS_BASHIT_PLUGINS[*]} " =~ " ${plugin_name} " ]]; then
   log::warn "Plugin ${plugin_name} is already loaded"
   return 0
@@ -546,6 +547,7 @@ frameworks::bashly::init() {
 frameworks::bashly::parse_args() {
   
   # Initialize variables
+  local IFS=' '  # "${arr[*]}" ниже склеивает пробелом / joins with a space below
   local args=()
   local flags=()
   local options=()

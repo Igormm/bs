@@ -14,7 +14,7 @@ set -euo pipefail
 
 # Каталог скрипта: прогон работает из любого текущего каталога
 # Script directory: the run works from any current directory
-readonly RUNNER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly RUNNER_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "${RUNNER_DIR}"
 
 # Общий фреймворк: print_header, цвета и гейт NO_COLOR / TERM=dumb / не-tty
@@ -90,7 +90,7 @@ run_test() {
   echo -e "${YELLOW}▶ Running test:${NC} $test_name"
   echo -e "${BLUE}────────────────────────${NC}"
 
-  if bash "${test_script}"; then
+  if env -u BS_ROOT -u BS_INITIALIZED bash "${RUNNER_DIR}/../bs" run "${test_script}"; then
     echo -e "${GREEN}✓ $test_name: PASSED${NC}"
     ((++passed_tests))
     echo

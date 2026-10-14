@@ -117,12 +117,22 @@ bs_shell_family() {
 # @param $1 Optional user name / Необязательное имя пользователя
 # @stdout family / семейство
 bs_shell_login() {
-  __bs_ls=''
+  bs_shell_of_name "$(bs_shell_login_path "${1:-}")"
+}
+
+# @description Path of the login shell binary: of the given user (getent), else
+#   the one the environment names.
+# @description Путь к бинарнику логин-оболочки: заданного пользователя (getent),
+#   иначе названной окружением.
+# @param $1 user name (optional) / имя пользователя (необязательно)
+# @stdout path / путь
+bs_shell_login_path() {
+  __bs_lp=''
   if [ -n "${1:-}" ] && command -v getent >/dev/null 2>&1; then
-    __bs_ls=$(getent passwd "$1" 2>/dev/null | cut -d: -f7)
+    __bs_lp=$(getent passwd "$1" 2>/dev/null | cut -d: -f7)
   fi
-  [ -n "$__bs_ls" ] || __bs_ls=${SHELL:-}
-  bs_shell_of_name "$__bs_ls"
+  [ -n "$__bs_lp" ] || __bs_lp=${SHELL:-}
+  printf '%s\n' "$__bs_lp"
 }
 
 # @description Family of the parent process (the shell the user typed in).
@@ -463,7 +473,7 @@ bs_shell_tier_desc() {
 if [ -n "${BASH_VERSION:-}" ] || [ -n "${ZSH_VERSION:-}" ]; then
   for __bs_fn in of_name family login parent user rc_file rc_scan all_rc_files \
       path_line reload_hint fresh_flags known host_ok host_find tier tier_desc \
-      file_tier tier_word tier_allows; do
+      login_path file_tier tier_word tier_allows; do
     eval "bs::shell::${__bs_fn}() { bs_shell_${__bs_fn} \"\$@\"; }"
   done
 fi

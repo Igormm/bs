@@ -384,8 +384,6 @@ utils::ensure_shell_version() {
 ## @description Определяет путь независимо от способа вызова
 ## @global Устанавливает FRAMEWORK_ROOT
 utils::detect_root() {
-    local script_source
-
     # 1. Пробуем получить из переменной окружения
     if is::not_empty "${FRAMEWORK_ROOT:-}" && is::dir "${FRAMEWORK_ROOT}"; then
         # log:: опционален для utils (нижний уровень) / log:: is optional for utils
@@ -395,26 +393,14 @@ utils::detect_root() {
         return 0
     fi
 
-    # 2. Определяем путь к скрипту
-    if [[ "${BASH_SOURCE[0]+x}" == "x" ]]; then
-        script_source="${BASH_SOURCE[0]}"
-    else
-        script_source="$0"
-    fi
-
-    # 3. Обработка симлинков
-    if is::symlink "${script_source}"; then
-        script_source="$(readlink -f -- "${script_source}")"
-    fi
-
-    # 4. Безопасное получение директории
+    # 2. Каталог этого файла (core/utils.sh), симлинки раскрыты
     local script_dir
-    script_dir="$(dirname -- "${script_source}")"
+    script_dir="$(bs::script_dir)"
 
-    # 5. Переход на уровень выше (если скрипт в bin/ или core/: BASH_SOURCE[0]
-    #    внутри этой функции — сам core/utils.sh, а не вызывающий скрипт)
-    #    One level up (if the script is in bin/ or core/: BASH_SOURCE[0] inside
-    #    this function is core/utils.sh itself, not the calling script)
+    # 5. Переход на уровень выше (если каталог — bin/ или core/; это каталог
+    #    самого core/utils.sh, а не вызывающего скрипта)
+    #    One level up (if the directory is bin/ or core/; it is the directory of
+    #    core/utils.sh itself, not of the calling script)
     if [[ "$(basename -- "${script_dir}")" == "bin" || "$(basename -- "${script_dir}")" == "core" ]]; then
         script_dir="$(dirname -- "${script_dir}")"
     fi
@@ -433,7 +419,7 @@ utils::detect_root() {
 #bootdir
 # @description Определить каталог bootstrap/ фреймворка / Detect framework bootstrap/ dir
 utils::boot_dir() {
-  BOOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../bootstrap" &>/dev/null && pwd)"
+  BOOT_DIR="$(cd -- "$(bs::script_dir)/../bootstrap" &>/dev/null && pwd)"
   export BOOT_DIR
 }
 
