@@ -37,7 +37,7 @@ main() {
     testframework::assert_equal "0" "${rc}" "guard returns 0 for successful command"
 
     rc=0
-    io::process::guard --timeout 5 -- bash -c 'exit 7' || rc=$?
+    io::process::guard --timeout 5 -- "${TEST_BASH}" -c 'exit 7' || rc=$?
     testframework::assert_equal "7" "${rc}" "guard preserves command exit code"
 
     # ==========================================
@@ -74,7 +74,7 @@ main() {
     testframework::section "Output activity prevents hang / Вывод предотвращает зависание"
 
     rc=0
-    io::process::guard --timeout 0 --hang-after 1 --timeout 3 -- bash -c 'for i in 1 2 3; do echo tick; sleep 0.6; done' || rc=$?
+    io::process::guard --timeout 0 --hang-after 1 --timeout 3 -- "${TEST_BASH}" -c 'for i in 1 2 3; do echo tick; sleep 0.6; done' || rc=$?
     testframework::assert_equal "0" "${rc}" "regular output prevents hang detection"
 
     # ==========================================

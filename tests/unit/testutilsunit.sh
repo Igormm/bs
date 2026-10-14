@@ -34,7 +34,7 @@ test_attempt_streams() {
     out="$(utils::attempt printf 'visible')"
     testframework::assert_equal "visible" "${out}" "utils::attempt keeps stdout"
 
-    out="$(utils::attempt bash -c 'printf noisy >&2; exit 3')"
+    out="$(utils::attempt ${TEST_BASH} -c 'printf noisy >&2; exit 3')"
     testframework::assert_equal "" "${out}" "utils::attempt mutes stderr of failing command"
 }
 

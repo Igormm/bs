@@ -35,7 +35,7 @@ inst() {
     shift
     RC=0
     OUT="$(cd "${BS_PROJECT_ROOT}" && env -i HOME="${E}/home" PATH="/usr/bin:/bin" \
-        BS_SYSTEM_PREFIX="${E}/sys" "${envs[@]}" bash ./install.sh "$@" </dev/null 2>&1)" || RC=$?
+        BS_SYSTEM_PREFIX="${E}/sys" "${envs[@]}" "${TEST_BASH}" ./install.sh "$@" </dev/null 2>&1)" || RC=$?
 }
 
 eq() { testframework::assert_equal "$1" "$2" "$3" || true; }

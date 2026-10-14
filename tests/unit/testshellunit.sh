@@ -152,7 +152,7 @@ test_host_and_tier() {
 
 test_bs_init_shell() {
     local out
-    run_init() { env -i HOME="${T}/h" PATH="/usr/bin:/bin" "$@" bash "${BS_PROJECT_ROOT}/bs" init-shell ${INIT_ARGS:-} 2>&1; }
+    run_init() { env -i HOME="${T}/h" PATH="/usr/bin:/bin" "$@" "${TEST_BASH}" "${BS_PROJECT_ROOT}/bs" init-shell ${INIT_ARGS:-} 2>&1; }
     out="$(INIT_ARGS=bash run_init)"
     ok "'${out}' == *'tier: native'* && '${out}' == *'source \"\${BS_ROOT}/bootstrap/init.sh\"'* " "init-shell bash: the library snippet"
     out="$(INIT_ARGS=zsh run_init)"
@@ -168,6 +168,27 @@ test_bs_init_shell() {
     eq "1" "$(INIT_ARGS=pwsh run_init >/dev/null 2>&1; echo $?)" "init-shell pwsh: non-zero exit"
 }
 
+test_version_and_strict() {
+    local sh_name sh_bin out
+    for sh_name in bash zsh dash; do
+        sh_bin="$(command -v "${sh_name}" || true)"
+        [[ -n "${sh_bin}" ]] || continue
+        out="$(probe "${sh_bin}" 'printf "%s|%s|%s" "$(bs_shell_family)" "$(bs_shell_version_major)" "$(bs_shell_version_minor)"')"
+        case "${sh_name}" in
+            bash) ok "'${out}' == bash\|[4-9]\|[0-9]* " "version: bash major/minor (${out})" ;;
+            zsh)  ok "'${out}' == zsh\|[4-9]\|[0-9]* " "version: zsh major/minor (${out})" ;;
+            dash) eq "dash|0|0" "${out}" "version: dash has no version variable: 0.0" ;;
+        esac
+        out="$(probe "${sh_bin}" 'bs_shell_strict; printf "%s" "${-}"')"
+        ok "'${out}' == *e* " "strict (${sh_name}): errexit is on (${out})"
+        ok "'${out}' == *u* " "strict (${sh_name}): nounset is on (${out})"
+        out="$(probe "${sh_bin}" 'bs_shell_strict; printf "%s" "${IFS}" | od -An -c | tr -d " "')"
+        eq '\n\t' "${out}" "strict (${sh_name}): IFS is newline + tab"
+    done
+    out="$(probe "$(command -v bash)" 'bs_shell_self_path')"
+    ok "-x '${out}'" "self_path: the running bash is executable (${out})"
+}
+
 main() {
     print_header "Shell Registry Unit Tests / Модульные тесты реестра оболочек"
 
@@ -181,6 +202,7 @@ main() {
     testframework::section "Detection / Определение"
     test_family_per_shell
     test_of_name
+    test_version_and_strict
     test_user_shell
 
     testframework::section "Registry / Реестр"

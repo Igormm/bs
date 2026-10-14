@@ -40,7 +40,7 @@ test_single_source() {
     testframework::assert_false "grep -qE 'BS_VERSION=\"[0-9]' '${BS_PROJECT_ROOT}/core/const.sh'" "core/const.sh has no version literal"
     top="$(sed -n 's/^## \[\([0-9][0-9.]*\)\].*/\1/p' "${BS_PROJECT_ROOT}/CHANGELOG.md" | head -n 1)"
     testframework::assert_equal "${BS_VERSION}" "${top}" "the top CHANGELOG section is the current version"
-    testframework::assert_equal "$(bash "${BS_PROJECT_ROOT}/bs" version)" "$(bash "${BS_PROJECT_ROOT}/bs" version --full | head -n 1)" "bs version --full starts with the plain bs version line"
+    testframework::assert_equal "$(${TEST_BASH} "${BS_PROJECT_ROOT}/bs" version)" "$(${TEST_BASH} "${BS_PROJECT_ROOT}/bs" version --full | head -n 1)" "bs version --full starts with the plain bs version line"
 }
 
 # Главная функция тестов

@@ -59,7 +59,7 @@ EOF
 
 run_inv() {
     RC=0
-    OUT="$(bash "${INVENTORY}" --tests-dir "${T}/tests" "$@" 2>&1)" || RC=$?
+    OUT="$(${TEST_BASH} "${INVENTORY}" --tests-dir "${T}/tests" "$@" 2>&1)" || RC=$?
 }
 
 row() { grep -F "\`$1\`" <<< "${OUT}" | head -n 1; }

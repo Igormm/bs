@@ -20,6 +20,15 @@ else
   readonly TF_COLOR=1
 fi
 
+# Интерпретатор для запуска CLI в тестах: тот же bash, что исполняет BS (не первый в PATH)
+# The interpreter that runs the CLI in tests: the same bash that runs BS (not the first in PATH)
+if declare -F bs::shell::host >/dev/null 2>&1; then
+  TEST_BASH="${TEST_BASH:-$(bs::shell::host)}"
+else
+  TEST_BASH="${TEST_BASH:-bash}"  # раннер вне bs / a runner outside bs
+fi
+export TEST_BASH
+
 # Цвета для вывода / Output colors
 if [[ "${TF_COLOR}" -eq 1 ]]; then
   readonly RED='\033[0;31m'

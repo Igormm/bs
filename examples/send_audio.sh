@@ -151,9 +151,9 @@ send_audio::__duration_ms() {
   if [[ ! "${raw}" =~ ${re} ]]; then
     return 1
   fi
-  frac="${BASH_REMATCH[3]:-}000"
+  frac="$(bs::regex::group 3)000"
   io::streams::printf '%d' \
-    "$(( 10#${BASH_REMATCH[1]} * 1000 + 10#${frac:0:3} ))"
+    "$(( 10#$(bs::regex::group 1) * 1000 + 10#${frac:0:3} ))"
 }
 
 # @description Extract the first audio track as mono 16 kHz WAV. Gaps and a

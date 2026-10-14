@@ -37,26 +37,26 @@ test_fixtures() {
 
     local f
     for f in bad_bracket bad_array bad_name; do
-        bash "${SCAN}" --check "${T}/${f}.sh" >/dev/null 2>&1 && eq "1" "0" "${f}: a posix file with a bashism fails --check" || eq "1" "1" "${f}: a posix file with a bashism fails --check"
+        "${TEST_BASH}" "${SCAN}" --check "${T}/${f}.sh" >/dev/null 2>&1 && eq "1" "0" "${f}: a posix file with a bashism fails --check" || eq "1" "1" "${f}: a posix file with a bashism fails --check"
     done
     local out
-    out="$(bash "${SCAN}" "${T}/bad_bracket.sh")"
+    out="$(${TEST_BASH} "${SCAN}" "${T}/bad_bracket.sh")"
     ok "'${out}' == *VIOLATION* && '${out}' == *'double-bracket'* " "the violation names the construct"
-    out="$(bash "${SCAN}" "${T}/bad_name.sh")"
+    out="$(${TEST_BASH} "${SCAN}" "${T}/bad_name.sh")"
     ok "'${out}' == *'\"::\" in a function name'* " "the violation names the :: function name"
-    bash "${SCAN}" --check "${T}/good.sh" >/dev/null 2>&1 && eq "0" "0" "a clean posix file passes --check" || eq "0" "1" "a clean posix file passes --check"
-    bash "${SCAN}" --check "${T}/string_only.sh" >/dev/null 2>&1 && eq "0" "0" "constructs inside strings do not fail a posix file" || eq "0" "1" "constructs inside strings do not fail a posix file"
-    out="$(bash "${SCAN}" --list "${T}/real_bash.sh")"
+    "${TEST_BASH}" "${SCAN}" --check "${T}/good.sh" >/dev/null 2>&1 && eq "0" "0" "a clean posix file passes --check" || eq "0" "1" "a clean posix file passes --check"
+    "${TEST_BASH}" "${SCAN}" --check "${T}/string_only.sh" >/dev/null 2>&1 && eq "0" "0" "constructs inside strings do not fail a posix file" || eq "0" "1" "constructs inside strings do not fail a posix file"
+    out="$(${TEST_BASH} "${SCAN}" --list "${T}/real_bash.sh")"
     ok "'${out}' == *bash4*bash4*ok* " "a bash4 file with a real array/assoc is consistent"
-    out="$(bash "${SCAN}" --list "${T}/plain.sh")"
+    out="$(${TEST_BASH} "${SCAN}" --list "${T}/plain.sh")"
     ok "'${out}' == *could-be-posix* " "a bash4 file without bashisms is reported as could-be-posix"
-    out="$(bash "${SCAN}" --list "${T}/none.sh")"
+    out="$(${TEST_BASH} "${SCAN}" --list "${T}/none.sh")"
     ok "'${out}' == *unannotated* " "a file without annotation is reported (default bash4)"
 }
 
 test_repository() {
     local out rc=0
-    out="$(bash "${SCAN}" --check "${BS_PROJECT_ROOT}/bootstrap" "${BS_PROJECT_ROOT}/install" \
+    out="$(${TEST_BASH} "${SCAN}" --check "${BS_PROJECT_ROOT}/bootstrap" "${BS_PROJECT_ROOT}/install" \
         "${BS_PROJECT_ROOT}/install.sh" "${BS_PROJECT_ROOT}/boot.sh" "${BS_PROJECT_ROOT}/bs" 2>&1)" || rc=$?
     eq "0" "${rc}" "the repository: annotations and constructs agree (no VIOLATION)"
     ok "'${out}' == *'bootstrap/shell.sh'*posix*ok* " "bootstrap/shell.sh is declared posix and consistent"
@@ -82,16 +82,16 @@ test_repository() {
 
 test_probe() {
     local out
-    out="$(bash "${PROBE}" --tsv bash 2>/dev/null)"
+    out="$(${TEST_BASH} "${PROBE}" --tsv bash 2>/dev/null)"
     ok "'${out}' == *'assoc array'*ok* " "probe: bash has associative arrays"
     ok "'${out}' == *'nameref'*ok* " "probe: bash has namerefs"
     if command -v dash >/dev/null 2>&1; then
-        out="$(bash "${PROBE}" --tsv dash 2>/dev/null)"
+        out="$(${TEST_BASH} "${PROBE}" --tsv dash 2>/dev/null)"
         ok "'${out}' == *'indexed array'*no* " "probe: dash has no arrays"
         ok "'${out}' == *'name with :: (a::b)'*no* " "probe: dash rejects :: in function names"
     fi
     if command -v zsh >/dev/null 2>&1; then
-        out="$(bash "${PROBE}" --tsv zsh 2>/dev/null)"
+        out="$(${TEST_BASH} "${PROBE}" --tsv zsh 2>/dev/null)"
         ok "'${out}' == *'nameref (local -n)'*no* " "probe: this zsh has no namerefs"
         ok "'${out}' == *'assoc array'*ok* " "probe: zsh has associative arrays"
     fi

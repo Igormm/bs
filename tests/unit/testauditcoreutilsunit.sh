@@ -22,7 +22,7 @@ export BS_HOME="${BS_PROJECT_ROOT}"
 run_child() {
     local -r tmpdir="$1" setup="$2"
     env -i HOME="${tmpdir}" PATH="/usr/bin:/bin" TMPDIR="${tmpdir}/tmp" BS_SILENT=1 \
-        BS_ROOT="${BS_PROJECT_ROOT}" bash -c '
+        BS_ROOT="${BS_PROJECT_ROOT}" "${TEST_BASH}" -c '
         source "$1/bootstrap/init.sh"
         errorhandler::setup_trap
         reg="$TMPDIR/bs-tmp-registry.$$"
@@ -64,7 +64,7 @@ test_tempfile_refuses_symlink_registry() {
     t="$(mktemp -d)"
     mkdir -p "${t}/tmp"
     : > "${t}/target"
-    out="$(env -u BS_INITIALIZED TMPDIR="${t}/tmp" bash -c '
+    out="$(env -u BS_INITIALIZED TMPDIR="${t}/tmp" ${TEST_BASH} -c '
         source "$1/bootstrap/init.sh"
         ln -s "$2/target" "$TMPDIR/bs-tmp-registry.$$"
         UTILS_TMP_REGISTRY="$TMPDIR/bs-tmp-registry.$$"
@@ -91,7 +91,7 @@ test_tempfile_normal() {
 # detect_root: the framework root, not core/
 test_detect_root() {
     local out
-    out="$(env -u FRAMEWORK_ROOT -u BS_INITIALIZED bash -c '
+    out="$(env -u FRAMEWORK_ROOT -u BS_INITIALIZED ${TEST_BASH} -c '
         source "$1/bootstrap/init.sh"
         utils::detect_root >/dev/null
         printf "%s" "${FRAMEWORK_ROOT}"

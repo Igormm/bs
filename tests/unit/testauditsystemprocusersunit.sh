@@ -191,7 +191,7 @@ main() {
     ln -sf "$(PATH="${ORIG_PATH}" command -v ps)" "${SANDBOX}/bin/ps"
     # Дочерняя оболочка с шаблоном в собственной командной строке / child shell whose
     # own command line contains the pattern
-    out="$(PATH="${SANDBOX}/bin" BS_SILENT=1 bash -c '
+    out="$(PATH="${SANDBOX}/bin" BS_SILENT=1 ${TEST_BASH} -c '
         source "$1/bootstrap/init.sh" >/dev/null 2>&1
         load "lib/system/processes" >/dev/null 2>&1
         system::processes::kill_by_name "$2" >/dev/null 2>&1

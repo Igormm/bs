@@ -56,7 +56,7 @@ bs::version::of() {
     [[ -f "${file}" ]] || return 0
     while IFS= read -r line; do
         if [[ "${line}" =~ ${re} ]]; then
-            printf '%s\n' "${BASH_REMATCH[1]}"
+            printf '%s\n' "$(bs::regex::group 1)"
             return 0
         fi
     done < "${file}"

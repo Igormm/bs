@@ -15,12 +15,12 @@ readonly BS_LAUNCHER="${BS_PROJECT_ROOT}/bs"
 source "${TEST_SCRIPT_DIR}/../testframework.sh"
 
 run_calc() {
-    bash "${BS_LAUNCHER}" calc "$@" 2>&1
+    "${TEST_BASH}" "${BS_LAUNCHER}" calc "$@" 2>&1
 }
 
 test_calc_help_flag() {
     local rc=0 out clean
-    out="$(bash "${BS_LAUNCHER}" calc --help 2>&1)" || rc=$?
+    out="$(${TEST_BASH} "${BS_LAUNCHER}" calc --help 2>&1)" || rc=$?
     testframework::assert_equal "0" "${rc}" "bs calc --help exits 0"
     clean="${out//\'/}"
     testframework::assert_true "'${clean}' =~ RPN" "help mentions RPN"
@@ -44,7 +44,7 @@ test_calc_comment_no_autop() {
 
 test_calc_interactive_state() {
     local out count_5=1 count_20=1
-    out="$(printf '2 3 +\n4 *\n:q\n' | bash "${BS_LAUNCHER}" calc 2>&1)"
+    out="$(printf '2 3 +\n4 *\n:q\n' | ${TEST_BASH} "${BS_LAUNCHER}" calc 2>&1)"
     printf '%s\n' "${out}" | grep -qx '5' || count_5=0
     testframework::assert_equal "1" "${count_5}" "interactive prints first result"
     printf '%s\n' "${out}" | grep -qx '20' || count_20=0

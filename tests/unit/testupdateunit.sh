@@ -45,7 +45,7 @@ test_update_basic() {
     printf 'mod_func() { :; }\n' > "${src}/lib/data/mod.sh"
     printf 'old_lib() { :; }\n' > "${target}/lib/data/old_lib.sh"
 
-    bash "${BS_PROJECT_ROOT}/bs" update --lib "${target}" --from "${src}" >/dev/null 2>&1
+    "${TEST_BASH}" "${BS_PROJECT_ROOT}/bs" update --lib "${target}" --from "${src}" >/dev/null 2>&1
     testframework::assert_equal "0" "$?" "bs update exits 0"
     testframework::assert_command "test -f '${target}/core/new.sh'" "bs update copies new core files"
     testframework::assert_command "test -f '${target}/lib/data/mod.sh'" "bs update copies lib modules"
@@ -58,7 +58,7 @@ test_update_basic() {
     testframework::assert_command "grep -qx 'mode=custom' '${target}/.install'" "bs update creates a manifest for an old install"
 
     # Повторный update — идемпотентность / Second update is idempotent
-    bash "${BS_PROJECT_ROOT}/bs" update --lib "${target}" --from "${src}" >/dev/null 2>&1
+    "${TEST_BASH}" "${BS_PROJECT_ROOT}/bs" update --lib "${target}" --from "${src}" >/dev/null 2>&1
     testframework::assert_equal "0" "$?" "bs update idempotent"
 
     rm -rf "${tmp_dir}"
@@ -94,7 +94,7 @@ test_update_autodetect() {
     fi
     # Без терминала (stdin не TTY) sudo не вызывается / no TTY, so no sudo
     HOME="${tmp_dir}/home" PATH="${tmp_dir}/bin:/usr/bin:/bin" \
-        bash "${BS_PROJECT_ROOT}/bs" update --from "${src}" >/dev/null 2>&1 </dev/null || true
+        "${TEST_BASH}" "${BS_PROJECT_ROOT}/bs" update --from "${src}" >/dev/null 2>&1 </dev/null || true
     testframework::assert_command "test -f '${target}/core/new.sh'" "bs update detects the install behind the PATH wrapper"
 
     rm -rf "${tmp_dir}"
@@ -163,7 +163,7 @@ test_update_github() {
     make_fake_target "${target}" 4.0.0
 
     # Явный источник: --repo подразумевает --github / --repo implies --github
-    bash "${BS_PROJECT_ROOT}/bs" update --lib "${target}" --repo "file://${repo}" >/dev/null 2>&1
+    "${TEST_BASH}" "${BS_PROJECT_ROOT}/bs" update --lib "${target}" --repo "file://${repo}" >/dev/null 2>&1
     testframework::assert_equal "0" "$?" "bs update --repo exits 0"
     testframework::assert_command "test -f '${target}/core/remote.sh'" "bs update --repo copies remote core"
     testframework::assert_command "test -f '${target}/lib/remote.sh'" "bs update --repo copies remote lib"
@@ -177,7 +177,7 @@ test_update_github() {
     local installed="${tmp_dir}/copy"
     mkdir -p "${installed}"
     cp -a "${BS_PROJECT_ROOT}/bootstrap" "${BS_PROJECT_ROOT}/core" "${BS_PROJECT_ROOT}/lib" "${BS_PROJECT_ROOT}/bs" "${installed}/"
-    (cd "${tmp_dir}" && env -u BS_ROOT -u BS_HOME BS_UPDATE_REPO="file://${repo}" bash "${installed}/bs" update --lib "${installed}" >/dev/null 2>&1)
+    (cd "${tmp_dir}" && env -u BS_ROOT -u BS_HOME BS_UPDATE_REPO="file://${repo}" "${TEST_BASH}" "${installed}/bs" update --lib "${installed}" >/dev/null 2>&1)
     testframework::assert_equal "0" "$?" "bs update from installed copy exits 0"
     testframework::assert_command "test -f '${installed}/core/remote.sh'" "installed copy updates from remote repo"
 
@@ -189,12 +189,12 @@ test_update_github() {
     git -C "${repo}" add -A
     git -C "${repo}" -c user.name=test -c user.email=test@example.com commit --quiet -m newer
     rm -rf "${target}" && make_fake_target "${target}" 4.0.0
-    out="$(BS_UPDATE_REPO="file://${repo}" bash "${BS_PROJECT_ROOT}/bs" update --lib "${target}" --from "${clone}" 2>&1 </dev/null)"
+    out="$(BS_UPDATE_REPO="file://${repo}" ${TEST_BASH} "${BS_PROJECT_ROOT}/bs" update --lib "${target}" --from "${clone}" 2>&1 </dev/null)"
     testframework::assert_equal "0" "$?" "bs update from a stale clone exits 0"
     testframework::assert_command "grep -q 'is behind' <<< '${out//\'/}'" "bs update warns when local repo is behind"
     testframework::assert_command "test ! -e '${target}/core/newer.sh'" "stale clone installs local code when non-interactive"
 
-    bash "${BS_PROJECT_ROOT}/bs" update --lib "${target}" --repo "file://${repo}" >/dev/null 2>&1
+    "${TEST_BASH}" "${BS_PROJECT_ROOT}/bs" update --lib "${target}" --repo "file://${repo}" >/dev/null 2>&1
     testframework::assert_command "test -f '${target}/core/newer.sh'" "bs update --repo installs the newer remote code"
 
     rm -rf "${tmp_dir}"

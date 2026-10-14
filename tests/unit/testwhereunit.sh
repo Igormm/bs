@@ -33,13 +33,13 @@ run_where() {
     RC=0
     OUT="$(cd "${T}" && env -i HOME="${T}/home" PATH="${P}" BS_SYSTEM_PREFIX="${T}/sys" \
         ${BS_USER_SHELL:+BS_USER_SHELL="${BS_USER_SHELL}"} \
-        bash "${BS_PROJECT_ROOT}/bs" where "$@" 2>&1)" || RC=$?
+        "${TEST_BASH}" "${BS_PROJECT_ROOT}/bs" where "$@" 2>&1)" || RC=$?
 }
 
 # Установка установщиком: install_bs [--local]
 install_bs() {
     (cd "${BS_PROJECT_ROOT}" && env -i HOME="${T}/home" PATH="/usr/bin:/bin" \
-        BS_SYSTEM_PREFIX="${T}/sys" bash ./install.sh "$@" </dev/null >/dev/null 2>&1) || true
+        BS_SYSTEM_PREFIX="${T}/sys" "${TEST_BASH}" ./install.sh "$@" </dev/null >/dev/null 2>&1) || true
 }
 
 has() {   # has "<phrase>" "<name>"  — OUT содержит фразу
@@ -63,7 +63,7 @@ tree_hash() { find "$1" -type f -exec sha256sum {} + 2>/dev/null | sort | sha256
 test_isolation_and_empty() {
     sandbox
     local seen
-    seen="$(env -i PATH="${P}" bash -c 'command -v bs || true')"
+    seen="$(env -i PATH="${P}" ${TEST_BASH} -c 'command -v bs || true')"
     testframework::assert_equal "" "${seen}" "isolation: no bs in the test PATH"
 
     run_where
@@ -215,7 +215,7 @@ test_cli_surface() {
     testframework::assert_true "${RC} -ne 0" "unknown argument: non-zero exit"
     has "unknown argument" "unknown argument: explained"
     local help_out
-    help_out="$(env -i HOME="${T}/home" PATH="${P}" bash "${BS_PROJECT_ROOT}/bs" help 2>&1)"
+    help_out="$(env -i HOME="${T}/home" PATH="${P}" ${TEST_BASH} "${BS_PROJECT_ROOT}/bs" help 2>&1)"
     testframework::assert_true "'${help_out}' =~ where" "bs help lists the where command"
     rm -rf "${T}"
 }

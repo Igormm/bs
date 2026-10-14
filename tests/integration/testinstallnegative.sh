@@ -55,7 +55,7 @@ run() {
     shift
     RC=0
     OUT="$(cd "${E}" && env -i HOME="${E}/home" PATH="${INST_PATH}" BS_SYSTEM_PREFIX="${E}/sys" \
-        "${envs[@]}" bash "${INSTALLER}" "$@" 2>&1)" || RC=$?
+        "${envs[@]}" "${TEST_BASH}" "${INSTALLER}" "$@" 2>&1)" || RC=$?
 }
 
 # Копия источника установщика (для сломанных источников) в $E/src
@@ -295,7 +295,7 @@ t_sudo_local_root_home() {
 t_home_problems() {
     new_env
     RC=0
-    OUT="$(env -i PATH="/usr/bin:/bin" BS_SYSTEM_PREFIX="${E}/sys" bash "${INSTALLER}" --local 2>&1)" || RC=$?
+    OUT="$(env -i PATH="/usr/bin:/bin" BS_SYSTEM_PREFIX="${E}/sys" ${TEST_BASH} "${INSTALLER}" --local 2>&1)" || RC=$?
     rc_is 1 "HOME unset: exit 1"
     has "HOME не задан" "HOME unset: RU explanation"
     lacks "unbound variable" "HOME unset: no raw unbound variable"
@@ -459,7 +459,7 @@ t_transaction_fresh_failure() {
     new_env; mk_src
     chmod 000 "${E}/src/lib/io"
     RC=0
-    OUT="$(env -i HOME="${E}/home" PATH="/usr/bin:/bin" BS_SYSTEM_PREFIX="${E}/sys" bash "${E}/src/install.sh" --local 2>&1)" || RC=$?
+    OUT="$(env -i HOME="${E}/home" PATH="/usr/bin:/bin" BS_SYSTEM_PREFIX="${E}/sys" ${TEST_BASH} "${E}/src/install.sh" --local 2>&1)" || RC=$?
     chmod 755 "${E}/src/lib/io"
     rc_is 1 "copy failure: exit 1"
     has "Установка не выполнена" "copy failure: RU ERROR"
@@ -478,7 +478,7 @@ t_transaction_keeps_previous() {
     rm -f "${E}/home/.local/bin/bs"          # полуустановка → переустановка / half → reinstall
     chmod 000 "${E}/src/lib/io"
     RC=0
-    OUT="$(env -i HOME="${E}/home" PATH="/usr/bin:/bin" BS_SYSTEM_PREFIX="${E}/sys" bash "${E}/src/install.sh" --local 2>&1)" || RC=$?
+    OUT="$(env -i HOME="${E}/home" PATH="/usr/bin:/bin" BS_SYSTEM_PREFIX="${E}/sys" ${TEST_BASH} "${E}/src/install.sh" --local 2>&1)" || RC=$?
     chmod 755 "${E}/src/lib/io"
     rc_is 1 "failed reinstall: exit 1"
     has "Прежняя установка не тронута" "failed reinstall: says the previous install is untouched"
@@ -494,7 +494,7 @@ t_incomplete_source() {
     new_env; mk_src
     rm -rf "${E}/src/lib" "${E}/src/bs" "${E}/src/core/logger.sh"
     RC=0
-    OUT="$(env -i HOME="${E}/home" PATH="/usr/bin:/bin" BS_SYSTEM_PREFIX="${E}/sys" bash "${E}/src/install.sh" --local 2>&1)" || RC=$?
+    OUT="$(env -i HOME="${E}/home" PATH="/usr/bin:/bin" BS_SYSTEM_PREFIX="${E}/sys" ${TEST_BASH} "${E}/src/install.sh" --local 2>&1)" || RC=$?
     rc_is 1 "incomplete source: exit 1"
     has "Источник установщика неполон" "incomplete source: RU ERROR"
     has "The installer source is incomplete" "incomplete source: EN ERROR"

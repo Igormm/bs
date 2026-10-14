@@ -81,7 +81,7 @@ load::__load_dependencies() {
     local line
     while IFS= read -r line || [[ -n "${line}" ]]; do
         if [[ "${line}" =~ ^[[:space:]]*#.*@depends[[:space:]]+(.+) ]]; then
-            depends_line="${BASH_REMATCH[1]}"
+            depends_line="$(bs::regex::group 1)"
             # Отрезаем trailing-комментарий (всё после очередного #)
             # Strip any trailing comment after another #
             depends_line="${depends_line%%#*}"

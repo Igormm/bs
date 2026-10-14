@@ -70,7 +70,7 @@ ts::stack::__cfg() {
     [[ "${line}" == \#* ]] && continue
     is::not_empty "${line}" || continue
     if [[ "${line}" =~ ^\[(.*)\]$ ]]; then
-      section="$(str::trim "${BASH_REMATCH[1]}")"
+      section="$(str::trim "$(bs::regex::group 1)")"
       continue
     fi
     k="$(str::trim "${line%%=*}")"

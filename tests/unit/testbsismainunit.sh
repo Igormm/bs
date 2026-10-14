@@ -28,11 +28,11 @@ main() {
 
     testframework::section "bs::is_main"
     printf '#!/bin/bash\nsource "%s/bootstrap/bs.sh"\nif bs::is_main; then echo MAIN; else echo SOURCED; fi\n' "${BS_PROJECT_ROOT}" > "${T}/m.sh"
-    eq "MAIN" "$(bash "${T}/m.sh")" "a file run directly is main"
+    eq "MAIN" "$(${TEST_BASH} "${T}/m.sh")" "a file run directly is main"
     printf '#!/bin/bash\nsource "%s/m.sh" 2>&1\n' "${T}" > "${T}/host.sh"
-    eq "SOURCED" "$(bash "${T}/host.sh" | tail -n 1)" "a file sourced by another is not main"
-    eq "MAIN" "$(BS_RUN_SCRIPT="${T}/m.sh" bash -c "source '${T}/m.sh'" 2>&1)" "a file run by bs run (BS_RUN_SCRIPT) is main"
-    eq "SOURCED" "$(BS_RUN_SCRIPT="${T}/other.sh" bash -c "source '${T}/m.sh'" 2>&1)" "a module sourced by the running script is not main"
+    eq "SOURCED" "$(${TEST_BASH} "${T}/host.sh" | tail -n 1)" "a file sourced by another is not main"
+    eq "MAIN" "$(BS_RUN_SCRIPT="${T}/m.sh" ${TEST_BASH} -c "source '${T}/m.sh'" 2>&1)" "a file run by bs run (BS_RUN_SCRIPT) is main"
+    eq "SOURCED" "$(BS_RUN_SCRIPT="${T}/other.sh" ${TEST_BASH} -c "source '${T}/m.sh'" 2>&1)" "a module sourced by the running script is not main"
 
     testframework::section "No copied guards / Нет копий охранника"
     local copies
@@ -42,10 +42,10 @@ main() {
     testframework::section "bs::script_dir"
     mkdir -p "${T}/sub"
     printf '#!/bin/bash\nsource "%s/bootstrap/bs.sh"\nf() { bs::script_dir; }\nf\n' "${BS_PROJECT_ROOT}" > "${T}/sub/d.sh"
-    eq "$(cd "${T}/sub" && pwd -P)" "$(bash "${T}/sub/d.sh")" "bs::script_dir is the physical directory of the caller's file"
+    eq "$(cd "${T}/sub" && pwd -P)" "$(${TEST_BASH} "${T}/sub/d.sh")" "bs::script_dir is the physical directory of the caller's file"
 
     testframework::section "init.sh and an inherited BS_INITIALIZED"
-    eq "yes" "$(env -i HOME="${T}" PATH=/usr/bin:/bin BS_INITIALIZED=1 bash -c "source '${BS_PROJECT_ROOT}/bootstrap/init.sh' >/dev/null 2>&1; declare -F utils::strict >/dev/null && echo yes || echo no")" "a child that inherited BS_INITIALIZED=1 still loads the kernel"
+    eq "yes" "$(env -i HOME="${T}" PATH=/usr/bin:/bin BS_INITIALIZED=1 ${TEST_BASH} -c "source '${BS_PROJECT_ROOT}/bootstrap/init.sh' >/dev/null 2>&1; declare -F utils::strict >/dev/null && echo yes || echo no")" "a child that inherited BS_INITIALIZED=1 still loads the kernel"
 
     testframework::section "utils::ensure_shell_version"
     local out rc=0

@@ -27,7 +27,9 @@ readonly __BS_SH_SOURCED=1
 # строки PATH, tier. Его же подключают оболочки, не являющиеся bash.
 # The POSIX shell registry (bootstrap/shell.sh): family detection, rc files,
 # PATH lines, tier. Shells other than bash source it too.
-: "${BS_BOOTSTRAP_DIR:=$(dirname -- "${BASH_SOURCE[0]}")}"
+# Каталог bootstrap/ задают init.sh и точки входа; запасной путь — от BS_ROOT / BS_ENTRY_DIR
+# The bootstrap/ directory is set by init.sh and the entry points; fallback: from BS_ROOT / BS_ENTRY_DIR
+: "${BS_BOOTSTRAP_DIR:=${BS_ROOT:-${BS_ENTRY_DIR:-.}}/bootstrap}"
 if [[ -f "${BS_BOOTSTRAP_DIR}/shell.sh" ]]; then
   # shellcheck source=bootstrap/shell.sh
   source "${BS_BOOTSTRAP_DIR}/shell.sh"
@@ -48,8 +50,7 @@ fi
 # @note Entry points only, never inside library modules.
 # @note Только в точках входа, никогда в библиотечных модулях.
 bs::strict() {
-  set -euo pipefail
-  IFS=$'\n\t'
+  bs_shell_strict
 }
 
 # ==========================================
@@ -132,6 +133,32 @@ bs::stack_func() {
   printf '%s\n' "${FUNCNAME[$(( ${1:-0} + 1 ))]:-main}"
 }
 
+# Результат последнего `[[ строка =~ regex ]]` в коде вызывающего. Единственное место,
+# которое знает про BASH_REMATCH; вызывать сразу после сопоставления.
+# The result of the caller's last `[[ string =~ regex ]]`. The only place that knows
+# BASH_REMATCH; call it right after the match.
+
+# @description Capture group N of the last regex match (empty if absent; 0 = whole match).
+# @description Группа N последнего сопоставления с регулярным выражением (пусто, если нет; 0 — всё совпадение).
+# @param $1 group number / номер группы
+bs::regex::group() {
+  printf '%s\n' "${BASH_REMATCH[${1:?group number required}]:-}"
+}
+
+# @description Number of captured items of the last regex match (group 0 included).
+# @description Число захваченных элементов последнего сопоставления (включая группу 0).
+bs::regex::count() {
+  printf '%d\n' "${#BASH_REMATCH[@]}"
+}
+
+# @description Copy the groups of the last regex match into the caller's array.
+# @description Скопировать группы последнего сопоставления в массив вызывающего.
+# @param $1 array name / имя массива
+bs::regex::captures() {
+  local -n __bs_rx_out="${1:?array name required}"
+  __bs_rx_out=("${BASH_REMATCH[@]}")
+}
+
 # @description Is the code running in a subshell (( ), $( ), pipeline)?
 # @description Исполняется ли код в подоболочке (( ), $( ), конвейер)?
 # @return 0 in a subshell, 1 in the main shell / 0 в подоболочке, 1 в основной оболочке
@@ -156,28 +183,18 @@ bs::trace_prefix() {
 # ==========================================
 # Shell detection / Определение оболочки
 #
-# Рантайм-определение через BASH_VERSION/ZSH_VERSION (а НЕ $SHELL — это
-# логин-оболочка, она врёт при source из другой оболочки). Все хелперы —
-# чистые builtins, доступны априори, до загрузки ядра.
-# Runtime detection via BASH_VERSION/ZSH_VERSION (NOT $SHELL — that is the
-# login shell and lies when sourcing from another shell). All helpers are
-# pure builtins, available a priori, before the kernel loads.
+# Определение — в реестре bootstrap/shell.sh (bs_shell_family и версии): это
+# единственное место, знающее BASH_VERSION/ZSH_VERSION; здесь только обёртки.
+# The detection lives in the registry bootstrap/shell.sh (bs_shell_family and the
+# version functions): the only place that knows BASH_VERSION/ZSH_VERSION; only
+# wrappers are here.
 # ==========================================
 
 # @description Current shell name: bash, zsh, dash, ash, ksh, ... or unknown.
 # @description Имя текущей оболочки: bash, zsh, dash, ash, ksh, ... или unknown.
 # @stdout shell name / имя оболочки
 bs::shell::name() {
-  if [[ -n "${BASH_VERSION:-}" ]]; then
-    printf 'bash\n'
-  elif [[ -n "${ZSH_VERSION:-}" ]]; then
-    printf 'zsh\n'
-  elif declare -F bs_shell_family >/dev/null 2>&1; then
-    bs_shell_family
-  else
-    printf 'unknown\n'
-  fi
-  return 0
+  bs_shell_family
 }
 
 # @description Absolute path of the interpreter that runs this code (the host bash),
@@ -186,67 +203,35 @@ bs::shell::name() {
 #   дочерние оболочки запускаются в ТОМ ЖЕ bash, а не в первом попавшемся в PATH.
 # @stdout path / путь
 bs::shell::host() {
-  if [[ -n "${BASH:-}" && -x "${BASH}" ]]; then
-    printf '%s\n' "${BASH}"
-  else
-    bs_shell_host_find 2>/dev/null || printf 'bash\n'
+  if bs_shell_host_ok && bs_shell_self_path 2>/dev/null; then
+    return 0
   fi
-}
-
-# @description Full version string of the running shell (bash: BASH_VERSION).
-# @description Полная строка версии работающей оболочки (bash: BASH_VERSION).
-# @stdout version / версия
-bs::shell::version_string() {
-  if [[ -n "${BASH_VERSION:-}" ]]; then
-    printf '%s\n' "${BASH_VERSION}"
-  elif [[ -n "${ZSH_VERSION:-}" ]]; then
-    printf '%s\n' "${ZSH_VERSION}"
-  else
-    printf 'unknown\n'
-  fi
-  return 0
+  bs_shell_host_find 2>/dev/null || printf 'bash\n'
 }
 
 # @description Major shell version (bash: BASH_VERSINFO[0], zsh: ZSH_VERSION).
 # @description Старшая версия оболочки (bash: BASH_VERSINFO[0], zsh: ZSH_VERSION).
 # @stdout major version / старшая версия
 bs::shell::version() {
-  if [[ -n "${BASH_VERSION:-}" ]]; then
-    printf '%s\n' "${BASH_VERSINFO[0]:-0}"
-  elif [[ -n "${ZSH_VERSION:-}" ]]; then
-    printf '%s\n' "${ZSH_VERSION%%.*}"
-  else
-    printf '0\n'
-  fi
-  return 0
+  bs_shell_version_major
 }
 
 # @description Capability gate: bash 4.2+ = full kernel (0/1).
 # @description Гейт возможностей: bash 4.2+ = полное ядро (0/1).
 # @stdout 1 bash 4.2+, 0 otherwise / 1 для bash 4.2+, 0 иначе
 bs::shell::ok() {
-  if [[ -n "${BASH_VERSION:-}" ]] && (( BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 2) )); then
-    printf '1\n'
-  else
-    printf '0\n'
-  fi
+  if bs_shell_host_ok; then printf '1\n'; else printf '0\n'; fi
   return 0
 }
 
 # @description Sourced vs executed for the DIRECT CALLER: 0 sourced, 1 executed.
 # @description Source vs исполнение ПРЯМОГО ВЫЗЫВАЮЩЕГО: 0 при source, 1 при исполнении.
-# bash: файл-вызывающий (BASH_SOURCE[1]) равен $0 только если он исполнен
-# напрямую; при source $0 — имя оболочки/скрипта-хозяина. zsh: контекст
-# исполнения через ZSH_EVAL_CONTEXT ($0 в zsh при source = имя файла).
-# In bash the caller file (BASH_SOURCE[1]) equals $0 only when executed
-# directly; when sourced, $0 is the host shell/script. zsh uses
-# ZSH_EVAL_CONTEXT ($0 becomes the file name when sourced).
+# Файл-вызывающий равен $0 только если он исполнен напрямую; при source $0 —
+# скрипт-хозяин. Библиотечный режим — только bash (гейт в init.sh), ветки zsh нет.
+# The caller file equals $0 only when executed directly; when sourced, $0 is the
+# host script. Library mode is bash only (the gate in init.sh): no zsh branch.
 # @return 0 caller is sourced / вызывающий подключён через source; 1 executed
 bs::shell::is_sourced() {
-  if [[ -n "${ZSH_VERSION:-}" ]]; then
-    [[ "${ZSH_EVAL_CONTEXT}" != toplevel* ]]
-    return $?
-  fi
   [[ "${BASH_SOURCE[1]:-}" != "$0" ]]
   return $?
 }
@@ -281,9 +266,9 @@ bs::shell::ensure_version() {
     printf 'ERROR: ensure_version: required version must be numbers, got %s.%s\n' "${required_major}" "${required_minor}" >&2
     return 1
   fi
-  local -r major="${BASH_VERSINFO[0]:-0}" minor="${BASH_VERSINFO[1]:-0}"
+  local -r major="$(bs_shell_version_major)" minor="$(bs_shell_version_minor)"
   if (( major < required_major || ( major == required_major && minor < required_minor ) )); then
-    printf 'ERROR: bash %s.%s+ required, found %s.%s\n' "${required_major}" "${required_minor}" "${major}" "${minor}" >&2
+    printf 'ERROR: %s %s.%s+ required, found %s.%s\n' "$(bs_shell_family)" "${required_major}" "${required_minor}" "${major}" "${minor}" >&2
     return 1
   fi
   return 0
@@ -1291,7 +1276,7 @@ bs::cli::update_wrapper_root() {
   local line n=0
   while IFS= read -r line && (( n++ < 5 )); do
     if [[ "${line}" =~ ${re} ]]; then
-      printf '%s\n' "${BASH_REMATCH[1]}"
+      printf '%s\n' "$(bs::regex::group 1)"
       return 0
     fi
   done < "${file}" 2>/dev/null
@@ -2702,7 +2687,7 @@ bs::cli::where_cmd() {
     while IFS= read -r line; do
       [[ "${line}" =~ ^[[:space:]]*# ]] && continue
       if [[ "${line}" =~ ${path_re} ]]; then
-        path="${BASH_REMATCH[1]}"
+        path="$(bs::regex::group 1)"
         path="${path/#\~/${HOME}}"; path="${path/#\$HOME/${HOME}}"; path="${path/#\$\{HOME\}/${HOME}}"
         [[ "${path}" == /* && "${path}" != *'$'* ]] && where_add "${path}"
       fi

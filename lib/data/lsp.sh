@@ -145,8 +145,8 @@ lsp::__word_at() {
   local -r __lsp_line="${1-}" __lsp_ch="${2:-0}"
   local __lsp_left="${__lsp_line:0:${__lsp_ch}}" __lsp_right="${__lsp_line:${__lsp_ch}}"
   local __lsp_w1="" __lsp_w2=""
-  [[ "${__lsp_left}" =~ ([A-Za-z0-9_:]+)$ ]] && __lsp_w1="${BASH_REMATCH[1]}"
-  [[ "${__lsp_right}" =~ ^([A-Za-z0-9_:]+) ]] && __lsp_w2="${BASH_REMATCH[1]}"
+  [[ "${__lsp_left}" =~ ([A-Za-z0-9_:]+)$ ]] && __lsp_w1="$(bs::regex::group 1)"
+  [[ "${__lsp_right}" =~ ^([A-Za-z0-9_:]+) ]] && __lsp_w2="$(bs::regex::group 1)"
   printf '%s%s\n' "${__lsp_w1}" "${__lsp_w2}"
 }
 
@@ -159,7 +159,7 @@ lsp::__prefix_at() {
   local -r __lsp_line="${1-}" __lsp_ch="${2:-0}"
   local __lsp_left="${__lsp_line:0:${__lsp_ch}}"
   if [[ "${__lsp_left}" =~ ([A-Za-z0-9_:]+)$ ]]; then
-    printf '%s\n' "${BASH_REMATCH[1]}"
+    printf '%s\n' "$(bs::regex::group 1)"
   fi
 }
 

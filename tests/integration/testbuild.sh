@@ -41,7 +41,7 @@ APP
 run_build() {
     local out="$1"
     shift
-    bash "${BS_LAUNCHER}" build "$@" --output "${out}" 2>&1
+    "${TEST_BASH}" "${BS_LAUNCHER}" build "$@" --output "${out}" 2>&1
 }
 
 test_build_basic() {
@@ -110,7 +110,7 @@ test_build_invalid_args() {
     testframework::assert_equal "1" "${rc}" "build with missing script exits 1"
 
     rc=0
-    bash "${BS_LAUNCHER}" build --bogus >/dev/null 2>&1 || rc=$?
+    "${TEST_BASH}" "${BS_LAUNCHER}" build --bogus >/dev/null 2>&1 || rc=$?
     testframework::assert_equal "1" "${rc}" "build with unknown flag exits 1"
 }
 
@@ -127,7 +127,7 @@ test_build_rejects_broken_script() {
 
 test_build_help() {
     local rc=0 out
-    out="$(bash "${BS_LAUNCHER}" build --help 2>&1)" || rc=$?
+    out="$(${TEST_BASH} "${BS_LAUNCHER}" build --help 2>&1)" || rc=$?
     testframework::assert_equal "0" "${rc}" "build --help exits 0"
     testframework::assert_true "'${out}' =~ bs\ build" "help mentions usage"
 }

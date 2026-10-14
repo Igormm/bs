@@ -24,12 +24,12 @@ trap 'rm -rf "${TMP_ROOT}"' EXIT
 run_repl() {
     local input="$1"
     local xdg="${TMP_ROOT}/xdg.$$"
-    printf '%s\n' "${input}" | env XDG_CONFIG_HOME="${xdg}" bash "${BS_LAUNCHER}" repl 2>&1
+    printf '%s\n' "${input}" | env XDG_CONFIG_HOME="${xdg}" "${TEST_BASH}" "${BS_LAUNCHER}" repl 2>&1
 }
 
 test_repl_help_flag() {
     local out rc=0
-    out="$(bash "${BS_LAUNCHER}" repl --help 2>&1)" || rc=$?
+    out="$(${TEST_BASH} "${BS_LAUNCHER}" repl --help 2>&1)" || rc=$?
     testframework::assert_equal "0" "${rc}" "bs repl --help exits 0"
     testframework::assert_true "'${out}' =~ bs\ repl" "help mentions usage"
 }
@@ -115,7 +115,7 @@ b"
 test_repl_history_persisted() {
     local xdg="${TMP_ROOT}/xdg_hist.$$"
     printf 'echo HIST_ONE\necho HIST_TWO\n:exit\n' | \
-        env XDG_CONFIG_HOME="${xdg}" bash "${BS_LAUNCHER}" repl >/dev/null 2>&1 || true
+        env XDG_CONFIG_HOME="${xdg}" "${TEST_BASH}" "${BS_LAUNCHER}" repl >/dev/null 2>&1 || true
 
     local hist_file="${xdg}/bs/repl_history"
     if [[ -f "${hist_file}" ]] && grep -q 'HIST_ONE' "${hist_file}" && grep -q 'HIST_TWO' "${hist_file}"; then
@@ -125,7 +125,7 @@ test_repl_history_persisted() {
     fi
 
     local out
-    out="$(printf ':hist\n:exit\n' | env XDG_CONFIG_HOME="${xdg}" bash "${BS_LAUNCHER}" repl 2>&1)"
+    out="$(printf ':hist\n:exit\n' | env XDG_CONFIG_HOME="${xdg}" ${TEST_BASH} "${BS_LAUNCHER}" repl 2>&1)"
     testframework::assert_true "'${out}' =~ HIST_ONE" "previous session history is loaded"
 }
 

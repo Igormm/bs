@@ -34,7 +34,7 @@ drop_sandbox() {
 run_installer() {
     OUT="$(cd "${T}" && env -i HOME="${T}/home" PATH="/usr/bin:/bin" SHELL="/bin/bash" \
         BS_SYSTEM_PREFIX="${T}/sys" TMPDIR="${T}/tmpd" \
-        bash "${BS_PROJECT_ROOT}/install.sh" "$@" 2>&1 </dev/null)" && RC=0 || RC=$?
+        "${TEST_BASH}" "${BS_PROJECT_ROOT}/install.sh" "$@" 2>&1 </dev/null)" && RC=0 || RC=$?
 }
 
 test_uninstall_failure_keeps_wrapper() {

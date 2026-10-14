@@ -180,7 +180,7 @@ install_wrapper_root() {
   [[ -f "${file}" && ! -L "${file}" ]] || return 0
   while IFS= read -r line || [[ -n "${line}" ]]; do
     if [[ "${line}" =~ ${re} ]]; then
-      printf '%s' "${BASH_REMATCH[1]}"
+      printf '%s' "$(bs::regex::group 1)"
       return 0
     fi
   done < "${file}" 2>/dev/null

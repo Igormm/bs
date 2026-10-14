@@ -17,7 +17,7 @@ source "${TEST_SCRIPT_DIR}/../testframework.sh"
 # загрузил его с настоящим HOME, поэтому тест запускает сам себя ещё раз под
 # изолированным HOME: фреймворк загрузится заново и возьмёт временный каталог.
 if [[ "${CONFIG_TEST_ISOLATED:-}" != "1" ]]; then
-    exec env CONFIG_TEST_ISOLATED=1 HOME="$(mktemp -d)" bash "${BS_PROJECT_ROOT}/bs" run "$(bs::script_path)" "$@"
+    exec env CONFIG_TEST_ISOLATED=1 HOME="$(mktemp -d)" "${TEST_BASH}" "${BS_PROJECT_ROOT}/bs" run "$(bs::script_path)" "$@"
 fi
 readonly TEST_HOME="${HOME}"
 export BS_SILENT=1

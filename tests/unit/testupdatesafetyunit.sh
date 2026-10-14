@@ -66,7 +66,7 @@ tree_sum() {
 run_bs() {
     OUT="$(cd "${T}" && env -u BS_ROOT -u BS_HOME -u BS_INITIALIZED -u SUDO_USER \
         HOME="${T}/home" PATH="${T}/bin:/usr/bin:/bin" BS_SYSTEM_PREFIX="${T}/sys" TMPDIR="${T}/tmpd" \
-        bash "${BS_CLI}" "$@" 2>&1 </dev/null)" && RC=0 || RC=$?
+        "${TEST_BASH}" "${BS_CLI}" "$@" 2>&1 </dev/null)" && RC=0 || RC=$?
     RAW="${OUT}"
     OUT="$(flatten_boxes "${OUT}")"
 }
@@ -106,7 +106,7 @@ test_isolation() {
     # Самая первая проверка: настоящий ~/.local/bin/bs не виден из PATH теста
     # The very first check: the real ~/.local/bin/bs is not visible from the test PATH
     local path_seen
-    path_seen="$(env HOME="${T}/home" PATH="${T}/bin:/usr/bin:/bin" bash -c 'command -v bs || true')"
+    path_seen="$(env HOME="${T}/home" PATH="${T}/bin:/usr/bin:/bin" ${TEST_BASH} -c 'command -v bs || true')"
     eq "" "${path_seen}" "isolation: no bs in the test PATH"
     eq "n" "$(has ":${T}/bin:/usr/bin:/bin:" "${REAL_HOME}/.local/bin")" "isolation: real ~/.local/bin is not in the test PATH"
     eq "n" "$(has "${T}/sys" "/usr/local")" "isolation: system prefix is inside the sandbox"
@@ -242,7 +242,7 @@ test_smoke_rollback() {
     chmod +x "${T}/fb/mv"
     make_src "${T}/good" 9.1.0
     (cd "${T}" && exec env -u BS_ROOT -u BS_HOME HOME="${T}/home" PATH="${T}/fb:/usr/bin:/bin" BS_SYSTEM_PREFIX="${T}/sys" \
-        bash "${BS_CLI}" update --lib "${T}/target" --from "${T}/good" >"${T}/o.txt" 2>&1 </dev/null) &
+        "${TEST_BASH}" "${BS_CLI}" update --lib "${T}/target" --from "${T}/good" >"${T}/o.txt" 2>&1 </dev/null) &
     local pid=$!
     for _ in 1 2 3 4 5 6 7 8 9 10; do
         [[ "$(cat "${T}/fb/cnt" 2>/dev/null || echo 0)" == "4" ]] && break
@@ -342,7 +342,7 @@ test_sudo_hint() {
     make_src "${T}/src" 0.8.0
     OUT="$(cd "${T}" && env -u BS_ROOT -u BS_HOME -u BS_INITIALIZED SUDO_USER="$(id -un)" \
         HOME="${T}/home" PATH="${T}/bin:/usr/bin:/bin" BS_SYSTEM_PREFIX="${T}/sys" \
-        bash "${BS_CLI}" update --local --from "${T}/src" 2>&1 </dev/null)" && RC=0 || RC=$?
+        "${TEST_BASH}" "${BS_CLI}" update --local --from "${T}/src" 2>&1 </dev/null)" && RC=0 || RC=$?
     eq "1" "${RC}" "7: --local under sudo with no install exits 1"
     eq "y" "$(has "${OUT}" "вы root/sudo")" "7: explains that ~ is root's home"
     eq "y" "$(has "${OUT}" "установка пользователя $(id -un)")" "7: points at the sudo user's own install"
@@ -492,7 +492,7 @@ test_running_info() {
     # Ниже первой строки — те же сведения, что печатает `bs version --full`
     # Below the first line: the same details `bs version --full` prints
     local full
-    full="$(bash "${BS_PROJECT_ROOT}/bs" version --full | tail -n +2)"
+    full="$(${TEST_BASH} "${BS_PROJECT_ROOT}/bs" version --full | tail -n +2)"
     eq "y" "$(has "${OUT}" "  root:      ${BS_PROJECT_ROOT}")" "info: the run header has the root row of version --full"
     eq "y" "$(has "${OUT}" "  install:")" "info: the run header has the install row of version --full"
     eq "y" "$(has "${OUT}" "${full%%$'\n'*}")" "info: the first detail line equals the one of version --full"

@@ -22,7 +22,7 @@ export BS_HOME="${BS_PROJECT_ROOT}"
 probe() {
     local -r dir="$1"
     (cd "${dir}" && env -i HOME="${dir}/home" PATH="/usr/bin:/bin" BS_SILENT=1 BS_ROOT="${BS_PROJECT_ROOT}" \
-        bash -c 'source "$1/bootstrap/init.sh" >/dev/null 2>&1
+        "${TEST_BASH}" -c 'source "$1/bootstrap/init.sh" >/dev/null 2>&1
                  printf "LD=[%s] REPO=[%s] PROV=[%s] MODEL=[%s]" \
                    "${LD_PRELOAD:-}" "${BS_UPDATE_REPO:-}" "${BS_LLM_PROVIDER:-}" "${BS_LLM_MODEL:-}"' _ "${BS_PROJECT_ROOT}")
 }

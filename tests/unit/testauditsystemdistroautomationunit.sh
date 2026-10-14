@@ -210,7 +210,7 @@ main() {
     eq "" "$(cat "${SANDBOX}/calls")" "display-manager NOT stopped on refusal"
     fake gdm 0
     system::display::manager "gdm" >/dev/null 2>&1
-    check "installed: stop, enable -f, set-default" bash -c "grep -qx 'systemctl stop display-manager' '${SANDBOX}/calls' && grep -qx 'systemctl enable -f gdm' '${SANDBOX}/calls' && grep -qx 'systemctl set-default graphical.target' '${SANDBOX}/calls'"
+    check "installed: stop, enable -f, set-default" "${TEST_BASH}" -c "grep -qx 'systemctl stop display-manager' '${SANDBOX}/calls' && grep -qx 'systemctl enable -f gdm' '${SANDBOX}/calls' && grep -qx 'systemctl set-default graphical.target' '${SANDBOX}/calls'"
     sandbox_drop
 
     testframework::section "display::multi primary: несуществующий вывод не гасит всё / bogus output keeps screens"
@@ -221,7 +221,7 @@ main() {
     check "unknown primary refused" test "${rc}" -ne 0
     eq "0" "$(grep -c -- '--off' "${SANDBOX}/calls")" "no output switched off"
     system::display::multi primary HDMI-1 >/dev/null 2>&1
-    check "only the other output is switched off" bash -c "grep -qx 'xrandr --output eDP-1 --off' '${SANDBOX}/calls' && ! grep -q 'HDMI-1 --off' '${SANDBOX}/calls'"
+    check "only the other output is switched off" "${TEST_BASH}" -c "grep -qx 'xrandr --output eDP-1 --off' '${SANDBOX}/calls' && ! grep -q 'HDMI-1 --off' '${SANDBOX}/calls'"
     sandbox_drop
 
     testframework::section "display::resolution: сбой xrandr / xrandr failure"

@@ -51,9 +51,6 @@ check_hit() {
   fi
   line="${hit#*:}"; line="${line#*:}"
   [[ "${line}" =~ ^[[:space:]]*# ]] && return 0
-  # BASH_REMATCH — захват группы `=~`, возможность языка bash (tier bash4), а не проверка оболочки
-  # BASH_REMATCH is the capture of `=~`, a bash language feature (tier bash4), not a shell check
-  if ! grep -oE '(^|[^A-Za-z0-9_])BASH_[A-Z_]+|FUNCNAME|ZSH_[A-Z_]+|\$\{?SHELL\}?|/proc/\$\$|ps -p +\$\$|(dirname|readlink -f)[^|]*"\$0"|\bshopt\b|\bsetopt\b|exec bash\b|/bin/bash|\bcompgen\b|complete -[FCW]|(bash|zsh) +(-[a-zA-Z]+|"|\$|\./)' <<< "${line}" | sed -E 's/^[^A-Za-z0-9_]?//' | grep -qvx 'BASH_REMATCH'; then return 0; fi
   if sed -n "$(( ln > 3 ? ln - 3 : 1 )),${ln}p" "${file}" | grep -q 'shell-gate'; then return 0; fi
   # Тег над определением функции охватывает всё её тело (например, генератор текста для bash)
   # A tag above a function definition covers its whole body (e.g. a generator of bash text)

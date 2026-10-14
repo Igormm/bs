@@ -36,7 +36,7 @@ run_installer() {
     # BS_SYSTEM_PREFIX inside TMP_ROOT: a "system" install never reaches the
     # real /usr/local. PATH without the user's ~/.local/bin.
     env HOME="${isolated_home}" PATH="/usr/bin:/bin" BS_SYSTEM_PREFIX="${isolated_home}/sysprefix" \
-        bash "${INSTALLER}" "$@" 2>&1
+        "${TEST_BASH}" "${INSTALLER}" "$@" 2>&1
 }
 
 # Установка по умолчанию (local-режим): пути в ~/.local изолированного HOME
@@ -131,7 +131,7 @@ test_custom_paths() {
     prefix="${TMP_ROOT}/custom.$$"
 
     out="$(env HOME="${iso}" PREFIX="${prefix}" BIN_DIR="${prefix}/bin" LIB_DIR="${prefix}/lib" \
-           bash "${INSTALLER}" --local install)" || rc=$?
+           "${TEST_BASH}" "${INSTALLER}" --local install)" || rc=$?
     testframework::assert_equal "0" "${rc}" "install with custom PREFIX/BIN_DIR/LIB_DIR exits 0"
 
     testframework::assert_file_exists "${prefix}/bin/bs"      "wrapper lands in custom BIN_DIR"
@@ -140,7 +140,7 @@ test_custom_paths() {
 
     rc=0
     out="$(env HOME="${iso}" PREFIX="${prefix}" BIN_DIR="${prefix}/bin" LIB_DIR="${prefix}/lib" \
-           bash "${INSTALLER}" --local uninstall)" || rc=$?
+           "${TEST_BASH}" "${INSTALLER}" --local uninstall)" || rc=$?
     testframework::assert_equal "0" "${rc}" "uninstall with custom paths exits 0"
 
     if [[ -e "${prefix}/bin/bs" || -d "${prefix}/lib/bs" ]]; then
@@ -335,14 +335,14 @@ test_installer_uninstall_safety() {
 
     # LIB_DIR pointing at the repo root (has .git) → must be skipped
     rc=0
-    out="$(env HOME="${iso}" LIB_DIR="${BS_PROJECT_ROOT}" BIN_DIR="${iso}/bin" bash "${INSTALLER}" --local uninstall)" || rc=$?
+    out="$(env HOME="${iso}" LIB_DIR="${BS_PROJECT_ROOT}" BIN_DIR="${iso}/bin" ${TEST_BASH} "${INSTALLER}" --local uninstall)" || rc=$?
     testframework::assert_equal "0" "${rc}" "installer uninstall exits 0 when TARGET_LIB is the repo"
     testframework::assert_command "test -d '${BS_PROJECT_ROOT}/core'" "repo core/ survives installer uninstall"
     testframework::assert_command "test -f '${BS_PROJECT_ROOT}/bs'" "repo bs launcher survives installer uninstall"
 
     # SOURCE_ROOT as TARGET_LIB → also skipped
     rc=0
-    out="$(env HOME="${iso}" LIB_DIR="$(dirname "${BS_PROJECT_ROOT}")" BIN_DIR="${iso}/bin" bash "${INSTALLER}" --local uninstall)" || rc=$?
+    out="$(env HOME="${iso}" LIB_DIR="$(dirname "${BS_PROJECT_ROOT}")" BIN_DIR="${iso}/bin" ${TEST_BASH} "${INSTALLER}" --local uninstall)" || rc=$?
     testframework::assert_equal "0" "${rc}" "installer uninstall exits 0 when TARGET_LIB == SOURCE_ROOT"
     testframework::assert_command "test -f '${BS_PROJECT_ROOT}/bs'" "repo survives when TARGET_LIB == SOURCE_ROOT"
 }
@@ -383,7 +383,7 @@ test_system_mode_requires_write_access() {
     iso="$(mk_isolated_home)"
     ro="${iso}/ro"
     mkdir -p "${ro}"; chmod 555 "${ro}"
-    out="$(env HOME="${iso}" PATH="/usr/bin:/bin" BS_SYSTEM_PREFIX="${ro}" bash "${INSTALLER}" 2>&1)" || rc=$?
+    out="$(env HOME="${iso}" PATH="/usr/bin:/bin" BS_SYSTEM_PREFIX="${ro}" ${TEST_BASH} "${INSTALLER}" 2>&1)" || rc=$?
     chmod 755 "${ro}"
     testframework::assert_equal "1" "${rc}" "system install without write access exits 1"
     testframework::assert_command "grep -qF 'Нет прав записи' <<< \"\${out}\"" "system mode explains the missing write access"

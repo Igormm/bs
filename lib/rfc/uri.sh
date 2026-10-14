@@ -58,8 +58,8 @@ uri::parse() {
   fi
   # scheme / схема
   if [[ "${__ur_rest}" =~ ^([A-Za-z][A-Za-z0-9+.-]*):(.*)$ ]]; then
-    __ur_scheme="${BASH_REMATCH[1]}"
-    __ur_rest="${BASH_REMATCH[2]}"
+    __ur_scheme="$(bs::regex::group 1)"
+    __ur_rest="$(bs::regex::group 2)"
   fi
   # authority + path / владелец + путь
   if [[ "${__ur_rest}" == //* ]]; then

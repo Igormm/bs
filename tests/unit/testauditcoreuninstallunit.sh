@@ -49,7 +49,7 @@ make_wrapper() {
 run_uninstall() {
     OUT="$(cd "${T}" && env -u BS_ROOT -u BS_HOME -u BS_INITIALIZED -u SUDO_USER \
         HOME="${T}/home" PATH="/usr/bin:/bin" BS_SYSTEM_PREFIX="${T}/sys" TMPDIR="${T}/tmpd" \
-        bash "${BS_PROJECT_ROOT}/bs" uninstall "$@" 2>&1 </dev/null)" && RC=0 || RC=$?
+        "${TEST_BASH}" "${BS_PROJECT_ROOT}/bs" uninstall "$@" 2>&1 </dev/null)" && RC=0 || RC=$?
 }
 
 test_failed_removal_keeps_wrapper() {

@@ -147,9 +147,9 @@ send_video::__to_ms() {
   if [[ ! "${raw}" =~ ${re} ]]; then
     return 1
   fi
-  frac="${BASH_REMATCH[3]:-}000"
+  frac="$(bs::regex::group 3)000"
   io::streams::printf '%d' \
-    "$(( 10#${BASH_REMATCH[1]} * 1000 + 10#${frac:0:3} ))"
+    "$(( 10#$(bs::regex::group 1) * 1000 + 10#${frac:0:3} ))"
 }
 
 # @description Format milliseconds as HH:MM:SS.
@@ -225,12 +225,12 @@ send_video::__overflow_parse() {
   local msg over="" limit=""
   msg="$(<"${file}")"
   if [[ "${msg}" =~ ${re_item} ]]; then
-    over="${BASH_REMATCH[1]}"
+    over="$(bs::regex::group 1)"
     if [[ "${msg}" =~ ${re_cache} ]]; then
-      limit="${BASH_REMATCH[1]}"
+      limit="$(bs::regex::group 1)"
     fi
   elif [[ "${msg}" =~ ${re_ctx} ]]; then
-    limit="${BASH_REMATCH[1]}"
+    limit="$(bs::regex::group 1)"
     # vLLM: "Input length (26569) exceeds model's maximum context length
     # (24576)"; старый формат — "... you requested N tokens". Если размер
     # не распознан, это всё равно ошибка размера: 0 = «неизвестно», поиск
@@ -240,14 +240,14 @@ send_video::__overflow_parse() {
     # unrecognised size is still a size error: 0 = "unknown", the chunk
     # search then falls back to bisection.
     if [[ "${msg}" =~ ${re_req} || "${msg}" =~ ${re_input} ]]; then
-      over="${BASH_REMATCH[1]}"
+      over="$(bs::regex::group 1)"
     else
       over=0
     fi
   elif [[ "${msg}" =~ ${re_len} ]]; then
-    over="${BASH_REMATCH[1]}"
+    over="$(bs::regex::group 1)"
     if [[ "${msg}" =~ ${re_max} ]]; then
-      limit="${BASH_REMATCH[1]}"
+      limit="$(bs::regex::group 1)"
     fi
   fi
   if is::number "${over}" && is::number "${limit}"; then

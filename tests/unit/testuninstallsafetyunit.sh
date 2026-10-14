@@ -66,7 +66,7 @@ tree_sum() {
 run_bs() {
     OUT="$(cd "${T}" && env -u BS_ROOT -u BS_HOME -u BS_INITIALIZED -u SUDO_USER \
         HOME="${T}/home" PATH="${T}/bin:/usr/bin:/bin" BS_SYSTEM_PREFIX="${T}/sys" TMPDIR="${T}/tmpd" \
-        bash "${BS_CLI}" "$@" 2>&1 </dev/null)" && RC=0 || RC=$?
+        "${TEST_BASH}" "${BS_CLI}" "$@" 2>&1 </dev/null)" && RC=0 || RC=$?
     RAW="${OUT}"
     OUT="$(flatten_boxes "${OUT}")"
 }
@@ -104,7 +104,7 @@ leftovers() { find "$1" -maxdepth 1 \( -name '.update.*' -o -name '.update-old.*
 test_isolation() {
     sandbox
     local path_seen
-    path_seen="$(env HOME="${T}/home" PATH="${T}/bin:/usr/bin:/bin" bash -c 'command -v bs || true')"
+    path_seen="$(env HOME="${T}/home" PATH="${T}/bin:/usr/bin:/bin" ${TEST_BASH} -c 'command -v bs || true')"
     eq "" "${path_seen}" "isolation: no bs in the test PATH"
     eq "n" "$(has ":${T}/bin:/usr/bin:/bin:" "${REAL_HOME}/.local/bin")" "isolation: real ~/.local/bin is not in the test PATH"
     rm -rf "${T}"
@@ -205,7 +205,7 @@ test_uninstall_self() {
     mkdir -p "${T}/prefix/bin"
     make_wrapper "${T}/prefix/bin/bs" "${T}/prefix/lib/bs"
     OUT="$(cd "${T}" && env -u BS_HOME -u BS_INITIALIZED -u SUDO_USER HOME="${T}/home" PATH="${T}/prefix/bin:/usr/bin:/bin" \
-        BS_SYSTEM_PREFIX="${T}/sys" bash "${T}/prefix/bin/bs" uninstall --lib "${T}/prefix/lib/bs" 2>&1 </dev/null)" && RC=0 || RC=$?
+        BS_SYSTEM_PREFIX="${T}/sys" "${TEST_BASH}" "${T}/prefix/bin/bs" uninstall --lib "${T}/prefix/lib/bs" 2>&1 </dev/null)" && RC=0 || RC=$?
     eq "0" "${RC}" "13: removing the copy that runs exits 0"
     eq "y" "$(has "${OUT}" "удаляется копия, из которой запущен bs")" "13: announces that the running copy is removed"
     eq "y" "$(has "${OUT%%$'\n'*}" "Запущен / Running: bs ")" "13: first line names the running copy"
@@ -219,15 +219,15 @@ test_version_env_odd() {
     make_real_copy "${T}/real/lib/bs"
     head -c 300 /dev/urandom > "${T}/real/lib/bs/.install"
     local bsx="${T}/real/lib/bs/bs"
-    OUT="$(cd "${T}" && env -u BS_ROOT -u BS_HOME -u BS_INITIALIZED HOME="${T}/home" PATH="/usr/bin:/bin" bash "${bsx}" version --full 2>&1 </dev/null)" && RC=0 || RC=$?
+    OUT="$(cd "${T}" && env -u BS_ROOT -u BS_HOME -u BS_INITIALIZED HOME="${T}/home" PATH="/usr/bin:/bin" ${TEST_BASH} "${bsx}" version --full 2>&1 </dev/null)" && RC=0 || RC=$?
     eq "0" "${RC}" "13: version --full with a corrupt manifest exits 0"
     eq "y" "$(has "${OUT}" "манифест повреждён")" "13: version --full reports the corrupt manifest"
-    OUT="$(cd "${T}" && env -u BS_ROOT -u BS_HOME -u BS_INITIALIZED HOME="${T}/home" PATH="/usr/bin:/bin" bash "${bsx}" env 2>&1 </dev/null)" && RC=0 || RC=$?
+    OUT="$(cd "${T}" && env -u BS_ROOT -u BS_HOME -u BS_INITIALIZED HOME="${T}/home" PATH="/usr/bin:/bin" ${TEST_BASH} "${bsx}" env 2>&1 </dev/null)" && RC=0 || RC=$?
     eq "0" "${RC}" "13: env with a corrupt manifest exits 0"
     eq "y" "$(has "${OUT}" "манифест повреждён")" "13: env reports the corrupt manifest"
 
     rm -f "${T}/real/lib/bs/.install"
-    OUT="$(cd "${T}" && env -u BS_ROOT -u BS_HOME -u BS_INITIALIZED HOME="${T}/home" PATH="/usr/bin:/bin" bash "${bsx}" version --full 2>&1 </dev/null)" && RC=0 || RC=$?
+    OUT="$(cd "${T}" && env -u BS_ROOT -u BS_HOME -u BS_INITIALIZED HOME="${T}/home" PATH="/usr/bin:/bin" ${TEST_BASH} "${bsx}" version --full 2>&1 </dev/null)" && RC=0 || RC=$?
     eq "y" "$(has "${OUT}" "no manifest")" "13: version --full without a manifest says so"
 
     # Исходный репозиторий без git в PATH / a checkout with no git in PATH

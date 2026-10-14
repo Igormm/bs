@@ -73,6 +73,21 @@ BS with all its abstractions must be reachable from most shells, not only bash a
 Тег ставят только тогда, когда реестр действительно недостижим; «так проще» — не причина.
 Add the tag only when the registry really is unreachable; "it is simpler" is not a reason.
 
+## Область: всё, что до lib/ / Scope: everything before lib/
+
+**Задача ветки.** Всё, что загружается до `lib/` — `bootstrap/`, точки входа, `core/` — не зависит от оболочки: приоритет bash, zsh, ash (дальше dash, nushell через host, fish, ksh, osh). Следов переменных оболочек (`BASH_*`, `ZSH_*`, `$SHELL`, …) нет нигде, кроме слоя абстракции (`bootstrap/shell.sh`, `bootstrap/bs.sh` до секции CLI, `trampoline.sh`) и строк с тегом `shell-gate`.
+**The branch's task.** Everything loaded before `lib/` — `bootstrap/`, the entry points, `core/` — is shell-independent: priority bash, zsh, ash. No shell-variable traces anywhere but the abstraction layer and `shell-gate` lines.
+
+**Решение: дублирование кода под оболочки — не грех.** Если одно и то же в bash, zsh и ash делается по-разному, пишем отдельную ветку на каждую оболочку внутри функции слоя (`case "$(bs_shell_family)" in bash) … ;; zsh) … ;; *) … ;; esac`), а потребитель зовёт одну функцию. Общий знаменатель любой ценой не нужен. Ветку для оболочки, которую не запускали, помечают «не проверено».
+**Decision: duplicating code per shell is fine.** When bash, zsh and ash do the same thing differently, write one branch per shell inside a layer function; the consumer calls one function. A branch for a shell that was not run is marked "not verified".
+
+**Tier каждого файла до lib/.** Метка `@shell` честно отражает язык файла:
+- `posix` — работает в bash, zsh, ash/dash: `bootstrap/shell.sh`, `bootstrap/trampoline.sh`, прологи точек входа (`bs_shell_strict` — здесь же: `bs::strict` в `bootstrap/bs.sh` лишь вызывает её; сам `bs.sh` — `bash4`);
+- `bash4` — пока остальное: `bootstrap/bs.sh`, `init.sh`, `loader.sh`, весь `core/` (массивы, ассоциативные массивы, `[[ ]]`, namerefs).
+Перевод файла из `bash4` в `posix` — отдельная задача на файл: сначала список конструкций (`tier_scan.sh --list`), затем замена или вынос в ветку оболочки, затем `dash -n`, `zsh -n`, тест под dash и zsh. Порядок: `core/const`, `core/guard`, `core/prereq`, `core/version`, `core/logger`, `core/utils`, `core/errorhandler`, затем `core/config`, `core/deps`, `core/args`, `core/lang` (самый большой, 1700 строк). Каждый шаг — отдельный коммит с тестом.
+
+**Откуда берутся пути.** Источники пути только такие: `$0` в точке входа (пролог, тег `shell-gate`), `BS_ROOT`/`BS_ENTRY_DIR`/`BS_BOOTSTRAP_DIR`, `BS_CURRENT_FILE`, который ставит загрузчик на время `source`. Подключаемый файл не определяет свой путь сам.
+
 ## Порядок работы / Workflow
 
 1. **Ветка.** Эта работа только в `fix/kernel-security-p0` (worktree), не в `main`. Историю не менять; коммит и push — по просьбе.

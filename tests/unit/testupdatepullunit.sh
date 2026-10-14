@@ -56,7 +56,7 @@ run_up() {
     RC=0
     OUT="$(cd "${C}" && env -i HOME="${T}/home" PATH="/usr/bin:/bin" \
         BS_SYSTEM_PREFIX="${T}/sys" BS_UPDATE_REPO="file://${R}" \
-        bash "${C}/bs" update --lib "${I}" "$@" </dev/null 2>&1)" || RC=$?
+        "${TEST_BASH}" "${C}/bs" update --lib "${I}" "$@" </dev/null 2>&1)" || RC=$?
 }
 
 ver()    { grep -o 'BS_VERSION="[0-9.]*"' "$1/core/version.sh" | tr -dc '0-9.'; }
@@ -160,7 +160,7 @@ test_pull_without_repo() {
     sandbox
     local out rc=0
     out="$(cd "${T}" && env -i HOME="${T}/home" PATH="/usr/bin:/bin" BS_SYSTEM_PREFIX="${T}/sys" \
-        bash "${I}/bs" update --lib "${I}" --pull </dev/null 2>&1)" || rc=$?
+        "${TEST_BASH}" "${I}/bs" update --lib "${I}" --pull </dev/null 2>&1)" || rc=$?
     eq "1" "${rc}" "S7 --pull with no repository around: exit 1"
     OUT="${out}"
     has "рядом нет репозитория BS" "S7: explains that there is no repository"
@@ -183,7 +183,7 @@ test_up_to_date() {
 # S9: справка описывает --pull
 test_help() {
     sandbox
-    OUT="$(env -i HOME="${T}/home" PATH="/usr/bin:/bin" bash "${BS_PROJECT_ROOT}/bs" update --help 2>&1)"
+    OUT="$(env -i HOME="${T}/home" PATH="/usr/bin:/bin" ${TEST_BASH} "${BS_PROJECT_ROOT}/bs" update --help 2>&1)"
     has "--pull" "S9: bs update --help documents --pull"
     rm -rf "${T}"
 }

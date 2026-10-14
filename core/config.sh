@@ -95,8 +95,8 @@ __config::load_file() {
 
     # Parse KEY="value" or KEY=value / Разбираем KEY="value" или KEY=value
     if [[ "${line}" =~ ^([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*=[[:space:]]*(.*)$ ]]; then
-      key="${BASH_REMATCH[1]}"
-      value="${BASH_REMATCH[2]}"
+      key="$(bs::regex::group 1)"
+      value="$(bs::regex::group 2)"
 
       if [[ "${trust}" == "local" && "${BS_CONFIG_LOCAL_KEYS}" != *" ${key} "* ]]; then
         log::warn "config: ${file}: key ${key} is not allowed in a project-local file, ignored"
@@ -105,9 +105,9 @@ __config::load_file() {
 
       # Remove surrounding quotes / Убираем окружающие кавычки
       if [[ "${value}" =~ ^\"(.*)\"$ ]]; then
-        value="${BASH_REMATCH[1]}"
+        value="$(bs::regex::group 1)"
       elif [[ "${value}" =~ ^\'(.*)\'$ ]]; then
-        value="${BASH_REMATCH[1]}"
+        value="$(bs::regex::group 1)"
       fi
 
       BS_CONFIG["${key}"]="${value}"

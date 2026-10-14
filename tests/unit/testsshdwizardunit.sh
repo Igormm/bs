@@ -139,7 +139,7 @@ main() {
 
     testframework::section "set -u isolation / изоляция set -u"
     local iso
-    iso="$(bash -c '
+    iso="$(${TEST_BASH} -c '
         unset BS_INITIALIZED BS_RUN_SCRIPT
         source "$1/bootstrap/init.sh"
         bs::strict

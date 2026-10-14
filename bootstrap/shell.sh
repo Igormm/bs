@@ -308,6 +308,38 @@ bs_shell_known() {
 # Host and tier / Хозяин и tier
 # ==========================================
 
+# @description Strict mode for an entry point, in every shell: errexit, nounset, pipefail
+#   where the shell has it (bash, zsh, busybox ash; not dash), IFS = newline + tab.
+#   Entry points only, never inside library modules.
+# @description Строгий режим точки входа в любой оболочке: errexit, nounset, pipefail
+#   там, где он есть (bash, zsh, busybox ash; в dash нет), IFS = перевод строки + табуляция.
+#   Только в точках входа, никогда в библиотечных модулях.
+bs_shell_strict() {
+  set -eu
+  # pipefail есть не везде: имя опции в переменной, проверка в подоболочке — dash не пострадает
+  # pipefail is not everywhere: the option name is in a variable, probed in a subshell — dash is not hurt
+  __bs_pf=pipefail
+  if (set -o "$__bs_pf") 2>/dev/null; then
+    set -o "$__bs_pf"
+  fi
+  IFS=$(printf '\n\t')
+}
+
+# @description Absolute path of the interpreter running this code.
+# @description Абсолютный путь интерпретатора, исполняющего этот код.
+# @stdout path / путь
+bs_shell_self_path() {
+  case $(bs_shell_family) in
+    bash) if [ -n "${BASH:-}" ] && [ -x "${BASH}" ]; then printf '%s\n' "${BASH}"; return 0; fi ;;
+  esac
+  __bs_sp=$(readlink "/proc/$$/exe" 2>/dev/null) || __bs_sp=''
+  if [ -n "$__bs_sp" ] && [ -x "$__bs_sp" ]; then
+    printf '%s\n' "$__bs_sp"
+  else
+    return 1
+  fi
+}
+
 # @description Can BS be sourced as a library from this shell family? (only bash:
 #   BS is bash code; other shells use the `bs` command)
 # @description Можно ли подключить BS как библиотеку (source) из этого семейства?
@@ -342,22 +374,56 @@ bs_shell_default_login_path() {
   fi
 }
 
+# @description Version string of the running shell (the one variable that holds it:
+#   BASH_VERSION, ZSH_VERSION, KSH_VERSION, OILS_VERSION); "unknown" if none.
+# @description Строка версии работающей оболочки (единственное место, знающее
+#   BASH_VERSION, ZSH_VERSION, KSH_VERSION, OILS_VERSION); «unknown», если нет.
+# @stdout version / версия
+bs_shell_version_string() {
+  case $(bs_shell_family) in
+    osh)   printf '%s\n' "${OILS_VERSION:-${OIL_VERSION:-unknown}}" ;;
+    bash)  printf '%s\n' "${BASH_VERSION:-unknown}" ;;
+    zsh)   printf '%s\n' "${ZSH_VERSION:-unknown}" ;;
+    ksh|mksh|oksh) printf '%s\n' "${KSH_VERSION:-unknown}" ;;
+    *)     printf 'unknown\n' ;;
+  esac
+}
+
+# @description Major version of the running shell (0 if unknown).
+# @description Старшая версия работающей оболочки (0, если неизвестна).
+# @stdout number / число
+bs_shell_version_major() {
+  __bs_vs=$(bs_shell_version_string)
+  __bs_vs=${__bs_vs%%[!0-9.]*}
+  case $__bs_vs in
+    [0-9]*) printf '%s\n' "${__bs_vs%%.*}" ;;
+    *)      printf '0\n' ;;
+  esac
+}
+
+# @description Minor version of the running shell (0 if unknown).
+# @description Младшая версия работающей оболочки (0, если неизвестна).
+# @stdout number / число
+bs_shell_version_minor() {
+  __bs_vs=$(bs_shell_version_string)
+  __bs_vs=${__bs_vs%%[!0-9.]*}
+  case $__bs_vs in
+    [0-9]*.[0-9]*) __bs_vr=${__bs_vs#*.}; printf '%s\n' "${__bs_vr%%.*}" ;;
+    *)             printf '0\n' ;;
+  esac
+}
+
 # @description Is the interpreter running THIS code a capable host (bash 4.2+)?
 # @description Годится ли интерпретатор, исполняющий ЭТОТ код, в хозяева (bash 4.2+)?
 # @return 0 yes, 1 no / 0 да, 1 нет
 bs_shell_host_ok() {
-  [ -n "${BASH_VERSION:-}" ] || return 1
+  [ "$(bs_shell_family)" = bash ] || return 1
   # shellcheck disable=SC3028  # SHELLOPTS есть в bash / exists in bash
   case ":${SHELLOPTS:-}:" in *:posix:*) return 1 ;; esac
-  [ -z "${OILS_VERSION:-}${OIL_VERSION:-}" ] || return 1
-  __bs_hv=${BASH_VERSION%%[!0-9.]*}
-  __bs_hmaj=${__bs_hv%%.*}
-  __bs_hr=${__bs_hv#*.}
-  __bs_hmin=${__bs_hr%%.*}
-  if [ "$__bs_hmaj" -gt 4 ] 2>/dev/null; then
-    return 0
-  fi
-  [ "$__bs_hmaj" -eq 4 ] 2>/dev/null && [ "$__bs_hmin" -ge 2 ] 2>/dev/null
+  __bs_hmaj=$(bs_shell_version_major)
+  __bs_hmin=$(bs_shell_version_minor)
+  [ "$__bs_hmaj" -gt 4 ] && return 0
+  [ "$__bs_hmaj" -eq 4 ] && [ "$__bs_hmin" -ge 2 ]
 }
 
 # @description Is the given executable a bash 4.2+? (it is asked, not assumed)
@@ -514,7 +580,7 @@ bs_shell_tier_desc() {
 if [ -n "${BASH_VERSION:-}" ] || [ -n "${ZSH_VERSION:-}" ]; then
   for __bs_fn in of_name family login parent user rc_file rc_scan all_rc_files \
       path_line reload_hint fresh_flags known host_ok host_find tier tier_desc \
-      login_path can_source rc_create_ok default_login_path file_tier tier_word tier_allows; do
+      login_path can_source rc_create_ok default_login_path version_string version_major version_minor strict self_path file_tier tier_word tier_allows; do
     eval "bs::shell::${__bs_fn}() { bs_shell_${__bs_fn} \"\$@\"; }"
   done
 fi

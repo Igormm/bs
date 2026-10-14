@@ -203,10 +203,9 @@ regex::groups() {
   local -rn __rg_ref="${3:?output array name required}"
   __rg_ref=()
   [[ "${__rg_str}" =~ ${__rg_pattern} ]] || return 1
-  local -i __rg_i
-  for (( __rg_i = 1; __rg_i < ${#BASH_REMATCH[@]}; __rg_i++ )); do
-    __rg_ref+=("${BASH_REMATCH[__rg_i]}")
-  done
+  local -a __rg_all=()
+  bs::regex::captures __rg_all
+  __rg_ref=("${__rg_all[@]:1}")
 }
 
 # @description One capture group of the FIRST match, printed
@@ -224,8 +223,10 @@ regex::group() {
   local -r __rg_n="${3:-0}"
   [[ "${__rg_n}" =~ ^[0-9]+$ ]] || return 1
   [[ "${__rg_str}" =~ ${__rg_pattern} ]] || return 1
-  if (( __rg_n < ${#BASH_REMATCH[@]} )); then
-    printf '%s\n' "${BASH_REMATCH[__rg_n]}"
+  local -a __rg_all=()
+  bs::regex::captures __rg_all
+  if (( __rg_n < ${#__rg_all[@]} )); then
+    printf '%s\n' "${__rg_all[__rg_n]}"
     return 0
   fi
   return 1
@@ -299,7 +300,7 @@ regex::__replace_bash() {
     __rg_subst=""
     __rg_remain="${__rg_line}"
     while [[ "${__rg_remain}" =~ ${__rg_pattern} ]]; do
-      __rg_match="${BASH_REMATCH[0]}"
+      __rg_match="$(bs::regex::group 0)"
       __rg_head="${__rg_remain%%"${__rg_match}"*}"
       __rg_tail="${__rg_remain#*"${__rg_match}"}"
       __rg_exp="$(regex::__expand_repl "${__rg_repl}")"
@@ -338,7 +339,7 @@ regex::__expand_repl() {
       __rg_ch="${__rg_repl:$(( __rg_i + 1 )):1}"
       case "${__rg_ch}" in
         [1-9])
-          __rg_out+="${BASH_REMATCH[${__rg_ch}]:-}"
+          __rg_out+="$(bs::regex::group "${__rg_ch}")"
           ;;
         *)
           __rg_out+="\\${__rg_ch}"
@@ -346,7 +347,7 @@ regex::__expand_repl() {
       esac
       __rg_i=$(( __rg_i + 1 ))
     elif [[ "${__rg_ch}" == "&" ]]; then
-      __rg_out+="${BASH_REMATCH[0]:-}"
+      __rg_out+="$(bs::regex::group 0)"
     else
       __rg_out+="${__rg_ch}"
     fi

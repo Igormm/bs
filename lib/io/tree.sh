@@ -366,7 +366,7 @@ io::tree::__parse_ini() {
     [[ "${__tr_line}" == \#* || "${__tr_line}" == \;* ]] && continue
     is::not_empty "${__tr_line}" || continue
     if [[ "${__tr_line}" =~ ^\[(.*)\]$ ]]; then
-      __tr_section="$(str::trim "${BASH_REMATCH[1]}")"
+      __tr_section="$(str::trim "$(bs::regex::group 1)")"
       [[ "${__tr_section}" == "root" ]] && __tr_section="."
       if [[ "${__tr_section}" != "." ]]; then
         io::tree::__add d "${__tr_section}" || return $?

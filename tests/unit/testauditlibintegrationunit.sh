@@ -165,7 +165,7 @@ audit::strict_child() {
     printf 'source %q/bootstrap/init.sh\n' "${BS_PROJECT_ROOT}"
     printf '%s\n' "$1"
   } > "${script}"
-  env -i HOME="${TEST_TMP}" PATH="${PATH}" bash "${script}" 2>&1 || true
+  env -i HOME="${TEST_TMP}" PATH="${PATH}" "${TEST_BASH}" "${script}" 2>&1 || true
 }
 
 test_ps1status_monitoring_idempotent() {

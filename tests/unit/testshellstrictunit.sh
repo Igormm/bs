@@ -104,9 +104,9 @@ test_cli() {
         run BS_SHELL_STRICT=1 -- "${sh_bin}" ./bs run "${T}/s.sh"
         eq "1" "${RC}" "${sh_name} BS_SHELL_STRICT=1: exit 1"
     done
-    run -- bash ./bs --strict-shell run "${T}/s.sh"
+    run -- "${TEST_BASH}" ./bs --strict-shell run "${T}/s.sh"
     eq "ran" "${OUT}" "bash --strict-shell: bash 4.2+ is allowed"
-    run -- bash ./bs --strict-shell version
+    run -- "${TEST_BASH}" ./bs --strict-shell version
     has "BS Framework version:" "--strict-shell does not block core/ and the commands"
     local dash_bin; dash_bin="$(command -v dash || true)"
     if [[ -n "${dash_bin}" ]]; then
