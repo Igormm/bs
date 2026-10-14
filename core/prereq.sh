@@ -126,10 +126,12 @@ bs_source_relative_from() {
 # @param $@ Relative file paths from the caller's directory.
 case "$(bs_shell_family)" in
   bash)
-    # Отдельная ветка bash: вызывающий — кадр стека 1 (обёртки между нет)
-    # A bash branch of its own: the caller is stack frame 1 (no wrapper between)
-    eval 'bs_source_relative() { bs_source_relative_from "$(bs::stack_file 1)" "$@"; }'
-    eval 'bs::source_relative() { bs_source_relative_from "$(bs::stack_file 1)" "$@"; }'
+    # Отдельная ветка bash: вызывающий — кадр стека 1 (обёртки между нет); без
+    # bootstrap/bs.sh (нет bs::stack_file) — BS_CURRENT_FILE, как в других оболочках
+    # A bash branch of its own: the caller is stack frame 1 (no wrapper between);
+    # without bootstrap/bs.sh (no bs::stack_file) — BS_CURRENT_FILE, as in other shells
+    eval 'bs_source_relative() { bs_source_relative_from "$(bs::stack_file 1 2>/dev/null || printf "%s" "${BS_CURRENT_FILE:-}")" "$@"; }'
+    eval 'bs::source_relative() { bs_source_relative_from "$(bs::stack_file 1 2>/dev/null || printf "%s" "${BS_CURRENT_FILE:-}")" "$@"; }'
     ;;
   *)
     bs_source_relative() {

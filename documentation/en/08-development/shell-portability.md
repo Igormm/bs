@@ -135,6 +135,9 @@ working. Helpers of the layer used by these modules: `bs_shell_alias`,
 local, so zsh gets `readonly -g`). The directory of a sourced file comes from
 `BS_CURRENT_FILE`, which the loader sets while it sources a module; bash
 additionally reads it from the call stack.
+`core/const.sh` shows the per-shell branches: ESC bytes come from `printf` (no `$'\033'`),
+`SUPPORTED_DISTROS` is an array in bash and zsh and a space-separated string in
+shells without arrays; `const::*` names are aliases of `const_*`.
 
 ## Not done yet
 
