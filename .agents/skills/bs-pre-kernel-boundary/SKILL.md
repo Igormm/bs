@@ -21,9 +21,9 @@ before that. So:
 
 | File | Boundary |
 |---|---|
-| `bootstrap/bs.sh` | the whole file |
+| `bootstrap/bs.sh` | the whole file, except the last section "CLI-команды bs / bs CLI commands" (`bs::cli::*`): there are only definitions, their bodies use `log::`, `utils::` and run after the kernel is loaded |
 | `boot.sh` | everything before `exec "${BS_ROOT}/bs"` |
-| `bs` | everything before `source "${BS_ROOT}/bootstrap/init.sh"` |
+| `bs` | everything before `source "${BS_ROOT}/bootstrap/init.sh"` (the commands themselves live in `bootstrap/bs.sh` as `bs::cli::*`) |
 | `bootstrap/init.sh` | everything before `source .../loader.sh` |
 | `bootstrap/loader.sh` | everything before `source .../bs.sh` (the loader itself is load-time machinery and may probe `declare -f`) |
 

@@ -35,7 +35,7 @@ ui::elements::input::draw() {
     tui::put $(( by + 4 )) $(( bx + 2 )) "Enter — OK · ESC — отмена / cancel" "$(tui::style dim)"
 }
 
-if [[ -n "${BASH_EXECUTION_STRING:-}" || "${BASH_SOURCE[0]}" == "$0" ]]; then
+if bs::is_main; then
     load "lib/tui/tui"
     tui::init
     tui::buf::clear

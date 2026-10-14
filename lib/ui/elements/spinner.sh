@@ -36,7 +36,7 @@ ui::elements::spinner::draw() {
     fi
 }
 
-if [[ -n "${BASH_EXECUTION_STRING:-}" || "${BASH_SOURCE[0]}" == "$0" ]]; then
+if bs::is_main; then
     load "lib/tui/tui"
     tui::init
     demo::run() {

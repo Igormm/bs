@@ -302,6 +302,6 @@ main() {
 # Запуск при исполнении или через `bs run` (source'ит скрипт),
 # пропуск при ручном source (для тестов).
 # Run when executed or via `bs run` (which sources); skip on manual source.
-if [[ -n "${BASH_EXECUTION_STRING:-}" || "${BASH_SOURCE[0]}" == "$0" ]]; then
+if bs::is_main; then
   main "$@"
 fi

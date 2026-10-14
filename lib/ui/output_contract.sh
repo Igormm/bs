@@ -49,7 +49,7 @@ output_contract::__root() {
     if is::not_empty "${BS_ROOT:-}"; then
         printf '%s\n' "${BS_ROOT}"
     else
-        (cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." >/dev/null 2>&1 && pwd -P)
+        (cd -- "$(bs::script_dir)/../.." >/dev/null 2>&1 && pwd -P)
     fi
 }
 
@@ -143,7 +143,7 @@ output_contract::check() {
 }
 
 # Прямой запуск / Direct run: список, демо, проверка.
-if [[ -n "${BASH_EXECUTION_STRING:-}" || "${BASH_SOURCE[0]}" == "$0" ]]; then
+if bs::is_main; then
     case "${1:-}" in
         --demo)
             shift

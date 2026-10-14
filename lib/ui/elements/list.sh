@@ -44,7 +44,7 @@ ui::elements::list::draw() {
     tui::list $(( by + 2 )) $(( bx + 2 )) $(( w - 4 )) $(( h - 3 )) items "${sel}"
 }
 
-if [[ -n "${BASH_EXECUTION_STRING:-}" || "${BASH_SOURCE[0]}" == "$0" ]]; then
+if bs::is_main; then
     load "lib/tui/tui"
     tui::init
     tui::buf::clear

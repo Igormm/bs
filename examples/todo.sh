@@ -152,6 +152,6 @@ main() {
     io::streams::print "Tasks saved: ${TODO_TASK_FILE} (${#TODO_TASKS[@]})"
 }
 
-if [[ -n "${BASH_EXECUTION_STRING:-}" || "${BASH_SOURCE[0]}" == "$0" ]]; then
+if bs::is_main; then
     main "$@"
 fi

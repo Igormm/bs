@@ -370,33 +370,11 @@ utils::ensure_source() {
 utils::ensure_shell_version() {
     local -r required_version="${1:-4}"  # Default to version 4 if not specified
 
-    if is::empty "${SHELL:-}"; then
-        log::error "SHELL variable is not set, cannot verify shell version"
-        return "${E_ERROR:-1}"
-    fi
+    # Оболочку и версию определяет bs::shell::* (рантайм, не $SHELL)
+    # The shell and its version come from bs::shell::* (runtime, not $SHELL)
+    bs::shell::ensure_version "${required_version}" 0 || return "${E_ERROR:-1}"
 
-    local -r shell_name="$(basename "${SHELL}")"
-
-    case "${shell_name}" in
-        "bash")
-            if is::empty "${BASH_VERSION:-}" || [[ "${BASH_VERSION%%.*}" -lt "${required_version}" ]]; then
-                log::error "Bash version ${required_version} or higher is required but you have version ${BASH_VERSION:-unknown}"
-                return "${E_ERROR:-1}"
-            fi
-            ;;
-        "zsh")
-            if is::empty "${ZSH_VERSION:-}" || [[ "${ZSH_VERSION%%.*}" -lt "${required_version}" ]]; then
-                log::error "Zsh version ${required_version} or higher is required but you have version ${ZSH_VERSION:-unknown}"
-                return "${E_ERROR:-1}"
-            fi
-            ;;
-        *)
-            log::warn "Unknown shell ${shell_name}, cannot verify version requirements"
-            return "${E_ERROR:-1}"
-            ;;
-    esac
-
-    printf 'Shell %s meets version requirement (>= %s)\n' "${shell_name}" "${required_version}"
+    printf 'Shell %s meets version requirement (>= %s)\n' "$(bs::shell::name)" "${required_version}"
     return 0
 }
 
