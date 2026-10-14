@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags
+# @shell bash4 — не переводится в posix пока: `local -r/-a/-i` и массив (`log::table`), `${1^^}`, `printf -v`, `$'\033'`, `[[ ]]`/`(( ))`; зависит от core/lang.sh (`is::empty`/`is::not_empty`, bash4, переводится последним); `log::*` вызывают 94 файла lib/core/bootstrap/examples / not converted to posix yet: `local -r/-a/-i` and an array (`log::table`), `${1^^}`, `printf -v`, `$'\033'`, `[[ ]]`/`(( ))`; depends on core/lang.sh (`is::empty`/`is::not_empty`, bash4, converted last); `log::*` is called from 94 files of lib/core/bootstrap/examples
 #
 # core/logger.sh — модуль логирования фреймворка BS
 # core/logger.sh — BS framework logging module
