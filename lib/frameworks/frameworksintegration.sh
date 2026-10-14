@@ -351,6 +351,7 @@ frameworks::bashit::plugins::git::load() {
 # @description Загрузить настройки и алиасы истории оболочки.
 frameworks::bashit::plugins::history::load() {
   # History settings
+  # shell-gate: плагин Bash-it — часть bash-only фреймворка / a Bash-it plugin: part of a bash-only framework
   shopt -s histappend
   export HISTCONTROL=ignoredups
   export HISTSIZE=10000

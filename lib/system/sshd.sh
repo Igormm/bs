@@ -507,13 +507,12 @@ sshd::revert() {
     local -r target="${1:?target required}"
     local -a baks=()
     local f
-    # Сохраняем чужой nullglob: модуль не вправе менять опции вызывающего шелла
-    # Save the caller's nullglob: a module must not change the caller's options
-    local nullglob_was=0
-    shopt -q nullglob && nullglob_was=1
-    shopt -s nullglob
-    for f in "${target}".bak.*; do baks+=("${f}"); done
-    (( nullglob_was == 1 )) || shopt -u nullglob
+    # Без shopt: несовпавший шаблон остаётся буквальным — пропускаем его по -e
+    # No shopt: an unmatched pattern stays literal — skipped by -e
+    for f in "${target}".bak.*; do
+        [[ -e "${f}" ]] || continue
+        baks+=("${f}")
+    done
     if (( ${#baks[@]} == 0 )); then
         return "${LIB_ERROR_FILE_NOT_FOUND}"
     fi

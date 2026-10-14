@@ -62,6 +62,12 @@ BS with all its abstractions must be reachable from most shells, not only bash a
 | Раннер или фикстура, исполняемые вне `bs` (`tests/run*.sh`, `validate*.sh`, скрипт во heredoc) | `$0` с тегом `shell-gate` и пояснением |
 | Имя функции вызывающего (`FUNCNAME[1]`) | `bs::func_name N` (в `bs::func_name` N=1 — вызывающий; из функции X уровень вызывающего X — 2) |
 | Файл, строка, функция кадра стека | `bs::stack_file/line/func L`, `bs::stack_depth` |
+| Запуск дочерней оболочки (`bash -c`, `exec bash`, `/bin/bash`) | `"$(bs::shell::host)" -c ...` — тот же bash, что исполняет BS, а не первый в PATH |
+| Особый случай для семейства (`bash`, `nu`) | функция реестра: `bs_shell_can_source`, `bs_shell_rc_create_ok`, `bs_shell_default_login_path`; сравнения `== "bash"` вне реестра запрещены |
+| Опции bash (`shopt nullglob`) | не использовать: цикл по шаблону с проверкой `[[ -e ]]`; неизбежное (плагин Bash-it) — тег `shell-gate` |
+| Автодополнение | `args::completion PROG [bash\|zsh\|fish\|nu]` (или `BS_COMPLETION_SHELL`); текст bash-completion — только в теле `args::completion` |
+| Скрипт, установленный как wrapper | POSIX `#!/bin/sh`; bash находит `bs` сам |
+| Имя запущенного скрипта | `bs::script_path` (под `bs run` и `$0` — путь скрипта) |
 | Тесты слоя абстракции | перечислены в `scripts/find_leaks.sh`; остальные тесты — без `BASH_SOURCE` |
 
 Тег ставят только тогда, когда реестр действительно недостижим; «так проще» — не причина.

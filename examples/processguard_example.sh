@@ -29,7 +29,7 @@ main() {
 
     # 4. Процесс с редким выводом не должен считаться зависшим
     echo "--- Running: slow writer (hang-after 2, total 3s) ---"
-    io::process::guard --timeout 5 --hang-after 2 -- bash -c 'for i in 1 2 3; do echo "tick ${i}"; sleep 1.1; done'
+    io::process::guard --timeout 5 --hang-after 2 -- "$(bs::shell::host)" -c 'for i in 1 2 3; do echo "tick ${i}"; sleep 1.1; done'
 
     echo ""
     echo "Inspect diagnostic reports in ${diag_dir}"

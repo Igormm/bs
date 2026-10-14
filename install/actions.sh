@@ -100,6 +100,13 @@ install_step() {
   return 1
 }
 
+# Записать wrapper (POSIX sh: он только передаёт управление bs) / Write the wrapper
+# (POSIX sh: it only hands over to bs)
+install_write_wrapper() {
+  local -r lib="$1" out="$2"
+  printf '#!/bin/sh\nexport BS_ROOT="%s"\nexec "${BS_ROOT}/bs" "$@"\n' "${lib}" > "${out}" && chmod 0755 "${out}"
+}
+
 # Транзакционная установка: копия во временный каталог рядом с TARGET_LIB,
 # затем атомарный rename. При сбое временное убирается, прежняя установка
 # остаётся на месте. $1 — 1, если TARGET_LIB уже была (её заменяем).
@@ -134,11 +141,9 @@ install_transaction() {
   install_step write_install_manifest "${INSTALL_TX_STAGE}" \
     || install_tx_fail "не удалось записать манифест" "cannot write the manifest" "${had_old}"
 
-  # Wrapper — во временный файл рядом с целевым (rename в одном каталоге).
+  # Wrapper — POSIX sh, не bash: bs сам находит подходящий bash. Во временный файл рядом с целевым (rename в одном каталоге).
   # The wrapper goes to a temporary file next to the target (same-dir rename).
-  install_step bash -c '
-    printf "#!/usr/bin/env bash\nexport BS_ROOT=\"%s\"\nexec \"\${BS_ROOT}/bs\" \"\$@\"\n" "$1" > "$2" && chmod 0755 "$2"
-  ' _ "${TARGET_LIB}" "${INSTALL_TX_WTMP}" \
+  install_step install_write_wrapper "${TARGET_LIB}" "${INSTALL_TX_WTMP}" \
     || install_tx_fail "не удалось создать wrapper" "cannot create the wrapper" "${had_old}"
 
   # Подмена lib: прежнюю (если есть) откладываем, новую переименовываем.

@@ -37,7 +37,7 @@ check_shell_environment() {
     if ! bs_shell_host_ok; then
         printf "ERROR: установщик исполняется в '%s', а нужен bash 4.2+ / the installer runs in '%s', bash 4.2+ is needed\n" \
             "${shell_name}" "${shell_name}" >&2
-        printf "Запустите / Run: bash %s\n" "$0" >&2
+        printf "Запустите / Run: %s %s\n" "$(bs_shell_host_find 2>/dev/null || printf 'bash')" "$0" >&2
         exit 1
     fi
 

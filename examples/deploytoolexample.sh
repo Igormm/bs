@@ -52,10 +52,14 @@ main() {
 
     # Служебный флаг для установки completion / Utility flag for completion install
     #   source <(bs run examples/deploytoolexample.sh --emit-completion)
-    if [[ "${1:-}" == "--emit-completion" ]]; then
-        args::completion "$(basename "$0")"
-        bs::exit success
-    fi
+    # --emit-completion[=SHELL]: bash (по умолчанию), zsh, fish, nu / bash (default), zsh, fish, nu
+    case "${1:-}" in
+        --emit-completion|--emit-completion=*)
+            local emit_shell="${1#--emit-completion}"
+            args::completion "$(basename -- "$(bs::script_path)")" "${emit_shell#=}"
+            bs::exit success
+            ;;
+    esac
 
     args::require "$@"
 

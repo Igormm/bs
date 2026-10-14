@@ -28,18 +28,45 @@ allowed+='|tests/unit/test(bsismain|shell|trampoline|shelltier|shellstrict)unit\
 pat='BASH_SOURCE|BASH_VERSION|BASH_VERSINFO|BASH_EXECUTION_STRING|BASH_LINENO|BASH_ARGV|FUNCNAME|ZSH_[A-Z]+|\$\{?SHELL\}?|\$\{?BASH\}?[^_A-Za-z]|/proc/\$\$|ps -p +\$\$|(dirname|readlink -f)[^|]*"\$0"'
 
 n=0
-while IFS= read -r hit; do
+cli_start="$(grep -n 'CLI-команды bs / bs CLI commands' bootstrap/bs.sh 2>/dev/null | head -n 1 | cut -d: -f1 || true)"
+: "${cli_start:=999999}"
+# Расширенные признаки (bash как программа, его опции и дополнение) — только вне tests/
+# Extended signs (bash as a program, its options and completion) — outside tests/ only
+pat_extra='\bshopt\b|\bsetopt\b|exec bash\b|\bbash -[a-z]*c\b|/bin/bash|\bcompgen\b|complete -[FCW]'
+
+scan() { # pattern, paths...
+  local pattern="$1"; shift
+  grep -rnE "${pattern}" "$@" --include='*.sh' 2>/dev/null || true
+}
+check_hit() {
+  local hit="$1" file line ln
   file="${hit%%:*}"
-  [[ "${file}" =~ ${allowed} ]] && continue
-  line="${hit#*:}"; line="${line#*:}"
-  [[ "${line}" =~ ^[[:space:]]*# ]] && continue          # comments / комментарии
-  # Явно помеченное неизбежное место: тег shell-gate в этой или одной из 3 предыдущих строк
-  # An explicitly tagged unavoidable site: the shell-gate tag on this or one of the 3 previous lines
   ln="${hit#*:}"; ln="${ln%%:*}"
-  if sed -n "$(( ln > 3 ? ln - 3 : 1 )),${ln}p" "${file}" | grep -q 'shell-gate'; then continue; fi
+  # bootstrap/bs.sh: слой — только до секции CLI-команд (bs::cli::*), там проверок оболочки быть не должно
+  # bootstrap/bs.sh: the layer is only the part before the CLI commands section (bs::cli::*)
+  if [[ "${file}" == */bs.sh || "${file}" == "bootstrap/bs.sh" ]] && (( ln > cli_start )); then
+    :
+  elif [[ "${file}" =~ ${allowed} ]]; then
+    return 0
+  fi
+  line="${hit#*:}"; line="${line#*:}"
+  [[ "${line}" =~ ^[[:space:]]*# ]] && return 0
+  if sed -n "$(( ln > 3 ? ln - 3 : 1 )),${ln}p" "${file}" | grep -q 'shell-gate'; then return 0; fi
+  # Тег над определением функции охватывает всё её тело (например, генератор текста для bash)
+  # A tag above a function definition covers its whole body (e.g. a generator of bash text)
+  local fn_line
+  fn_line="$(head -n "${ln}" "${file}" | grep -nE '^[A-Za-z_][A-Za-z0-9_:]*\(\) *\{' | tail -n 1 | cut -d: -f1 || true)"
+  if [[ -n "${fn_line}" ]] && sed -n "$(( fn_line > 3 ? fn_line - 3 : 1 )),${fn_line}p" "${file}" | grep -q 'shell-gate'; then return 0; fi
   n=$(( n + 1 ))
   [[ "${mode}" == "list" ]] && printf '%s\n' "${hit}"
-done < <(grep -rnE "${pat}" "${paths[@]}" --include='*.sh' 2>/dev/null || true)
+  return 0
+}
+while IFS= read -r hit; do check_hit "${hit}"; done < <(scan "${pat}" "${paths[@]}")
+non_tests=()
+for pth in "${paths[@]}"; do [[ "${pth}" == tests* ]] || non_tests+=("${pth}"); done
+if (( ${#non_tests[@]} > 0 )); then
+  while IFS= read -r hit; do check_hit "${hit}"; done < <(scan "${pat_extra}" "${non_tests[@]}")
+fi
 
 [[ "${mode}" == "count" ]] && printf '%d\n' "${n}"
 if (( n > 0 )); then

@@ -14,6 +14,8 @@
 - fix: code that assumed the default IFS broke under the strict IFS of `bs` scripts: `sshnetwork::close_tunnel` found no tunnel, `io::files::copy_matching` read `*.sh *.md` as one pattern (fixed with `IFS=' ' read`); found because the tests now run through `bs run`
 - refactor: the entry points ask the shell registry (`bs_shell_host_ok`; shell.sh is now idempotent) instead of repeating the BASH_VERSION test; `loader.sh` and `bs.sh` take the bootstrap directory from `BS_BOOTSTRAP_DIR` set once by `init.sh`; `find_leaks.sh` exempts only the layer files and lines tagged `shell-gate`
 - refactor: `FUNCNAME` uses go through `bs::func_name`/`bs::stack_func`; the entry points read their directory once (`BS_ENTRY_DIR`); the leak finder also looks for `FUNCNAME`, `BASH_LINENO`, `$BASH`, `/proc/$$`, `$0` as a path; unavoidable places carry a `shell-gate` tag
+- refactor: child shells start in the running bash (`bs::shell::host`) — `bs run`, osagent, ts stack, sshnetwork, Homebrew install; `bs run` passes the script path as `$0`; registry questions `bs_shell_can_source`, `bs_shell_rc_create_ok`, `bs_shell_default_login_path` replace family comparisons; the installed wrapper is POSIX `#!/bin/sh`; `shopt nullglob` removed from sshd and fail2ban
+- feat: `args::completion PROG [bash|zsh|fish|nu]` (`BS_COMPLETION_SHELL`), examples accept `--emit-completion[=SHELL]`; zsh tested in a real zsh, fish and nushell as text only
 - skill: bs-shell-abstraction (`scripts/find_leaks.sh`), bs-shell-portability (tier_scan.sh, probe_shells.sh, shell matrix); docs: 08-development/shell-portability.md
 - tests: unit/testshellunit.sh, testtrampolineunit.sh, testshelltierunit.sh, integration/testinstallshells.sh, unit/testshellstrictunit.sh
 

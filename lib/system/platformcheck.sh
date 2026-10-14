@@ -326,7 +326,9 @@ platformcheck::install_macos_deps() {
     # Проверяем Homebrew / Check Homebrew
     if ! utils::has brew; then
         log::info "Homebrew not found. Installing..."
-        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        # shell-gate: сценарий Homebrew требует bash; запускаем тем же bash, что исполняет BS
+        # shell-gate: the Homebrew script requires bash; run it with the same bash that runs BS
+        "$(bs::shell::host)" -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     fi
     
     # Устанавливаем необходимые пакеты / Install necessary packages

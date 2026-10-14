@@ -13,7 +13,7 @@ main() {
 
     # Создаём структуру / Create structure
     mkdir -p "${work_dir}/project/src"
-    printf '#!/bin/bash\necho hello\n' > "${work_dir}/project/src/hello.sh"
+    printf '#!/bin/sh\necho hello\n' > "${work_dir}/project/src/hello.sh"
     printf 'docs\n' > "${work_dir}/project/readme.md"
     printf 'skip\n' > "${work_dir}/project/cache.tmp"
 

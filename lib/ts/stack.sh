@@ -108,7 +108,7 @@ ts::stack::__spawn() {
   (
     cd "${workdir}" || exit 1
     export PORT="${port}"
-    bash -c "${cmdline}"
+    "$(bs::shell::host)" -c "${cmdline}"
   ) >> "${log_file}" 2>&1 &
   printf '%s\n' "$!"
   return 0

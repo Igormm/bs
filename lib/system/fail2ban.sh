@@ -450,12 +450,12 @@ fail2ban::revert() {
     local -r target="${1:?target required}"
     local -a baks=()
     local f
-    # Сохраняем чужой nullglob / Preserve the caller's nullglob
-    local nullglob_was=0
-    shopt -q nullglob && nullglob_was=1
-    shopt -s nullglob
-    for f in "${target}".bak.*; do baks+=("${f}"); done
-    (( nullglob_was == 1 )) || shopt -u nullglob
+    # Без shopt: несовпавший шаблон остаётся буквальным — пропускаем его по -e
+    # No shopt: an unmatched pattern stays literal — skipped by -e
+    for f in "${target}".bak.*; do
+        [[ -e "${f}" ]] || continue
+        baks+=("${f}")
+    done
     (( ${#baks[@]} == 0 )) && return "${LIB_ERROR_FILE_NOT_FOUND}"
     local latest="${baks[0]}"
     for f in "${baks[@]}"; do [[ "${f}" > "${latest}" ]] && latest="${f}"; done

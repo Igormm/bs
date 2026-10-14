@@ -17,11 +17,11 @@ bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/uti
 # @param $3 [optional] Shell / [опционально] Оболочка
 # @example
 #   system::users::create "newuser"
-#   system::users::create "newuser" "/home/newuser" "/bin/bash"
+#   system::users::create "newuser" "/home/newuser" "/bin/sh"
 system::users::create() {
     local username="${1:-}"
     local home_dir="${2:-/home/${username}}"
-    local shell="${3:-/bin/bash}"
+    local shell="${3:-$(bs_shell_default_login_path)}"
     
     if is::empty "${username}"; then
         log::warn "Username not specified"

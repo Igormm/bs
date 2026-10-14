@@ -248,7 +248,7 @@ path_manager_add_for() {
   local -r fam="$1" rc="$2"
   local line
   line="$(path_manager_line "${fam}")"
-  if [[ "${fam}" == "nu" && ! -f "${rc}" ]]; then
+  if ! bs_shell_rc_create_ok "${fam}" && [[ ! -f "${rc}" ]]; then
     printf "ВНИМАНИЕ: %s не существует — nushell не настроен; добавьте строку сами:\nNOTE: %s does not exist — nushell is not set up; add the line yourself:\n  %s\n" \
       "${rc}" "${rc}" "${line}"
     return 0

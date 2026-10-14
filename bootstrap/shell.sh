@@ -308,6 +308,40 @@ bs_shell_known() {
 # Host and tier / Хозяин и tier
 # ==========================================
 
+# @description Can BS be sourced as a library from this shell family? (only bash:
+#   BS is bash code; other shells use the `bs` command)
+# @description Можно ли подключить BS как библиотеку (source) из этого семейства?
+#   (только bash: BS — код на bash; остальные работают командой `bs`)
+# @param $1 family / семейство
+# @return 0 yes, 1 no / 0 да, 1 нет
+bs_shell_can_source() {
+  [ "${1:-}" = bash ]
+}
+
+# @description May the installer create the rc file of this family from scratch?
+#   nushell: no — a bare env.nu would keep nu from creating its own configuration.
+# @description Может ли установщик создать rc-файл этого семейства с нуля?
+#   nushell: нет — «голый» env.nu помешал бы nu создать собственную конфигурацию.
+# @param $1 family / семейство
+# @return 0 yes, 1 no / 0 да, 1 нет
+bs_shell_rc_create_ok() {
+  [ "${1:-}" != nu ]
+}
+
+# @description Default login shell for a new account: the one the environment
+#   names if it is listed in /etc/shells, else /bin/sh.
+# @description Оболочка по умолчанию для новой учётной записи: названная окружением,
+#   если она есть в /etc/shells, иначе /bin/sh.
+# @stdout path / путь
+bs_shell_default_login_path() {
+  __bs_dl=$(bs_shell_login_path)
+  if [ -n "$__bs_dl" ] && [ -x "$__bs_dl" ] && grep -qxF "$__bs_dl" /etc/shells 2>/dev/null; then
+    printf '%s\n' "$__bs_dl"
+  else
+    printf '/bin/sh\n'
+  fi
+}
+
 # @description Is the interpreter running THIS code a capable host (bash 4.2+)?
 # @description Годится ли интерпретатор, исполняющий ЭТОТ код, в хозяева (bash 4.2+)?
 # @return 0 yes, 1 no / 0 да, 1 нет
@@ -480,7 +514,7 @@ bs_shell_tier_desc() {
 if [ -n "${BASH_VERSION:-}" ] || [ -n "${ZSH_VERSION:-}" ]; then
   for __bs_fn in of_name family login parent user rc_file rc_scan all_rc_files \
       path_line reload_hint fresh_flags known host_ok host_find tier tier_desc \
-      login_path file_tier tier_word tier_allows; do
+      login_path can_source rc_create_ok default_login_path file_tier tier_word tier_allows; do
     eval "bs::shell::${__bs_fn}() { bs_shell_${__bs_fn} \"\$@\"; }"
   done
 fi

@@ -166,6 +166,19 @@ bs::shell::name() {
   return 0
 }
 
+# @description Absolute path of the interpreter that runs this code (the host bash),
+#   to start child shells in the SAME bash instead of whichever `bash` is first in PATH.
+# @description Абсолютный путь интерпретатора, исполняющего этот код (host bash):
+#   дочерние оболочки запускаются в ТОМ ЖЕ bash, а не в первом попавшемся в PATH.
+# @stdout path / путь
+bs::shell::host() {
+  if [[ -n "${BASH:-}" && -x "${BASH}" ]]; then
+    printf '%s\n' "${BASH}"
+  else
+    bs_shell_host_find 2>/dev/null || printf 'bash\n'
+  fi
+}
+
 # @description Full version string of the running shell (bash: BASH_VERSION).
 # @description Полная строка версии работающей оболочки (bash: BASH_VERSION).
 # @stdout version / версия
@@ -691,7 +704,7 @@ bs::cli::doctor_cmd() {
   dfam="$(bs_shell_family)"
   duser="$(bs_shell_user)"
   dtier="$(bs_shell_tier "${duser}")"
-  log::success "$(printf '  %-8s | %-30s | %s' "OK" "shell (host)" "${dfam} ${BASH_VERSION}")"
+  log::success "$(printf '  %-8s | %-30s | %s' "OK" "shell (host)" "${dfam} $(bs::shell::version_string)")"
   log::success "$(printf '  %-8s | %-30s | %s' "OK" "shell (yours)" "${duser}, tier ${dtier}")"
   log::info "$(printf '  %-8s | %-30s | %s' "" "" "$(bs_shell_tier_desc "${dtier}")")"
   pass=$(( pass + 2 ))
@@ -742,13 +755,13 @@ bs::cli::run_cmd() {
   is::file "$script" || bs::cli::die "run: file not found: $script"
   # Запускаем скрипт в новом bash с уже загруженным BS-окружением
   # Сбрасываем унаследованный BS_INITIALIZED, иначе init.sh пропустит загрузку
-  BS_RUN_SCRIPT="$script" exec bash -c '
+  BS_RUN_SCRIPT="$script" exec "$(bs::shell::host)" -c '
     unset BS_INITIALIZED
     source "'"${BS_ROOT}/bootstrap/init.sh"'"
     bs::strict
     script=$1; shift
     source "$script" "$@"
-  ' bash "$script" "$@"
+  ' "$script" "$script" "$@"
 }
 
 # Build helper: base64 with -w0 fallback for busybox / base64 с fallback на busybox
@@ -1082,7 +1095,7 @@ bs::cli::init_shell_cmd() {
   tier="$(bs_shell_tier "${fam}")"
   dir="$(bs::cli::init_shell_bin_dir)"
   printf '# BS for %s (tier: %s) - add to %s\n' "${fam}" "${tier}" "${rc}"
-  if [[ "${fam}" == "bash" ]]; then
+  if bs_shell_can_source "${fam}"; then
     # Только bash 4.2+ может подключить BS как библиотеку (source)
     # Only bash 4.2+ can source BS as a library
     printf 'export BS_ROOT="%s"\n' "${BS_ROOT}"
@@ -1091,7 +1104,7 @@ bs::cli::init_shell_cmd() {
   fi
   bs_shell_path_line "${fam}" "${dir}"
   printf '# apply in this terminal: %s\n' "$(bs_shell_reload_hint "${fam}")"
-  if [[ "${fam}" != "bash" ]]; then
+  if ! bs_shell_can_source "${fam}"; then
     printf '# %s\n' "$(bs_shell_tier_desc "${tier}")"
   fi
 }
@@ -2608,7 +2621,7 @@ bs::cli::where_cmd() {
   ushell="$(bs_shell_user)"
   utier="$(bs_shell_tier "${ushell}")"
   printf '\n== Оболочка / Shell ==\n'
-  bs::cli::where_row "хозяин:" "$(bs_shell_family) ${BASH_VERSION} (исполняет код BS / runs the BS code)"
+  bs::cli::where_row "хозяин:" "$(bs_shell_family) $(bs::shell::version_string) (исполняет код BS / runs the BS code)"
   bs::cli::where_row "ваша:" "${ushell}  (login: $(bs_shell_login), parent: $(bs_shell_parent))"
   bs::cli::where_row "tier:" "${utier}"
   printf '    %s\n' "$(bs_shell_tier_desc "${utier}")"

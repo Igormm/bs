@@ -66,10 +66,14 @@ main() {
     # Hidden utility flag: print completion for sourcing
     # Установка (одна строка в ~/.bashrc) / Install (one line in ~/.bashrc):
     #   source <(bs run examples/argsparseexample.sh --emit-completion)
-    if [[ "${1:-}" == "--emit-completion" ]]; then
-        args::completion "$(basename "$0")"
-        bs::exit success
-    fi
+    # --emit-completion[=SHELL]: bash (по умолчанию), zsh, fish, nu / bash (default), zsh, fish, nu
+    case "${1:-}" in
+        --emit-completion|--emit-completion=*)
+            local emit_shell="${1#--emit-completion}"
+            args::completion "$(basename -- "$(bs::script_path)")" "${emit_shell#=}"
+            bs::exit success
+            ;;
+    esac
 
     # При ошибке parse сам печатает причину и help в stderr
     # On error parse prints the reason and help to stderr itself

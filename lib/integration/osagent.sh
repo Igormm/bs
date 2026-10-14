@@ -178,7 +178,7 @@ osagent::exec() {
         log::error "osagent::exec: osagent.exec requires .command"
         return 2
       fi
-      timeout 10 bash -c "${cmd}" 2>&1 || { log::error "osagent::exec: command failed (timeout 10s)"; return 2; }
+      timeout 10 "$(bs::shell::host)" -c "${cmd}" 2>&1 || { log::error "osagent::exec: command failed (timeout 10s)"; return 2; }
       ;;
     *)
       log::error "osagent::exec: unknown tool: ${tool} (available: $(osagent::tools::names))"

@@ -296,7 +296,7 @@ sshnetwork::test_connection() {
         log::debug "Invalid host or port: ${host}:${port}"
         return 1
     fi
-    if utils::quiet_err timeout "${SSH_NETWORK_CONNECT_TIMEOUT}" bash -c 'exec 3<>"/dev/tcp/$1/$2"' _ "${host}" "${port}"; then
+    if utils::quiet_err timeout "${SSH_NETWORK_CONNECT_TIMEOUT}" "$(bs::shell::host)" -c 'exec 3<>"/dev/tcp/$1/$2"' _ "${host}" "${port}"; then
         log::debug "Connection successful to ${host}:${port}"
         return 0
     else
