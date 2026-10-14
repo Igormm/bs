@@ -151,7 +151,7 @@ utils::__tmp_registry_trusted() {
 #   directory are removed.
 #   Чужой реестр игнорируется; удаляются только пути внутри каталога реестра.
 utils::__tmp_cleanup() {
-  (( BASH_SUBSHELL == 0 )) || return 0
+  ! bs::shell::in_subshell || return 0
   [[ -e "${UTILS_TMP_REGISTRY}" || -L "${UTILS_TMP_REGISTRY}" ]] || return 0
   utils::__tmp_registry_trusted || return 0
   local p base="${UTILS_TMP_REGISTRY%/*}"

@@ -25,14 +25,14 @@ allowed='^(bootstrap/(bs|shell|trampoline)\.sh'
 # тесты самого слоя абстракции проверяют эти конструкции намеренно / tests of the layer itself check them on purpose
 allowed+='|tests/unit/test(bsismain|shell|trampoline|shelltier|shellstrict)unit\.sh|tests/validatedocscode\.sh)$'
 # Что ищем / what we look for
-pat='BASH_SOURCE|BASH_VERSION|BASH_VERSINFO|BASH_EXECUTION_STRING|BASH_LINENO|BASH_ARGV|FUNCNAME|ZSH_[A-Z]+|\$\{?SHELL\}?|\$\{?BASH\}?[^_A-Za-z]|/proc/\$\$|ps -p +\$\$|(dirname|readlink -f)[^|]*"\$0"'
+pat='(^|[^A-Za-z0-9_])BASH_[A-Z_]+|FUNCNAME|ZSH_[A-Z]+|\$\{?SHELL\}?|\$\{?BASH\}?[^_A-Za-z]|/proc/\$\$|ps -p +\$\$|(dirname|readlink -f)[^|]*"\$0"'
 
 n=0
 cli_start="$(grep -n 'CLI-команды bs / bs CLI commands' bootstrap/bs.sh 2>/dev/null | head -n 1 | cut -d: -f1 || true)"
 : "${cli_start:=999999}"
 # Расширенные признаки (bash как программа, его опции и дополнение) — только вне tests/
 # Extended signs (bash as a program, its options and completion) — outside tests/ only
-pat_extra='\bshopt\b|\bsetopt\b|exec bash\b|\bbash -[a-z]*c\b|/bin/bash|\bcompgen\b|complete -[FCW]'
+pat_extra='\bshopt\b|\bsetopt\b|exec bash\b|(^|[^A-Za-z_./$-])(bash|zsh) +(-[a-zA-Z]+|"|\$|\./)|/bin/bash|\bcompgen\b|complete -[FCW]'
 
 scan() { # pattern, paths...
   local pattern="$1"; shift
@@ -51,6 +51,9 @@ check_hit() {
   fi
   line="${hit#*:}"; line="${line#*:}"
   [[ "${line}" =~ ^[[:space:]]*# ]] && return 0
+  # BASH_REMATCH — захват группы `=~`, возможность языка bash (tier bash4), а не проверка оболочки
+  # BASH_REMATCH is the capture of `=~`, a bash language feature (tier bash4), not a shell check
+  if ! grep -oE '(^|[^A-Za-z0-9_])BASH_[A-Z_]+|FUNCNAME|ZSH_[A-Z_]+|\$\{?SHELL\}?|/proc/\$\$|ps -p +\$\$|(dirname|readlink -f)[^|]*"\$0"|\bshopt\b|\bsetopt\b|exec bash\b|/bin/bash|\bcompgen\b|complete -[FCW]|(bash|zsh) +(-[a-zA-Z]+|"|\$|\./)' <<< "${line}" | sed -E 's/^[^A-Za-z0-9_]?//' | grep -qvx 'BASH_REMATCH'; then return 0; fi
   if sed -n "$(( ln > 3 ? ln - 3 : 1 )),${ln}p" "${file}" | grep -q 'shell-gate'; then return 0; fi
   # Тег над определением функции охватывает всё её тело (например, генератор текста для bash)
   # A tag above a function definition covers its whole body (e.g. a generator of bash text)

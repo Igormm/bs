@@ -16,6 +16,7 @@
 - refactor: `FUNCNAME` uses go through `bs::func_name`/`bs::stack_func`; the entry points read their directory once (`BS_ENTRY_DIR`); the leak finder also looks for `FUNCNAME`, `BASH_LINENO`, `$BASH`, `/proc/$$`, `$0` as a path; unavoidable places carry a `shell-gate` tag
 - refactor: child shells start in the running bash (`bs::shell::host`) — `bs run`, osagent, ts stack, sshnetwork, Homebrew install; `bs run` passes the script path as `$0`; registry questions `bs_shell_can_source`, `bs_shell_rc_create_ok`, `bs_shell_default_login_path` replace family comparisons; the installed wrapper is POSIX `#!/bin/sh`; `shopt nullglob` removed from sshd and fail2ban
 - feat: `args::completion PROG [bash|zsh|fish|nu]` (`BS_COMPLETION_SHELL`), examples accept `--emit-completion[=SHELL]`; zsh tested in a real zsh, fish and nushell as text only
+- refactor: `BASH_SUBSHELL` and `BASH_XTRACEFD` go through `bs::shell::in_subshell` / `bs::trace_to_fd`; `bash -n` and the update smoke test run in the host bash; the leak finder covers every `BASH_*` (except the `BASH_REMATCH` capture) and explicit `bash`/`zsh` calls
 - skill: bs-shell-abstraction (`scripts/find_leaks.sh`), bs-shell-portability (tier_scan.sh, probe_shells.sh, shell matrix); docs: 08-development/shell-portability.md
 - tests: unit/testshellunit.sh, testtrampolineunit.sh, testshelltierunit.sh, integration/testinstallshells.sh, unit/testshellstrictunit.sh
 

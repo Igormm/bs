@@ -132,6 +132,20 @@ bs::stack_func() {
   printf '%s\n' "${FUNCNAME[$(( ${1:-0} + 1 ))]:-main}"
 }
 
+# @description Is the code running in a subshell (( ), $( ), pipeline)?
+# @description Исполняется ли код в подоболочке (( ), $( ), конвейер)?
+# @return 0 in a subshell, 1 in the main shell / 0 в подоболочке, 1 в основной оболочке
+bs::shell::in_subshell() {
+  (( BASH_SUBSHELL > 0 ))
+}
+
+# @description Send `set -x` traces to the open file descriptor FD.
+# @description Направить трассировку `set -x` в открытый дескриптор FD.
+# @param $1 fd / дескриптор
+bs::trace_to_fd() {
+  BASH_XTRACEFD="${1:?fd required}"
+}
+
 # @description Make `set -x` traces show "file:line:" (PS4).
 # @description Трассировка `set -x` показывает «файл:строка:» (PS4).
 bs::trace_prefix() {
@@ -870,7 +884,7 @@ bs::cli::build_cmd() {
 
   is::not_empty "${script}" || bs::cli::die "build: script path required"
   is::file "$script" || bs::cli::die "build: file not found: $script"
-  if ! utils::quiet_err bash -n "$script"; then
+  if ! utils::quiet_err "$(bs::shell::host)" -n "$script"; then
     bs::cli::die "build: bash syntax errors in: $script"
   fi
 
@@ -1601,7 +1615,7 @@ bs::cli::update_smoke() {
   local -a limit=()
   utils::has timeout && limit=(timeout 60)
   out="$(env -u BS_INITIALIZED -u BS_VERSION BS_ROOT="${t}" BS_HOME="${t}" BS_SILENT=1 \
-    "${limit[@]}" bash "${t}/bs" version 2>&1)" || return 1
+    "${limit[@]}" "$(bs::shell::host)" "${t}/bs" version 2>&1)" || return 1
   [[ "${out}" == *"version: ${want}"* ]]
 }
 

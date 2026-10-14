@@ -286,6 +286,7 @@ frameworks::bashit::plugins::docker::load() {
   alias drmi='docker rmi'
   alias dcl='docker system prune -f'
   
+  # shell-gate: плагин Bash-it подключает именно bash-completion docker / the Bash-it plugin loads docker's bash completion
   # Docker bash completion
   if utils::has docker && utils::has docker-compose; then
   utils::ignore source <(docker completion bash)

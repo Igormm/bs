@@ -727,7 +727,7 @@ send_video::__log_environment() {
   local -n __map_cfg=__SEND_VIDEO_CFG
   local key line
   send_video::__log debug \
-    "bash $(bs::shell::version_string), IFS=$(io::streams::printf '%q' "${IFS}")"
+    "shell $(bs::shell::name) $(bs::shell::version_string), IFS=$(io::streams::printf '%q' "${IFS}")"
   send_video::__log debug \
     "locale: LC_ALL=${LC_ALL:-} LC_NUMERIC=${LC_NUMERIC:-} LANG=${LANG:-}"
   send_video::__log debug "system: $(uname -sr)"
@@ -946,7 +946,7 @@ ${__map_cfg[run_dir]} (lock .video.lock)" "${E_ERROR}"
   : > "${__map_cfg[log_file]}"
   if send_video::__flag_on xtrace; then
     exec {fd}>> "${__map_cfg[log_file]}"
-    BASH_XTRACEFD="${fd}"
+    bs::trace_to_fd "${fd}"
     bs::trace_prefix
     set -x
   fi
