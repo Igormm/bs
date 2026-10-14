@@ -45,6 +45,7 @@ BS with all its abstractions must be reachable from most shells, not only bash a
    | подходит ли tier файла оболочке запуска | `bs_shell_tier_allows`, `bs_shell_file_tier` |
 
    **Точки входа** (`bs`, `install.sh`, `boot.sh`, запускаемые раннеры `tests/run*.sh`, `tests/validate*.sh`) исполняются, а не подключаются, поэтому свой путь берут из POSIX `$0` + `readlink -f`, не из `BASH_SOURCE`. **Тесты** (`tests/**/test*.sh`) запускаются через `bs run` (его делает `tests/runalltests.sh`; вручную — `./bs run tests/unit/testX.sh`) и берут каталог из `bs::script_dir`; прямой `bash testX.sh` не поддерживается. Единственные исключения — тесты самого слоя абстракции (см. список в `scripts/find_leaks.sh`).
+   **Исключений по файлам нет.** Свободны от проверки только сами файлы слоя (`bootstrap/bs.sh`, `shell.sh`, `trampoline.sh`); любое другое место — даже в `init.sh`, `loader.sh`, точках входа — должно звать реестр (`bs_shell_host_ok`, `bs_shell_family`, `bs_shell_of_name`) либо нести явный тег `shell-gate` в этой или одной из трёх предыдущих строк с объяснением, почему реестр туда не достать (сейчас так помечены 2 места в `init.sh`: до загрузки реестра из не-bash оболочки путь к нему неизвестен). Каталог `bootstrap/` все файлы берут из `BS_BOOTSTRAP_DIR`, его ставит `init.sh`.
    Нет нужной абстракции — **сначала добавьте её** в `bootstrap/bs.sh` (bash) или `bootstrap/shell.sh` (POSIX), потом используйте; не копируйте проверку в третий файл.
 2. **Команды `bs` живут в `bootstrap/bs.sh` как `bs::cli::*`.** Файл `bs` — тонкая точка входа: пролог, загрузка ядра, флаги, диспетчер. Новую команду пишите как `bs::cli::<имя>`; имена без префикса (`help`, `die`) запрещены — они затеняют чужие.
 3. **Неустранимая зависимость помечается, а не прячется.** Строка в заголовке файла: `# @shell posix|bash4 — <причина на русском> / <reason in English>`. Отсутствие метки = `bash4`. Синонимы: `sh`, `shell`, `posix` = posix; `bash`, `bash4` = bash4; `fs`, `fish` = fish; `nu`, `nushell` = nu; другое слово — оболочка с этим именем; список `a,b`. Это отдельная ось от `@tier core|gnu-linux` (какой userland нужен) — её не менять.
@@ -52,6 +53,22 @@ BS with all its abstractions must be reachable from most shells, not only bash a
 5. **`--strict-shell` / `BS_SHELL_STRICT=1`** делает tier обязательным при `load` для `lib/`; `core/` (ядро) разрешено всегда. Tier нового модуля пишите честно — именно его проверяет строгий режим.
 6. **Установка, проверки, удаление не предполагают bash/zsh:** rc-файл, синтаксис PATH, перезагрузка — через реестр; для nushell без `env.nu` — не создавать файл, а напечатать строку.
 7. **Не врать о проверенном.** Оболочка, которую не запускали (ash/busybox, ksh, mksh, oksh, osh, fish, nu — если их нет на машине), помечается «не проверено»; проверены только сгенерированные тексты.
+
+## Решения по спорным случаям / Decisions for the hard cases
+
+| Случай | Решение |
+|---|---|
+| Гейт «нужен bash 4.2+» в точке входа | пролог (одинаковый в `bs`, `install.sh`, `boot.sh`) подключает идемпотентный `bootstrap/shell.sh` и спрашивает `bs_shell_host_ok`; если нет — `trampoline.sh` |
+| Тот же гейт в `init.sh` (подключаемый файл) | остаётся встроенным и помечен `shell-gate`: из dash/zsh файл не знает своего каталога, реестр недостижим |
+| Где лежит `bootstrap/` | `BS_BOOTSTRAP_DIR`: ставит `init.sh` (тег `shell-gate`), `bs.sh` подставляет по умолчанию; `loader.sh` и остальные только читают |
+| Каталог точки входа | `BS_ENTRY_DIR`, считает пролог (тег `shell-gate`); `BS_DIR`/`SCRIPT_DIR`/`BOOT_DIR` берут его |
+| Раннер или фикстура, исполняемые вне `bs` (`tests/run*.sh`, `validate*.sh`, скрипт во heredoc) | `$0` с тегом `shell-gate` и пояснением |
+| Имя функции вызывающего (`FUNCNAME[1]`) | `bs::func_name N` (в `bs::func_name` N=1 — вызывающий; из функции X уровень вызывающего X — 2) |
+| Файл, строка, функция кадра стека | `bs::stack_file/line/func L`, `bs::stack_depth` |
+| Тесты слоя абстракции | перечислены в `scripts/find_leaks.sh`; остальные тесты — без `BASH_SOURCE` |
+
+Тег ставят только тогда, когда реестр действительно недостижим; «так проще» — не причина.
+Add the tag only when the registry really is unreachable; "it is simpler" is not a reason.
 
 ## Порядок работы / Workflow
 
