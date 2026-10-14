@@ -102,7 +102,7 @@ errorhandler::throw() {
 # @example
 #   error::throw "Something failed" "${LIB_ERROR_FILE_NOT_FOUND}"
 error::throw() {
-	errorhandler::throw "${FUNCNAME[1]}" "${@}"
+	errorhandler::throw "$(bs::func_name 2)" "${@}"
 }
 
 # @description Subscribe a function to a signal / Подписать функцию на сигнал

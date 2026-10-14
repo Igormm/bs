@@ -104,6 +104,7 @@ FAKE
     local retry_script="${tmp_dir}/retry.sh"
     cat > "${retry_script}" <<'EOF'
 #!/usr/bin/env bash
+# shell-gate: фикстура — отдельный скрипт вне bs / fixture: a standalone script outside bs
 marker="$(dirname "$0")/retry_marker"
 if [[ -f "${marker}" ]]; then
   echo "ok"

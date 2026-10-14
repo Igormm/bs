@@ -31,7 +31,7 @@ declare -g CORE_LANG_VERSION="1.0.0"
 #   log::debug "entering $(bs::func_name)"
 bs::func_name() {
   local -r depth="${1:-1}"
-  printf '%s\n' "${FUNCNAME[${depth}]:-main}"
+  bs::stack_func "${depth}"
 }
 
 # @description Print the current call stack, one frame per line.

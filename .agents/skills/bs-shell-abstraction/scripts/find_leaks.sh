@@ -25,7 +25,7 @@ allowed='^(bootstrap/(bs|shell|trampoline)\.sh'
 # тесты самого слоя абстракции проверяют эти конструкции намеренно / tests of the layer itself check them on purpose
 allowed+='|tests/unit/test(bsismain|shell|trampoline|shelltier|shellstrict)unit\.sh|tests/validatedocscode\.sh)$'
 # Что ищем / what we look for
-pat='BASH_SOURCE|BASH_VERSION|BASH_VERSINFO|BASH_EXECUTION_STRING|ZSH_[A-Z]+|\$\{?SHELL\}?'
+pat='BASH_SOURCE|BASH_VERSION|BASH_VERSINFO|BASH_EXECUTION_STRING|BASH_LINENO|BASH_ARGV|FUNCNAME|ZSH_[A-Z]+|\$\{?SHELL\}?|\$\{?BASH\}?[^_A-Za-z]|/proc/\$\$|ps -p +\$\$|(dirname|readlink -f)[^|]*"\$0"'
 
 n=0
 while IFS= read -r hit; do

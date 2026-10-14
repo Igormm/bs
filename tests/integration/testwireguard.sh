@@ -51,14 +51,14 @@ test_increment() {
 test_pass() {
     test_increment
     ((++TESTS_PASSED))
-    log::success "✓ ${FUNCNAME[1]}"
+    log::success "✓ $(bs::func_name 2)"
 }
 
 test_fail() {
     test_increment
     ((++TESTS_FAILED))
-    FAILED_TESTS+=("${FUNCNAME[1]}")
-    log::error "✗ ${FUNCNAME[1]}"
+    FAILED_TESTS+=("$(bs::func_name 2)")
+    log::error "✗ $(bs::func_name 2)"
 }
 
 # Check if running as root

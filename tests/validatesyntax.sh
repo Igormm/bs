@@ -14,6 +14,7 @@ set -euo pipefail
 
 # Корень проекта от расположения скрипта: проверка работает из любого каталога
 # Project root from the script location: validation works from any directory
+# shell-gate: исполняемый раннер вне bs; $0 — единственный источник пути / a runner executed outside bs; $0 is the only source of its path
 readonly SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 readonly BS_PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${BS_PROJECT_ROOT}"

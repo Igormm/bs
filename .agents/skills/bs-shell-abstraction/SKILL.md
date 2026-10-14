@@ -51,6 +51,22 @@ BS with all its abstractions must be reachable from most shells, not only bash a
 6. **Установка, проверки, удаление не предполагают bash/zsh:** rc-файл, синтаксис PATH, перезагрузка — через реестр; для nushell без `env.nu` — не создавать файл, а напечатать строку.
 7. **Не врать о проверенном.** Оболочка, которую не запускали (ash/busybox, ksh, mksh, oksh, osh, fish, nu — если их нет на машине), помечается «не проверено»; проверены только сгенерированные тексты.
 
+## Решения по спорным случаям / Decisions for the hard cases
+
+| Случай | Решение |
+|---|---|
+| Гейт «нужен bash 4.2+» в точке входа | пролог (одинаковый в `bs`, `install.sh`, `boot.sh`) подключает идемпотентный `bootstrap/shell.sh` и спрашивает `bs_shell_host_ok`; если нет — `trampoline.sh` |
+| Тот же гейт в `init.sh` (подключаемый файл) | остаётся встроенным и помечен `shell-gate`: из dash/zsh файл не знает своего каталога, реестр недостижим |
+| Где лежит `bootstrap/` | `BS_BOOTSTRAP_DIR`: ставит `init.sh` (тег `shell-gate`), `bs.sh` подставляет по умолчанию; `loader.sh` и остальные только читают |
+| Каталог точки входа | `BS_ENTRY_DIR`, считает пролог (тег `shell-gate`); `BS_DIR`/`SCRIPT_DIR`/`BOOT_DIR` берут его |
+| Раннер или фикстура, исполняемые вне `bs` (`tests/run*.sh`, `validate*.sh`, скрипт во heredoc) | `$0` с тегом `shell-gate` и пояснением |
+| Имя функции вызывающего (`FUNCNAME[1]`) | `bs::func_name N` (в `bs::func_name` N=1 — вызывающий; из функции X уровень вызывающего X — 2) |
+| Файл, строка, функция кадра стека | `bs::stack_file/line/func L`, `bs::stack_depth` |
+| Тесты слоя абстракции | перечислены в `scripts/find_leaks.sh`; остальные тесты — без `BASH_SOURCE` |
+
+Тег ставят только тогда, когда реестр действительно недостижим; «так проще» — не причина.
+Add the tag only when the registry really is unreachable; "it is simpler" is not a reason.
+
 ## Порядок работы / Workflow
 
 1. **Ветка.** Эта работа только в `fix/kernel-security-p0` (worktree), не в `main`. Историю не менять; коммит и push — по просьбе.

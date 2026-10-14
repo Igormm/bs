@@ -18,6 +18,7 @@ set -euo pipefail
 
 # Каталог скрипта: прогон работает из любого текущего каталога
 # Script directory: the run works from any current directory
+# shell-gate: исполняемый раннер вне bs; $0 — единственный источник пути / a runner executed outside bs; $0 is the only source of its path
 readonly SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 readonly PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${PROJECT_ROOT}"

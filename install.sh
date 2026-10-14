@@ -50,8 +50,11 @@
 # zsh changes $0 inside a sourced file — the entry point path is saved here
 __bs_s=$0
 __bs_p=$0
+# shell-gate: единственное место, где точка входа узнаёт свой путь (POSIX, до реестра)
+# shell-gate: the one place an entry point learns its own path (POSIX, before the registry)
 __bs_r=$(readlink -f -- "$0" 2>/dev/null) && [ -n "$__bs_r" ] && __bs_p=$__bs_r
 case $__bs_p in */*) __bs_p=${__bs_p%/*} ;; *) __bs_p=. ;; esac
+BS_ENTRY_DIR=$(cd -- "$__bs_p" >/dev/null 2>&1 && pwd -P) || BS_ENTRY_DIR=$__bs_p
 # Реестр оболочек отвечает, годится ли эта оболочка в хозяева
 # The shell registry answers whether this shell can be the host
 # shellcheck disable=SC1091
@@ -64,7 +67,7 @@ unset __BS_TRAMPOLINE __bs_p __bs_r __bs_s
 # --- конец пролога / end of the prologue ------------------------------------
 
 # Определить каталог запуска скрипта
-SCRIPT_DIR="$(cd -- "$(dirname -- "$(readlink -f -- "$0" 2>/dev/null || printf '%s' "$0")")" && pwd)"
+SCRIPT_DIR="${BS_ENTRY_DIR}"
 
 # Определить каталог с файлами установки
 INSTALLER_DIR="${SCRIPT_DIR}/install"
