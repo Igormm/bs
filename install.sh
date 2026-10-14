@@ -46,14 +46,17 @@
 # это одна проверка. Текст пролога одинаков во всех точках входа (тест).
 # Unless run by bash 4+ (sh install.sh, zsh ./bs, bash 3.2, bash as sh), re-run
 # in a capable bash or explain what to install. In bash 4+ it is one test.
-if [ -z "${BASH_VERSION:-}" ] || [ "${BASH_VERSINFO:-0}" -lt 4 ] \
-   || { case ":${SHELLOPTS:-}:" in *:posix:*) true ;; *) false ;; esac; }; then
-  # zsh меняет $0 внутри подключаемого файла — путь точки входа запоминаем здесь
-  # zsh changes $0 inside a sourced file — the entry point path is saved here
-  __bs_s=$0
-  __bs_p=$0
-  __bs_r=$(readlink -f -- "$0" 2>/dev/null) && [ -n "$__bs_r" ] && __bs_p=$__bs_r
-  case $__bs_p in */*) __bs_p=${__bs_p%/*} ;; *) __bs_p=. ;; esac
+# zsh меняет $0 внутри подключаемого файла — путь точки входа запоминаем здесь
+# zsh changes $0 inside a sourced file — the entry point path is saved here
+__bs_s=$0
+__bs_p=$0
+__bs_r=$(readlink -f -- "$0" 2>/dev/null) && [ -n "$__bs_r" ] && __bs_p=$__bs_r
+case $__bs_p in */*) __bs_p=${__bs_p%/*} ;; *) __bs_p=. ;; esac
+# Реестр оболочек отвечает, годится ли эта оболочка в хозяева
+# The shell registry answers whether this shell can be the host
+# shellcheck disable=SC1091
+. "$__bs_p/bootstrap/shell.sh"
+if ! bs_shell_host_ok; then
   # shellcheck disable=SC1091
   . "$__bs_p/bootstrap/trampoline.sh"
 fi

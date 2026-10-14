@@ -27,9 +27,10 @@ readonly __BS_SH_SOURCED=1
 # строки PATH, tier. Его же подключают оболочки, не являющиеся bash.
 # The POSIX shell registry (bootstrap/shell.sh): family detection, rc files,
 # PATH lines, tier. Shells other than bash source it too.
-if [[ -n "${BASH_SOURCE[0]:-}" && -f "$(dirname -- "${BASH_SOURCE[0]}")/shell.sh" ]]; then
+: "${BS_BOOTSTRAP_DIR:=$(dirname -- "${BASH_SOURCE[0]}")}"
+if [[ -f "${BS_BOOTSTRAP_DIR}/shell.sh" ]]; then
   # shellcheck source=bootstrap/shell.sh
-  source "$(dirname -- "${BASH_SOURCE[0]}")/shell.sh"
+  source "${BS_BOOTSTRAP_DIR}/shell.sh"
 fi
 
 # ==========================================

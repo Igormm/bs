@@ -12,9 +12,9 @@
 # Idempotent via its own guard — safe when init.sh already sourced it.
 # Pre-kernel namespace: bs::shell::*, bs::script_dir, PATH-твик.
 # Идемпотентен через собственный guard — безопасно, если init.sh уже подключил его.
-if [[ -f "$(dirname -- "${BASH_SOURCE[0]}")/bs.sh" ]]; then
+if [[ -f "${BS_BOOTSTRAP_DIR:-}/bs.sh" ]]; then
   # shellcheck disable=SC1090
-  source "$(dirname -- "${BASH_SOURCE[0]}")/bs.sh"
+  source "${BS_BOOTSTRAP_DIR}/bs.sh"
 fi
 
 # ============================================================================

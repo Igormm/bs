@@ -16,6 +16,7 @@
 # POSIX gate: BS can be sourced as a library only from bash 4+. From another
 # shell: an explanation and a return, no "Bad substitution". The bs command
 # works from any shell.
+# shell-gate: до загрузки реестра; из не-bash оболочки путь к нему неизвестен / before the registry; its path is unknown from a non-bash shell
 if [ -z "${BASH_VERSION:-}" ] || [ "${BASH_VERSINFO:-0}" -lt 4 ]; then
   printf '%s\n' "BS: bootstrap/init.sh подключается (source) только из bash 4.2+; эта оболочка — не он." \
     "BS: bootstrap/init.sh can be sourced only from bash 4.2+; this shell is not." \
@@ -46,10 +47,12 @@ HELP
 }
 
 # Load pre-kernel helpers first: they are dependency-free and bash-3.2-compatible.
-__bs_init_file__="${BASH_SOURCE[0]}"
-if [[ -f "$(dirname -- "${__bs_init_file__}")/bs.sh" ]]; then
+# shell-gate: единственное место, где init.sh узнаёт свой каталог (подключаемый файл, только bash)
+# shell-gate: the one place init.sh learns its own directory (a sourced file, bash only)
+BS_BOOTSTRAP_DIR="$(dirname -- "${BASH_SOURCE[0]}")"
+if [[ -f "${BS_BOOTSTRAP_DIR}/bs.sh" ]]; then
   # shellcheck disable=SC1090
-  source "$(dirname -- "${__bs_init_file__}")/bs.sh"
+  source "${BS_BOOTSTRAP_DIR}/bs.sh"
 fi
 
 # If executed directly, warn and exit. Library mode is bash 4.2+ only.
@@ -80,7 +83,7 @@ else
   # навсегда блокировал бы retry в этом шелле (переменная осталась бы пустой и
   # неизменяемой) / no readonly, explicit status: a transient cd failure with
   # readonly would permanently block retry in this shell
-  __BS_INIT_DIR__="$(cd -- "$(dirname -- "${__bs_init_file__}")" >/dev/null 2>&1 && pwd -P)" || return 1
+  __BS_INIT_DIR__="$(cd -- "${BS_BOOTSTRAP_DIR}" >/dev/null 2>&1 && pwd -P)" || return 1
   __BS_ROOT_CANDIDATE__="$(cd -- "${__BS_INIT_DIR__}/.." >/dev/null 2>&1 && pwd -P)" || return 1
   if [[ -d "${__BS_ROOT_CANDIDATE__}" && -f "${__BS_ROOT_CANDIDATE__}/bs" ]]; then
     export BS_ROOT="${__BS_ROOT_CANDIDATE__}"

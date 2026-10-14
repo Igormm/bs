@@ -37,6 +37,11 @@ case "${__BS_SHELL_SOURCED:-}" in
 esac
 __BS_SHELL_SOURCED=1
 
+# Идемпотентность: файл подключают пролог точки входа, трамплин и bs.sh
+# Idempotent: sourced by the entry-point prologue, the trampoline and bs.sh
+[ -z "${__BS_SHELL_SH:-}" ] || return 0
+__BS_SHELL_SH=1
+
 # ==========================================
 # Names / Имена
 # ==========================================
@@ -308,6 +313,8 @@ bs_shell_known() {
 # @return 0 yes, 1 no / 0 да, 1 нет
 bs_shell_host_ok() {
   [ -n "${BASH_VERSION:-}" ] || return 1
+  # shellcheck disable=SC3028  # SHELLOPTS есть в bash / exists in bash
+  case ":${SHELLOPTS:-}:" in *:posix:*) return 1 ;; esac
   [ -z "${OILS_VERSION:-}${OIL_VERSION:-}" ] || return 1
   __bs_hv=${BASH_VERSION%%[!0-9.]*}
   __bs_hmaj=${__bs_hv%%.*}
