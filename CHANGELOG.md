@@ -21,6 +21,7 @@
 - skill: bs-shell-abstraction (`scripts/find_leaks.sh`), bs-shell-portability (tier_scan.sh, probe_shells.sh, shell matrix); docs: 08-development/shell-portability.md
 - refactor(core): `core/prereq.sh` is `@shell posix` — `bs_guard`, `bs_guard_loaded`, `bs_source_relative` (valid names for dash) with `bs::guard`/`bs::guard_loaded`/`bs::source_relative` as bash/zsh aliases; new layer helpers `bs_shell_alias`, `bs_shell_readonly` (global readonly, `readonly -g` in zsh); the loader sets `BS_CURRENT_FILE` while it sources a module; tested in dash, zsh and bash (`unit/testprereqportableunit.sh`)
 - refactor(core): `core/guard.sh` is `@shell posix` — the shim checks for `bs_guard` and sources `core/prereq.sh` from `BS_ROOT/core` (or the directory of `BS_CURRENT_FILE`) without `declare -f`, `[[ ]]` or `BASH_*`; tested in dash, zsh and bash (`unit/testguardportableunit.sh`)
+- refactor(core): `core/version.sh` is `@shell posix` — `bs_version_print/get/of/compare` (`bs::version::*` stay as bash/zsh aliases); the version line is read with `case` and parameter expansion instead of `[[ =~ ]]`/`bs::regex::group`, the comparison walks the parts without arrays; the old and new `compare` agree on 14 edge cases; tested in dash, zsh and bash (`unit/testversionportableunit.sh`)
 - tests: unit/testshellunit.sh, testtrampolineunit.sh, testshelltierunit.sh, integration/testinstallshells.sh, unit/testshellstrictunit.sh
 
 ### Not verified
