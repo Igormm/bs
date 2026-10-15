@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- polyglot: `--dep SPEC` — dependencies (pip into a cached venv, npm into a cached node_modules, Go modules, cargo crates, pkg-config libraries for C/C++); the package manager is checked BEFORE anything is built or run (`LIB_ERROR_DEPENDENCY_MISSING` with an install hint), unsafe specs are refused; `polyglot::doctor` reports languages and managers; verified offline for pip (a local wheel), npm (a local package) and pkg-config, and for the missing-manager and failed-install paths of all five; a real network fetch for Go modules and cargo crates was not exercised
 - polyglot: `polyglot::run` — run C, C++, Go, Rust, Python and JavaScript code inside a bs script: arguments after `--`, `--env`, `--input` go in; stdout comes back into a scalar (`--out`), an array (`--lines`) or an associative array (`--map`), the exit code into `--rc`; `--timeout`, `--flags`, `--no-cache`; compiled programs are cached by the hash of language, compiler and source (`POLYGLOT_CACHE_DIR`); `polyglot::languages` lists the tools found; tests (unit/testpolyglotunit.sh, 33 checks), documentation en/ru, example examples/polyglot_example.sh
 
 ## [0.7.4] - 2026-10-12

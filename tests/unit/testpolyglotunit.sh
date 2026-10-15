@@ -213,6 +213,131 @@ test_errors() {
     fi
 }
 
+test_dependencies() {
+    testframework::section "Dependencies: the manager is checked BEFORE anything runs / Менеджер проверяется ДО запуска"
+    local work marker rc
+    work="$(mktemp -d)"
+    marker="${work}/MARKER"
+
+    # Python есть, pip нет / Python is there, pip is not
+    if have python; then
+        cat > "${work}/fakepy" <<'EOF2'
+#!/bin/sh
+case "$*" in
+  "-m pip --version") exit 1 ;;
+esac
+exec python3 "$@"
+EOF2
+        chmod +x "${work}/fakepy"
+        rc=0
+        POLYGLOT_PYTHON_TOOLS="${work}/fakepy" polyglot::run python --dep requests >/dev/null 2>&1 <<EOF2 || rc=$?
+open("${marker}", "w").write("ran")
+EOF2
+        testframework::assert_equal "${LIB_ERROR_DEPENDENCY_MISSING}" "${rc}" "no pip: dependency missing"
+        testframework::assert_true "! -e ${marker}" "no pip: the code was not executed"
+    fi
+
+    # npm / cargo / pkg-config / go отсутствуют / absent
+    rc=0
+    POLYGLOT_NPM_TOOLS="no-such-npm" polyglot::run js --dep left-pad >/dev/null 2>&1 <<EOF2 || rc=$?
+require('fs').writeFileSync("${marker}", 'ran');
+EOF2
+    testframework::assert_equal "${LIB_ERROR_DEPENDENCY_MISSING}" "${rc}" "no npm: dependency missing"
+    testframework::assert_true "! -e ${marker}" "no npm: the code was not executed"
+
+    rc=0
+    POLYGLOT_CARGO_TOOLS="no-such-cargo" polyglot::run rust --dep serde >/dev/null 2>&1 <<<"fn main() {}" || rc=$?
+    testframework::assert_equal "${LIB_ERROR_DEPENDENCY_MISSING}" "${rc}" "no cargo: dependency missing"
+
+    rc=0
+    POLYGLOT_PKGCONFIG_TOOLS="no-such-pkgconfig" polyglot::run c --dep zlib >/dev/null 2>&1 <<<"int main(void) { return 0; }" || rc=$?
+    testframework::assert_equal "${LIB_ERROR_DEPENDENCY_MISSING}" "${rc}" "no pkg-config: dependency missing"
+
+    cat > "${work}/fakego" <<'EOF2'
+#!/bin/sh
+case "$1" in
+  env) exit 1 ;;
+esac
+exit 1
+EOF2
+    chmod +x "${work}/fakego"
+    rc=0
+    POLYGLOT_GO_TOOLS="${work}/fakego" polyglot::run go --dep example.com/m@v1.0.0 >/dev/null 2>&1 <<<"package main" || rc=$?
+    testframework::assert_equal "${LIB_ERROR_DEPENDENCY_MISSING}" "${rc}" "go without modules support: dependency missing"
+
+    # Безопасность записи зависимости / dependency spec safety
+    local spec
+    for spec in "-e evil" "a b" ";rm" '$(x)' ""; do
+        rc=0
+        polyglot::run python --dep "${spec}" >/dev/null 2>&1 <<<"print(1)" || rc=$?
+        testframework::assert_equal "${LIB_ERROR_INVALID_ARGS}" "${rc}" "unsafe --dep '${spec}' is refused"
+    done
+
+    # Сбой установки: понятная ошибка, код не запускается / install failure: clear error, no run
+    cat > "${work}/failgo" <<'EOF2'
+#!/bin/sh
+case "$1" in
+  env) exit 0 ;;
+  get) echo "boom"; exit 1 ;;
+esac
+exit 1
+EOF2
+    chmod +x "${work}/failgo"
+    rc=0
+    POLYGLOT_GO_TOOLS="${work}/failgo" polyglot::run go --dep example.com/m@v1.0.0 >/dev/null 2>&1 <<<"package main" || rc=$?
+    testframework::assert_equal "${LIB_ERROR_DEPENDENCY}" "${rc}" "go get fails: dependency error"
+
+    # Положительные пути без сети / positive paths without a network
+    local out=""
+    if have python && python3 -m pip --version >/dev/null 2>&1 && python3 -m venv --help >/dev/null 2>&1; then
+        python3 - "${work}" <<'EOF2'
+import sys, zipfile
+w = sys.argv[1]
+with zipfile.ZipFile(w + "/bsdemo-1.0-py3-none-any.whl", "w") as z:
+    z.writestr("bsdemo.py", "VALUE = 41\n")
+    z.writestr("bsdemo-1.0.dist-info/METADATA", "Metadata-Version: 2.1\nName: bsdemo\nVersion: 1.0\n")
+    z.writestr("bsdemo-1.0.dist-info/WHEEL", "Wheel-Version: 1.0\nGenerator: bs\nRoot-Is-Purelib: true\nTag: py3-none-any\n")
+    z.writestr("bsdemo-1.0.dist-info/RECORD", "")
+EOF2
+        polyglot::run python --dep "${work}/bsdemo-1.0-py3-none-any.whl" --out out <<'EOF2'
+import bsdemo
+print(bsdemo.VALUE + 1)
+EOF2
+        testframework::assert_equal "42" "${out}" "pip: a local wheel is installed into the cached venv and importable"
+    else
+        echo "  SKIP: no pip/venv"
+    fi
+    if have js && utils::has npm; then
+        mkdir -p "${work}/bsdemo-js"
+        printf '{"name":"bsdemo-js","version":"1.0.0","main":"index.js"}\n' > "${work}/bsdemo-js/package.json"
+        printf 'module.exports = { value: 41 };\n' > "${work}/bsdemo-js/index.js"
+        polyglot::run js --dep "${work}/bsdemo-js" --out out <<'EOF2'
+console.log(require('bsdemo-js').value + 1);
+EOF2
+        testframework::assert_equal "42" "${out}" "npm: a local package is installed and require()-able"
+    else
+        echo "  SKIP: no npm"
+    fi
+    if have c && utils::has pkg-config; then
+        printf 'Name: bsdemo\nDescription: demo\nVersion: 1.0\nCflags: -DBSDEMO=41\nLibs:\n' > "${work}/bsdemo.pc"
+        PKG_CONFIG_PATH="${work}" polyglot::run c --dep bsdemo --out out <<'EOF2'
+#include <stdio.h>
+int main(void) { printf("%d\n", BSDEMO + 1); return 0; }
+EOF2
+        testframework::assert_equal "42" "${out}" "pkg-config: the library flags reach the compiler"
+        rc=0
+        PKG_CONFIG_PATH="${work}" polyglot::run c --dep no-such-lib >/dev/null 2>&1 <<<"int main(void) { return 0; }" || rc=$?
+        testframework::assert_equal "${LIB_ERROR_DEPENDENCY_MISSING}" "${rc}" "pkg-config: a missing library is reported"
+    else
+        echo "  SKIP: no pkg-config"
+    fi
+
+    local report
+    report="$(polyglot::doctor)"
+    testframework::assert_true "\"${report//$'\n'/;}\" == *pip*" "polyglot::doctor reports pip"
+    rm -rf "${work}"
+}
+
 main() {
     print_header "Polyglot Unit Tests / Модульные тесты polyglot"
 
@@ -233,6 +358,7 @@ main() {
     test_compiled
     test_cache
     test_errors
+    test_dependencies
 
     rm -rf "${POLYGLOT_CACHE_DIR%/*}"
     testframework::summary

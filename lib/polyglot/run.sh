@@ -61,6 +61,29 @@ bs::source_relative "../../core/lang.sh" "../../core/const.sh" "../../core/logge
 # @global POLYGLOT_JS_TOOLS — Хук: рантаймы JavaScript (категория: hook)
 : "${POLYGLOT_JS_TOOLS:=node bun}"
 
+# @global POLYGLOT_NPM_TOOLS — Hook: npm to probe for JavaScript dependencies (category: hook)
+# @global POLYGLOT_NPM_TOOLS — Хук: npm для зависимостей JavaScript (категория: hook)
+: "${POLYGLOT_NPM_TOOLS:=npm}"
+# @global POLYGLOT_CARGO_TOOLS — Hook: cargo to probe for Rust dependencies (category: hook)
+# @global POLYGLOT_CARGO_TOOLS — Хук: cargo для зависимостей Rust (категория: hook)
+: "${POLYGLOT_CARGO_TOOLS:=cargo}"
+# @global POLYGLOT_PKGCONFIG_TOOLS — Hook: pkg-config to probe for C/C++ libraries (category: hook)
+# @global POLYGLOT_PKGCONFIG_TOOLS — Хук: pkg-config для библиотек C/C++ (категория: hook)
+: "${POLYGLOT_PKGCONFIG_TOOLS:=pkg-config pkgconf}"
+
+# @global POLYGLOT_DEPS_OUT — Result of polyglot::__deps_env: environment dir or pkg-config flags (category: state)
+# @global POLYGLOT_DEPS_OUT — Результат polyglot::__deps_env: каталог окружения или флаги pkg-config (категория: state)
+declare -g POLYGLOT_DEPS_OUT=""
+# @global POLYGLOT_RUN_TARGET — Result of polyglot::__prepare: file to run (category: state)
+# @global POLYGLOT_RUN_TARGET — Результат polyglot::__prepare: запускаемый файл (категория: state)
+declare -g POLYGLOT_RUN_TARGET=""
+# @global POLYGLOT_RUN_RUNNER — Result of polyglot::__prepare: interpreter command (category: state)
+# @global POLYGLOT_RUN_RUNNER — Результат polyglot::__prepare: команда интерпретатора (категория: state)
+declare -ga POLYGLOT_RUN_RUNNER=()
+# @global POLYGLOT_RUN_ENV — Result of polyglot::__prepare: extra NAME=VALUE for the run (category: state)
+# @global POLYGLOT_RUN_ENV — Результат polyglot::__prepare: дополнительные NAME=VALUE для запуска (категория: state)
+declare -ga POLYGLOT_RUN_ENV=()
+
 # @global POLYGLOT_TOOL_IDS — Cache: tool identity (path + version) per tool (category: cache)
 # @global POLYGLOT_TOOL_IDS — Кэш: идентичность инструмента (путь + версия) (категория: cache)
 declare -gA POLYGLOT_TOOL_IDS=()
@@ -174,22 +197,199 @@ polyglot::__valid_name() {
 # ==========================================
 
 # @private
-# @description Prepare the program: write the source into the cache, compile it when the
-#   language is compiled (or reuse the cached binary). Prints the path to run.
-# @description Подготовить программу: записать исходник в кэш, скомпилировать (если язык
-#   компилируемый) или взять готовый бинарник. Печатает путь для запуска.
+# @description First tool of a hook list that is installed / Первый установленный инструмент из списка.
+# @param $1 space separated names / имена через пробел
+polyglot::__first() {
+  local -a names=()
+  IFS=' ' read -r -a names <<< "${1}"
+  local n
+  for n in "${names[@]}"; do
+    if utils::has "${n}"; then
+      printf '%s\n' "${n}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# @private
+# @description Is a dependency spec safe (no option injection, no shell metacharacters)?
+# @description Безопасна ли запись зависимости (без опций и метасимволов)?
+polyglot::__dep_valid() {
+  [[ "${1:-}" =~ ^[A-Za-z0-9._/@:+=~^-]+$ && "${1}" != -* ]]
+}
+
+# @private
+# @description Check the package manager a language needs for its dependencies — BEFORE anything
+#   is built or run. Prints the reason and an install hint on failure.
+# @description Проверить менеджер пакетов, нужный языку для зависимостей, — ДО сборки и запуска.
+#   При неудаче печатает причину и подсказку по установке.
+# @param $1 canonical language / язык
+# @param $2 language tool / инструмент языка
+# @return 0 present, LIB_ERROR_DEPENDENCY_MISSING otherwise
+polyglot::__check_manager() {
+  local -r lang="$1" tool="$2"
+  local what="" hint=""
+  case "${lang}" in
+    python)
+      if ! "${tool}" -m pip --version >/dev/null 2>&1; then
+        what="pip (${tool} -m pip)"
+        hint="apt install python3-pip python3-venv | dnf install python3-pip | apk add py3-pip | brew install python"
+      elif ! "${tool}" -m venv --help >/dev/null 2>&1; then
+        what="venv (${tool} -m venv)"
+        hint="apt install python3-venv | dnf install python3 | apk add python3"
+      fi ;;
+    js)
+      if ! polyglot::__first "${POLYGLOT_NPM_TOOLS}" >/dev/null; then
+        what="npm"
+        hint="apt install npm | dnf install npm | apk add npm | brew install node"
+      fi ;;
+    go)
+      # зависимости Go ставит сам go (модули) / Go dependencies are fetched by go itself (modules)
+      if ! "${tool}" env GOPATH >/dev/null 2>&1; then
+        what="go modules (${tool})"
+        hint="apt install golang | dnf install golang | apk add go | brew install go"
+      fi ;;
+    rust)
+      if ! polyglot::__first "${POLYGLOT_CARGO_TOOLS}" >/dev/null; then
+        what="cargo"
+        hint="apt install cargo | dnf install cargo | apk add cargo | brew install rust | https://rustup.rs"
+      fi ;;
+    c | cpp)
+      if ! polyglot::__first "${POLYGLOT_PKGCONFIG_TOOLS}" >/dev/null; then
+        what="pkg-config"
+        hint="apt install pkg-config | dnf install pkgconf | apk add pkgconf | brew install pkg-config"
+      fi ;;
+  esac
+  if [[ -n "${what}" ]]; then
+    log::error "polyglot: ${what} is not available — dependencies for '${lang}' cannot be installed / недоступен ${what}"
+    log::error "  install / установите: ${hint}"
+    return "${LIB_ERROR_DEPENDENCY_MISSING}"
+  fi
+  return 0
+}
+
+# @private
+# @description Environment with the dependencies installed (cached by the hash of language, tool, deps).
+#   Python: a venv with pip; JavaScript: node_modules via npm; Go: a module via go get;
+#   Rust: a cargo project; C/C++: pkg-config flags. Fills POLYGLOT_RUN_ENV / POLYGLOT_RUN_RUNNER
+#   or prints the extra compiler flags.
+# @description Окружение с установленными зависимостями (кэш по хешу языка, инструмента, зависимостей).
+# @param $1 canonical language / язык
+# @param $2 language tool / инструмент языка
+# @param $3 dependencies, one per line / зависимости по одной в строке
+# @param $4 no-cache (1/0) / без кэша
+# @return 0 ok; POLYGLOT_DEPS_OUT holds the environment directory (or the pkg-config flags for C/C++)
+polyglot::__deps_env() {
+  local -r lang="$1" tool="$2" deps_text="$3" nocache="$4"
+  local -a deps=()
+  mapfile -t deps <<< "${deps_text}"
+  local d
+  for d in "${deps[@]}"; do
+    polyglot::__dep_valid "${d}" || {
+      log::error "polyglot: unsafe dependency spec '${d}' / небезопасная запись зависимости"
+      return "${LIB_ERROR_INVALID_ARGS}"
+    }
+  done
+
+  if [[ "${lang}" == c || "${lang}" == cpp ]]; then
+    local pc
+    pc="$(polyglot::__first "${POLYGLOT_PKGCONFIG_TOOLS}")"
+    for d in "${deps[@]}"; do
+      "${pc}" --exists "${d}" 2>/dev/null || {
+        log::error "polyglot: library '${d}' not found by ${pc} / библиотека '${d}' не найдена"
+        return "${LIB_ERROR_DEPENDENCY_MISSING}"
+      }
+    done
+    POLYGLOT_DEPS_OUT="$("${pc}" --cflags --libs "${deps[@]}")"
+    return 0
+  fi
+
+  local hash env
+  hash="$(printf '%s\0%s\0%s' "${lang}" "$(polyglot::__tool_id "${tool}")" "${deps_text}" | polyglot::__sha256)"
+  env="${POLYGLOT_CACHE_DIR}/${lang}-deps/${hash}"
+  if [[ "${nocache}" != 1 && -f "${env}/.ready" ]]; then
+    POLYGLOT_DEPS_OUT="${env}"
+    return 0
+  fi
+  rm -rf -- "${env}"
+  mkdir -p "${env}" || return "${LIB_ERROR_FILE_OPERATION}"
+  log::info "polyglot: installing ${#deps[@]} ${lang} dependenc(ies) / установка зависимостей: ${deps[*]}"
+  local out="" rc=0
+  case "${lang}" in
+    python)
+      out="$("${tool}" -m venv "${env}" 2>&1 && "${env}/bin/python" -m pip install --quiet --disable-pip-version-check "${deps[@]}" 2>&1)" || rc=$? ;;
+    js)
+      local npm
+      npm="$(polyglot::__first "${POLYGLOT_NPM_TOOLS}")"
+      out="$("${npm}" install --silent --no-audit --no-fund --prefix "${env}" "${deps[@]}" 2>&1)" || rc=$? ;;
+    go)
+      printf 'module bspolyglot\n\ngo 1.20\n' > "${env}/go.mod"
+      out="$(cd "${env}" && "${tool}" get "${deps[@]}" 2>&1)" || rc=$? ;;
+    rust)
+      local cargo_tool
+      cargo_tool="$(polyglot::__first "${POLYGLOT_CARGO_TOOLS}")"
+      {
+        printf '[package]\nname = "bspolyglot"\nversion = "0.0.0"\nedition = "2021"\n\n[dependencies]\n'
+        for d in "${deps[@]}"; do
+          if [[ "${d}" == *@* ]]; then
+            printf '%s = "%s"\n' "${d%%@*}" "${d#*@}"
+          else
+            printf '%s = "*"\n' "${d}"
+          fi
+        done
+      } > "${env}/Cargo.toml"
+      mkdir -p "${env}/src"
+      printf 'fn main() {}\n' > "${env}/src/main.rs"
+      out="$(cd "${env}" && "${cargo_tool}" fetch --quiet 2>&1)" || rc=$? ;;
+  esac
+  if (( rc != 0 )); then
+    log::error "polyglot: installing dependencies failed / не удалось установить зависимости"
+    local line
+    while IFS= read -r line; do log::error "  ${line}"; done <<< "${out}"
+    rm -rf -- "${env}"
+    return "${LIB_ERROR_DEPENDENCY}"
+  fi
+  : > "${env}/.ready"
+  POLYGLOT_DEPS_OUT="${env}"
+}
+
+# @private
+# @description Prepare the program: write the source into the cache, install dependencies, compile
+#   when the language is compiled (or reuse the cached binary). Sets POLYGLOT_RUN_TARGET,
+#   POLYGLOT_RUN_RUNNER and POLYGLOT_RUN_ENV.
+# @description Подготовить программу: записать исходник в кэш, поставить зависимости, скомпилировать
+#   (или взять готовый бинарник). Заполняет POLYGLOT_RUN_TARGET, POLYGLOT_RUN_RUNNER, POLYGLOT_RUN_ENV.
 # @param $1 canonical language / язык
 # @param $2 tool / инструмент
 # @param $3 source / исходник
 # @param $4 extra flags (space separated) / дополнительные флаги
 # @param $5 no-cache flag (1/0) / без кэша
-# @stdout path to run (binary for compiled, source file for interpreted)
-# @return 0 ok, LIB_ERROR_FILE_OPERATION, LIB_ERROR_DEPENDENCY on compile failure
+# @param $6 dependencies, one per line (may be empty) / зависимости по одной в строке
+# @return 0 ok, LIB_ERROR_FILE_OPERATION, LIB_ERROR_DEPENDENCY, LIB_ERROR_DEPENDENCY_MISSING
 polyglot::__prepare() {
-  local -r lang="$1" tool="$2" src="$3" flags="$4" nocache="$5"
+  local -r lang="$1" tool="$2" src="$3" nocache="$5" deps_text="${6-}"
+  local flags="$4"
+  POLYGLOT_RUN_TARGET=""
+  POLYGLOT_RUN_RUNNER=()
+  POLYGLOT_RUN_ENV=()
+
+  # Менеджер пакетов проверяется ДО всего остального / the package manager is checked BEFORE anything else
+  local env_dir=""
+  if [[ -n "${deps_text}" ]]; then
+    polyglot::__check_manager "${lang}" "${tool}" || return $?
+    POLYGLOT_DEPS_OUT=""
+    polyglot::__deps_env "${lang}" "${tool}" "${deps_text}" "${nocache}" || return $?
+    if [[ "${lang}" == c || "${lang}" == cpp ]]; then
+      flags="${flags} ${POLYGLOT_DEPS_OUT}"
+    else
+      env_dir="${POLYGLOT_DEPS_OUT}"
+    fi
+  fi
+
   local ext hash dir file bin
   ext="$(polyglot::__ext "${lang}")"
-  hash="$(printf '%s\0%s\0%s\0%s' "${lang}" "$(polyglot::__tool_id "${tool}")" "${flags}" "${src}" | polyglot::__sha256)"
+  hash="$(printf '%s\0%s\0%s\0%s\0%s' "${lang}" "$(polyglot::__tool_id "${tool}")" "${flags}" "${deps_text}" "${src}" | polyglot::__sha256)"
   dir="${POLYGLOT_CACHE_DIR}/${lang}"
   mkdir -p "${dir}" || return "${LIB_ERROR_FILE_OPERATION}"
   file="${dir}/${hash}.${ext}"
@@ -199,12 +399,19 @@ polyglot::__prepare() {
     if [[ "${nocache}" == 1 || ! -f "${file}" ]]; then
       polyglot::__write_atomic "${file}" "${src}" || return "${LIB_ERROR_FILE_OPERATION}"
     fi
-    printf '%s\n' "${file}"
+    POLYGLOT_RUN_TARGET="${file}"
+    case "${lang}" in
+      python)
+        if [[ -n "${env_dir}" ]]; then POLYGLOT_RUN_RUNNER=("${env_dir}/bin/python"); else POLYGLOT_RUN_RUNNER=("${tool}"); fi ;;
+      js)
+        POLYGLOT_RUN_RUNNER=("${tool}")
+        [[ -n "${env_dir}" ]] && POLYGLOT_RUN_ENV=("NODE_PATH=${env_dir}/node_modules") ;;
+    esac
     return 0
   fi
 
   if [[ "${nocache}" != 1 && -x "${bin}" ]]; then
-    printf '%s\n' "${bin}"
+    POLYGLOT_RUN_TARGET="${bin}"
     return 0
   fi
 
@@ -212,12 +419,27 @@ polyglot::__prepare() {
   local tmp_bin="${bin}.tmp.$$"
   local -a extra=()
   IFS=' ' read -r -a extra <<< "${flags}"
-  local err rc=0
+  local err="" rc=0
   case "${lang}" in
     c)    err="$("${tool}" -O2 -x c "${file}" -o "${tmp_bin}" ${extra[@]+"${extra[@]}"} -lm 2>&1)" || rc=$? ;;
     cpp)  err="$("${tool}" -O2 -x c++ "${file}" -o "${tmp_bin}" ${extra[@]+"${extra[@]}"} 2>&1)" || rc=$? ;;
-    go)   err="$("${tool}" build -o "${tmp_bin}" ${extra[@]+"${extra[@]}"} "${file}" 2>&1)" || rc=$? ;;
-    rust) err="$("${tool}" -O -o "${tmp_bin}" ${extra[@]+"${extra[@]}"} "${file}" 2>&1)" || rc=$? ;;
+    go)
+      if [[ -n "${env_dir}" ]]; then
+        cp -- "${file}" "${env_dir}/main.go"
+        err="$(cd "${env_dir}" && "${tool}" build -o "${tmp_bin}" ${extra[@]+"${extra[@]}"} . 2>&1)" || rc=$?
+      else
+        err="$("${tool}" build -o "${tmp_bin}" ${extra[@]+"${extra[@]}"} "${file}" 2>&1)" || rc=$?
+      fi ;;
+    rust)
+      if [[ -n "${env_dir}" ]]; then
+        cp -- "${file}" "${env_dir}/src/main.rs"
+        local cargo_tool
+        cargo_tool="$(polyglot::__first "${POLYGLOT_CARGO_TOOLS}")"
+        err="$(cd "${env_dir}" && "${cargo_tool}" build --release --quiet ${extra[@]+"${extra[@]}"} 2>&1)" || rc=$?
+        [[ ${rc} -eq 0 ]] && cp -- "${env_dir}/target/release/bspolyglot" "${tmp_bin}"
+      else
+        err="$("${tool}" -O -o "${tmp_bin}" ${extra[@]+"${extra[@]}"} "${file}" 2>&1)" || rc=$?
+      fi ;;
   esac
   if (( rc != 0 )) || [[ ! -x "${tmp_bin}" ]]; then
     log::error "polyglot: ${lang} compilation failed (${tool}) / сборка ${lang} не удалась"
@@ -229,7 +451,7 @@ polyglot::__prepare() {
     return "${LIB_ERROR_DEPENDENCY}"
   fi
   mv -f -- "${tmp_bin}" "${bin}" || return "${LIB_ERROR_FILE_OPERATION}"
-  printf '%s\n' "${bin}"
+  POLYGLOT_RUN_TARGET="${bin}"
 }
 
 # @private
@@ -258,6 +480,40 @@ polyglot::languages() {
   done
 }
 
+# @description Report the language tools and the package managers needed for --dep, with install hints.
+# @description Показать инструменты языков и менеджеры пакетов для --dep с подсказками по установке.
+# @stdout lines "item<TAB>status<TAB>detail"
+# @return 0 always; the report says what is missing
+polyglot::doctor() {
+  local l t m
+  for l in c cpp go rust python js; do
+    t="$(polyglot::__tool "${l}" || true)"
+    polyglot::__row "${l}" "${t}"
+  done
+  t="$(polyglot::__tool python || true)"
+  if [[ -n "${t}" ]] && "${t}" -m pip --version >/dev/null 2>&1; then
+    m="${t} -m pip"
+  else
+    m=""
+  fi
+  polyglot::__row pip "${m}"
+  for l in "npm:${POLYGLOT_NPM_TOOLS}" "cargo:${POLYGLOT_CARGO_TOOLS}" "pkg-config:${POLYGLOT_PKGCONFIG_TOOLS}"; do
+    t="$(polyglot::__first "${l#*:}" || true)"
+    polyglot::__row "${l%%:*}" "${t}"
+  done
+  polyglot::__row go-modules "$(polyglot::__tool go || true)"
+}
+
+# @private
+# @description One doctor row: item, ok|missing, what was found / Строка отчёта doctor.
+polyglot::__row() {
+  if [[ -n "${2}" ]]; then
+    printf '%s\tok\t%s\n' "${1}" "${2}"
+  else
+    printf '%s\tmissing\t-\n' "${1}"
+  fi
+}
+
 # @description Run code written in another language and bring the result back.
 # @description Выполнить код на другом языке и вернуть результат в скрипт.
 # @param $1 Language: c, cpp, go, rust, python, js (aliases: c++, golang, rs, py, javascript, node)
@@ -270,6 +526,9 @@ polyglot::languages() {
 #   --input TEXT    text on the program's stdin
 #   --timeout SEC   kill the program after SEC seconds
 #   --flags "…"     extra compiler flags (compiled languages)
+#   --dep SPEC      a dependency (repeatable): pip package, npm package, Go module[@ver],
+#                   cargo crate[@ver], or a pkg-config library for C/C++; the package
+#                   manager is checked BEFORE anything runs (LIB_ERROR_DEPENDENCY_MISSING)
 #   --no-cache      rebuild even if a cached binary exists
 #   --              everything after is passed to the program as arguments (argv)
 # @stdin the source code (heredoc) / исходный код (heredoc)
@@ -299,6 +558,7 @@ polyglot::run() {
   shift
 
   local _pg_out_var="" _pg_lines_var="" _pg_map_var="" _pg_rc_var="" _pg_input="" _pg_timeout_s="" _pg_flags="" _pg_nocache=0 _pg_has_input=0
+  local _pg_deps=""
   local -a _pg_envs=() _pg_args=()
   while [[ $# -gt 0 ]]; do
     case "${1}" in
@@ -310,6 +570,12 @@ polyglot::run() {
       --input)   _pg_input="${2-}"; _pg_has_input=1; shift 2 ;;
       --timeout) _pg_timeout_s="${2:?--timeout needs seconds}"; shift 2 ;;
       --flags)   _pg_flags="${2-}"; shift 2 ;;
+      --dep)
+        polyglot::__dep_valid "${2:-}" || {
+          log::error "polyglot::run: unsafe or empty --dep '${2:-}' (a name, optionally @version, no spaces or leading -) / небезопасная или пустая зависимость"
+          return "${LIB_ERROR_INVALID_ARGS}"
+        }
+        _pg_deps+="${2}"$'\n'; shift 2 ;;
       --no-cache) _pg_nocache=1; shift ;;
       --)        shift; _pg_args=("$@"); break ;;
       *)
@@ -359,20 +625,21 @@ polyglot::run() {
     return "${LIB_ERROR_DEPENDENCY_MISSING}"
   }
 
-  local _pg_target
-  _pg_target="$(polyglot::__prepare "${_pg_lang}" "${_pg_tool}" "${_pg_src}" "${_pg_flags}" "${_pg_nocache}")" || return $?
+  _pg_deps="${_pg_deps%$'\n'}"
+  polyglot::__prepare "${_pg_lang}" "${_pg_tool}" "${_pg_src}" "${_pg_flags}" "${_pg_nocache}" "${_pg_deps}" || return $?
 
   local -a _pg_cmd=()
-  if (( ${#_pg_envs[@]} > 0 )); then
-    _pg_cmd+=(env "${_pg_envs[@]}")
+  if (( ${#_pg_envs[@]} + ${#POLYGLOT_RUN_ENV[@]} > 0 )); then
+    _pg_cmd+=(env ${POLYGLOT_RUN_ENV[@]+"${POLYGLOT_RUN_ENV[@]}"} ${_pg_envs[@]+"${_pg_envs[@]}"})
   fi
   if [[ -n "${_pg_timeout_s}" ]]; then
     _pg_cmd+=(timeout "${_pg_timeout_s}")
   fi
-  case "${_pg_lang}" in
-    c | cpp | go | rust) _pg_cmd+=("${_pg_target}") ;;
-    python | js)         _pg_cmd+=("${_pg_tool}" "${_pg_target}") ;;
-  esac
+  if (( ${#POLYGLOT_RUN_RUNNER[@]} > 0 )); then
+    _pg_cmd+=("${POLYGLOT_RUN_RUNNER[@]}" "${POLYGLOT_RUN_TARGET}")
+  else
+    _pg_cmd+=("${POLYGLOT_RUN_TARGET}")
+  fi
   _pg_cmd+=(${_pg_args[@]+"${_pg_args[@]}"})
 
   local _pg_out="" _pg_rc=0

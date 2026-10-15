@@ -86,8 +86,42 @@ echo "${code} ${msg}"
 `--out VAR`, `--lines VAR`, `--map VAR` (сначала `declare -A`), `--rc VAR`,
 `--env NAME=VALUE` (можно повторять), `--input TEXT`, `--timeout SEC`
 (`LIB_ERROR_TIMEOUT` при срабатывании), `--flags "…"` (дополнительные флаги
-компилятора), `--no-cache`. Без `--out`/`--lines`/`--map` stdout программы
+компилятора), `--no-cache`, `--dep SPEC`. Без `--out`/`--lines`/`--map` stdout программы
 печатается.
+
+## Зависимости (`--dep`)
+
+`--dep SPEC` (можно повторять) ставит зависимость до запуска кода. **Менеджер
+пакетов проверяется первым — до сборки, установки и выполнения чего-либо** — если
+его нет, возвращается `LIB_ERROR_DEPENDENCY_MISSING` с причиной и подсказкой по
+установке, а код не запускается.
+
+| Язык | Что значит `--dep` | Какой менеджер проверяется | Куда ставится |
+|---|---|---|---|
+| `python` | требование pip (`requests==2.32.0`, путь к wheel) | `pip` и `venv` интерпретатора | venv в кэше |
+| `js` | пакет npm (`left-pad@1.3.0`, каталог) | `npm` | `node_modules` в кэше (`NODE_PATH`) |
+| `go` | модуль (`example.com/m@v1.2.0`) | модули `go` | каталог модуля в кэше |
+| `rust` | крейт (`serde@1`) | `cargo` | проект cargo в кэше |
+| `c`, `cpp` | библиотека pkg-config (`zlib`) | `pkg-config` и сама библиотека | флаги идут компилятору |
+
+Зависимости не трогают глобальное окружение: у каждой комбинации своё
+кэшируемое окружение (хеш языка, инструмента и зависимостей). Установке нужна
+сеть (кроме локальных путей и pkg-config). Запись, начинающаяся с `-` или с
+пробелами и метасимволами оболочки, отклоняется (`LIB_ERROR_INVALID_ARGS`).
+`polyglot::doctor` показывает, какие языки и менеджеры есть.
+
+```bash
+#!/usr/bin/env bs
+
+load "lib/polyglot/run"
+
+polyglot::doctor
+
+polyglot::run python --dep requests --out status <<'PY'
+import requests
+print(requests.__version__)
+PY
+```
 
 ## Кэш и хуки
 
@@ -95,7 +129,7 @@ echo "${code} ${msg}"
 (`~/.cache/bs/polyglot`) по хешу языка, компилятора (путь и версия), флагов и
 исходника; первый запуск компилирует, последующие стартуют сразу. Порядок
 поиска задают `POLYGLOT_C_TOOLS`, `POLYGLOT_CPP_TOOLS`, `POLYGLOT_GO_TOOLS`,
-`POLYGLOT_RUST_TOOLS`, `POLYGLOT_PYTHON_TOOLS` и `POLYGLOT_JS_TOOLS`.
+`POLYGLOT_RUST_TOOLS`, `POLYGLOT_PYTHON_TOOLS` и `POLYGLOT_JS_TOOLS`; для зависимостей `POLYGLOT_NPM_TOOLS`, `POLYGLOT_CARGO_TOOLS`, `POLYGLOT_PKGCONFIG_TOOLS`.
 
 Смотрите также: [math](../../../lib/math/math.sh) — вычислитель на C, который
 обобщает этот модуль.
