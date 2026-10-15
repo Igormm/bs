@@ -214,6 +214,10 @@ test_json_merge() {
 
 # Test 11: XML validation
 test_xml_validation() {
+    if ! utils::has xmllint; then
+        log::warn "SKIP test_xml_validation: xmllint not installed (apt install libxml2-utils)"
+        return 0
+    fi
     log::info "Testing XML validation..."
     
     # Test valid XML
@@ -233,6 +237,10 @@ test_xml_validation() {
 
 # Test 12: XML pretty print
 test_xml_pretty() {
+    if ! utils::has xmllint; then
+        log::warn "SKIP test_xml_pretty: xmllint not installed (apt install libxml2-utils)"
+        return 0
+    fi
     log::info "Testing XML pretty print..."
     
     local pretty_xml
@@ -247,6 +255,10 @@ test_xml_pretty() {
 
 # Test 13: XML XPath
 test_xml_xpath() {
+    if ! utils::has xmllint; then
+        log::warn "SKIP test_xml_xpath: xmllint not installed (apt install libxml2-utils)"
+        return 0
+    fi
     log::info "Testing XML XPath..."
     
     local result
@@ -355,6 +367,10 @@ city: New York'
 
 # Test 20: JSON to YAML
 test_json_to_yaml() {
+    if ! { utils::has yq || python3 -c 'import yaml' 2>/dev/null; }; then
+        log::warn "SKIP test_json_to_yaml: yq or python3 PyYAML not installed (apt install python3-yaml)"
+        return 0
+    fi
     log::info "Testing JSON to YAML conversion..."
     
     # Используем реальный pyyaml (установлен в системе)
@@ -371,6 +387,10 @@ test_json_to_yaml() {
 
 # Test 21: Format detection
 test_format_detection() {
+    if ! utils::has xmllint; then
+        log::warn "SKIP test_format_detection: xmllint not installed (apt install libxml2-utils)"
+        return 0
+    fi
     log::info "Testing format detection..."
     
     # Test JSON detection
