@@ -338,6 +338,35 @@ EOF2
     rm -rf "${work}"
 }
 
+test_network_dependencies() {
+    testframework::section "Network: real Go and cargo dependencies (POLYGLOT_TEST_NETWORK=1) / Сеть: настоящие зависимости Go и cargo"
+    if [[ "${POLYGLOT_TEST_NETWORK:-0}" != "1" ]]; then
+        echo "  SKIP: set POLYGLOT_TEST_NETWORK=1 to fetch real packages"
+        return 0
+    fi
+    local out=""
+    if have go; then
+        polyglot::run go --dep github.com/google/uuid@v1.6.0 --out out <<'EOF2'
+package main
+
+import (
+	"fmt"
+
+	"github.com/google/uuid"
+)
+
+func main() { fmt.Println(len(uuid.New().String())) }
+EOF2
+        testframework::assert_equal "36" "${out}" "Go: a real module is fetched and linked"
+    fi
+    if have rust && utils::has cargo; then
+        polyglot::run rust --dep itoa@1 --out out <<'EOF2'
+fn main() { let mut b = itoa::Buffer::new(); println!("{}", b.format(12345u32)); }
+EOF2
+        testframework::assert_equal "12345" "${out}" "Rust: a real crate is fetched and linked"
+    fi
+}
+
 main() {
     print_header "Polyglot Unit Tests / Модульные тесты polyglot"
 
@@ -359,6 +388,7 @@ main() {
     test_cache
     test_errors
     test_dependencies
+    test_network_dependencies
 
     rm -rf "${POLYGLOT_CACHE_DIR%/*}"
     testframework::summary
