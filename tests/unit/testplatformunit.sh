@@ -51,9 +51,9 @@ test_cache() {
     local tier1 tier2
     tier1="$(platform::get tier)"
     tier2="$(
-        PLATFORM_CACHE_FILE="${cache_dir}/facts" bash -c '
+        PLATFORM_CACHE_FILE="${cache_dir}/facts" PLATFORM_TEST_ROOT="${BS_PROJECT_ROOT}" bash -c '
             unset BS_INITIALIZED
-            source /home/igor/bs/bootstrap/init.sh >/dev/null 2>&1
+            source "${PLATFORM_TEST_ROOT}/bootstrap/init.sh" >/dev/null 2>&1
             export BS_SILENT=1
             load "lib/platform/facts"
             platform::get tier
