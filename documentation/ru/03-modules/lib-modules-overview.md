@@ -108,6 +108,14 @@ RFC-хелперы: UUID 4/7 ([uuid.sh](../../../lib/rfc/uuid.sh)), URI, CSV.
 
 Подробнее: [ts-toolchain.md](ts-toolchain.md), [ts-stack.md](ts-stack.md)
 
+## polyglot — `lib/polyglot/`
+
+- [run.sh](../../../lib/polyglot/run.sh) — запуск C, C++, Go, Rust, Python и JavaScript внутри скрипта: аргументы туда, результат обратно в переменные (`--out`, `--lines`, `--map`, `--rc`), скомпилированные программы кэшируются по хешу.
+
+Ключевые функции: `polyglot::run`, `polyglot::languages`.
+
+Подробнее: [polyglot.md](polyglot.md)
+
 ## frameworks — `lib/frameworks/`
 
 - [frameworksintegration.sh](../../../lib/frameworks/frameworksintegration.sh) — прослойки совместимости, которые предоставляют идеи других bash-фреймворков (bash-it, bashinator, bashly, ShellSpec, MBFL) через единый API `frameworks::*`.

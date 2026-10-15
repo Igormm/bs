@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- polyglot: `polyglot::run` — run C, C++, Go, Rust, Python and JavaScript code inside a bs script: arguments after `--`, `--env`, `--input` go in; stdout comes back into a scalar (`--out`), an array (`--lines`) or an associative array (`--map`), the exit code into `--rc`; `--timeout`, `--flags`, `--no-cache`; compiled programs are cached by the hash of language, compiler and source (`POLYGLOT_CACHE_DIR`); `polyglot::languages` lists the tools found; tests (unit/testpolyglotunit.sh, 33 checks), documentation en/ru, example examples/polyglot_example.sh
+
 ## [0.7.4] - 2026-10-12
 
 ### Added
