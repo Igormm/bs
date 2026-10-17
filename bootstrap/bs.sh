@@ -324,6 +324,7 @@ Maintenance / Обслуживание:
   uninstall [opts]    Remove installed BS copies / удаление
   where [--deep]      Find every trace of BS on this machine / все следы BS на машине
   init-shell [SHELL]  PATH snippet for your shell: bash zsh ash dash ksh fish nu / snippet для вашей оболочки
+  shebang <cmd>       Check and rewrite #! lines for this machine (Termux: no /usr/bin/env) / проверка и правка #! для этой машины
   --strict-shell      (before the command) refuse lib/ modules whose @shell tier does not fit the shell bs was started from / отказывать модулям lib/, чей tier @shell не подходит оболочке запуска
 
 Shebang mode:
@@ -367,6 +368,7 @@ bs::cli::help_cmd() {
     uninstall)      bs::cli::uninstall_cmd --help ;;
     where)          bs::cli::where_cmd --help ;;
     init-shell)     bs::cli::init_shell_usage ;;
+    shebang)        bs::cli::shebang_usage ;;
     rfc)            bs::cli::rfc_cmd --help ;;
     *)              bs::cli::die "help: unknown command: ${cmd}" ;;
   esac
@@ -1106,6 +1108,116 @@ bs::cli::init_shell_cmd() {
   if ! bs_shell_can_source "${fam}"; then
     printf '# %s\n' "$(bs_shell_tier_desc "${tier}")"
   fi
+}
+
+bs::cli::shebang_usage() {
+  printf 'Usage: bs shebang <command> [options]\n\n'
+  printf 'Manage the first line (#!) of scripts so that it works on THIS machine.\n'
+  printf 'Termux has no /usr/bin/env: env lives in $PREFIX/bin/env.\n\n'
+  printf 'Commands:\n'
+  printf '  info                      this machine: env path, Termux, which modes work\n'
+  printf '  line [--mode M] [--prog P] print the shebang line for the mode\n'
+  printf '  check [PATH...]           does the shebang of each file work here (default: bs entry points)\n'
+  printf '  set [--mode M] [--prog P] [--dry-run] PATH...   rewrite the shebang of files / directories\n\n'
+  printf 'Modes: portable (#!/usr/bin/env P) | env (env found on this machine) | abs (full path of P) | auto (default)\n'
+  printf 'set rewrites only files whose shebang already starts P (default P=bs); exit 1 if check finds a broken file.\n'
+  printf 'Управляет первой строкой (#!) скриптов, чтобы она работала на ЭТОЙ машине.\n'
+  printf 'В Termux нет /usr/bin/env: env лежит в $PREFIX/bin/env.\n'
+}
+
+# @private Files to look at: the arguments, directories expanded (shebang files only).
+bs::cli::shebang_files() {
+  local p
+  for p in "$@"; do
+    if [[ -d "${p}" ]]; then
+      find "${p}" -type f -not -path '*/.git/*' -print
+    elif [[ -e "${p}" ]]; then
+      printf '%s\n' "${p}"
+    else
+      printf 'bs shebang: no such file: %s\n' "${p}" >&2
+      return 1
+    fi
+  done
+}
+
+bs::cli::shebang_cmd() {
+  local sub="${1:-}"
+  case "${sub}" in
+    ""|-h|--help|help) bs::cli::shebang_usage; return 0 ;;
+  esac
+  shift
+  source "${BS_BOOTSTRAP_DIR}/shebang.sh" || bs::cli::die "shebang: bootstrap/shebang.sh not found"
+
+  local mode="auto" prog="bs" dry=0 arg
+  local -a paths=()
+  while [[ $# -gt 0 ]]; do
+    arg="$1"; shift
+    case "${arg}" in
+      --mode=*) mode="${arg#--mode=}" ;;
+      --mode)   mode="${1:?--mode needs a value}"; shift ;;
+      --prog=*) prog="${arg#--prog=}" ;;
+      --prog)   prog="${1:?--prog needs a value}"; shift ;;
+      --dry-run) dry=1 ;;
+      -h|--help) bs::cli::shebang_usage; return 0 ;;
+      -*) bs::cli::die "shebang: unknown option: ${arg}" ;;
+      *) paths+=("${arg}") ;;
+    esac
+  done
+
+  local f line why rc=0
+  case "${sub}" in
+    info)
+      local e m
+      e="$(bs_shebang_env_path || true)"
+      printf 'termux:    %s\n' "$(bs_shebang_is_termux && echo yes || echo no)"
+      printf 'env:       %s\n' "${e:-not found}"
+      printf '/usr/bin/env: %s\n' "$([[ -x /usr/bin/env ]] && echo present || echo absent)"
+      for m in portable env abs; do
+        line="$(bs_shebang_line "${m}" "${prog}" 2>/dev/null || echo '-')"
+        printf '%-9s  %s\n' "${m}" "${line}"
+      done
+      printf 'auto:      %s\n' "$(bs_shebang_line auto "${prog}" 2>/dev/null || echo '-')"
+      ;;
+    line)
+      bs_shebang_line "${mode}" "${prog}" || return 1
+      ;;
+    check)
+      [[ ${#paths[@]} -gt 0 ]] || paths=("${BS_ROOT}/bs" "${BS_ROOT}/install.sh" "${BS_ROOT}/boot.sh")
+      while IFS= read -r f; do
+        line="$(bs_shebang_read "${f}")" || continue
+        if why="$(bs_shebang_works "${line}")"; then
+          printf 'ok      %s  %s\n' "${f}" "${line}"
+        else
+          printf 'BROKEN  %s  %s  (%s)\n' "${f}" "${line}" "${why}"
+          rc=1
+        fi
+      done < <(bs::cli::shebang_files "${paths[@]}")
+      if [[ ${rc} -ne 0 ]]; then
+        printf 'fix: bs shebang set --prog <program> <file>  (Termux: install termux-exec, or use --mode env)\n' >&2
+      fi
+      return "${rc}"
+      ;;
+    set)
+      [[ ${#paths[@]} -gt 0 ]] || bs::cli::die "shebang set: give at least one file or directory"
+      local new n=0
+      new="$(bs_shebang_line "${mode}" "${prog}")" || return 1
+      while IFS= read -r f; do
+        line="$(bs_shebang_read "${f}")" || continue
+        bs_shebang_is_for "${line}" "${prog}" || continue
+        [[ "${line}" == "${new}" ]] && continue
+        if [[ ${dry} -eq 1 ]]; then
+          printf 'would change  %s\n  %s\n  -> %s\n' "${f}" "${line}" "${new}"
+        else
+          bs_shebang_rewrite "${f}" "${new}" || { printf 'failed        %s\n' "${f}" >&2; rc=1; continue; }
+          printf 'changed       %s\n  %s\n  -> %s\n' "${f}" "${line}" "${new}"
+        fi
+        n=$((n + 1))
+      done < <(bs::cli::shebang_files "${paths[@]}")
+      printf '%d file(s) %s\n' "${n}" "$([[ ${dry} -eq 1 ]] && echo 'would change' || echo changed)"
+      return "${rc}"
+      ;;
+    *) bs::cli::die "shebang: unknown command: ${sub} (see: bs shebang --help)" ;;
+  esac
 }
 
 # @private Boxed notice printed WITHOUT log prefixes — timestamps would

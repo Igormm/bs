@@ -271,6 +271,27 @@ export PATH="$HOME/.local/bin:$PATH"
 
 Правила: `~/.bashrc` обновляется, если он существует или если нет `~/.zshrc`; `~/.zshrc` обновляется, только если уже существует. После этого перезагрузите оболочку (`source ~/.bashrc`) или откройте новую сессию.
 
+## Termux и shebang: `bs shebang`
+
+Shebang требует абсолютный путь. На большинстве Linux это `/usr/bin/env`; **в Termux (Android) каталога `/usr` нет**: `env` лежит в `$PREFIX/bin/env` (`/data/data/com.termux/files/usr/bin/env`). `#!/usr/bin/env bs` работает там только при установленном пакете `termux-exec`. Иначе перепишите первую строку скриптов под эту машину:
+
+```bash
+pkg install -y bash termux-exec     # проще всего: /usr/bin/env и /bin/sh начинают работать
+bs shebang info                     # путь env, Termux или нет, строка каждого режима
+bs shebang check ./scripts          # работает ли #! каждого файла здесь (exit 1, если нет)
+bs shebang set ./scripts            # переписать под эту машину (режим auto)
+bs shebang set --mode env --dry-run script.sh   # показать, что изменится
+```
+
+| Режим | Первая строка | Когда |
+|---|---|---|
+| `portable` | `#!/usr/bin/env bs` | скрипты, которыми делитесь; нужен `/usr/bin/env` |
+| `env` | `#!<env этой машины> bs` | Termux без termux-exec |
+| `abs` | `#!<полный путь bs>` | `env` нет совсем; привязано к этой установке |
+| `auto` (по умолчанию) | `portable`, а без `/usr/bin/env` — `env` | большинство случаев |
+
+`set` переписывает только файлы, чей shebang уже запускает нужную программу (`--prog`, по умолчанию `bs`), сохраняет тело и права файла; `--dry-run` ничего не меняет. Эти же функции — POSIX (`bootstrap/shebang.sh`: `bs_shebang_line`, `bs_shebang_works`, `bs_shebang_rewrite`), поэтому работают в dash, zsh и bash. Перед установщиком в Termux поставьте оболочки: `pkg install bash zsh dash busybox`; затем `bs shebang check` для установленных файлов.
+
 ## Примечания
 
 - **Исходный каталог можно удалить.**  

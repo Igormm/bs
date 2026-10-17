@@ -165,7 +165,7 @@ fi
 # первый аргумент — путь к существующему скрипту, а не команда.
 if [[ $# -ge 1 && -f "$1" ]]; then
   case "$1" in
-    help|-h|--help|version|env|list|lang-doc|lsp|chat|sync|rfc|api|ts|audit|doctor|run|build|repl|calc|init-shell|update|uninstall|where) : ;;
+    help|-h|--help|version|env|list|lang-doc|lsp|chat|sync|rfc|api|ts|audit|doctor|run|build|repl|calc|init-shell|shebang|update|uninstall|where) : ;;
     *) BS_SHEBANG=1 ;;
   esac
 fi
@@ -213,5 +213,6 @@ case "${1:-help}" in
                   fi
                   calc::main "$@" ;;
   init-shell)     shift; bs::cli::init_shell_cmd "$@" ;;
+  shebang)        shift; bs::cli::shebang_cmd "$@" ;;
   *)              bs::cli::die "unknown command: $1" ;;
 esac

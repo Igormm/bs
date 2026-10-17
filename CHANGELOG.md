@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- shebang: `bs shebang info|line|check|set` — check and rewrite the `#!` line of scripts for this machine (modes portable, env, abs, auto; Termux has no /usr/bin/env); POSIX layer `bootstrap/shebang.sh`; Termux section in documentation/{en,ru}/install.md; tests unit/testshebangunit.sh
 - shells: BS entry points (`bs`, `install.sh`, `boot.sh`) start with a POSIX prologue and re-run themselves in a capable bash via `bootstrap/trampoline.sh` (`sh install.sh`, `dash ./bs`, `zsh ./bs`, bash as `sh`); `BS_HOST_BASH` overrides the search; without bash 4.2+ a bilingual message with install hints
 - shells: `bootstrap/shell.sh` — POSIX registry of shells (bash zsh dash ash sh ksh mksh oksh osh fish nu): rc file, PATH line, reload command, host search, tier; `bs::shell::*` aliases in bash/zsh
 - shells: `@shell posix|bash4` annotation, `platform::get user_shell|shell_tier` (native / hosted / unsupported)
@@ -33,6 +34,7 @@
 ## [0.7.4] - 2026-10-12
 
 ### Added
+- shebang: `bs shebang info|line|check|set` — check and rewrite the `#!` line of scripts for this machine (modes portable, env, abs, auto; Termux has no /usr/bin/env); POSIX layer `bootstrap/shebang.sh`; Termux section in documentation/{en,ru}/install.md; tests unit/testshebangunit.sh
 - cli: bs update --pull — `git pull --ff-only` in the local repository before anything else (history is never rewritten, nothing is merged); the interactive question about a repository that is behind GitHub gets `[p]ull` (the default when the pull is possible): pull, then install from the repository; without a terminal the warning names `--pull`; a refusal (uncommitted changes, diverged history, no upstream, no network, no repository around) is explained, exits 1 and changes nothing
 - cli: bs update — after the install it prints "State after the update" (installed version, the repository with its version, commit and relation to GitHub, a verdict); `--github` next to a repository that is behind says that the repository was NOT updated (bs update copies only bs, bootstrap, core, lib — examples/ and tests/ stay as they are), which is why a flag added on GitHub was "missing" after an update
 - agents: skill bs-scenario-audit — a scenario-driven sweep for logic errors in library functions and CLI commands: a six-part scenario card per function (user scenario, main scenario, alternative scenarios, scenario parameters, half-scenario = interrupted midway, parameter groups), actual-vs-expected runs in a sandbox with the safety rules learned from this project, a two-lane scheme for business-logic findings, 12 classes of logic errors (references/logic-traps.md) and scripts/inventory.sh, a read-only inventory of public functions with parameters, risk markers and test coverage (core, lib and bootstrap: 1193 functions, 579 without tests, 332 with risk markers)
@@ -53,6 +55,7 @@
 ## [0.7.3] - 2026-10-12
 
 ### Added
+- shebang: `bs shebang info|line|check|set` — check and rewrite the `#!` line of scripts for this machine (modes portable, env, abs, auto; Termux has no /usr/bin/env); POSIX layer `bootstrap/shebang.sh`; Termux section in documentation/{en,ru}/install.md; tests unit/testshebangunit.sh
 - examples: send_video.sh — `--prefill TEXT` presets the start of the model's answer (an assistant message with vLLM `continue_final_message`), the most reliable way to keep the language of the answer when a vision model drifts to English; the report shows the prefix plus the continuation; the prefill is part of the run's identity; tests for the `--prompt-file` / `--system` / `--prefill` request body (unit/testsendvideoprefillunit.sh)
 - cli: bs where [--deep] — read-only report of every trace of BS on the machine: the running copy, every `bs` in PATH (wrapper → install, launcher, broken, foreign), installs with kind/version/manifest/owner/leftovers, source checkouts, lines in shell rc files, data and cache directories, environment variables, and a summary of what looks wrong with the commands to fix it; `--deep` also searches ~, /opt, /usr/local, /srv; no found copy of bs is run
 - examples: send_audio.sh — while a long request is processed (a Whisper chunk on a CPU takes minutes) it prints "waiting for the server: N s, chunk i/n" every `SEND_AUDIO_HEARTBEAT_S` seconds (default 20), and after each chunk the progress, the speed relative to real time and the estimated remaining time; Ctrl-C/SIGTERM now also stops the background `curl`
@@ -67,6 +70,7 @@
 ## [0.7.1] - 2026-10-12
 
 ### Added
+- shebang: `bs shebang info|line|check|set` — check and rewrite the `#!` line of scripts for this machine (modes portable, env, abs, auto; Termux has no /usr/bin/env); POSIX layer `bootstrap/shebang.sh`; Termux section in documentation/{en,ru}/install.md; tests unit/testshebangunit.sh
 - install: negative scenarios are explained by bilingual notices instead of raw errors — "ALREADY INSTALLED" (versions, `bs update`, uninstall + install, another `PREFIX`), "PARTIAL INSTALL — REPAIRING", "ANOTHER INSTALL EXISTS" (which copy `bs` will run, by `PATH` order), "NOTHING TO REMOVE", "PART LEFT IN PLACE"; install/notice.sh is the new home of the notices and checks
 - install: the installer never deletes or overwrites what is not BS — a foreign `TARGET_LIB` (directory, file, symlink, source checkout) and a foreign `TARGET_BIN` (no `export BS_ROOT=`) are refused for install and left alone by uninstall (the old `rm -rf TARGET_LIB` without a check is gone); installation is transactional (staging next to the target + rename, the previous copy is put back on failure, the ERROR names the real cause)
 - install: write access to `BIN_DIR`/`LIB_DIR` is checked instead of `EUID`, so `PREFIX=/opt/x ./install.sh` works without root; `sudo ./install.sh --local` into the home of `SUDO_USER` is refused (root-owned files in a user's home), with `HOME=/root` it only warns; unset or unwritable `HOME`, a relative `PREFIX`, forbidden characters in paths, `BIN_DIR` equal to `LIB_DIR` and an incomplete source are bilingual errors; `BIN_DIR` outside `PATH` gets the exact `export` line; an unwritable rc file no longer aborts the install; uninstall edits rc files in place (keeps a symlinked dotfile and its owner)
@@ -124,6 +128,7 @@
 ## [0.6.0] - 2026-09-28
 
 ### Added
+- shebang: `bs shebang info|line|check|set` — check and rewrite the `#!` line of scripts for this machine (modes portable, env, abs, auto; Termux has no /usr/bin/env); POSIX layer `bootstrap/shebang.sh`; Termux section in documentation/{en,ru}/install.md; tests unit/testshebangunit.sh
 - skills: bs-audit — полный аудит проекта (валидация, сниппеты, артефакты, en/ru синхронизация, ревизия модулей)
 - lib/tui: высокоуровневый слой app.sh — окна, кнопки, биндинги, модалки, цикл; app_demo.sh для новичков; todo.sh переведён на tui::app (267→150 строк)
 - tests: validatedocscode.sh — проверка сниппетов кода в документации (конвенции, load-пути, API, соответствие examples/); skill bs-check-docs-code
