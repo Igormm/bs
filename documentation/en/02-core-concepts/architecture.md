@@ -167,7 +167,7 @@ performs the following:
 - Takes its own directory from `BS_ENTRY_DIR` (set by the prologue), sources `bootstrap/bs.sh` (pre-kernel namespace)
   and runs `bs::shell::ensure_version 4`, so the bash 4.2+ gate runs before
   anything else is loaded.
-- Pulls in `BS_VERSION` from `core/version.sh` (currently `0.7.4`); `const.sh` has no number of its own.
+- Pulls in `BS_VERSION` from `core/version.sh` (currently `0.8.0`); `const.sh` has no number of its own.
 - Resolves `BS_ROOT` if it is not already set: first the script's own
   directory (when it contains `bootstrap/init.sh`), then
   `~/.local/lib/bs` and `/usr/local/lib/bs`.

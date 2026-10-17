@@ -51,12 +51,17 @@ bs_shebang_env_path() {
   printf '%s\n' "$__bs_sb_p"
 }
 
-# @description Print the interpreter line of FILE (first line, only if it is #!).
-# @description Печатает строку интерпретатора FILE (первую, только если это #!).
+# @description Print the interpreter line of FILE (first line, only if it is #!;
+#   a trailing CR of a CRLF file is dropped).
+# @description Печатает строку интерпретатора FILE (первую, только если это #!;
+#   CR в конце строки CRLF-файла отбрасывается).
 # @param $1 file / файл
 bs_shebang_read() {
   [ -f "$1" ] || return 1
+  __bs_sb_l=""
   IFS= read -r __bs_sb_l < "$1" || [ -n "$__bs_sb_l" ] || return 1
+  __bs_sb_cr=$(printf '\r')
+  __bs_sb_l=${__bs_sb_l%"$__bs_sb_cr"}
   case "$__bs_sb_l" in
     '#!'*) printf '%s\n' "$__bs_sb_l" ;;
     *) return 1 ;;
@@ -75,8 +80,10 @@ bs_shebang_parse() {
 }
 
 # @description Does the shebang line work on this machine? Prints the reason on failure.
-#   rc 0 = works; rc 1 = broken (reason on stdout).
+#   rc 0 = works; rc 1 = broken (reason on stdout). If the interpreter is itself a
+#   script (#!), its own shebang is checked too (up to 3 hops).
 # @description Работает ли строка shebang на этой машине? При сбое печатает причину.
+#   Если интерпретатор сам скрипт (#!), проверяется и его shebang (до 3 переходов).
 # @param $1 shebang line / строка shebang
 bs_shebang_works() {
   __bs_sb_r=$(bs_shebang_parse "$1")
@@ -93,14 +100,33 @@ bs_shebang_works() {
   fi
   case "$__bs_sb_i" in
     */env)
-      # env: the first word of the argument is the program (skip -S and options)
-      # env: первое слово аргумента — программа (пропускаем -S и опции)
-      for __bs_sb_w in $__bs_sb_a; do
-        case "$__bs_sb_w" in -*|*=*) continue ;; esac
+      # env: the first word of the argument is the program (skip options and NAME=value)
+      # env: первое слово аргумента — программа (пропускаем опции и NAME=значение)
+      # Words are cut by parameter expansion: zsh does not split an unquoted variable.
+      # Слова режем подстановкой параметров: zsh не разбивает неокавыченную переменную.
+      __bs_sb_rest=$__bs_sb_a
+      while [ -n "$__bs_sb_rest" ]; do
+        __bs_sb_w=${__bs_sb_rest%% *}
+        case "$__bs_sb_rest" in *' '*) __bs_sb_rest=${__bs_sb_rest#* } ;; *) __bs_sb_rest="" ;; esac
+        case "$__bs_sb_w" in ''|-*|*=*) continue ;; esac
         command -v "$__bs_sb_w" >/dev/null 2>&1 \
           || { printf 'not found in PATH: %s\n' "$__bs_sb_w"; return 1; }
         break
       done
+      ;;
+    *)
+      # the interpreter is a script: its own first line must work too
+      # интерпретатор — скрипт: его собственная первая строка тоже должна работать
+      if __bs_sb_n=$(bs_shebang_read "$__bs_sb_i"); then
+        if [ "${__BS_SB_DEPTH:-0}" -ge 3 ]; then
+          printf 'too many nested interpreters: %s\n' "$__bs_sb_i"
+          return 1
+        fi
+        if ! __bs_sb_why=$( __BS_SB_DEPTH=$(( ${__BS_SB_DEPTH:-0} + 1 )); export __BS_SB_DEPTH; bs_shebang_works "$__bs_sb_n" ); then
+          printf '%s is a script and its own shebang is broken: %s\n' "$__bs_sb_i" "$__bs_sb_why"
+          return 1
+        fi
+      fi
       ;;
   esac
   return 0
@@ -132,28 +158,52 @@ bs_shebang_line() {
   esac
 }
 
-# @description Does the shebang line start the program PROG (directly or via env)?
+# @description Is the shebang line EXACTLY "start PROG": "[dir/]PROG" or
+#   "[dir/]env PROG", with no extra arguments? Lines with flags (env -S bs --x,
+#   sh -c bs) are not touched, so a rewrite never drops them.
+# @description Строка shebang РОВНО «запустить PROG»: «[каталог/]PROG» или
+#   «[каталог/]env PROG», без лишних аргументов? Строки с флагами не трогаются.
 # @param $1 shebang line / строка shebang
 # @param $2 program / программа
 bs_shebang_is_for() {
   __bs_sb_r=$(bs_shebang_parse "$1")
-  case "$__bs_sb_r" in
-    "$2"|*"/$2"|"$2 "*|*"/$2 "*|*" $2"|*" $2 "*) return 0 ;;
+  __bs_sb_i=${__bs_sb_r%% *}
+  __bs_sb_a=""
+  case "$__bs_sb_r" in *' '*) __bs_sb_a=${__bs_sb_r#* } ;; esac
+  case "$__bs_sb_a" in
+    '')
+      [ "${__bs_sb_i##*/}" = "$2" ] ;;
+    *' '*) return 1 ;;
+    *)
+      [ "${__bs_sb_i##*/}" = env ] && [ "$__bs_sb_a" = "$2" ] ;;
   esac
-  return 1
 }
 
 # @description Replace the first line of FILE, keeping the rest and the file mode.
+#   Atomic: the new content is built in a temporary file next to FILE (mode copied
+#   with cp -p) and moved over it with mv, so a failure never leaves FILE truncated.
 #   Does nothing (rc 0) if the line is already the same. rc 2 = no shebang to replace.
 # @description Заменить первую строку FILE, сохранив остальное и права файла.
+#   Атомарно: новое содержимое собирается во временном файле рядом (права — cp -p)
+#   и переносится mv, поэтому сбой не оставляет FILE усечённым.
 # @param $1 file / файл
 # @param $2 new shebang line / новая строка shebang
 bs_shebang_rewrite() {
-  __bs_sb_old=$(bs_shebang_read "$1") || return 2
+  __bs_sb_t=$1
+  # a symlink is rewritten through to its target / по символической ссылке правится цель
+  if [ -L "$__bs_sb_t" ]; then
+    __bs_sb_t=$(readlink -f -- "$__bs_sb_t" 2>/dev/null) || return 1
+  fi
+  # names starting with "-" must not look like options / имена с «-» не должны выглядеть опциями
+  case "$__bs_sb_t" in -*) __bs_sb_t=./$__bs_sb_t ;; esac
+  __bs_sb_old=$(bs_shebang_read "$__bs_sb_t") || return 2
   [ "$__bs_sb_old" = "$2" ] && return 0
-  __bs_sb_tmp="$1.shebang.$$"
-  { printf '%s\n' "$2"; tail -n +2 "$1"; } > "$__bs_sb_tmp" || { rm -f "$__bs_sb_tmp"; return 1; }
-  # cat > file keeps the mode, owner and symlink / cat > file сохраняет права, владельца и ссылку
-  cat "$__bs_sb_tmp" > "$1" || { rm -f "$__bs_sb_tmp"; return 1; }
-  rm -f "$__bs_sb_tmp"
+  __bs_sb_tmp=$(mktemp "$__bs_sb_t.shebang.XXXXXX") || return 1
+  if cp -p -- "$__bs_sb_t" "$__bs_sb_tmp" \
+     && { printf '%s\n' "$2"; tail -n +2 -- "$__bs_sb_t"; } > "$__bs_sb_tmp" \
+     && mv -f -- "$__bs_sb_tmp" "$__bs_sb_t"; then
+    return 0
+  fi
+  rm -f -- "$__bs_sb_tmp"
+  return 1
 }

@@ -22,12 +22,17 @@ bs_guard VERSION || return 0
 # Единственный источник BS_VERSION — этот модуль; bs и const.sh только используют
 # Single source of BS_VERSION is this module; bs and const.sh only use it
 if [ -z "${BS_VERSION:-}" ]; then
-  export BS_VERSION="0.7.4"
+  export BS_VERSION="0.8.0"
 fi
 
 # @global BS_NAME — Env: framework full name (category: env)
 # @global BS_NAME — Env: полное имя фреймворка (категория: env)
 export BS_NAME="BS (Bash Open Source Architecture) BOSA Framework"
+
+# @global BS_CODENAME — Env: release code name (category: env)
+# @global BS_CODENAME — Env: кодовое название релиза (категория: env)
+: "${BS_CODENAME:=Lingoa}"
+export BS_CODENAME
 
 # @description Print version information / Вывести информацию о версии
 #   Version is read via bs::version::get (function), not the raw constant.
@@ -44,6 +49,11 @@ bs_version_print() {
 #   version=$(bs::version::get)
 bs_version_get() {
     printf '%s\n' "${BS_VERSION}"
+}
+
+# @description Get the release code name / Получить кодовое название релиза
+bs_version_codename() {
+    printf '%s\n' "${BS_CODENAME}"
 }
 
 # @description Version of another BS directory (a repository, an installed
@@ -133,5 +143,6 @@ bs_version_compare() {
 
 bs_shell_alias bs_version_print bs::version::print
 bs_shell_alias bs_version_get bs::version::get
+bs_shell_alias bs_version_codename bs::version::codename
 bs_shell_alias bs_version_of bs::version::of
 bs_shell_alias bs_version_compare bs::version::compare

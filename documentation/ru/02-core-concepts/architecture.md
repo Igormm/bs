@@ -168,7 +168,7 @@ BS — тонкий слой времени выполнения поверх ba
 - Берёт свой каталог из `BS_ENTRY_DIR` (его задал пролог), подключает `bootstrap/bs.sh` (pre-kernel
   namespace) и выполняет `bs::shell::ensure_version 4` — гейт bash 4.2+
   срабатывает до загрузки чего-либо ещё.
-- Подключает `BS_VERSION` из `core/version.sh` (сейчас `0.7.4`); собственного номера у `const.sh` нет.
+- Подключает `BS_VERSION` из `core/version.sh` (сейчас `0.8.0`); собственного номера у `const.sh` нет.
 - Определяет `BS_ROOT`, если тот ещё не задан: сначала каталог самого скрипта
   (если в нём есть `bootstrap/init.sh`), затем `~/.local/lib/bs` и
   `/usr/local/lib/bs`.

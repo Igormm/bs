@@ -2,7 +2,11 @@
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-17 "Lingoa"
+
 ### Added
+- version: release code name — `BS_CODENAME` (`Lingoa`), `bs_version_codename` / `bs::version::codename`, `bs version --full` prints `Codename:`
+- fix(shebang): `bs_shebang_rewrite` is atomic (temporary file next to the target, `cp -p`, `mv`), follows symlinks, handles names starting with `-`; `bs_shebang_is_for` matches only lines without extra arguments (`env -S bs --flag`, `sh -c bs` are skipped, flags are never dropped); `bs_shebang_works` also checks the shebang of an interpreter that is itself a script (mode `abs`); CRLF is read correctly; `bs shebang check/set` fail on a missing path; word splitting by parameter expansion (zsh)
 - shebang: `bs shebang info|line|check|set` — check and rewrite the `#!` line of scripts for this machine (modes portable, env, abs, auto; Termux has no /usr/bin/env); POSIX layer `bootstrap/shebang.sh`; Termux section in documentation/{en,ru}/install.md; tests unit/testshebangunit.sh
 - shells: BS entry points (`bs`, `install.sh`, `boot.sh`) start with a POSIX prologue and re-run themselves in a capable bash via `bootstrap/trampoline.sh` (`sh install.sh`, `dash ./bs`, `zsh ./bs`, bash as `sh`); `BS_HOST_BASH` overrides the search; without bash 4.2+ a bilingual message with install hints
 - shells: `bootstrap/shell.sh` — POSIX registry of shells (bash zsh dash ash sh ksh mksh oksh osh fish nu): rc file, PATH line, reload command, host search, tier; `bs::shell::*` aliases in bash/zsh

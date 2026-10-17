@@ -62,6 +62,29 @@ test_rewrite_keeps_body_and_mode() {
     eq "$(cat "${T}/n.sh")" 'no shebang' "file without #! is not touched"
 }
 
+test_hardening() {
+    # flags are never dropped: lines with extra arguments are not "for bs"
+    eq "$(run_in bash 'bs_shebang_is_for "#!/usr/bin/env -S bs --flag" bs || echo n')" 'n' "env -S bs --flag is skipped"
+    eq "$(run_in bash 'bs_shebang_is_for "#!/bin/sh -c bs" bs || echo n')" 'n' "sh -c bs is skipped"
+    # CRLF: the CR is not part of the program name
+    printf '#!/usr/bin/env sh\r\necho x\r\n' > "${T}/crlf.sh"
+    eq "$(run_in bash 'bs_shebang_read "'"${T}"'/crlf.sh"')" '#!/usr/bin/env sh' "CRLF: CR is dropped"
+    # a leading "-" in the file name
+    ( cd "${T}" && printf '#!/usr/bin/env bs\nbody\n' > ./-n && run_in bash 'bs_shebang_rewrite -n "#!/x/env bs"' >/dev/null )
+    eq "$(head -n1 "${T}/-n")" '#!/x/env bs' "file named -n is rewritten"
+    eq "$(ls "${T}" | grep -c shebang\\.)" '0' "no temporary file is left"
+    # a symlink is rewritten through to its target
+    printf '#!/usr/bin/env bs\necho t\n' > "${T}/target.sh"; ln -sf target.sh "${T}/link.sh"
+    run_in bash 'bs_shebang_rewrite "'"${T}"'/link.sh" "#!/y/env bs"' >/dev/null
+    eq "$(head -n1 "${T}/target.sh")" '#!/y/env bs' "symlink: the target is rewritten"
+    eq "$([[ -L "${T}/link.sh" ]] && echo link)" 'link' "symlink: the link is still a link"
+    # abs mode: an interpreter that is itself a script with a broken shebang is broken
+    printf '#!/nonexistent/bash\n' > "${T}/inner"; chmod +x "${T}/inner"
+    eq "$(run_in bash 'bs_shebang_works "#!'"${T}"'/inner" >/dev/null || echo broken')" 'broken' "nested broken shebang is reported"
+    # check on a missing path fails
+    testframework::assert_false "'${BS_PROJECT_ROOT}/bs' shebang check '${T}/nope' >/dev/null 2>&1" "check: missing path -> exit 1" || true
+}
+
 test_cli() {
     local bs_bin="${BS_PROJECT_ROOT}/bs"
     printf '#!/usr/bin/env bs\necho hi\n' > "${T}/c.sh"
@@ -85,6 +108,7 @@ main() {
     testframework::section "is_for"; test_is_for
     testframework::section "rewrite"; test_rewrite_keeps_body_and_mode
     testframework::section "bs shebang"; test_cli
+    testframework::section "Hardening / Устойчивость"; test_hardening
     rm -rf "${T:?}"
     testframework::summary
 }

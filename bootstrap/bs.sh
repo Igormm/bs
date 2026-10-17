@@ -432,7 +432,7 @@ bs::cli::bs_running_block() {
 bs::cli::version_cmd() {
   case "${1:-}" in
     "")          bs::version::print; return 0 ;;
-    -f|--full)   bs::version::print ;;
+    -f|--full)   bs::version::print; printf 'Codename: %s\n' "$(bs::version::codename)" ;;
     *)           bs::cli::die "version: unknown argument: $1 (try: bs version --full)" ;;
   esac
 
@@ -1129,6 +1129,7 @@ bs::cli::shebang_usage() {
 bs::cli::shebang_files() {
   local p
   for p in "$@"; do
+    [[ "${p}" == -* ]] && p="./${p}"
     if [[ -d "${p}" ]]; then
       find "${p}" -type f -not -path '*/.git/*' -print
     elif [[ -e "${p}" ]]; then
@@ -1165,6 +1166,10 @@ bs::cli::shebang_cmd() {
   done
 
   local f line why rc=0
+  local p
+  for p in "${paths[@]+"${paths[@]}"}"; do
+    [[ -e "${p}" ]] || bs::cli::die "shebang: no such file or directory: ${p}"
+  done
   case "${sub}" in
     info)
       local e m
