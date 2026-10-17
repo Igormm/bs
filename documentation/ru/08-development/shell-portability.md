@@ -142,5 +142,6 @@ dash ./bs --strict-shell run script.sh   # модуль lib/io/streams (@shell b
 
 ## Не сделано
 
-Автодополнение для zsh/fish/nushell (есть только bash); аннотации `@shell`
-вне bootstrap/install (по умолчанию `bash4`).
+Автодополнение для fish и nushell `args::completion` генерирует, но в
+настоящих fish/nu оно ещё не запускалось; аннотации `@shell` покрывают `core/`
+и почти весь `lib/` (файл без аннотации считается `bash4`).
