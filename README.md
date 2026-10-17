@@ -1,14 +1,18 @@
 # BS Framework
 
-**BS** — модульный фреймворк и стандартная библиотека для Bash 4.2+:
+**BS** — модульный фреймворк и стандартная библиотека shell-скриптов:
 загрузчик модулей, логирование, обработка ошибок, декларативные параметры
 скриптов, абстракция потоков ввода/вывода и набор системных модулей —
-всё в едином code style и без единой внешней зависимости.
+всё в едином code style и без единой внешней зависимости. Запускается из
+любой оболочки (bash, zsh, dash, ash, sh, ksh, fish, nushell): код исполняет
+найденный на машине bash 4.2+.
 
-**BS** is a modular framework and standard library for Bash 4.2+:
+**BS** is a modular framework and standard library for shell scripts:
 a module loader, logging, error handling, declarative script parameters,
 an I/O streams abstraction and a set of system modules — all in a
-consistent code style and with zero external dependencies.
+consistent code style and with zero external dependencies. It starts from
+any shell (bash, zsh, dash, ash, sh, ksh, fish, nushell): the code is run by
+a bash 4.2+ found on the machine.
 
 ## Возможности / Features
 
@@ -61,8 +65,11 @@ consistent code style and with zero external dependencies.
 
 ## Требования / Requirements
 
-- Bash 4.4+ (CI-минимум; Bash 4.0–4.3 не проверяется)
-- Linux (основная платформа; macOS — частично)
+- Linux (основная платформа; macOS — частично) / Linux (primary; macOS partially)
+- Любая оболочка пользователя; на машине должен быть bash 4.2+ (CI: 4.4–5.x) /
+  Any user shell; a bash 4.2+ must exist on the machine (CI: 4.4–5.x).
+  Tier-ы и строгий режим / Tiers and strict mode:
+  [01-getting-started](documentation/ru/01-getting-started/README.md#работа-из-любой-оболочки)
 
 ## Быстрый старт / Quick start
 
@@ -280,7 +287,7 @@ sudo ./install.sh
 # Собрать самодостаточный исполняемый файл (фреймворк внутри, ~230 КБ)
 ./bs build examples/sysdiag.sh                 # → examples/sysdiag.standalone.sh
 
-# Запуск на любой машине с bash 4+ (дистрибутив не важен)
+# Запуск на любой машине, где есть bash 4.2+ (дистрибутив и оболочка не важны)
 ./examples/sysdiag.standalone.sh quick
 ```
 

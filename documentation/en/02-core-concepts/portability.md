@@ -84,13 +84,15 @@ Compatibility tiers (for the version and `bs doctor`):
 - `gnu-linux` — GNU userland (`grep -P`, `sed -z`, `sha256sum`);
 - `posix` — POSIX-only tools (fallback mode);
 - `bsd` — macOS/FreeBSD compatibility layers.
-**The shell is part of the capability vector** (facts `shell`, `shell_ok`,
-`bash_version`): bash 4.2+ — full kernel; zsh — init-level only
-(`bootstrap/init.sh`); dash/sh/fish — unsupported. The tiers below assume
-`shell_ok=1`, checked via `platform::get shell_ok`.
-**Оболочка — часть вектора возможностей** (факты `shell`, `shell_ok`,
-`bash_version`): bash 4.2+ — полное ядро; zsh — только инициализация
-(`bootstrap/init.sh`); dash/sh/fish — не поддерживаются.
+
+**The shell is part of the capability vector** (facts `shell`,
+`shell_version`, `shell_ok`, `user_shell`, `shell_tier`). The code always
+runs in a host bash 4.2+ (`shell_ok=1`); the user's shell may be any of
+bash, zsh, dash, ash, sh, ksh, fish, nushell. `shell_tier` says how BS works
+for it: `native` (bash 4.2+, `source` works too), `hosted` (another shell,
+BS runs as the `bs` command) or `unsupported` (no bash 4.2+ on the machine).
+The per-file `@shell posix | bash4` tier and strict mode are described in
+[01-getting-started](../01-getting-started/README.md#running-from-any-shell).
 
 A script checks the required tier at startup and fails with a clear
 message if the capability is missing (instead of a cryptic crash from
