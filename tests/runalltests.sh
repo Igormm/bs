@@ -82,7 +82,7 @@ skip_test() {
 # @description Run a test and track results
 # @param $1 Test name / Название теста
 # @param $2 Test script / Скрипт теста
-# @return 0 if test passed, 1 if failed
+# @return 0 always: the outcome is counted (passed_tests / failed_tests), the final exit code follows it
 run_test() {
   local test_name="$1"
   local test_script="$2"
@@ -100,7 +100,9 @@ run_test() {
     echo -e "${RED}✗ $test_name: FAILED${NC}"
     ((++failed_tests))
     echo
-    return 1
+    # Падение теста не обрывает прогон (set -e): считаем и идём дальше, итог — по failed_tests
+    # A failing test does not abort the run (set -e): count it and go on, the verdict comes from failed_tests
+    return 0
   fi
 }
 

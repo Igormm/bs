@@ -58,6 +58,14 @@ main() {
 
     testframework::section "Basics / Основы"
     test_calc_help_flag
+
+    # Нет dc (его нет на минимальных образах CI) — вычислительные проверки пропускаются
+    # No dc (minimal CI images lack it) — the arithmetic checks are skipped
+    if ! command -v dc >/dev/null 2>&1; then
+        echo "  SKIP: dc is not installed (apt install bc) / dc не установлен — проверки вычислений пропущены"
+        testframework::summary
+        return 0
+    fi
     test_calc_oneshot
     test_calc_explicit_print
     test_calc_comment_no_autop
