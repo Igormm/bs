@@ -5,7 +5,11 @@
 ## [0.8.0] - 2026-10-17 "Lingoa"
 
 ### Added
-- version: release code name — `BS_CODENAME` (`Lingoa`), `bs_version_codename` / `bs::version::codename`, `bs version --full` prints `Codename:`
+- cli: `bs call [--load MODULE] FUNCTION [ARGS]` — the bridge to kernel functions from any shell (fish, nushell, dash, ash, ksh): runs the function in the bash `bs` starts, passes stdout/stderr and the exit code; only an existing function with a valid name and a `core/`/`lib/` module path are accepted (unit/testcallbridgeunit.sh, 29 checks in bash zsh dash busybox-ash ksh mksh fish)
+- refactor(core): `core/quiet.sh` is `@shell posix` — `utils_has`, `utils_quiet`, `utils_quiet_err`, `utils_ignore`, `utils_attempt` moved out of `core/utils.sh` (`utils::*` stay as bash/zsh aliases); loaded before `core/utils.sh`, registered in `bs doctor`; tested in bash, zsh, dash, busybox ash, ksh93 and mksh (`unit/testquietportableunit.sh`, 51 checks)
+- docs: shell priority table in documentation/{en,ru}/08-development/shell-portability.md (where each shell is found, version, what was run for real, what to do); probe_shells.sh runs busybox as `busybox ash`
+- install/update: the installer and `bs update` adapt the shebang of the installed `bs` and of the wrapper to the machine (`bs_shebang_fix`; Termux: `$PREFIX/bin/env`, `sh` from PATH) — a working line is never touched; `bs update` smoke test runs the installed `bs` as a program, through its own shebang (a broken shebang now fails and rolls back); `update_source_missing` also requires `bootstrap/shell.sh`, `trampoline.sh`, `shebang.sh`, `bs.sh` and `core/prereq.sh`; empty arrays in `update_*` no longer fail under bash 4.2/4.3 (`${a[@]+"${a[@]}"}`)
+- version: release code name — `BS_CODENAME` (`Lingoa`), `bs_version_codename` / `bs::version::codename`, `bs version --full` prints a `codename:` row
 - fix(shebang): `bs_shebang_rewrite` is atomic (temporary file next to the target, `cp -p`, `mv`), follows symlinks, handles names starting with `-`; `bs_shebang_is_for` matches only lines without extra arguments (`env -S bs --flag`, `sh -c bs` are skipped, flags are never dropped); `bs_shebang_works` also checks the shebang of an interpreter that is itself a script (mode `abs`); CRLF is read correctly; `bs shebang check/set` fail on a missing path; word splitting by parameter expansion (zsh)
 - shebang: `bs shebang info|line|check|set` — check and rewrite the `#!` line of scripts for this machine (modes portable, env, abs, auto; Termux has no /usr/bin/env); POSIX layer `bootstrap/shebang.sh`; Termux section in documentation/{en,ru}/install.md; tests unit/testshebangunit.sh
 - shells: BS entry points (`bs`, `install.sh`, `boot.sh`) start with a POSIX prologue and re-run themselves in a capable bash via `bootstrap/trampoline.sh` (`sh install.sh`, `dash ./bs`, `zsh ./bs`, bash as `sh`); `BS_HOST_BASH` overrides the search; without bash 4.2+ a bilingual message with install hints
@@ -33,7 +37,7 @@
 - polyglot: `polyglot::run` — run C, C++, Go, Rust, Python and JavaScript code inside a bs script: arguments after `--`, `--env`, `--input` go in; stdout comes back into a scalar (`--out`), an array (`--lines`) or an associative array (`--map`), the exit code into `--rc`; `--timeout`, `--flags`, `--no-cache`; compiled programs are cached by the hash of language, compiler and source (`POLYGLOT_CACHE_DIR`); `polyglot::languages` lists the tools found; tests (unit/testpolyglotunit.sh, 33 checks), documentation en/ru, example examples/polyglot_example.sh
 
 ### Not verified
-- ash/busybox, ksh, mksh, oksh, osh, fish, nu were not run on real interpreters; only generated texts are tested
+- nushell, oksh and osh were not run on real interpreters (nushell is not installed on the test machine); busybox ash 1.37, ksh93u+m, mksh R59 and fish 4.2 were run: `bs version`, a script with the `bs` shebang, `install.sh --help` (fish: the `bs` command and the shebang script only)
 
 ## [0.7.4] - 2026-10-12
 

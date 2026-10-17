@@ -207,3 +207,36 @@ bs_shebang_rewrite() {
   rm -f -- "$__bs_sb_tmp"
   return 1
 }
+
+# @description Repair the first line of FILE for THIS machine, only if it does not
+#   work here. "#!/usr/bin/env PROG" becomes "#!<env found here> PROG" (Termux:
+#   $PREFIX/bin/env); "#!/bin/sh" becomes the sh found in PATH. A line that works,
+#   a file without #!, and lines with extra flags are left alone. rc 0 = nothing
+#   to do or repaired, 1 = could not repair.
+# @description Починить первую строку FILE под ЭТУ машину, только если она здесь не
+#   работает. «#!/usr/bin/env PROG» превращается в «#!<найденный env> PROG» (Termux:
+#   $PREFIX/bin/env); «#!/bin/sh» — в sh из PATH. Рабочая строка, файл без #! и
+#   строки с лишними флагами не трогаются. rc 0 = делать нечего или починено.
+# @param $1 file / файл
+bs_shebang_fix() {
+  __bs_sb_fl=$(bs_shebang_read "$1") || return 0
+  bs_shebang_works "$__bs_sb_fl" >/dev/null && return 0
+  __bs_sb_fp=$(bs_shebang_parse "$__bs_sb_fl")
+  __bs_sb_fi=${__bs_sb_fp%% *}
+  __bs_sb_fa=""
+  case "$__bs_sb_fp" in *' '*) __bs_sb_fa=${__bs_sb_fp#* } ;; esac
+  case "$__bs_sb_fa" in *' '*) return 0 ;; esac
+  __bs_sb_fb=${__bs_sb_fi##*/}
+  case "$__bs_sb_fb" in
+    env)
+      [ -n "$__bs_sb_fa" ] || return 1
+      __bs_sb_fn=$(bs_shebang_line env "$__bs_sb_fa") || return 1
+      ;;
+    *)
+      __bs_sb_fx=$(command -v "$__bs_sb_fb" 2>/dev/null) || return 1
+      case "$__bs_sb_fx" in /*) ;; *) return 1 ;; esac
+      if [ -n "$__bs_sb_fa" ]; then __bs_sb_fn="#!$__bs_sb_fx $__bs_sb_fa"; else __bs_sb_fn="#!$__bs_sb_fx"; fi
+      ;;
+  esac
+  bs_shebang_rewrite "$1" "$__bs_sb_fn"
+}

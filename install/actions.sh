@@ -5,6 +5,10 @@
 
 # Installation and uninstallation functions
 
+# bs_shebang_fix: подогнать shebang под машину (Termux: нет /usr/bin/env и /bin/sh)
+# bs_shebang_fix: adapt the shebang to the machine (Termux: no /usr/bin/env, no /bin/sh)
+source -- "${BS_BOOTSTRAP_DIR}/shebang.sh"
+
 # Записать манифест установки: как, откуда и куда поставлена эта копия BS.
 # Его читают `bs env`, `bs update` и `bs uninstall`.
 # Write the install manifest: how, from where and where this BS copy was
@@ -104,7 +108,8 @@ install_step() {
 # (POSIX sh: it only hands over to bs)
 install_write_wrapper() {
   local -r lib="$1" out="$2"
-  printf '#!/bin/sh\nexport BS_ROOT="%s"\nexec "${BS_ROOT}/bs" "$@"\n' "${lib}" > "${out}" && chmod 0755 "${out}"
+  printf '#!/bin/sh\nexport BS_ROOT="%s"\nexec "${BS_ROOT}/bs" "$@"\n' "${lib}" > "${out}" && chmod 0755 "${out}" \
+    && bs_shebang_fix "${out}"
 }
 
 # Транзакционная установка: копия во временный каталог рядом с TARGET_LIB,
@@ -135,6 +140,11 @@ install_transaction() {
     install_step cp -a -- "${SOURCE_ROOT}/${item}" "${INSTALL_TX_STAGE}/" \
       || install_tx_fail "не удалось скопировать ${item}" "cannot copy ${item}" "${had_old}"
   done
+
+  # shebang копии bs — под эту машину (Termux: $PREFIX/bin/env вместо /usr/bin/env)
+  # the shebang of the bs copy — for this machine (Termux: $PREFIX/bin/env, not /usr/bin/env)
+  install_step bs_shebang_fix "${INSTALL_TX_STAGE}/bs" \
+    || install_tx_fail "не удалось подогнать shebang у bs" "cannot adapt the shebang of bs" "${had_old}"
 
   # Манифест — тоже в staging: после rename копия сразу полная.
   # The manifest goes to staging too: after the rename the copy is complete.

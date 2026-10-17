@@ -26,6 +26,14 @@ points, installer, PATH setup, checks, uninstall, `bs where`.
   `exec`s the same file with the same arguments.
 - **source** — `source bootstrap/init.sh`. Only bash 4.2+. Elsewhere it answers
   with a bilingual message instead of `Bad substitution`.
+- **call** — `bs call [--load MODULE] FUNCTION [ARGS]`: the bridge for shells
+  with another syntax (fish, nushell, dash, ash, ksh). A kernel or module
+  function runs in the bash that `bs` starts; its stdout and stderr are yours,
+  and its exit code becomes the exit code of `bs call`. Only an existing
+  function with a valid name runs (`rm`, `a;b`, `$(id)` are refused), a module
+  path is only `core/...` or `lib/...` without `..`. Example: `bs call
+  utils::human_size 1536000`; from fish: `set size (bs call utils::human_size
+  1536000)`.
 - **trampoline** — the mechanism of the first mode. `BS_HOST_BASH=/path`
   overrides the search (an invalid value is an error, never a silent fallback).
   With no bash 4.2+ it prints install hints (apk/apt/dnf/brew) and exits 1.
@@ -100,18 +108,42 @@ Only in the abstraction layer: `bootstrap/bs.sh`, `bootstrap/shell.sh`, `bootstr
 
 Beyond detection, the layer also gives: `bs::shell::host` (the running bash — start child shells with `"$(bs::shell::host)" -c`, never a bare `bash`), registry questions instead of family comparisons (`bs_shell_can_source`, `bs_shell_rc_create_ok`, `bs_shell_default_login_path`), and `args::completion PROG [bash|zsh|fish|nu]` (zsh is tested in a real zsh; fish and nushell only as text).
 
-## Priorities
+## Shell priorities
 
-1. bash, zsh, ash/dash, nushell — full path: install, uninstall, `bs where`,
-   `bs init-shell`.
-2. fish, ksh, mksh, oksh, osh — in the registry, same code paths.
+Priority comes from two things: **where the shell is found** (an estimate from
+distributions and platforms, not a measurement) and **what was really verified
+on this machine** (Fedora 43; `./bs version`, a script with `#!/usr/bin/env bs`,
+`install.sh --help`, `bs init-shell`, `probe_shells.sh`). Fill the table only
+with results of real runs.
+
+| # | Shell | Where it is found | Version here | Runs `bs` and a script | Native kernel (`bash4`) | What to do |
+|---|---|---|---|---|---|---|
+| 1 | bash | nearly every Linux, Termux, WSL; macOS has the old 3.2 | 5.3.0 | yes | yes | the kernel host; the reference |
+| 1 | zsh | macOS default, many Linux developers | 5.9 | yes | parses, behaves differently (arrays from 1, no `FUNCNAME`, `BASH_REMATCH`) | compatibility layer, completions |
+| 2 | dash | `/bin/sh` on Debian/Ubuntu, install scripts | 0.5.12 | yes (trampoline) | no | POSIX kernel (`core/`) |
+| 2 | busybox ash | Alpine, containers, routers, Termux | 1.37.0 | yes (trampoline) | no; friendlier than dash (`[[ ]]`, `pipefail`, `::`) | POSIX kernel, check in Termux |
+| 3 | fish | popular interactive shell | 4.2.0 | yes, only as the `bs` command and a script with the shebang | not applicable (other syntax) | bridge (`bs call`), completion text |
+| 3 | ksh93 | Unix, BSD, enterprise systems | 93u+m 1.0.10 | yes | parses; no `local`, `local -r`, `::` | POSIX kernel; no bash4 kernel promised |
+| 3 | mksh | **the Android system shell**, OpenBSD (a fork) | R59 | yes | does not parse fully | POSIX kernel |
+| 4 | nushell | growing, developers | not installed | not verified | not applicable | bridge, check after installing |
+| 4 | oksh, osh | rare | not installed | not verified | — | do not develop |
+
+"Yes" in the run column means: `./bs version` through this shell and a script
+with `#!/usr/bin/env bs` worked; `install.sh --help` printed the help. "No" for
+the bash4 kernel is not an error: the kernel runs in the bash the trampoline
+found, and the other shells get POSIX modules and the bridge.
+
+Development order: **1 → 2 → 3 → 4**. At levels 2–3 the main contribution is
+growing the POSIX kernel (see "POSIX modules of the kernel") and the bridge for
+shells with another syntax.
 
 ## What is verified
 
-Run for real: bash 5.3, zsh 5.9, dash 0.5.12 (syntax, entry points,
-trampoline, install/uninstall in an isolated `HOME`). **Not run on a real
-interpreter:** ash/busybox, ksh, mksh, oksh, osh, fish, nu — only the generated
-text (rc file, line, reload command) is tested. Treat those as unverified.
+Run for real on this machine: bash 5.3.0, zsh 5.9, dash 0.5.12, busybox ash
+1.37.0, ksh93u+m 1.0.10, mksh R59, fish 4.2.0 — `bs version`, a script with the
+`bs` shebang, `install.sh --help`, the feature probe. **Not run:** nushell (not
+installed), oksh, osh. For fish only the `bs` command and a script with the
+shebang were run; the kernel does not read its syntax.
 
 ## Tests and tools
 
@@ -138,6 +170,11 @@ additionally reads it from the call stack.
 `core/const.sh` shows the per-shell branches: ESC bytes come from `printf` (no `$'\033'`),
 `SUPPORTED_DISTROS` is an array in bash and zsh and a space-separated string in
 shells without arrays; `const::*` names are aliases of `const_*`.
+
+`core/quiet.sh` (`@shell posix`) — the "quiet" idioms: `utils_has`, `utils_quiet`,
+`utils_quiet_err`, `utils_ignore`, `utils_attempt` (the old `utils::*` in bash
+and zsh). It loads before `core/utils.sh`; verified in bash, zsh, dash, busybox
+ash, ksh93 and mksh (`unit/testquietportableunit.sh`).
 
 ## Not done yet
 
