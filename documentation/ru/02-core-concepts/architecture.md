@@ -3,55 +3,138 @@
 # Архитектура
 
 BS — тонкий слой времени выполнения поверх bash 4.2+. Он состоит из двух
-входных скриптов (`boot.sh`, `bs`), инициализатора (`bootstrap/init.sh`),
+входных скриптов (`boot.sh`, `bs`) с общим POSIX-прологом, реестра оболочек
+(`bootstrap/shell.sh`), инициализатора (`bootstrap/init.sh`),
 загрузчика модулей (`bootstrap/loader.sh`), всегда загружаемых модулей `core/`
 и подключаемых по требованию модулей `lib/`. Документ описывает, как части
 связаны между собой и что происходит между shebang скрипта и его завершением.
 
 ## Общая схема загрузки
 
+Схема читается сверху вниз. Три слоя: **POSIX-пролог** (работает в любой
+оболочке), **стадии 1–2** (`boot.sh`, `bs` — bash 4.2+) и **ядро**
+(`bootstrap/init.sh` → `bootstrap/loader.sh` → `core/*`).
+
 ```
-вход: ./boot.sh <script> [args]           вход: bs <cmd> | #!/usr/bin/env bs
-            │                                        │
-            ▼                                        │
-  stage-1: boot.sh                                   │
-    · требуется bash >= 4      (exit 1)              │
-    · поиск BS_ROOT            (exit 2, если не найден)
-    · exec "${BS_ROOT}/bs" "$@" ────────────────────►│
-                                                     ▼
-                                          stage-2: bs
-                                            · set -euo pipefail, IFS
-                                            · BS_VERSION (readonly), BS_ROOT,
-                                              BS_HOME, BS_SILENT=1
-                                            · source bootstrap/init.sh
-                                              │   · идемпотентность: BS_INITIALIZED
-                                              │   · source bootstrap/loader.sh
-                                              │   · загрузка core: const, logger,
-                                              │     errorhandler, version, utils
-                                            · errorhandler::setup_trap
-                                              (EXIT-trap → стек очистки)
-                                                     │
-                              ┌──────────────────────┴──────────────────────┐
-                              ▼                                             ▼
-                     CLI-диспетчер                                  shebang-режим
-                     help/version/env/list/        первый аргумент — файл → BS_SHEBANG=1
-                     doctor/run/init-shell                      │
-                                                                ▼
-                                              run_cmd: новый процесс bash
-                                                · unset BS_INITIALIZED
-                                                · source bootstrap/init.sh
-                                                · source <script> [args]
-                                                                │
-                                                                ▼
-                                                     ваш скрипт выполняется
-                                                         load "core/args"
-                                                         load "lib/io/streams"
-                                                         ...
-                                                                │
-                                                                ▼
-                                            exit → EXIT-trap → cleanup::__run_all
-                                            (BS_CLEANUP_STACK, порядок LIFO)
+ кто-то запускает:  ./boot.sh <script>   bs <cmd>   #!/usr/bin/env bs   sh install.sh
+                    (из bash, zsh, dash, sh, ...: оболочка пользователя неважна)
+                                          │
+                                          ▼
+ ┌─ POSIX-ПРОЛОГ: первые строки bs, boot.sh, install.sh ───────────────────────┐
+ │  · запомнить $0 (zsh меняет $0 внутри подключаемого файла)                   │
+ │  · readlink -f → BS_ENTRY_DIR (каталог точки входа, ссылки раскрыты)         │
+ │  · . bootstrap/shell.sh          реестр оболочек, чистый POSIX               │
+ │  · bs_shell_host_ok ?  (это bash 4.2+ в обычном режиме)                      │
+ │        да ───────────────────────────────► дальше, ничего не стоит          │
+ │        нет ─► . bootstrap/trampoline.sh                                      │
+ │                 · защита от цикла: __BS_TRAMPOLINE                           │
+ │                 · BS_HOST_BASH или bs_shell_host_find ищет bash 4.2+         │
+ │                 · найден  → exec bash <этот же файл> <те же аргументы>       │
+ │                             (BS_ORIGIN_SHELL помнит исходную оболочку)       │
+ │                 · не найден → двуязычное сообщение «что установить», exit 1  │
+ └───────────────────────────────────────────────────────────────────────────────┘
+                                          │ (теперь мы в bash 4.2+)
+              ┌───────────────────────────┴───────────────────────────┐
+              ▼                                                       ▼
+   stage-1: boot.sh                                          stage-2: bs
+    · source bootstrap/bs.sh (pre-kernel)                      (boot.sh делает exec сюда)
+    · bs::strict, bs::shell::ensure_version 4                        │
+    · BS_ROOT: env → рядом с boot.sh →                               ▼
+      ~/.local/lib/bs → /usr/local/lib/bs        · BS_CALLER_PATH = PATH вызвавшего
+      (не найден → exit 2)                       · source bootstrap/bs.sh:
+    · exec "$BS_ROOT/bs" "$@" ─────────────────►     bs::cli::*, bs::shell::*, bs::is_main
+                                                 · bs::strict, ensure_version 4
+                                                 · BS_ROOT (свой каталог → ~/.local/lib/bs
+                                                   → $BS_SYSTEM_PREFIX/lib/bs), BS_HOME,
+                                                   BS_SILENT=1
+                                                 · unset BS_INITIALIZED
+                                                 · source bootstrap/init.sh ──┐
+                                                 · errorhandler::setup_trap   │ (ниже)
+                                                 · --strict-shell → BS_SHELL_STRICT=1
+                                                          │
+                       ┌──────────────────────────────────┴───────────────┐
+                       ▼                                                  ▼
+              CLI-диспетчер                                      shebang-режим
+              help version env list doctor run                   первый аргумент — файл,
+              build init-shell shebang update                    не команда → BS_SHEBANG=1
+              uninstall where ... → bs::cli::*_cmd                        │
+                                                                          ▼
+                                                    bs::cli::run_cmd: exec новый bash
+                                                     · BS_RUN_SCRIPT=<script>
+                                                     · unset BS_INITIALIZED
+                                                     · source bootstrap/init.sh
+                                                     · bs::strict
+                                                     · source <script> [args]
+                                                                          │
+                                                                          ▼
+                                                              ваш скрипт выполняется
+                                                              load "core/args" ...
+                                                                          │
+                                                                          ▼
+                                       exit → EXIT-trap → cleanup::__run_all (LIFO)
 ```
+
+### Ядро: что делает `bootstrap/init.sh`
+
+```
+ source bootstrap/init.sh
+   │
+   ├─ POSIX-гейт: не bash 4.2+ → двуязычное объяснение, return 1
+   ├─ source bootstrap/bs.sh  (pre-kernel); BS_BOOTSTRAP_DIR
+   ├─ уже BS_INITIALIZED и есть bs::guard? → return 0   (идемпотентность)
+   ├─ BS_ROOT (задан, иначе родитель bootstrap/ с файлом bs)
+   ├─ bs::shell::ensure_version 4
+   ├─ bs::append_local_bin_to_path   (~/.local/bin в PATH этого процесса)
+   ├─ BS_HOME (по умолчанию BS_ROOT)
+   ├─ source bootstrap/loader.sh      → появляются load, bs::load
+   ├─ load core/prereq      bs::guard, bs::source_relative (первым!)
+   ├─ load core/lang        str::, arr::, map::, bs::func_name
+   ├─ load core/const       коды ошибок, цвета, флаги
+   ├─ load core/logger      log::*
+   ├─ load core/errorhandler  errorhandler::*, cleanup::add
+   ├─ load core/version     BS_VERSION, bs::version::*
+   ├─ load core/utils       utils::has, utils::quiet, ...
+   ├─ load core/config      config::*
+   ├─ load core/deps        разбор # @depends
+   ├─ config::load          конфигурация из файлов и окружения
+   └─ BS_INITIALIZED=1
+```
+
+### Загрузчик: что делает `load "lib/group/module"`
+
+```
+ load "lib/io/streams"
+   │
+   ├─ BS_ROOT задан и это каталог?            нет → ошибка, return 1
+   ├─ уже в BS_LOADED_MODULES?                да  → return 0
+   ├─ --strict-shell: @shell-tier модуля подходит BS_ORIGIN_SHELL?   нет → отказ
+   ├─ модуль уже в BS_LOAD_STACK?             да  → circular dependency, return 1
+   ├─ push в BS_LOAD_STACK
+   ├─ для каждой зависимости из «# @depends» → load (рекурсивно); сбой → return 1
+   ├─ BS_CURRENT_FILE=<файл>; source ${BS_ROOT}/lib/io/streams.sh
+   ├─ pop из BS_LOAD_STACK (и при ошибке тоже)
+   └─ BS_LOADED_MODULES[путь]=1
+```
+
+## Стадия 0: POSIX-пролог и `trampoline`
+
+Точки входа (`bs`, `boot.sh`, `install.sh`) начинаются с одинакового короткого
+пролога, который разбирает любая оболочка (dash, ash, zsh, ksh, bash). Без него
+`sh install.sh`, `dash ./bs` или bash 3.2 упали бы с «Bad substitution» ещё до
+первой полезной строки.
+
+| Что | Где | Зачем |
+|---|---|---|
+| `BS_ENTRY_DIR` | пролог | каталог точки входа со снятыми символическими ссылками; от него считаются `BS_ROOT`, `bootstrap/` |
+| `bootstrap/shell.sh` | реестр оболочек | POSIX-ответы: какая это оболочка, годится ли в хозяева (`bs_shell_host_ok`), где искать bash 4.2+ (`bs_shell_host_find`), tier |
+| `bootstrap/trampoline.sh` | перезапуск | `exec` в найденный bash с теми же файлом и аргументами; иначе сообщение, что установить |
+| `BS_HOST_BASH` | окружение | принудительно указать bash для перезапуска |
+| `BS_ORIGIN_SHELL` | окружение | оболочка, из которой запустили; нужна `--strict-shell` |
+| `__BS_TRAMPOLINE` | окружение | защита от зацикливания перезапуска |
+
+В bash 4.2+ в обычном режиме пролог — одна проверка и ничего не перезапускает.
+Подробнее о tier'ах `@shell posix|bash4` и оболочках — в
+[shell-portability](../08-development/shell-portability.md).
 
 ## Стадия 1: `boot.sh`
 
@@ -78,10 +161,11 @@ BS — тонкий слой времени выполнения поверх ba
 
 ## Стадия 2: `bs` — CLI и shebang-интерпретатор
 
-Скрипт [bs](../../../bs) — единая точка входа. Он работает под
-`set -euo pipefail` с `IFS=$'\n\t'` и выполняет следующее:
+Скрипт [bs](../../../bs) — единая точка входа. Он начинается с POSIX-пролога
+(см. схему), затем включает строгий режим через `bs::strict` и выполняет
+следующее:
 
-- Определяет собственный каталог, подключает `bootstrap/bs.sh` (pre-kernel
+- Берёт свой каталог из `BS_ENTRY_DIR` (его задал пролог), подключает `bootstrap/bs.sh` (pre-kernel
   namespace) и выполняет `bs::shell::ensure_version 4` — гейт bash 4.2+
   срабатывает до загрузки чего-либо ещё.
 - Подключает `BS_VERSION` из `core/version.sh` (сейчас `0.7.4`); собственного номера у `const.sh` нет.
@@ -103,8 +187,9 @@ BS — тонкий слой времени выполнения поверх ba
   совпадает ни с одной из CLI-команд, выставляется `BS_SHEBANG=1`, и файл
   выполняется через `run_cmd`. Именно так работает `#!/usr/bin/env bs`.
 - **CLI-режим.** Иначе первый аргумент диспетчеризуется как команда:
-  `help`, `version`, `env`, `list`, `doctor`, `run <script> [args]`,
-  `init-shell`, `update`, `uninstall`.
+  `help`, `version`, `env`, `list`, `doctor`, `run <script> [args]`, `build`,
+  `init-shell`, `shebang`, `update`, `uninstall`, `where` и др. (полный список —
+  `bs help`); сами команды живут в `bootstrap/bs.sh` как `bs::cli::*`.
 
 `run_cmd` (используется и командой `bs run`) выполняет целевой скрипт в
 **новом процессе bash**: сбрасывает унаследованный `BS_INITIALIZED`, заново
