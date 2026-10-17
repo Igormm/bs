@@ -108,6 +108,14 @@ Key functions: `ts::toolchain::detect_runtime`, `ts::toolchain::lockfile_pm`, `t
 
 Details: [ts-toolchain.md](ts-toolchain.md), [ts-stack.md](ts-stack.md)
 
+## polyglot — `lib/polyglot/`
+
+- [run.sh](../../../lib/polyglot/run.sh) — run C, C++, Go, Rust, Python and JavaScript inside a script: arguments in, result back into variables (`--out`, `--lines`, `--map`, `--rc`), compiled programs cached by hash.
+
+Key functions: `polyglot::run`, `polyglot::languages`.
+
+Details: [polyglot.md](polyglot.md)
+
 ## frameworks — `lib/frameworks/`
 
 - [frameworksintegration.sh](../../../lib/frameworks/frameworksintegration.sh) — compatibility shims that expose ideas from other bash frameworks (bash-it, bashinator, bashly, ShellSpec, MBFL) through a uniform `frameworks::*` API.

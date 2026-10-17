@@ -623,7 +623,13 @@ dataprocessor::json::to_yaml() {
     
     # Use yq if available, otherwise use python3 with pyyaml
     if utils::has yq; then
-        echo "${json_data}" | yq -y
+        # Два несовместимых yq: Go (mikefarah) печатает YAML через -P, Python (kislyuk) — через -y
+        # Two incompatible yq: Go (mikefarah) prints YAML with -P, Python (kislyuk) with -y
+        if yq --version 2>&1 | grep -qi mikefarah; then
+            echo "${json_data}" | yq -P '.'
+        else
+            echo "${json_data}" | yq -y
+        fi
     elif utils::quiet_err python3 -c "import yaml"; then
         echo "${json_data}" | python3 -c "
 import yaml, json, sys
