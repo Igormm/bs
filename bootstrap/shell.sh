@@ -419,6 +419,7 @@ bs_shell_version_minor() {
 bs_shell_host_ok() {
   [ "$(bs_shell_family)" = bash ] || return 1
   # shellcheck disable=SC3028  # SHELLOPTS есть в bash / exists in bash
+  # shellcheck disable=SC3028  # SHELLOPTS есть только в bash; ветка выполняется только там / SHELLOPTS exists only in bash; the branch runs only there
   case ":${SHELLOPTS:-}:" in *:posix:*) return 1 ;; esac
   __bs_hmaj=$(bs_shell_version_major)
   __bs_hmin=$(bs_shell_version_minor)
@@ -602,9 +603,25 @@ bs_shell_readonly() {
 # @param $1 real function name, e.g. bs_guard / настоящее имя функции
 # @param $2 namespaced name, e.g. bs::guard / имя с пространством имён
 bs_shell_alias() {
-  if [ -n "${BASH_VERSION:-}" ] || [ -n "${ZSH_VERSION:-}" ]; then
+  if bs_shell__ns_ok; then
     eval "$2() { $1 \"\$@\"; }"
   fi
+}
+
+# @description True when this shell accepts "::" in function names: zsh, and bash
+#   outside POSIX mode (bash started as sh rejects them: "not a valid identifier";
+#   the trampoline re-runs such a bash in normal mode anyway).
+# @description Истина, если оболочка принимает "::" в именах функций: zsh и bash
+#   вне режима POSIX (bash, запущенный как sh, их отвергает: «not a valid
+#   identifier»; трамплин всё равно перезапускает такой bash в обычном режиме).
+bs_shell__ns_ok() {
+  [ -n "${ZSH_VERSION:-}" ] && return 0
+  [ -n "${BASH_VERSION:-}" ] || return 1
+  # shellcheck disable=SC3028  # SHELLOPTS есть только в bash; ветка выполняется только там / SHELLOPTS exists only in bash; the branch runs only there
+  case ":${SHELLOPTS:-}:" in
+    *:posix:*) return 1 ;;
+  esac
+  return 0
 }
 
 # ==========================================
@@ -613,7 +630,7 @@ bs_shell_alias() {
 
 # eval: dash не должен разбирать "::" в именах даже в непройденной ветке
 # eval: dash must not parse "::" in names even in a branch that is not taken
-if [ -n "${BASH_VERSION:-}" ] || [ -n "${ZSH_VERSION:-}" ]; then
+if bs_shell__ns_ok; then
   for __bs_fn in of_name family login parent user rc_file rc_scan all_rc_files \
       path_line reload_hint fresh_flags known host_ok host_find tier tier_desc \
       login_path can_source rc_create_ok default_login_path version_string version_major version_minor strict self_path file_tier tier_word tier_allows; do
