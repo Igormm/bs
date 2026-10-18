@@ -5,6 +5,7 @@
 ## [0.8.0] - 2026-10-17 "Lingoa"
 
 ### Added
+- docs: shell claims fixed by tier — "bash 4.2+" now belongs to the `bash4` tier, not to the whole kernel (architecture, portability, install; ru/en); new section "The kernel by tiers" with the table of the 5 `posix` and 9 `bash4` files of `core/`
 - cli: `bs call [--load MODULE] FUNCTION [ARGS]` — the bridge to kernel functions from any shell (fish, nushell, dash, ash, ksh): runs the function in the bash `bs` starts, passes stdout/stderr and the exit code; only an existing function with a valid name and a `core/`/`lib/` module path are accepted (unit/testcallbridgeunit.sh, 29 checks in bash zsh dash busybox-ash ksh mksh fish)
 - refactor(core): `core/quiet.sh` is `@shell posix` — `utils_has`, `utils_quiet`, `utils_quiet_err`, `utils_ignore`, `utils_attempt` moved out of `core/utils.sh` (`utils::*` stay as bash/zsh aliases); loaded before `core/utils.sh`, registered in `bs doctor`; tested in bash, zsh, dash, busybox ash, ksh93 and mksh (`unit/testquietportableunit.sh`, 51 checks)
 - docs: shell priority table in documentation/{en,ru}/08-development/shell-portability.md (where each shell is found, version, what was run for real, what to do); probe_shells.sh runs busybox as `busybox ash`

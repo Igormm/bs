@@ -302,7 +302,8 @@ bs shebang set --mode env --dry-run script.sh   # show what would change
   - `system` (default): `/usr/local/lib/bs`;
   - `local` (`--local`): `~/.local/lib/bs`;
   - custom: values of `PREFIX`, `BIN_DIR`, `LIB_DIR`.
-- bash 4.2+ is required; the version gate runs in the bootstrap
+- bash 4.2+ is required to start the kernel (the `bash4` tier); the installer can
+  be started from any shell — the entry point finds bash itself (trampoline). The version gate runs in the bootstrap
   (`bs::shell::ensure_version`, based on the real interpreter, not `$SHELL`),
   which the installer sources before anything else. `check_shell_environment`
   handles the interpreter dispatch (bash/zsh/ksh/dash/fish) only.

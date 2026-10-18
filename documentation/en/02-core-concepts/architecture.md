@@ -2,7 +2,9 @@
 
 # Architecture
 
-BS is a thin runtime layer over bash 4.2+. It consists of two entry scripts
+BS is a thin runtime layer: the kernel is split into a POSIX tier (any shell)
+and a `bash4` tier (bash 4.2+; the other shells reach it through a re-run or
+`bs call`). It consists of two entry scripts
 (`boot.sh`, `bs`) with a shared POSIX prologue, a shell registry
 (`bootstrap/shell.sh`), a bootstrapper (`bootstrap/init.sh`), a module loader
 (`bootstrap/loader.sh`), the always-loaded `core/` modules and the on-demand
@@ -116,6 +118,38 @@ Read top to bottom. Three layers: the **POSIX prologue** (runs in any shell),
    └─ BS_LOADED_MODULES[path]=1
 ```
 
+## The kernel by tiers: what every shell gets
+
+The kernel is neither "bash only" nor "POSIX only": each `core/` file carries a
+`# @shell posix` or `# @shell bash4` label, and that label says where it runs.
+The labels are checked by `bash .agents/skills/bs-shell-portability/scripts/tier_scan.sh`;
+what was really run is in the priority table of
+[shell-portability](../08-development/shell-portability.md).
+
+| Tier | `core/` files | Runs directly in | How the other shells get it |
+|---|---|---|---|
+| `posix` (5) | `prereq`, `guard`, `const`, `version`, `quiet` | bash, zsh, dash, busybox ash, ksh93, mksh (verified by running) | — (they source it themselves) |
+| `bash4` (9) | `lang`, `args`, `errorhandler`, `config`, `logger`, `utils`, `deps`, `calc`, `repl` | bash 4.2+ only | the entry point finds bash and re-runs itself in it (trampoline); kernel functions — the `bs call` command |
+
+What makes it "available to all":
+
+1. **Any shell runs `bs` and scripts with `#!/usr/bin/env bs`**: the entry-point
+   prologue is POSIX and re-runs the file in bash 4.2+ when needed.
+2. **The POSIX tier is sourced directly** from bash, zsh, dash, ash, ksh, mksh:
+   constants, the version, `utils_has`/`utils_quiet` and the rest, the shell
+   registry (`bootstrap/shell.sh`), shebang management (`bootstrap/shebang.sh`).
+3. **The bridge `bs call [--load MODULE] FUNCTION [ARGS]`** calls any kernel
+   function from fish, nushell and other shells with another syntax; the
+   function runs in bash, the output and the exit code go back to the caller.
+
+What the kernel does **not** promise: to run `lang`, `args`, `errorhandler` and
+the other `bash4` files in dash, ash, ksh, mksh, fish or nushell. They need
+associative arrays, namerefs and `=~` with `BASH_REMATCH`, which are missing or
+behave differently there. Shells without a real run (nushell, oksh, osh) are
+not considered verified. Files move from `bash4` to `posix` one by one (order:
+`calc`, `utils`, `config`, `logger`, `deps`); `lang`, `args` and `repl` stay in
+the `bash4` tier.
+
 ## Stage 0: POSIX prologue and the `trampoline`
 
 The entry points (`bs`, `boot.sh`, `install.sh`) start with the same short
@@ -166,7 +200,9 @@ performs the following:
 
 - Takes its own directory from `BS_ENTRY_DIR` (set by the prologue), sources `bootstrap/bs.sh` (pre-kernel namespace)
   and runs `bs::shell::ensure_version 4`, so the bash 4.2+ gate runs before
-  anything else is loaded.
+  anything else is loaded. It belongs to the `bash4` tier (that is how the
+  kernel starts); `@shell posix` modules and the `bs call` bridge do not
+  require it.
 - Pulls in `BS_VERSION` from `core/version.sh` (currently `0.8.0`); `const.sh` has no number of its own.
 - Resolves `BS_ROOT` if it is not already set: first the script's own
   directory (when it contains `bootstrap/init.sh`), then

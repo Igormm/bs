@@ -7,8 +7,11 @@
 
 ## 1. Why
 
-BS runs on Bash 4.2+ and claims "ubiquity". But "everywhere" is several
-worlds:
+BS claims "ubiquity": the kernel is split into **tiers** (`@shell posix` runs in
+any shell, `@shell bash4` needs bash 4.2+ as the host), and the other shells
+reach it through a re-run in bash and the `bs call` bridge (see
+[shell-portability](../08-development/shell-portability.md)). But "everywhere"
+is several worlds:
 
 - **GNU/Linux** — `grep -P`, `sed -z`, `sha256sum`, `stat -c`, `/proc`, `/sys`;
 - **macOS and FreeBSD (BSD userland)** — `shasum`, `stat -f`, no `grep -P`
@@ -85,12 +88,12 @@ Compatibility tiers (for the version and `bs doctor`):
 - `posix` — POSIX-only tools (fallback mode);
 - `bsd` — macOS/FreeBSD compatibility layers.
 **The shell is part of the capability vector** (facts `shell`, `shell_ok`,
-`bash_version`): bash 4.2+ — full kernel; zsh — init-level only
-(`bootstrap/init.sh`); dash/sh/fish — unsupported. The tiers below assume
-`shell_ok=1`, checked via `platform::get shell_ok`.
-**Оболочка — часть вектора возможностей** (факты `shell`, `shell_ok`,
-`bash_version`): bash 4.2+ — полное ядро; zsh — только инициализация
-(`bootstrap/init.sh`); dash/sh/fish — не поддерживаются.
+`bash_version`): bash 4.2+ — the whole kernel (both tiers); the other shells
+(zsh, dash, busybox ash, ksh, mksh) — `@shell posix` modules directly and
+everything else through a re-run in bash; fish and nushell — only through the
+`bs` command and the `bs call` bridge. The tiers below assume `shell_ok=1`,
+checked via `platform::get shell_ok`. What was really run is in the priority
+table of [shell-portability](../08-development/shell-portability.md).
 
 A script checks the required tier at startup and fails with a clear
 message if the capability is missing (instead of a cryptic crash from

@@ -7,8 +7,11 @@
 
 ## 1. Зачем это
 
-Проект BS работает на bash 4.2+ и претендует на «вездесущность». Но
-«везде» — это разные миры:
+Проект BS претендует на «вездесущность»: ядро делится на **ярусы** (`@shell
+posix` работает в любой оболочке, `@shell bash4` требует bash 4.2+ как хозяина), а
+остальные оболочки получают его через перезапуск в bash и мост `bs call` (см.
+[shell-portability](../08-development/shell-portability.md)). Но «везде» — это
+разные миры:
 
 - **GNU/Linux** — `grep -P`, `sed -z`, `sha256sum`, `stat -c`, `/proc`, `/sys`;
 - **macOS и FreeBSD (BSD userland)** — `shasum`, `stat -f`, нет `grep -P` и `sed -z`, нет `/proc`/`/sys`;
@@ -84,9 +87,12 @@ GNU-only инструменты и их fallback:
 - `bsd` — macOS/FreeBSD слои совместимости.
 
 **Оболочка — часть вектора возможностей** (факты `shell`, `shell_ok`,
-`bash_version`): bash 4.2+ — полное ядро; zsh — только инициализация
-(`bootstrap/init.sh`); dash/sh/fish — не поддерживаются. Тиры ниже
-предполагают `shell_ok=1`, проверяется через `platform::get shell_ok`.
+`bash_version`): bash 4.2+ — всё ядро (оба яруса); остальные оболочки (zsh,
+dash, busybox ash, ksh, mksh) — модули `@shell posix` напрямую и всё остальное
+через перезапуск в bash; fish и nushell — только командой `bs` и мостом
+`bs call`. Тиры ниже предполагают `shell_ok=1`, проверяется через
+`platform::get shell_ok`. Что реально запускалось — таблица приоритетов в
+[shell-portability](../08-development/shell-portability.md).
 **The shell is part of the capability vector** (facts `shell`, `shell_ok`,
 `bash_version`): bash 4.2+ — full kernel; zsh — init-level only
 (`bootstrap/init.sh`); dash/sh/fish — unsupported. The tiers below assume
