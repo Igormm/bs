@@ -14,8 +14,8 @@
 
 | Функции | Модуль | Настоящие имена |
 |---|---|---|
-| `utils::has`, `utils::quiet`, `utils::quiet_err`, `utils::ignore`, `utils::attempt` | [core/quiet.sh](../../../core/quiet.sh) | `utils_has`, `utils_quiet`, … |
-| `utils::human_size`, `utils::head_bytes`, `utils::now_s`, `utils::now_ms`, `utils::now_float`, `utils::stamp`, `utils::log_stamp` | [core/fmt.sh](../../../core/fmt.sh) | `fmt_human_size`, `fmt_stamp`, … |
+| `utils::has`, `utils::quiet`, `utils::quiet_err`, `utils::ignore`, `utils::attempt` | [core/quiet.sh](../../../core/quiet.sh) | `bs_utils_has`, `bs_utils_quiet`, … |
+| `utils::human_size`, `utils::head_bytes`, `utils::now_s`, `utils::now_ms`, `utils::now_float`, `utils::stamp`, `utils::log_stamp` | [core/fmt.sh](../../../core/fmt.sh) | `bs_utils_human_size`, `bs_utils_stamp`, … |
 | остальное (`utils::tempfile`, `utils::split`, `utils::ensure_source`, …) | [core/utils.sh](../../../core/utils.sh) | — (ярус `bash4`) |
 
 Описание функций ниже остаётся верным: меняется только файл, в котором они определены. Подробнее о ярусах — [shell-portability](../08-development/shell-portability.md).

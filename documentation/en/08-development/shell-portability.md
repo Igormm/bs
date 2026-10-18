@@ -2,8 +2,8 @@
 
 # Shell portability
 
-**BS requires bash 4.2+.** All of `lib/` (86 modules, none of them POSIX) and 7 of the 15 kernel
-files are written in bash; only 8 small `@shell posix` kernel files and the prologue of the entry
+**BS requires bash 4.2+.** All of `lib/` (87 modules, none of them POSIX) and 6 of the 15 kernel
+files are written in bash; only 9 small `@shell posix` kernel files and the prologue of the entry
 points do not depend on it. "Usable from most shells" means: `bs` and `install.sh` can be started
 from any shell (they re-run in bash), kernel functions are called from any shell with `bs call`,
 and the POSIX files are sourced directly. This page is the
@@ -201,30 +201,52 @@ additionally reads it from the call stack.
 `SUPPORTED_DISTROS` is an array in bash and zsh and a space-separated string in
 shells without arrays; `const::*` names are aliases of `const_*`.
 
-`core/quiet.sh` (`@shell posix`) — the "quiet" idioms: `utils_has`, `utils_quiet`,
-`utils_quiet_err`, `utils_ignore`, `utils_attempt` (the old `utils::*` in bash
+`core/quiet.sh` (`@shell posix`) — the "quiet" idioms: `bs_utils_has`, `bs_utils_quiet`,
+`bs_utils_quiet_err`, `bs_utils_ignore`, `bs_utils_attempt` (the old `utils::*` in bash
 and zsh). It loads before `core/utils.sh`; verified in bash, zsh, dash, busybox
 ash, ksh93 and mksh (`unit/testquietportableunit.sh`).
 
-`core/calc.sh` (`@shell posix`) — the RPN calculator on `dc`: `calc_help`, `calc_autop`, `calc_eval`,
-`calc_interactive`, `calc_main` (the old `calc::*` in bash and zsh, which `bs calc` calls). It uses the
-logger only when it is loaded (`calc_log`), otherwise stderr; the interactive prompt is shown only on a
+`core/calc.sh` (`@shell posix`) — the RPN calculator on `dc`: `bs_calc_help`, `bs_calc_autop`, `bs_calc_eval`,
+`bs_calc_interactive`, `bs_calc_main` (the old `calc::*` in bash and zsh, which `bs calc` calls). It uses the
+logger only when it is loaded (`bs_calc_log`), otherwise stderr; the interactive prompt is shown only on a
 terminal (`[ -t 0 ]`), like `read -p`. Verified in bash, zsh, dash, busybox ash, ksh93 and mksh
 (`unit/testcalcportableunit.sh`).
 
-`core/fmt.sh` (`@shell posix`) — sizes and timestamps: `fmt_human_size`, `fmt_head_bytes`, `fmt_now_s`,
-`fmt_now_ms`, `fmt_now_float`, `fmt_stamp`, `fmt_log_stamp` (the old `utils::human_size` etc. in bash and zsh).
+`core/fmt.sh` (`@shell posix`) — sizes and timestamps: `bs_utils_human_size`, `bs_utils_head_bytes`, `bs_utils_now_s`,
+`bs_utils_now_ms`, `bs_utils_now_float`, `bs_utils_stamp`, `bs_utils_log_stamp` (the old `utils::human_size` etc. in bash and zsh).
 The size multiplication is done in `awk`, not in `$(( ))`: `mksh` arithmetic is 32-bit and `3 GiB` overflows in
 it — the test found it. Verified in six shells (`unit/testfmtportableunit.sh`).
 
-`core/logger.sh` (`@shell posix`) — logging: `log_trace … log_fatal`, `log_print`, `log_header`, `log_list`,
-`log_table`, `log_progress`, `log_clear_line` and the private `log_timestamp`, `log_is_color_enabled`,
-`log_level_to_number`, `log_format_message` and others (the old `log::*` and `log::__*` in bash and zsh, which the
+`core/logger.sh` (`@shell posix`) — logging: `bs_log_trace … bs_log_fatal`, `bs_log_print`, `bs_log_header`, `bs_log_list`,
+`bs_log_table`, `bs_log_progress`, `bs_log_clear_line` and the private `bs_log_timestamp`, `bs_log_is_color_enabled`,
+`bs_log_level_to_number`, `bs_log_format_message` and others (the old `log::*` and `log::__*` in bash and zsh, which the
 whole framework uses). It no longer depends on `core/lang.sh`. The output was checked **byte for byte** against the
 previous bash logger on 48 combinations (text/structured/json × colour × level × timestamp, Cyrillic, quotes,
 newlines, frames, progress), then in six shells (`unit/testloggerportableunit.sh`, 122 checks). The one difference:
-the width of the `log_header` frame is counted with `${#}`, which counts bytes in dash and ash, so a non-ASCII
+the width of the `bs_log_header` frame is counted with `${#}`, which counts bytes in dash and ash, so a non-ASCII
 header gets a wider frame in those shells.
+
+## The `bs_` namespace
+
+All kernel code (`bootstrap/`, `core/`, `install/`, the entry points) lives in **one** namespace: the real function is named `bs_` + the `::` name with `::` turned into `_` (`utils::has` ↔ `bs_utils_has`, `log::info` ↔ `bs_log_info`, `bs::version::get` ↔ `bs_version_get`). The old `::` names stay as aliases for bash and zsh (made by `bs_shell_alias`), so the 87 modules of `lib/` and every script work without changes. `check_posix_tier.sh` checks the rule: a function outside `bs_`/`__bs_` or defined with `::` is a violation. Private functions lose the leading `__` (`log::__timestamp` ↔ `bs_log_timestamp`); temporaries inside are `__bs_<module>_…`.
+
+## The data layer `core/data.sh`
+
+POSIX sh has no arrays or associative arrays, and the kernel needs them (the list of loaded modules, the cleanup stack, the configuration, script parameters). `core/data.sh` (`@shell posix`) gives them a replacement built on variables and `eval`, the same in dash, ash, ksh, mksh, zsh and bash:
+
+- arrays: `bs_arr_new/push/len/get/set/pop/shift/remove_at/index_of/contains/join/clear/copy/from_lines/to_args/each`;
+- maps: `bs_map_set/get/has/remove/count/keys/keys_to/clear/each` (a key of any kind: spaces, quotes, `$`, `*`, Cyrillic, empty; the insertion order is kept);
+- `bs_quote` — a single-quoted string that `eval` gives back unchanged (`eval "$(bs_arr_to_args name)"` puts an array into `"$@"`).
+
+Worth knowing: functions that change state and return a value (`bs_arr_pop`, `bs_arr_shift`) must not be called as `$(…)` — the change would stay in the subshell; take the result into a variable (`bs_arr_pop name result`). Verified by 272 checks in six shells and by a random comparison with native bash arrays (6 sets of 2500 operations, no differences). The old `arr::*` and `map::*` of `core/lang.sh` work on real bash arrays and stay as they are for now; `lang`, `config`, `loader` and the rest of the kernel move onto this layer.
+
+## `repl` outside the kernel
+
+`bs repl` is an interactive bash session with the kernel loaded, so by its nature it is not a kernel part. The module moved from `core/repl.sh` to `lib/ui/repl.sh` (loaded with `load "lib/ui/repl"`); the kernel keeps 15 files.
+
+## Heading for shell independence
+
+The goal is for `bootstrap/`, `core/`, `install/`, `boot.sh`, `bs` and `install.sh` to live in one namespace `bs_*` and be shell-independent. State: 9 of the 15 `core/` files are done (`prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`), plus the shell and shebang layer in `bootstrap/` and the prologue of the entry points. Next: `lang`, `utils`, `deps`, `errorhandler`, `config`, `args` on the data layer, then `init.sh`, `loader.sh`, the `bs::cli::*` commands, `install/*`, and finally the entry points. Until then BS requires bash 4.2+ (see the top of this page).
 
 ## Not done yet
 

@@ -122,7 +122,7 @@ Negation reads naturally: `if ! is::file "${path}"; then`.
 
 ## Logging — `core/logger.sh`
 
-`core/logger.sh` is a module of the `@shell posix` tier: the real functions are named `log_info`, `log_warn`, `log_error`, … (they can be sourced and called from dash, ash, ksh, mksh), and `log::info` and the other `log::*` are their aliases in bash and zsh; all existing code works unchanged. The output is byte-identical to the previous bash version. The one difference is the frame width of `log::header` for non-ASCII text in dash and ash (`${#}` counts bytes there).
+`core/logger.sh` is a module of the `@shell posix` tier: the real functions are named `bs_log_info`, `bs_log_warn`, `bs_log_error`, … (they can be sourced and called from dash, ash, ksh, mksh), and `log::info` and the other `log::*` are their aliases in bash and zsh; all existing code works unchanged. The output is byte-identical to the previous bash version. The one difference is the frame width of `log::header` for non-ASCII text in dash and ash (`${#}` counts bytes there).
 
 All `log::*` functions take the message as `"$@"` (arguments are joined with spaces). A message is printed only if its level is not below `BS_LOG_LEVEL`. `log::error` and `log::fatal` write to stderr, the rest to stdout.
 

@@ -232,8 +232,8 @@ case "${1:-help}" in
   run)            shift; bs::cli::run_cmd "$@" ;;
   build)          shift; bs::cli::build_cmd "$@" ;;
   repl)           shift
-                  if ! source -- "${BS_ROOT}/core/repl.sh"; then
-                    bs::cli::die "repl: core/repl.sh not found"
+                  if ! load "lib/ui/repl"; then
+                    bs::cli::die "repl: lib/ui/repl.sh not found"
                   fi
                   repl::main "$@" ;;
   calc)           shift

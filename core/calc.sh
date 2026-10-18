@@ -19,16 +19,16 @@
 #   bs calc '10k 355 113 /'   → 3.1415929203  (точность 10 / scale 10)
 
 # ИМЕНА / NAMES
-#   Real functions: calc_help, calc_autop, calc_eval, calc_interactive, calc_main;
+#   Real functions: bs_calc_help, bs_calc_autop, bs_calc_eval, bs_calc_interactive, bs_calc_main;
 #   in bash and zsh also calc::* (the old names, used by the bs command).
-#   Настоящие функции: calc_help, calc_autop, calc_eval, calc_interactive, calc_main;
+#   Настоящие функции: bs_calc_help, bs_calc_autop, bs_calc_eval, bs_calc_interactive, bs_calc_main;
 #   в bash и zsh — ещё и calc::* (прежние имена, их зовёт команда bs).
 
 # Source Guard / Защита от повторной загрузки
 bs_guard CORE_CALC || return 0
 
 # @description Показать справку / Show help
-calc_help() {
+bs_calc_help() {
   cat <<HELP
 BS calc — RPN calculator on dc / RPN-калькулятор на dc
 
@@ -59,7 +59,7 @@ HELP
 # @description Сообщение через логгер BS, если он загружен, иначе просто в stderr
 # @param $1 level (warn, error) / уровень
 # @param $2 text / текст
-calc_log() {
+bs_calc_log() {
   if command -v "log::$1" >/dev/null 2>&1; then
     "log::$1" "$2"
   else
@@ -70,7 +70,7 @@ calc_log() {
 # @private
 # @description Append a print command p unless the expression prints itself
 # @description Добавить команду печати p, если выражение её не содержит
-calc_autop() {
+bs_calc_autop() {
   case "${1:-}" in
     *"#"*)
       printf '%s\n' "${1:-}"
@@ -90,9 +90,9 @@ calc_autop() {
 # @return код возврата dc / dc exit status
 # @example
 #   bs calc '2 3 4 * +'
-calc_eval() {
+bs_calc_eval() {
   __bs_calc_expr=${1:?expression required}
-  __bs_calc_code=$(calc_autop "$__bs_calc_expr")
+  __bs_calc_code=$(bs_calc_autop "$__bs_calc_expr")
   printf '%s\n' "$__bs_calc_code" | dc
 }
 
@@ -101,7 +101,7 @@ calc_eval() {
 #   re-evaluated, so the stack persists between lines.
 #   Каждая новая строка добавляется к сессии, и вся сессия пересчитывается
 #   заново — стек сохраняется между строками.
-calc_interactive() {
+bs_calc_interactive() {
   __bs_calc_session=''
   printf 'BS calc — RPN on dc. :q / Ctrl-D — exit. Top of stack is printed.\n'
   while true; do
@@ -117,35 +117,35 @@ calc_interactive() {
     [ -n "$__bs_calc_line" ] || continue
     __bs_calc_session="${__bs_calc_session}${__bs_calc_line}
 "
-    if ! printf '%s\n' "$(calc_autop "$__bs_calc_session")" | dc; then
-      calc_log warn "calc: dc failed (see error above)"
+    if ! printf '%s\n' "$(bs_calc_autop "$__bs_calc_session")" | dc; then
+      bs_calc_log warn "calc: dc failed (see error above)"
     fi
   done
 }
 
 # @description Entry point / Точка входа
-calc_main() {
+bs_calc_main() {
   case "${1:-}" in
     -h|--help)
-      calc_help
+      bs_calc_help
       return 0 ;;
   esac
 
   if ! command -v dc >/dev/null 2>&1; then
-    calc_log error "calc: dc not found — install bc/dc (part of every Linux distribution)"
+    bs_calc_log error "calc: dc not found — install bc/dc (part of every Linux distribution)"
     return 1
   fi
 
   if [ $# -ge 1 ]; then
-    calc_eval "$*"
+    bs_calc_eval "$*"
     return $?
   fi
 
-  calc_interactive
+  bs_calc_interactive
 }
 
-bs_shell_alias calc_help calc::help
-bs_shell_alias calc_autop calc::__autop
-bs_shell_alias calc_eval calc::eval
-bs_shell_alias calc_interactive calc::interactive
-bs_shell_alias calc_main calc::main
+bs_shell_alias bs_calc_help calc::help
+bs_shell_alias bs_calc_autop calc::__autop
+bs_shell_alias bs_calc_eval calc::eval
+bs_shell_alias bs_calc_interactive calc::interactive
+bs_shell_alias bs_calc_main calc::main

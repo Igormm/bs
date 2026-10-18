@@ -62,7 +62,7 @@ test_constants_per_shell() {
             "${name}: formatting, path and regex constants"
         eq "false false" "$(probe "${bin}" 'echo "$FRAMEWORK_DEBUG $FRAMEWORK_DRY_RUN"')" "${name}: framework flags default to false"
         eq "yes" "$(probe "${bin}" 'bs_guard_loaded CONST && bs_guard_loaded VERSION && echo yes')" "${name}: guard marks of CONST and the pulled-in VERSION"
-        eq "${BS_VERSION}" "$(probe "${bin}" 'const_version')" "${name}: const_version is the version from version.sh"
+        eq "${BS_VERSION}" "$(probe "${bin}" 'bs_const_version')" "${name}: bs_const_version is the version from version.sh"
         eq "unset" "$(probe "${bin}" '[ -n "${__bs_esc+x}" ] && echo leaked || echo unset')" "${name}: the ESC helper variable does not leak"
     done < <(installed_shells 2>/dev/null)
 }
@@ -97,9 +97,9 @@ test_functions_per_shell() {
     local bin name
     while IFS= read -r bin; do
         name="${bin##*/}"
-        eq "0 0 0 1 1 1 " "$(probe "${bin}" 'for c in 0 5 210; do const_is_valid_error_code "$c"; printf "%s " $?; done; for c in 11 abc 999; do const_is_valid_error_code "$c"; printf "%s " $?; done')" "${name}: const_is_valid_error_code"
+        eq "0 0 0 1 1 1 " "$(probe "${bin}" 'for c in 0 5 210; do bs_const_is_valid_error_code "$c"; printf "%s " $?; done; for c in 11 abc 999; do bs_const_is_valid_error_code "$c"; printf "%s " $?; done')" "${name}: bs_const_is_valid_error_code"
         eq "Success / Успешно|File not found / Файл не найден|Configuration error / Ошибка конфигурации|Unknown error / Неизвестная ошибка" \
-            "$(probe "${bin}" 'printf "%s|%s|%s|%s" "$(const_error_description 0)" "$(const_error_description 5)" "$(const_error_description 210)" "$(const_error_description 999)"')" "${name}: const_error_description"
+            "$(probe "${bin}" 'printf "%s|%s|%s|%s" "$(bs_const_error_description 0)" "$(bs_const_error_description 5)" "$(bs_const_error_description 210)" "$(bs_const_error_description 999)"')" "${name}: bs_const_error_description"
         case "${name}" in
             bash|zsh) eq "0 1 ${BS_VERSION}" "$(probe "${bin}" 'const::is_valid_error_code 5; a=$?; const::is_valid_error_code 99; b=$?; echo "$a $b $(const::version)"')" "${name}: const::* names are aliases" ;;
             *)        eq "absent" "$(probe "${bin}" 'type const::version >/dev/null 2>&1 && echo present || echo absent')" "${name}: no const::* (the name is not valid here)" ;;

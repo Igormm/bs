@@ -11,6 +11,7 @@ readonly BS_BIN="${BS_PROJECT_ROOT}/bs"
 
 source "${TEST_SCRIPT_DIR}/../testframework.sh"
 
+# eq <expected> <actual> <message> — как в остальных тестах ярусов / the same order as in the other tier tests
 eq() { testframework::assert_equal "$1" "$2" "$3" || true; }
 
 # Оболочки; "busybox ash" — апплет / shells; "busybox ash" is an applet
@@ -27,33 +28,36 @@ test_every_shell() {
     local sh_name rc
     for sh_name in "${TEST_SHELLS[@]}"; do
         command -v "${sh_name%% *}" >/dev/null 2>&1 || { printf '  skip: %s is not installed / не установлен\n' "${sh_name}"; continue; }
-        eq "$(in_shell "${sh_name}" 'bs call utils::human_size 1536000')" "1.5 MiB" "${sh_name}: bs call returns the function's stdout"
+        out="$(in_shell "${sh_name}" 'bs call utils::human_size 1536000')"
+        # при сбое покажем, КАКОЙ bs запустился / on a failure show WHICH bs was started
+        [[ "${out}" == "1.5 MiB" ]] || printf '    diagnostics: bs=%s | %s\n' "$(in_shell "${sh_name}" 'command -v bs')" "$(in_shell "${sh_name}" 'bs version --full' | tr '\n' ' ' | cut -c1-200)"
+        eq "1.5 MiB" "${out}" "${sh_name}: bs call returns the function's stdout"
         rc=0; in_shell "${sh_name}" 'bs call no_such_function_xyz' >/dev/null || rc=$?
-        eq "${rc}" "127" "${sh_name}: unknown function -> 127"
+        eq "127" "${rc}" "${sh_name}: unknown function -> 127"
         rc=0; in_shell "${sh_name}" 'bs call utils::has no-such-command-xyz' >/dev/null || rc=$?
-        eq "${rc}" "1" "${sh_name}: the exit code of the function is the exit code of bs call"
+        eq "1" "${rc}" "${sh_name}: the exit code of the function is the exit code of bs call"
     done
 }
 
 test_safety() {
     local rc
     rc=0; "${BS_BIN}" call 'rm' -rf /nonexistent >/dev/null 2>&1 || rc=$?
-    eq "${rc}" "127" "an external command is not a function -> 127"
+    eq "127" "${rc}" "an external command is not a function -> 127"
     rc=0; "${BS_BIN}" call 'a;b' >/dev/null 2>&1 || rc=$?
-    eq "${rc}" "2" "a name with ; is refused (2)"
+    eq "2" "${rc}" "a name with ; is refused (2)"
     rc=0; "${BS_BIN}" call '$(id)' >/dev/null 2>&1 || rc=$?
-    eq "${rc}" "2" "a name with \$( ) is refused (2)"
+    eq "2" "${rc}" "a name with \$( ) is refused (2)"
     rc=0; "${BS_BIN}" call --load ../etc/passwd foo >/dev/null 2>&1 || rc=$?
-    eq "${rc}" "2" "a module path with .. is refused (2)"
+    eq "2" "${rc}" "a module path with .. is refused (2)"
     rc=0; "${BS_BIN}" call --load /etc/passwd foo >/dev/null 2>&1 || rc=$?
-    eq "${rc}" "2" "an absolute module path is refused (2)"
+    eq "2" "${rc}" "an absolute module path is refused (2)"
     rc=0; "${BS_BIN}" call >/dev/null 2>&1 || rc=$?
-    eq "${rc}" "2" "no function -> usage (2)"
+    eq "2" "${rc}" "no function -> usage (2)"
 }
 
 test_load() {
-    eq "$("${BS_BIN}" call --load lib/system/info system::info::os 2>&1 | head -n 1)" "=== Operating System ===" "--load brings a library function"
-    eq "$("${BS_BIN}" call --load lib/io/streams --load lib/system/info utils::human_size 1024)" "1.0 KiB" "--load can repeat"
+    eq "=== Operating System ===" "$("${BS_BIN}" call --load lib/system/info system::info::os 2>&1 | head -n 1)" "--load brings a library function"
+    eq "1.0 KiB" "$("${BS_BIN}" call --load lib/io/streams --load lib/system/info utils::human_size 1024)" "--load can repeat"
 }
 
 main() {

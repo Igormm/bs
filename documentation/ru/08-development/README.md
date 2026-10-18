@@ -241,8 +241,8 @@ bs> :exit
 `:info <модуль>` `:version` `:hist` `:!N` `:exit`. История (последние 200
 строк) сохраняется в `$XDG_CONFIG_HOME/bs/repl_history` (переопределяется
 `BS_REPL_HISTORY_FILE`). Промпты: `BS_REPL_PROMPT1` / `BS_REPL_PROMPT2`.
-Продолжение строк — обратным слешем. Реализация: `core/repl.sh`
-([repl.sh](../../../core/repl.sh)), тесты: `tests/integration/testrepl.sh`.
+Продолжение строк — обратным слешем. Реализация: `lib/ui/repl.sh`
+([repl.sh](../../../lib/ui/repl.sh)), тесты: `tests/integration/testrepl.sh`.
 
 ## bs calc — RPN-калькулятор
 

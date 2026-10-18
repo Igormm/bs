@@ -7,11 +7,11 @@
 # core/fmt.sh — size formatting and timestamps
 #
 # ИМЕНА / NAMES
-#   Real functions: fmt_human_size, fmt_head_bytes, fmt_now_s, fmt_now_ms, fmt_now_float,
-#   fmt_stamp, fmt_log_stamp; in bash and zsh also utils::human_size, utils::head_bytes,
+#   Real functions: bs_utils_human_size, bs_utils_head_bytes, bs_utils_now_s, bs_utils_now_ms, bs_utils_now_float,
+#   bs_utils_stamp, bs_utils_log_stamp; in bash and zsh also utils::human_size, utils::head_bytes,
 #   utils::now_s, utils::now_ms, utils::now_float, utils::stamp, utils::log_stamp (the old names).
-#   Настоящие функции: fmt_human_size, fmt_head_bytes, fmt_now_s, fmt_now_ms, fmt_now_float,
-#   fmt_stamp, fmt_log_stamp; в bash и zsh — ещё и прежние utils::human_size, utils::head_bytes,
+#   Настоящие функции: bs_utils_human_size, bs_utils_head_bytes, bs_utils_now_s, bs_utils_now_ms, bs_utils_now_float,
+#   bs_utils_stamp, bs_utils_log_stamp; в bash и zsh — ещё и прежние utils::human_size, utils::head_bytes,
 #   utils::now_s, utils::now_ms, utils::now_float, utils::stamp, utils::log_stamp.
 
 # Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
@@ -24,7 +24,7 @@ bs_guard FMT || return 0
 # @description Человеческий размер: байты или строка с суффиксом → "12.0 KiB".
 # @param $1 size: plain bytes or suffixed (K/M/G/T, KiB/MiB/GiB) / размер
 # @stdout normalized size / нормализованный размер
-fmt_human_size() {
+bs_utils_human_size() {
   __bs_fmt_v=${1:-0}
   __bs_fmt_mult=1
   case "$__bs_fmt_v" in
@@ -67,7 +67,7 @@ fmt_human_size() {
 # @param $1 file path / путь к файлу
 # @param $2 max bytes / максимум байт
 # @stdout first N bytes / первые N байт
-fmt_head_bytes() {
+bs_utils_head_bytes() {
   __bs_fmt_file=${1:?file required}
   __bs_fmt_max=${2:-4000}
   [ -f "$__bs_fmt_file" ] || return 1
@@ -78,7 +78,7 @@ fmt_head_bytes() {
 # @description Current unix time in seconds (epoch).
 # @description Текущее время в секундах (epoch).
 # @stdout секунды с начала эпохи
-fmt_now_s() {
+bs_utils_now_s() {
   date +%s
 }
 
@@ -87,7 +87,7 @@ fmt_now_s() {
 # @description Current unix time in milliseconds (epoch).
 # @description Текущее время в миллисекундах (epoch).
 # @stdout миллисекунды с начала эпохи
-fmt_now_ms() {
+bs_utils_now_ms() {
   # EPOCHREALTIME есть в bash 5, ksh93 и zsh (zsh/datetime); иначе date / EPOCHREALTIME exists in bash 5, ksh93 and zsh (zsh/datetime); date otherwise
   # shellcheck disable=SC3028  # EPOCHREALTIME необязательна: пусто там, где её нет / optional: empty where it does not exist
   __bs_fmt_now=$(printf '%s' "${EPOCHREALTIME:-}" | tr -cd '0-9')
@@ -107,7 +107,7 @@ fmt_now_ms() {
 # @description Current unix time in seconds with fractional part (epoch).
 # @description Текущее время в секундах с дробной частью (epoch).
 # @stdout секунды с наносекундной дробной частью
-fmt_now_float() {
+bs_utils_now_float() {
   date +%s.%N
 }
 
@@ -116,7 +116,7 @@ fmt_now_float() {
 # @description Timestamp for filenames: YYYYMMDD_HHMMSS.
 # @description Метка времени для имён файлов: YYYYMMDD_HHMMSS.
 # @stdout timestamp, безопасный для имён файлов
-fmt_stamp() {
+bs_utils_stamp() {
   date +%Y%m%d_%H%M%S
 }
 
@@ -125,14 +125,14 @@ fmt_stamp() {
 # @description Human-readable timestamp for logs: "YYYY-MM-DD HH:MM:SS".
 # @description Человекочитаемая метка времени для логов: "YYYY-MM-DD HH:MM:SS".
 # @stdout timestamp для логов
-fmt_log_stamp() {
+bs_utils_log_stamp() {
   date '+%Y-%m-%d %H:%M:%S'
 }
 
-bs_shell_alias fmt_human_size utils::human_size
-bs_shell_alias fmt_head_bytes utils::head_bytes
-bs_shell_alias fmt_now_s utils::now_s
-bs_shell_alias fmt_now_ms utils::now_ms
-bs_shell_alias fmt_now_float utils::now_float
-bs_shell_alias fmt_stamp utils::stamp
-bs_shell_alias fmt_log_stamp utils::log_stamp
+bs_shell_alias bs_utils_human_size utils::human_size
+bs_shell_alias bs_utils_head_bytes utils::head_bytes
+bs_shell_alias bs_utils_now_s utils::now_s
+bs_shell_alias bs_utils_now_ms utils::now_ms
+bs_shell_alias bs_utils_now_float utils::now_float
+bs_shell_alias bs_utils_stamp utils::stamp
+bs_shell_alias bs_utils_log_stamp utils::log_stamp

@@ -8,11 +8,11 @@
 # core/quiet.sh — the "quiet" idioms: command check and output suppression
 #
 # ИМЕНА / NAMES
-#   Real functions: utils_has, utils_quiet, utils_quiet_err, utils_ignore,
-#   utils_attempt; in bash and zsh also utils::* (the old names, they live in
+#   Real functions: bs_utils_has, bs_utils_quiet, bs_utils_quiet_err, bs_utils_ignore,
+#   bs_utils_attempt; in bash and zsh also utils::* (the old names, they live in
 #   core/utils.sh as aliases of these).
-#   Настоящие функции: utils_has, utils_quiet, utils_quiet_err, utils_ignore,
-#   utils_attempt; в bash и zsh — ещё и utils::* (прежние имена).
+#   Настоящие функции: bs_utils_has, bs_utils_quiet, bs_utils_quiet_err, bs_utils_ignore,
+#   bs_utils_attempt; в bash и zsh — ещё и utils::* (прежние имена).
 
 # Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points
@@ -27,8 +27,8 @@ bs_guard QUIET || return 0
 # @returns 0  команда доступна
 # @returns 1  команда не найдена
 # @example
-#   if utils_has dnf; then ...; fi        # bash/zsh: utils::has dnf
-utils_has() {
+#   if bs_utils_has dnf; then ...; fi        # bash/zsh: utils::has dnf
+bs_utils_has() {
   command -v "${1}" >/dev/null 2>&1
 }
 
@@ -38,7 +38,7 @@ utils_has() {
 # @description Выполнить команду, подавляя весь вывод (stdout и stderr).
 # @param $@ {string} Команда и её аргументы
 # @returns код возврата команды
-utils_quiet() {
+bs_utils_quiet() {
   "$@" >/dev/null 2>&1
 }
 
@@ -48,7 +48,7 @@ utils_quiet() {
 # @description Выполнить команду, подавляя только stderr.
 # @param $@ {string} Команда и её аргументы
 # @returns код возврата команды
-utils_quiet_err() {
+bs_utils_quiet_err() {
   "$@" 2>/dev/null
 }
 
@@ -59,7 +59,7 @@ utils_quiet_err() {
 # @description Выполнить команду, игнорируя результат (всегда успех).
 # @param $@ {string} Команда и её аргументы
 # @returns всегда 0
-utils_ignore() {
+bs_utils_ignore() {
   "$@" >/dev/null 2>&1 || :
 }
 
@@ -70,12 +70,12 @@ utils_ignore() {
 # @description Выполнить команду best-effort, игнорируя сбой (всегда успех).
 # @param $@ {string} Команда и её аргументы
 # @returns всегда 0
-utils_attempt() {
+bs_utils_attempt() {
   "$@" 2>/dev/null || :
 }
 
-bs_shell_alias utils_has utils::has
-bs_shell_alias utils_quiet utils::quiet
-bs_shell_alias utils_quiet_err utils::quiet_err
-bs_shell_alias utils_ignore utils::ignore
-bs_shell_alias utils_attempt utils::attempt
+bs_shell_alias bs_utils_has utils::has
+bs_shell_alias bs_utils_quiet utils::quiet
+bs_shell_alias bs_utils_quiet_err utils::quiet_err
+bs_shell_alias bs_utils_ignore utils::ignore
+bs_shell_alias bs_utils_attempt utils::attempt

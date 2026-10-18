@@ -3,8 +3,8 @@
 # Architecture
 
 BS is a thin runtime layer **on top of bash 4.2+**: all of the `lib/` library (86
-modules) and 7 of the 15 kernel files (the `bash4` tier) are written in it. The
-exception is 8 small `@shell posix` kernel files that run in any shell; the other
+modules) and 6 of the 15 kernel files (the `bash4` tier) are written in it. The
+exception is 9 small `@shell posix` kernel files that run in any shell; the other
 shells reach BS through a re-run in bash or `bs call`. It consists of two entry scripts
 (`boot.sh`, `bs`) with a shared POSIX prologue, a shell registry
 (`bootstrap/shell.sh`), a bootstrapper (`bootstrap/init.sh`), a module loader
@@ -96,8 +96,9 @@ Read top to bottom. Three layers: the **POSIX prologue** (runs in any shell),
    ├─ load core/logger      log::*
    ├─ load core/errorhandler  errorhandler::*, cleanup::add
    ├─ load core/version     BS_VERSION, bs::version::*
-   ├─ load core/quiet       utils_has, utils_quiet, ...  (posix)
-   ├─ load core/fmt         fmt_human_size, fmt_stamp, ...   (posix)
+   ├─ load core/quiet       bs_utils_has, bs_utils_quiet, ...  (posix)
+   ├─ load core/fmt         bs_utils_human_size, bs_utils_stamp, ...   (posix)
+   ├─ load core/data        bs_arr_*, bs_map_*  (arrays and maps)      (posix)
    ├─ load core/utils       the rest of utils::*
    ├─ load core/config      config::*
    ├─ load core/deps        # @depends parsing
@@ -131,16 +132,16 @@ what was really run is in the priority table of
 
 | Tier | `core/` files | Runs directly in | How the other shells get it |
 |---|---|---|---|
-| `posix` (8) | `prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc` | bash, zsh, dash, busybox ash, ksh93, mksh (verified by running) | — (they source it themselves) |
-| `bash4` (7) | `lang`, `args`, `errorhandler`, `config`, `utils`, `deps`, `repl` | bash 4.2+ only |
-| `bash4` (86) | **all of `lib/`**, every module | bash 4.2+ only (no `lib/` module is POSIX) | the entry point finds bash and re-runs itself in it (trampoline); kernel functions — the `bs call` command |
+| `posix` (9) | `prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data` | bash, zsh, dash, busybox ash, ksh93, mksh (verified by running) | — (they source it themselves) |
+| `bash4` (6) | `lang`, `args`, `errorhandler`, `config`, `utils`, `deps` (`repl` moved to `lib/ui/repl`) | bash 4.2+ only |
+| `bash4` (87) | **all of `lib/`**, every module | bash 4.2+ only (no `lib/` module is POSIX) | the entry point finds bash and re-runs itself in it (trampoline); kernel functions — the `bs call` command |
 
 What makes it "available to all":
 
 1. **Any shell runs `bs` and scripts with `#!/usr/bin/env bs`**: the entry-point
    prologue is POSIX and re-runs the file in bash 4.2+ when needed.
 2. **The POSIX tier is sourced directly** from bash, zsh, dash, ash, ksh, mksh:
-   constants, the version, `utils_has`/`utils_quiet` and the rest, the shell
+   constants, the version, `bs_utils_has`/`bs_utils_quiet` and the rest, the shell
    registry (`bootstrap/shell.sh`), shebang management (`bootstrap/shebang.sh`).
 3. **The bridge `bs call [--load MODULE] FUNCTION [ARGS]`** calls any kernel
    function from fish, nushell and other shells with another syntax; the
@@ -273,8 +274,8 @@ Its steps:
      color constants, framework flags (`FRAMEWORK_DEBUG`,
      `FRAMEWORK_DRY_RUN`);
    - `core/logger` — the `log::` family (`log::info`, `log::warn`,
-     `log::error`, …); `@shell posix`: the real functions are `log_info`,
-     `log_warn`, …, and `log::*` are their aliases in bash and zsh;
+     `log::error`, …); `@shell posix`: the real functions are `bs_log_info`,
+     `bs_log_warn`, …, and `log::*` are their aliases in bash and zsh;
    - `core/errorhandler` — `errorhandler::throw`, `errorhandler::setup_trap`,
      the cleanup stack (`cleanup::add`) and exit helpers (`bs::exit`,
      `error::exit`);
@@ -284,10 +285,12 @@ Its steps:
      `utils::quiet`, `utils::quiet_err`, `utils::ignore`, `utils::attempt`
      (replacements for `command -v … >/dev/null 2>&1`, `>/dev/null 2>&1`,
      `2>/dev/null`, `>/dev/null 2>&1 || true` and `2>/dev/null || true`
-     respectively); the real names are `utils_has`, `utils_quiet`, …;
+     respectively); the real names are `bs_utils_has`, `bs_utils_quiet`, …;
    - `core/fmt` (`@shell posix`) — sizes and timestamps: `utils::human_size`,
      `utils::head_bytes`, `utils::now_s`, `utils::now_ms`, `utils::now_float`,
      `utils::stamp`, `utils::log_stamp` (the real names are `fmt_*`);
+   - `core/data` (`@shell posix`) — arrays and maps for shells that have none:
+     `bs_arr_*`, `bs_map_*`, `bs_quote` (built on variables and `eval`, any kind of key);
    - `core/utils` — the other environment helpers (`utils::tempfile`, `utils::split`,
      `utils::ensure_source`, …);
    - `core/config` — the unified configuration loader (`config::load`,

@@ -2,8 +2,8 @@
 
 # Переносимость между оболочками
 
-**BS требует bash 4.2+.** На bash написаны вся `lib/` (86 модулей, ни один не POSIX) и 7 из
-15 файлов ядра; от bash не зависят только 8 небольших файлов ядра `@shell posix` и пролог точек
+**BS требует bash 4.2+.** На bash написаны вся `lib/` (87 модулей, ни один не POSIX) и 7 из
+15 файлов ядра; от bash не зависят только 9 небольших файлов ядра `@shell posix` и пролог точек
 входа. «Работает из большинства оболочек» значит: `bs` и `install.sh` можно запустить из любой
 оболочки (они перезапускаются в bash), функции ядра вызываются из любой оболочки через
 `bs call`, а POSIX-файлы подключаются напрямую. Эта
@@ -200,30 +200,52 @@ nushell (не установлен), oksh, osh. Для fish проверен т�
 `SUPPORTED_DISTROS` — массив в bash и zsh и строка через пробел там, где массивов нет;
 имена `const::*` — псевдонимы `const_*`.
 
-`core/quiet.sh` (`@shell posix`) — идиомы «тишины»: `utils_has`, `utils_quiet`,
-`utils_quiet_err`, `utils_ignore`, `utils_attempt` (в bash и zsh — прежние
+`core/quiet.sh` (`@shell posix`) — идиомы «тишины»: `bs_utils_has`, `bs_utils_quiet`,
+`bs_utils_quiet_err`, `bs_utils_ignore`, `bs_utils_attempt` (в bash и zsh — прежние
 `utils::*`). Загружается перед `core/utils.sh`; проверен в bash, zsh, dash,
 busybox ash, ksh93 и mksh (`unit/testquietportableunit.sh`).
 
-`core/calc.sh` (`@shell posix`) — RPN-калькулятор на `dc`: `calc_help`, `calc_autop`,
-`calc_eval`, `calc_interactive`, `calc_main` (в bash и zsh — прежние `calc::*`, их зовёт `bs calc`).
-Логгер он берёт, только если тот загружен (`calc_log`), иначе пишет в stderr; приглашение интерактивного режима —
+`core/calc.sh` (`@shell posix`) — RPN-калькулятор на `dc`: `bs_calc_help`, `bs_calc_autop`,
+`bs_calc_eval`, `bs_calc_interactive`, `bs_calc_main` (в bash и zsh — прежние `calc::*`, их зовёт `bs calc`).
+Логгер он берёт, только если тот загружен (`bs_calc_log`), иначе пишет в stderr; приглашение интерактивного режима —
 только на терминале (`[ -t 0 ]`), как у `read -p`. Проверен в bash, zsh, dash, busybox ash, ksh93 и mksh
 (`unit/testcalcportableunit.sh`).
 
-`core/fmt.sh` (`@shell posix`) — размеры и метки времени: `fmt_human_size`, `fmt_head_bytes`, `fmt_now_s`,
-`fmt_now_ms`, `fmt_now_float`, `fmt_stamp`, `fmt_log_stamp` (в bash и zsh — прежние `utils::human_size` и др.).
+`core/fmt.sh` (`@shell posix`) — размеры и метки времени: `bs_utils_human_size`, `bs_utils_head_bytes`, `bs_utils_now_s`,
+`bs_utils_now_ms`, `bs_utils_now_float`, `bs_utils_stamp`, `bs_utils_log_stamp` (в bash и zsh — прежние `utils::human_size` и др.).
 Умножение размера считается в `awk`, а не в `$(( ))`: арифметика `mksh` 32-битная, и `3 GiB` в ней переполняется —
 это нашёл тест. Проверен в шести оболочках (`unit/testfmtportableunit.sh`).
 
-`core/logger.sh` (`@shell posix`) — логирование: `log_trace … log_fatal`, `log_print`, `log_header`, `log_list`,
-`log_table`, `log_progress`, `log_clear_line` и приватные `log_timestamp`, `log_is_color_enabled`,
-`log_level_to_number`, `log_format_message` и др. (в bash и zsh — прежние `log::*` и `log::__*`, ими пользуется
+`core/logger.sh` (`@shell posix`) — логирование: `bs_log_trace … bs_log_fatal`, `bs_log_print`, `bs_log_header`, `bs_log_list`,
+`bs_log_table`, `bs_log_progress`, `bs_log_clear_line` и приватные `bs_log_timestamp`, `bs_log_is_color_enabled`,
+`bs_log_level_to_number`, `bs_log_format_message` и др. (в bash и zsh — прежние `log::*` и `log::__*`, ими пользуется
 весь фреймворк). От `core/lang.sh` больше не зависит. Вывод проверен **побайтно** против прежнего bash-логгера на
 48 комбинациях (формат text/structured/json × цвет × уровень × метка времени, кириллица, кавычки, переводы строк,
 рамки, прогресс), затем в шести оболочках (`unit/testloggerportableunit.sh`, 122 проверки). Единственное отличие:
-ширину рамки `log_header` считает `${#}`, а он в dash и ash считает байты, так что у заголовка с не-ASCII
+ширину рамки `bs_log_header` считает `${#}`, а он в dash и ash считает байты, так что у заголовка с не-ASCII
 рамка в этих оболочках получится шире.
+
+## Пространство имён `bs_`
+
+Весь код ядра (`bootstrap/`, `core/`, `install/`, точки входа) живёт в **одном** пространстве имён: настоящая функция называется `bs_` + имя через `::`, где `::` заменено на `_` (`utils::has` ↔ `bs_utils_has`, `log::info` ↔ `bs_log_info`, `bs::version::get` ↔ `bs_version_get`). Прежние имена с `::` остаются псевдонимами для bash и zsh (их создаёт `bs_shell_alias`), поэтому 87 модулей `lib/` и все скрипты работают без правок. Правило проверяет `check_posix_tier.sh`: функция вне `bs_`/`__bs_` или определённая с `::` — нарушение. Приватные функции теряют ведущие `__` (`log::__timestamp` ↔ `bs_log_timestamp`); временные переменные внутри — `__bs_<модуль>_…`.
+
+## Слой данных `core/data.sh`
+
+В POSIX sh нет массивов и ассоциативных массивов, а ядру они нужны (список загруженных модулей, стек очистки, конфигурация, параметры скрипта). `core/data.sh` (`@shell posix`) даёт им замену на переменных и `eval`, одинаковую в dash, ash, ksh, mksh, zsh и bash:
+
+- массивы: `bs_arr_new/push/len/get/set/pop/shift/remove_at/index_of/contains/join/clear/copy/from_lines/to_args/each`;
+- словари: `bs_map_set/get/has/remove/count/keys/keys_to/clear/each` (ключ любого вида: пробелы, кавычки, `$`, `*`, кириллица, пустой; порядок вставки сохраняется);
+- `bs_quote` — строка в одинарных кавычках, которую `eval` вернёт как есть (`eval "$(bs_arr_to_args имя)"` кладёт массив в `"$@"`).
+
+Что важно знать: функции, которые меняют состояние и возвращают значение (`bs_arr_pop`, `bs_arr_shift`), нельзя вызывать как `$(…)` — изменение останется в подоболочке; результат берут в переменную (`bs_arr_pop имя результат`). Проверено 272 проверками в шести оболочках и случайным сравнением с родными массивами bash (6 наборов по 2500 операций, расхождений нет). Прежние `arr::*` и `map::*` из `core/lang.sh` работают с настоящими массивами bash и пока остаются как есть; на этот слой переводятся `lang`, `config`, `loader` и остальное ядро.
+
+## `repl` вне ядра
+
+`bs repl` — интерактивная сессия bash с загруженным ядром, то есть по смыслу не часть ядра. Модуль перенесён из `core/repl.sh` в `lib/ui/repl.sh` (загружается `load "lib/ui/repl"`); в ядре остаётся 15 файлов.
+
+## Курс на независимость от оболочки
+
+Цель — чтобы `bootstrap/`, `core/`, `install/`, `boot.sh`, `bs` и `install.sh` жили в одном пространстве имён `bs_*` и не зависели от оболочки. Состояние: готово 9 из 15 файлов `core/` (`prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`), слой оболочек и шебанга в `bootstrap/` и пролог точек входа. Дальше: `lang`, `utils`, `deps`, `errorhandler`, `config`, `args` на слое данных, затем `init.sh`, `loader.sh`, команды `bs::cli::*`, `install/*`, и в конце точки входа. До тех пор BS требует bash 4.2+ (см. начало страницы).
 
 ## Не сделано
 

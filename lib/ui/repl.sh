@@ -1,7 +1,9 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bs
+# shellcheck shell=bash
 # @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags
 #
-# core/repl.sh — Interactive BS REPL
+# lib/ui/repl.sh — Interactive BS REPL
+# (вынесен из ядра: REPL по смыслу — сессия bash с загруженным ядром, а не часть ядра / moved out of the kernel: a REPL is by nature a bash session with the kernel loaded, not a kernel part)
 # Интерактивная консоль BS: загруженное ядро + оценка выражений на лету.
 #
 # Usage / Использование:
@@ -19,7 +21,7 @@
 #   BS_REPL_HISTORY_FILE  файл истории (по умолчанию $XDG_CONFIG_HOME/bs/repl_history)
 
 # Source Guard / Защита от повторной загрузки
-bs::guard "CORE_REPL" || return 0
+bs::guard "UI_REPL" || return 0
 
 # @global REPL_HISTORY — Repl: command history (category: constant)
 # @global REPL_HISTORY — Repl: история команд (категория: constant)

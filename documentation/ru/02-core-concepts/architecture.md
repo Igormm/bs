@@ -3,8 +3,8 @@
 # Архитектура
 
 BS — тонкий слой времени выполнения **поверх bash 4.2+**: на нём написаны вся
-библиотека `lib/` (86 модулей) и 7 из 15 файлов ядра (ярус `bash4`). Исключение —
-8 небольших файлов ядра `@shell posix`, которые работают в любой оболочке;
+библиотека `lib/` (87 модулей) и 6 из 15 файлов ядра (ярус `bash4`). Исключение —
+9 небольших файлов ядра `@shell posix`, которые работают в любой оболочке;
 остальные оболочки попадают в BS через перезапуск в bash или `bs call`. Он состоит из двух
 входных скриптов (`boot.sh`, `bs`) с общим POSIX-прологом, реестра оболочек
 (`bootstrap/shell.sh`), инициализатора (`bootstrap/init.sh`),
@@ -96,8 +96,9 @@ BS — тонкий слой времени выполнения **поверх 
    ├─ load core/logger      log::*
    ├─ load core/errorhandler  errorhandler::*, cleanup::add
    ├─ load core/version     BS_VERSION, bs::version::*
-   ├─ load core/quiet       utils_has, utils_quiet, ...  (posix)
-   ├─ load core/fmt         fmt_human_size, fmt_stamp, ...   (posix)
+   ├─ load core/quiet       bs_utils_has, bs_utils_quiet, ...  (posix)
+   ├─ load core/fmt         bs_utils_human_size, bs_utils_stamp, ...   (posix)
+   ├─ load core/data        bs_arr_*, bs_map_*  (arrays and maps)      (posix)
    ├─ load core/utils       остальное utils::*
    ├─ load core/config      config::*
    ├─ load core/deps        разбор # @depends
@@ -131,16 +132,16 @@ BS — тонкий слой времени выполнения **поверх 
 
 | Ярус | Файлы `core/` | Где работает напрямую | Как попадают остальные оболочки |
 |---|---|---|---|
-| `posix` (8) | `prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc` | bash, zsh, dash, busybox ash, ksh93, mksh (проверено запуском) | — (подключаются сами) |
-| `bash4` (7) | `lang`, `args`, `errorhandler`, `config`, `utils`, `deps`, `repl` | только bash 4.2+ |
-| `bash4` (86) | **вся `lib/`**, все модули | только bash 4.2+ (ни один модуль `lib/` не POSIX) | точка входа находит bash и перезапускается в нём (трамплин); функции ядра — командой `bs call` |
+| `posix` (9) | `prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data` | bash, zsh, dash, busybox ash, ksh93, mksh (проверено запуском) | — (подключаются сами) |
+| `bash4` (6) | `lang`, `args`, `errorhandler`, `config`, `utils`, `deps` (`repl` вынесен в `lib/ui/repl`) | только bash 4.2+ |
+| `bash4` (87) | **вся `lib/`**, все модули | только bash 4.2+ (ни один модуль `lib/` не POSIX) | точка входа находит bash и перезапускается в нём (трамплин); функции ядра — командой `bs call` |
 
 Что делает «доступным всем»:
 
 1. **Любая оболочка запускает `bs` и скрипты с `#!/usr/bin/env bs`**: пролог точки
    входа написан на POSIX, при необходимости перезапускает файл в bash 4.2+.
 2. **POSIX-ярус подключается напрямую** из bash, zsh, dash, ash, ksh, mksh:
-   константы, версия, `utils_has`/`utils_quiet` и др., реестр оболочек
+   константы, версия, `bs_utils_has`/`bs_utils_quiet` и др., реестр оболочек
    (`bootstrap/shell.sh`), управление шебангом (`bootstrap/shebang.sh`).
 3. **Мост `bs call [--load МОДУЛЬ] ФУНКЦИЯ [АРГУМЕНТЫ]`** вызывает любую функцию
    ядра из fish, nushell и прочих оболочек с другим синтаксисом; функция
@@ -275,7 +276,7 @@ source**, а не запускаться (при прямом запуске о�
      цветовые константы, флаги фреймворка (`FRAMEWORK_DEBUG`,
      `FRAMEWORK_DRY_RUN`);
    - `core/logger` — семейство `log::` (`log::info`, `log::warn`,
-     `log::error`, …); `@shell posix`: настоящие функции `log_info`, `log_warn`, …,
+     `log::error`, …); `@shell posix`: настоящие функции `bs_log_info`, `bs_log_warn`, …,
      `log::*` — их псевдонимы в bash и zsh;
    - `core/errorhandler` — `errorhandler::throw`, `errorhandler::setup_trap`,
      стек очистки (`cleanup::add`) и помощники выхода (`bs::exit`,
@@ -286,10 +287,12 @@ source**, а не запускаться (при прямом запуске о�
      `utils::quiet`, `utils::quiet_err`, `utils::ignore`, `utils::attempt`
      (замены для `command -v … >/dev/null 2>&1`, `>/dev/null 2>&1`,
      `2>/dev/null`, `>/dev/null 2>&1 || true` и `2>/dev/null || true`
-     соответственно); настоящие имена `utils_has`, `utils_quiet`, …;
+     соответственно); настоящие имена `bs_utils_has`, `bs_utils_quiet`, …;
    - `core/fmt` (`@shell posix`) — размеры и метки времени: `utils::human_size`,
      `utils::head_bytes`, `utils::now_s`, `utils::now_ms`, `utils::now_float`,
      `utils::stamp`, `utils::log_stamp` (настоящие имена `fmt_*`);
+   - `core/data` (`@shell posix`) — массивы и словари для оболочек, где их нет:
+     `bs_arr_*`, `bs_map_*`, `bs_quote` (на переменных и `eval`, ключ любого вида);
    - `core/utils` — остальные помощники среды (`utils::tempfile`, `utils::split`,
      `utils::ensure_source`, …);
    - `core/config` — единый загрузчик конфигурации (`config::load`,

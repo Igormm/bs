@@ -54,6 +54,14 @@ test_catches_violations() {
     bash "${CHECKER}" "${T}/bad_arr.sh" >/dev/null 2>&1 || rc=$?
     testframework::assert_equal "1" "${rc}" "an array in a posix file is caught" || true
     rc=0
+    printf '#!/bin/sh\n# @shell posix — test\nutils_helper() { :; }\n' > "${T}/bad_ns.sh"
+    bash "${CHECKER}" "${T}/bad_ns.sh" >/dev/null 2>&1 || rc=$?
+    testframework::assert_equal "1" "${rc}" "a function outside the bs_ namespace is caught" || true
+    rc=0
+    printf '#!/bin/sh\n# @shell posix — test\nbs_log::x() { :; }\n' > "${T}/bad_colon.sh"
+    bash "${CHECKER}" "${T}/bad_colon.sh" >/dev/null 2>&1 || rc=$?
+    testframework::assert_equal "1" "${rc}" "a function defined with :: is caught" || true
+    rc=0
     printf '#!/bin/sh\n# @shell posix — test\necho clean\n' > "${T}/ok.sh"
     bash "${CHECKER}" "${T}/ok.sh" >/dev/null 2>&1 || rc=$?
     testframework::assert_equal "0" "${rc}" "a clean posix file passes" || true

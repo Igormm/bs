@@ -259,7 +259,7 @@ bs_shell_readonly FILENAME_ALLOWED_CHARS='[a-zA-Z0-9._-]'
 # @description Check if error code is valid / Проверить валидность кода ошибки
 # @param $1 Error code to check / Код ошибки для проверки
 # @return E_SUCCESS if valid, E_ERROR otherwise / E_SUCCESS если валиден, иначе E_ERROR
-const_is_valid_error_code() {
+bs_const_is_valid_error_code() {
     : "${1:?Missing error code}"
 
     case "${1}" in
@@ -275,7 +275,7 @@ const_is_valid_error_code() {
 # @description Get error description by code / Получить описание ошибки по коду
 # @param $1 Error code / Код ошибки
 # @return Error description / Описание ошибки
-const_error_description() {
+bs_const_error_description() {
     : "${1:?Missing error code}"
 
     case "${1}" in
@@ -304,10 +304,10 @@ const_error_description() {
 
 # @description Get framework version / Получить версию фреймворка
 # @return Framework version string / Строка версии фреймворка
-const_version() {
+bs_const_version() {
     printf '%s\n' "${BS_VERSION}"
 }
 
-bs_shell_alias const_is_valid_error_code const::is_valid_error_code
-bs_shell_alias const_error_description const::error_description
-bs_shell_alias const_version const::version
+bs_shell_alias bs_const_is_valid_error_code const::is_valid_error_code
+bs_shell_alias bs_const_error_description const::error_description
+bs_shell_alias bs_const_version const::version

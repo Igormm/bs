@@ -14,8 +14,8 @@ so its functions are available in every module and every script after bootstrap 
 
 | Functions | Module | Real names |
 |---|---|---|
-| `utils::has`, `utils::quiet`, `utils::quiet_err`, `utils::ignore`, `utils::attempt` | [core/quiet.sh](../../../core/quiet.sh) | `utils_has`, `utils_quiet`, … |
-| `utils::human_size`, `utils::head_bytes`, `utils::now_s`, `utils::now_ms`, `utils::now_float`, `utils::stamp`, `utils::log_stamp` | [core/fmt.sh](../../../core/fmt.sh) | `fmt_human_size`, `fmt_stamp`, … |
+| `utils::has`, `utils::quiet`, `utils::quiet_err`, `utils::ignore`, `utils::attempt` | [core/quiet.sh](../../../core/quiet.sh) | `bs_utils_has`, `bs_utils_quiet`, … |
+| `utils::human_size`, `utils::head_bytes`, `utils::now_s`, `utils::now_ms`, `utils::now_float`, `utils::stamp`, `utils::log_stamp` | [core/fmt.sh](../../../core/fmt.sh) | `bs_utils_human_size`, `bs_utils_stamp`, … |
 | the rest (`utils::tempfile`, `utils::split`, `utils::ensure_source`, …) | [core/utils.sh](../../../core/utils.sh) | — (the `bash4` tier) |
 
 The function descriptions below stay valid: only the file that defines them changed. More about tiers: [shell-portability](../08-development/shell-portability.md).

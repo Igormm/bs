@@ -3,8 +3,8 @@
 # tests/unit/testquietportableunit.sh — core/quiet.sh as POSIX code under dash, ash, ksh, mksh, zsh and bash
 # tests/unit/testquietportableunit.sh — core/quiet.sh как POSIX-код под dash, ash, ksh, mksh, zsh и bash
 #
-# core/quiet.sh is "@shell posix": utils_has / utils_quiet / utils_quiet_err /
-# utils_ignore / utils_attempt must give the same answers in every shell.
+# core/quiet.sh is "@shell posix": bs_utils_has / bs_utils_quiet / bs_utils_quiet_err /
+# bs_utils_ignore / bs_utils_attempt must give the same answers in every shell.
 # core/quiet.sh — "@shell posix": эти пять функций обязаны давать одинаковые
 # ответы в любой оболочке.
 
@@ -46,14 +46,14 @@ test_behaviour() {
     local sh_bin sh_name out
     while IFS= read -r sh_bin; do
         sh_name="${sh_bin##*/}"
-        eq "$(probe "${sh_bin}" -- 'utils_has ls && echo y')" "y" "${sh_name}: utils_has finds ls"
-        eq "$(probe "${sh_bin}" -- 'utils_has no-such-cmd-xyz || echo n')" "n" "${sh_name}: utils_has misses a missing command"
-        eq "$(probe "${sh_bin}" -- 'utils_quiet sh -c "echo out; echo err >&2; exit 3"; echo "rc=$?"')" "rc=3" "${sh_name}: utils_quiet hides all output, keeps rc"
-        out="$(probe "${sh_bin}" -- 'utils_quiet_err sh -c "echo out; echo err >&2; exit 2"; echo "rc=$?"' | tr '\n' ' ')"
-        eq "${out}" "out rc=2 " "${sh_name}: utils_quiet_err keeps stdout and rc, hides stderr"
-        eq "$(probe "${sh_bin}" -- 'utils_ignore false; echo "rc=$?"')" "rc=0" "${sh_name}: utils_ignore always succeeds"
-        out="$(probe "${sh_bin}" -- 'utils_attempt sh -c "echo out; echo err >&2; exit 1"; echo "rc=$?"' | tr '\n' ' ')"
-        eq "${out}" "out rc=0 " "${sh_name}: utils_attempt keeps stdout, hides stderr, succeeds"
+        eq "$(probe "${sh_bin}" -- 'bs_utils_has ls && echo y')" "y" "${sh_name}: bs_utils_has finds ls"
+        eq "$(probe "${sh_bin}" -- 'bs_utils_has no-such-cmd-xyz || echo n')" "n" "${sh_name}: bs_utils_has misses a missing command"
+        eq "$(probe "${sh_bin}" -- 'bs_utils_quiet sh -c "echo out; echo err >&2; exit 3"; echo "rc=$?"')" "rc=3" "${sh_name}: bs_utils_quiet hides all output, keeps rc"
+        out="$(probe "${sh_bin}" -- 'bs_utils_quiet_err sh -c "echo out; echo err >&2; exit 2"; echo "rc=$?"' | tr '\n' ' ')"
+        eq "${out}" "out rc=2 " "${sh_name}: bs_utils_quiet_err keeps stdout and rc, hides stderr"
+        eq "$(probe "${sh_bin}" -- 'bs_utils_ignore false; echo "rc=$?"')" "rc=0" "${sh_name}: bs_utils_ignore always succeeds"
+        out="$(probe "${sh_bin}" -- 'bs_utils_attempt sh -c "echo out; echo err >&2; exit 1"; echo "rc=$?"' | tr '\n' ' ')"
+        eq "${out}" "out rc=0 " "${sh_name}: bs_utils_attempt keeps stdout, hides stderr, succeeds"
     done < <(testframework::posix_shells)
 }
 
@@ -62,8 +62,8 @@ test_aliases() {
     for sh_name in bash zsh; do
         sh_bin="$(command -v "${sh_name}" || true)"
         [[ -n "${sh_bin}" ]] || continue
-        eq "$(probe "${sh_bin}" -- 'utils::has ls && echo y')" "y" "${sh_name}: utils::has is an alias of utils_has"
-        eq "$(probe "${sh_bin}" -- 'utils::ignore false; echo "rc=$?"')" "rc=0" "${sh_name}: utils::ignore is an alias of utils_ignore"
+        eq "$(probe "${sh_bin}" -- 'utils::has ls && echo y')" "y" "${sh_name}: utils::has is an alias of bs_utils_has"
+        eq "$(probe "${sh_bin}" -- 'utils::ignore false; echo "rc=$?"')" "rc=0" "${sh_name}: utils::ignore is an alias of bs_utils_ignore"
     done
     # kernel in bash: the old names still work after the real load
     eq "$(utils::has ls && echo y)" "y" "kernel: utils::has works"

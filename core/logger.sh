@@ -28,13 +28,13 @@
 
 # Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
 # ИМЕНА / NAMES
-#   Real functions: log_trace, log_debug, log_info, log_success, log_warn, log_error, log_fatal,
-#   log_print, log_header, log_list, log_table, log_progress, log_clear_line and the private
-#   log_timestamp, log_is_color_enabled, log_level_to_number, log_is_level_allowed,
-#   log_get_level_color, log_json_escape, log_format_message; in bash and zsh also log::*
+#   Real functions: bs_log_trace, bs_log_debug, bs_log_info, bs_log_success, bs_log_warn, bs_log_error, bs_log_fatal,
+#   bs_log_print, bs_log_header, bs_log_list, bs_log_table, bs_log_progress, bs_log_clear_line and the private
+#   bs_log_timestamp, bs_log_is_color_enabled, bs_log_level_to_number, bs_log_is_level_allowed,
+#   bs_log_get_level_color, bs_log_json_escape, bs_log_format_message; in bash and zsh also log::*
 #   (the old names, used by the whole framework) and log::__* for the private ones.
-#   Настоящие функции: log_trace … log_clear_line и приватные log_timestamp …
-#   log_format_message; в bash и zsh — ещё и log::* (прежние имена, их зовёт весь фреймворк)
+#   Настоящие функции: bs_log_trace … bs_log_clear_line и приватные bs_log_timestamp …
+#   bs_log_format_message; в bash и zsh — ещё и log::* (прежние имена, их зовёт весь фреймворк)
 #   и log::__* для приватных.
 
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points
@@ -67,7 +67,7 @@ __bs_log_esc=$(printf '\033')
 # @private
 # @description Получить текущую временную метку / Get current timestamp
 # @return Timestamp in format YYYY-MM-DD HH:MM:SS / Метка времени в формате ГГГГ-ММ-ДД ЧЧ:ММ:СС
-log_timestamp() {
+bs_log_timestamp() {
   if [ "${BS_LOG_TIMESTAMP}" = "true" ]; then
     date +"%Y-%m-%d %H:%M:%S"
   fi
@@ -76,7 +76,7 @@ log_timestamp() {
 # @private
 # @description Проверить, включён ли цвет для дескриптора / Check whether colour is on for a descriptor
 # @param $1 file descriptor, default 1 / дескриптор, по умолчанию 1
-log_is_color_enabled() {
+bs_log_is_color_enabled() {
   if [ -n "${NO_COLOR:-}" ]; then
     return 1
   fi
@@ -92,7 +92,7 @@ log_is_color_enabled() {
 # @private
 # @description Числовой приоритет уровня (регистр не важен) / Numeric priority of a level (case-insensitive)
 # @param $1 level / уровень
-log_level_to_number() {
+bs_log_level_to_number() {
   case "${1:-}" in
     [Tt][Rr][Aa][Cc][Ee])             printf '%d\n' 0 ;;
     [Dd][Ee][Bb][Uu][Gg])             printf '%d\n' 10 ;;
@@ -109,16 +109,16 @@ log_level_to_number() {
 # @private
 # @description Разрешён ли вывод сообщения этого уровня / Whether a message of this level is printed
 # @param $1 level / уровень
-log_is_level_allowed() {
-  __bs_log_msg_num=$(log_level_to_number "${1:-}")
-  __bs_log_cfg_num=$(log_level_to_number "${BS_LOG_LEVEL}")
+bs_log_is_level_allowed() {
+  __bs_log_msg_num=$(bs_log_level_to_number "${1:-}")
+  __bs_log_cfg_num=$(bs_log_level_to_number "${BS_LOG_LEVEL}")
   [ "$__bs_log_msg_num" -ge "$__bs_log_cfg_num" ]
 }
 
 # @private
 # @description ANSI-цвет уровня (уровень — заглавными) / ANSI colour of a level (upper-case level)
 # @param $1 level / уровень
-log_get_level_color() {
+bs_log_get_level_color() {
   case "${1:-}" in
     TRACE)   printf '%s\n' "${__bs_log_esc}[90m" ;;   # Серый / Gray
     DEBUG)   printf '%s\n' "${__bs_log_esc}[36m" ;;   # Циан / Cyan
@@ -134,7 +134,7 @@ log_get_level_color() {
 # @private
 # @description Заменить все вхождения $2 на $3 в $1; результат в __bs_log_out / Replace every $2 with $3 in $1; the result is in __bs_log_out
 # (подстановка ${s//a/b} есть не везде / the ${s//a/b} substitution does not exist everywhere)
-log_replace_all() {
+bs_log_replace_all() {
   __bs_log_rs=$1
   __bs_log_out=''
   while :; do
@@ -152,15 +152,15 @@ log_replace_all() {
 # @private
 # @description Экранирование строки для JSON / Escape a string for JSON
 # @param $1 text / текст
-log_json_escape() {
+bs_log_json_escape() {
   __bs_log_js=$1
   # shellcheck disable=SC1003  # '\' — один обратный слэш в одинарных кавычках / '\' is one backslash in single quotes
-  log_replace_all "$__bs_log_js" '\' '\\'; __bs_log_js=$__bs_log_out   # Обратный слэш / Backslash
-  log_replace_all "$__bs_log_js" '"' '\"';   __bs_log_js=$__bs_log_out   # Кавычка / Quote
-  log_replace_all "$__bs_log_js" '
+  bs_log_replace_all "$__bs_log_js" '\' '\\'; __bs_log_js=$__bs_log_out   # Обратный слэш / Backslash
+  bs_log_replace_all "$__bs_log_js" '"' '\"';   __bs_log_js=$__bs_log_out   # Кавычка / Quote
+  bs_log_replace_all "$__bs_log_js" '
 ' '\n';                                       __bs_log_js=$__bs_log_out   # Перевод строки / Newline
-  log_replace_all "$__bs_log_js" "$(printf '\r')" '\r'; __bs_log_js=$__bs_log_out   # Возврат каретки / Carriage return
-  log_replace_all "$__bs_log_js" "$(printf '\t')" '\t'; __bs_log_js=$__bs_log_out   # Табуляция / Tab
+  bs_log_replace_all "$__bs_log_js" "$(printf '\r')" '\r'; __bs_log_js=$__bs_log_out   # Возврат каретки / Carriage return
+  bs_log_replace_all "$__bs_log_js" "$(printf '\t')" '\t'; __bs_log_js=$__bs_log_out   # Табуляция / Tab
   printf '%s' "$__bs_log_js"
 }
 
@@ -169,7 +169,7 @@ log_json_escape() {
 # @param $1 level (upper-case) / уровень (заглавными)
 # @param $2 file descriptor / дескриптор
 # @param $@ message words / слова сообщения
-log_format_message() {
+bs_log_format_message() {
   __bs_log_level=${1:-INFO}
   __bs_log_fd=${2:-1}
   shift 2
@@ -184,10 +184,10 @@ log_format_message() {
       __bs_log_text="$__bs_log_text $__bs_log_word"
     fi
   done
-  __bs_log_ts=$(log_timestamp)
+  __bs_log_ts=$(bs_log_timestamp)
   case "${BS_LOG_FORMAT}" in
     json)
-      __bs_log_esc_text=$(log_json_escape "$__bs_log_text")
+      __bs_log_esc_text=$(bs_log_json_escape "$__bs_log_text")
       if [ -n "$__bs_log_ts" ]; then
         printf '{"timestamp":"%s","level":"%s","message":"%s"}\n' \
           "$__bs_log_ts" "$__bs_log_level" "$__bs_log_esc_text"
@@ -203,9 +203,9 @@ log_format_message() {
       fi
       ;;
     *)
-      if log_is_color_enabled "$__bs_log_fd"; then
+      if bs_log_is_color_enabled "$__bs_log_fd"; then
         __bs_log_reset="${__bs_log_esc}[0m"
-        __bs_log_color=$(log_get_level_color "$__bs_log_level")
+        __bs_log_color=$(bs_log_get_level_color "$__bs_log_level")
         if [ "$__bs_log_level" = "ERROR" ] || [ "$__bs_log_level" = "FATAL" ]; then
           __bs_log_color="${__bs_log_color}${__bs_log_esc}[1m"
         fi
@@ -236,65 +236,65 @@ log_format_message() {
 
 # @description Трассировка / Trace message
 # @param $@ message / сообщение
-log_trace() {
-  log_is_level_allowed "TRACE" || return 0
-  log_format_message "TRACE" 1 "$@"
+bs_log_trace() {
+  bs_log_is_level_allowed "TRACE" || return 0
+  bs_log_format_message "TRACE" 1 "$@"
 }
 
 # @description Отладка / Debug message
 # @param $@ message / сообщение
-log_debug() {
-  log_is_level_allowed "DEBUG" || return 0
-  log_format_message "DEBUG" 1 "$@"
+bs_log_debug() {
+  bs_log_is_level_allowed "DEBUG" || return 0
+  bs_log_format_message "DEBUG" 1 "$@"
 }
 
 # @description Информация / Information message
 # @param $@ message / сообщение
-log_info() {
-  log_is_level_allowed "INFO" || return 0
-  log_format_message "INFO" 1 "$@"
+bs_log_info() {
+  bs_log_is_level_allowed "INFO" || return 0
+  bs_log_format_message "INFO" 1 "$@"
 }
 
 # @description Успех / Success message
 # @param $@ message / сообщение
-log_success() {
-  log_is_level_allowed "SUCCESS" || return 0
-  log_format_message "SUCCESS" 1 "$@"
+bs_log_success() {
+  bs_log_is_level_allowed "SUCCESS" || return 0
+  bs_log_format_message "SUCCESS" 1 "$@"
 }
 
 # @description Предупреждение (stderr) / Warning (stderr)
 # @param $@ message / сообщение
-log_warn() {
-  log_is_level_allowed "WARN" || return 0
-  log_format_message "WARN" 2 "$@" >&2
+bs_log_warn() {
+  bs_log_is_level_allowed "WARN" || return 0
+  bs_log_format_message "WARN" 2 "$@" >&2
 }
 
 # @description Ошибка (stderr) / Error (stderr)
 # @param $@ message / сообщение
-log_error() {
-  log_is_level_allowed "ERROR" || return 0
-  log_format_message "ERROR" 2 "$@" >&2
+bs_log_error() {
+  bs_log_is_level_allowed "ERROR" || return 0
+  bs_log_format_message "ERROR" 2 "$@" >&2
 }
 
 # @description Фатальная ошибка (stderr), возвращает E_ERROR / Fatal error (stderr), returns E_ERROR
 # @param $@ message / сообщение
-log_fatal() {
-  if log_is_level_allowed "FATAL"; then
-    log_format_message "FATAL" 2 "$@" >&2
+bs_log_fatal() {
+  if bs_log_is_level_allowed "FATAL"; then
+    bs_log_format_message "FATAL" 2 "$@" >&2
   fi
   return "${E_ERROR:-1}"
 }
 
-# @description Алиас для log_info / Alias for log_info
+# @description Алиас для bs_log_info / Alias for bs_log_info
 # @param $@ message / сообщение
-log_print() {
-  log_info "$@"
+bs_log_print() {
+  bs_log_info "$@"
 }
 
 # @description Заголовок (рамка или линия) / A header (a frame or a line)
 # @param $1 text / текст
 # @param $2 char: box (по умолчанию) или символ линии / box (default) or the line character
-log_header() {
+bs_log_header() {
   __bs_log_htext=${1:?Missing header text}
   __bs_log_hchar=${2:-box}
   if [ "$__bs_log_hchar" = "box" ]; then
@@ -305,9 +305,9 @@ log_header() {
       __bs_log_line="${__bs_log_line}─"
       __bs_log_n=$((__bs_log_n - 1))
     done
-    log_info "╭${__bs_log_line}╮"
-    log_info "│${__bs_log_inner}│"
-    log_info "╰${__bs_log_line}╯"
+    bs_log_info "╭${__bs_log_line}╮"
+    bs_log_info "│${__bs_log_inner}│"
+    bs_log_info "╰${__bs_log_line}╯"
     return 0
   fi
   __bs_log_n=${#__bs_log_htext}
@@ -316,29 +316,29 @@ log_header() {
     __bs_log_line="${__bs_log_line}${__bs_log_hchar}"
     __bs_log_n=$((__bs_log_n - 1))
   done
-  log_info ""
-  log_info "$__bs_log_htext"
-  log_info "$__bs_log_line"
-  log_info ""
+  bs_log_info ""
+  bs_log_info "$__bs_log_htext"
+  bs_log_info "$__bs_log_line"
+  bs_log_info ""
 }
 
 # @description Маркированный список / A bulleted list
 # @param $@ items / элементы
-log_list() {
+bs_log_list() {
   for __bs_log_item in "$@"; do
-    if log_is_color_enabled; then
-      log_info "  • $__bs_log_item"
+    if bs_log_is_color_enabled; then
+      bs_log_info "  • $__bs_log_item"
     else
-      log_info "  * $__bs_log_item"
+      bs_log_info "  * $__bs_log_item"
     fi
   done
 }
 
 # @description Таблица (строки с отступом) / A table (indented rows)
 # @param $@ rows / строки
-log_table() {
+bs_log_table() {
   for __bs_log_row in "$@"; do
-    log_info "  $__bs_log_row"
+    bs_log_info "  $__bs_log_row"
   done
 }
 
@@ -346,7 +346,7 @@ log_table() {
 # @param $1 current / текущее
 # @param $2 max / максимум
 # @param $3 width, default 50 / ширина, по умолчанию 50
-log_progress() {
+bs_log_progress() {
   __bs_log_cur=${1:?Missing current value}
   __bs_log_max=${2:?Missing max value}
   __bs_log_width=${3:-50}
@@ -371,7 +371,7 @@ log_progress() {
 }
 
 # @description Очистить текущую строку / Clear the current line
-log_clear_line() {
+bs_log_clear_line() {
   printf '\r\033[K'
 }
 
@@ -391,25 +391,25 @@ fi
 # shellcheck disable=SC2034  # читают тесты и другие модули / read by tests and other modules
 LOGGER_LOADED="1"
 
-bs_shell_alias log_timestamp log::__timestamp
-bs_shell_alias log_is_color_enabled log::__is_color_enabled
-bs_shell_alias log_level_to_number log::__level_to_number
-bs_shell_alias log_is_level_allowed log::__is_level_allowed
-bs_shell_alias log_get_level_color log::__get_level_color
-bs_shell_alias log_json_escape log::__json_escape
-bs_shell_alias log_format_message log::__format_message
-bs_shell_alias log_trace log::trace
-bs_shell_alias log_debug log::debug
-bs_shell_alias log_info log::info
-bs_shell_alias log_success log::success
-bs_shell_alias log_warn log::warn
-bs_shell_alias log_error log::error
-bs_shell_alias log_fatal log::fatal
-bs_shell_alias log_print log::print
-bs_shell_alias log_header log::header
-bs_shell_alias log_list log::list
-bs_shell_alias log_table log::table
-bs_shell_alias log_progress log::progress
-bs_shell_alias log_clear_line log::clear_line
+bs_shell_alias bs_log_timestamp log::__timestamp
+bs_shell_alias bs_log_is_color_enabled log::__is_color_enabled
+bs_shell_alias bs_log_level_to_number log::__level_to_number
+bs_shell_alias bs_log_is_level_allowed log::__is_level_allowed
+bs_shell_alias bs_log_get_level_color log::__get_level_color
+bs_shell_alias bs_log_json_escape log::__json_escape
+bs_shell_alias bs_log_format_message log::__format_message
+bs_shell_alias bs_log_trace log::trace
+bs_shell_alias bs_log_debug log::debug
+bs_shell_alias bs_log_info log::info
+bs_shell_alias bs_log_success log::success
+bs_shell_alias bs_log_warn log::warn
+bs_shell_alias bs_log_error log::error
+bs_shell_alias bs_log_fatal log::fatal
+bs_shell_alias bs_log_print log::print
+bs_shell_alias bs_log_header log::header
+bs_shell_alias bs_log_list log::list
+bs_shell_alias bs_log_table log::table
+bs_shell_alias bs_log_progress log::progress
+bs_shell_alias bs_log_clear_line log::clear_line
 
-log_debug "Logger module initialized with level: ${BS_LOG_LEVEL}, color: ${BS_LOG_COLOR}" 2>/dev/null || true
+bs_log_debug "Logger module initialized with level: ${BS_LOG_LEVEL}, color: ${BS_LOG_COLOR}" 2>/dev/null || true
