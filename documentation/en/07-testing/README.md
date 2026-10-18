@@ -130,6 +130,18 @@ Notes:
 - If a module writes to `~/.config` or `~/Music`, export an isolated `HOME=$(mktemp -d)` **before** sourcing the module — readonly paths are derived from `HOME`.
 - In your own checks prefer the idioms from `core/utils.sh` over raw redirections: `utils::has cmd` instead of `command -v cmd >/dev/null 2>&1`, `utils::quiet cmd` instead of `>/dev/null 2>&1`, `utils::quiet_err cmd` instead of `2>/dev/null`, `utils::ignore cmd` instead of `>/dev/null 2>&1 || true`.
 
+## Tests of the `@shell` tiers
+
+Modules labelled `# @shell posix` must work in six shells, so their tests run the code in every installed shell and compare the answers.
+
+- **One shared list of shells** — `testframework::posix_shells`: `bash zsh dash ash ksh mksh`, one path per line. A real `ash` is used; without one, the `busybox ash` applet through a tiny launcher. A missing shell is printed as `skip: … is not installed` and goes to the report as "not verified", never skipped silently.
+- **A portable test per module** — `tests/unit/test<module>portableunit.sh` for every `posix` file of `core/` (models: `testquietportableunit.sh`, `testfmtportableunit.sh`, `testloggerportableunit.sh`, `testcalcportableunit.sh`): parse (`X -n`), `shellcheck -s sh`, behaviour under `env -i` in every shell and the `::` aliases in bash and zsh.
+- **`testposixtierunit.sh`** — runs `check_posix_tier.sh` and requires every `posix` file of `core/` to have its portable test.
+- **`check_posix_tier.sh`** (`.agents/skills/bs-shell-abstraction/scripts/`) — proves that bash does not take part in the `posix` tier: parse in non-bash shells, no bash-only constructs, a run of the tier in dash with a `PATH` that has no bash.
+- **Shells in the other tests**: `testshellunit.sh`, `testtrampolineunit.sh`, `testshellstrictunit.sh`, `testshebangunit.sh`, `testcallbridgeunit.sh` use the same list; `probe_shells.sh` shows what each shell can do.
+
+Traps these tests found: `$(( ))` arithmetic is 32-bit in `mksh` (do big numbers in `awk`); `local -r a b` makes `b` read-only too; `bs` scripts have a strict `IFS`, so split words explicitly (`IFS=' ' read -ra`).
+
 ## Syntax validation
 
 ```bash

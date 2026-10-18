@@ -2,9 +2,10 @@
 
 # Architecture
 
-BS is a thin runtime layer: the kernel is split into a POSIX tier (any shell)
-and a `bash4` tier (bash 4.2+; the other shells reach it through a re-run or
-`bs call`). It consists of two entry scripts
+BS is a thin runtime layer **on top of bash 4.2+**: all of the `lib/` library (86
+modules) and 7 of the 15 kernel files (the `bash4` tier) are written in it. The
+exception is 8 small `@shell posix` kernel files that run in any shell; the other
+shells reach BS through a re-run in bash or `bs call`. It consists of two entry scripts
 (`boot.sh`, `bs`) with a shared POSIX prologue, a shell registry
 (`bootstrap/shell.sh`), a bootstrapper (`bootstrap/init.sh`), a module loader
 (`bootstrap/loader.sh`), the always-loaded `core/` modules and the on-demand
@@ -131,7 +132,8 @@ what was really run is in the priority table of
 | Tier | `core/` files | Runs directly in | How the other shells get it |
 |---|---|---|---|
 | `posix` (8) | `prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc` | bash, zsh, dash, busybox ash, ksh93, mksh (verified by running) | — (they source it themselves) |
-| `bash4` (7) | `lang`, `args`, `errorhandler`, `config`, `utils`, `deps`, `repl` | bash 4.2+ only | the entry point finds bash and re-runs itself in it (trampoline); kernel functions — the `bs call` command |
+| `bash4` (7) | `lang`, `args`, `errorhandler`, `config`, `utils`, `deps`, `repl` | bash 4.2+ only |
+| `bash4` (86) | **all of `lib/`**, every module | bash 4.2+ only (no `lib/` module is POSIX) | the entry point finds bash and re-runs itself in it (trampoline); kernel functions — the `bs call` command |
 
 What makes it "available to all":
 
@@ -271,18 +273,23 @@ Its steps:
      color constants, framework flags (`FRAMEWORK_DEBUG`,
      `FRAMEWORK_DRY_RUN`);
    - `core/logger` — the `log::` family (`log::info`, `log::warn`,
-     `log::error`, …);
+     `log::error`, …); `@shell posix`: the real functions are `log_info`,
+     `log_warn`, …, and `log::*` are their aliases in bash and zsh;
    - `core/errorhandler` — `errorhandler::throw`, `errorhandler::setup_trap`,
      the cleanup stack (`cleanup::add`) and exit helpers (`bs::exit`,
      `error::exit`);
    - `core/version` — `BS_VERSION` / `BS_NAME` exports and
      `bs::version::*` helpers;
-   - `core/utils` — environment helpers, including the silence idioms
-     `utils::has`, `utils::quiet`, `utils::quiet_err`, `utils::ignore`,
-     `utils::attempt`
+   - `core/quiet` (`@shell posix`) — the silence idioms `utils::has`,
+     `utils::quiet`, `utils::quiet_err`, `utils::ignore`, `utils::attempt`
      (replacements for `command -v … >/dev/null 2>&1`, `>/dev/null 2>&1`,
      `2>/dev/null`, `>/dev/null 2>&1 || true` and `2>/dev/null || true`
-     respectively);
+     respectively); the real names are `utils_has`, `utils_quiet`, …;
+   - `core/fmt` (`@shell posix`) — sizes and timestamps: `utils::human_size`,
+     `utils::head_bytes`, `utils::now_s`, `utils::now_ms`, `utils::now_float`,
+     `utils::stamp`, `utils::log_stamp` (the real names are `fmt_*`);
+   - `core/utils` — the other environment helpers (`utils::tempfile`, `utils::split`,
+     `utils::ensure_source`, …);
    - `core/config` — the unified configuration loader (`config::load`,
      `config::get`, `config::set`);
    - `core/deps` — module dependency parsing (`# @depends`).

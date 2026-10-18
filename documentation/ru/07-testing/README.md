@@ -130,6 +130,18 @@ main "$@"
 - Если модуль пишет в `~/.config` или `~/Music`, экспортируйте изолированный `HOME=$(mktemp -d)` **до** подключения модуля — readonly-пути вычисляются из `HOME`.
 - В собственных проверках используйте идиомы из `core/utils.sh` вместо «сырых» перенаправлений: `utils::has cmd` вместо `command -v cmd >/dev/null 2>&1`, `utils::quiet cmd` вместо `>/dev/null 2>&1`, `utils::quiet_err cmd` вместо `2>/dev/null`, `utils::ignore cmd` вместо `>/dev/null 2>&1 || true`.
 
+## Тесты ярусов `@shell`
+
+Модули с меткой `# @shell posix` должны работать в шести оболочках, поэтому их тесты гоняют код во всех установленных оболочках и сравнивают ответы.
+
+- **Общий список оболочек** — `testframework::posix_shells`: `bash zsh dash ash ksh mksh`, по одному пути в строке. `ash` берётся настоящая, а при её отсутствии — апплет `busybox ash` через маленький лаунчер. Отсутствующая оболочка печатается как `skip: … не установлен` и попадает в отчёт «не проверено», а не пропускается молча.
+- **Переносимый тест модуля** — `tests/unit/test<модуль>portableunit.sh` для каждого `posix`-файла `core/` (образцы: `testquietportableunit.sh`, `testfmtportableunit.sh`, `testloggerportableunit.sh`, `testcalcportableunit.sh`): разбор файла (`X -n`), `shellcheck -s sh`, поведение под `env -i` в каждой оболочке и псевдонимы `::` в bash и zsh.
+- **`testposixtierunit.sh`** — запускает `check_posix_tier.sh` и требует, чтобы у каждого `posix`-файла `core/` был свой переносимый тест.
+- **`check_posix_tier.sh`** (`.agents/skills/bs-shell-abstraction/scripts/`) — доказывает, что bash в ярусе `posix` не участвует: разбор в не-bash оболочках, запрет bash-конструкций, запуск яруса в dash с `PATH` без bash.
+- **Оболочки в остальных тестах**: `testshellunit.sh`, `testtrampolineunit.sh`, `testshellstrictunit.sh`, `testshebangunit.sh`, `testcallbridgeunit.sh` используют тот же список; `probe_shells.sh` показывает, что умеет каждая оболочка.
+
+Ловушки, найденные этими тестами: арифметика `$(( ))` в `mksh` 32-битная (большие числа считают в `awk`); `local -r a b` делает `b` тоже read-only; в скриптах `bs` строгий `IFS`, поэтому слова делят явно (`IFS=' ' read -ra`).
+
 ## Проверка синтаксиса
 
 ```bash

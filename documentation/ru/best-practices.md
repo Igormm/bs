@@ -22,7 +22,7 @@ documentation/   # Гайды, справочники API, примеры
 Ключевые точки входа:
 
 - Shebang-режим: скрипты начинаются с `#!/usr/bin/env bs` (устанавливает `BS_SHEBANG=1`).
-- CLI: `bs help|version|env|list|doctor|run|init-shell`.
+- CLI: `bs help|version|env|list|doctor|run|build|repl|calc|init-shell|shebang|call|update|uninstall|where` (полный список — `bs help`).
 - Инициализация: из `BS_ROOT` подключается `bootstrap/init.sh`, загружается ядро и выставляются флаги.
 
 ## Тестовая стратегия

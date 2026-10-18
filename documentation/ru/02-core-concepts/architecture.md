@@ -2,9 +2,10 @@
 
 # Архитектура
 
-BS — тонкий слой времени выполнения: ядро делится на POSIX-ярус (любая
-оболочка) и ярус `bash4` (bash 4.2+, остальные оболочки попадают в него через
-перезапуск или `bs call`). Он состоит из двух
+BS — тонкий слой времени выполнения **поверх bash 4.2+**: на нём написаны вся
+библиотека `lib/` (86 модулей) и 7 из 15 файлов ядра (ярус `bash4`). Исключение —
+8 небольших файлов ядра `@shell posix`, которые работают в любой оболочке;
+остальные оболочки попадают в BS через перезапуск в bash или `bs call`. Он состоит из двух
 входных скриптов (`boot.sh`, `bs`) с общим POSIX-прологом, реестра оболочек
 (`bootstrap/shell.sh`), инициализатора (`bootstrap/init.sh`),
 загрузчика модулей (`bootstrap/loader.sh`), всегда загружаемых модулей `core/`
@@ -131,7 +132,8 @@ BS — тонкий слой времени выполнения: ядро де�
 | Ярус | Файлы `core/` | Где работает напрямую | Как попадают остальные оболочки |
 |---|---|---|---|
 | `posix` (8) | `prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc` | bash, zsh, dash, busybox ash, ksh93, mksh (проверено запуском) | — (подключаются сами) |
-| `bash4` (7) | `lang`, `args`, `errorhandler`, `config`, `utils`, `deps`, `repl` | только bash 4.2+ | точка входа находит bash и перезапускается в нём (трамплин); функции ядра — командой `bs call` |
+| `bash4` (7) | `lang`, `args`, `errorhandler`, `config`, `utils`, `deps`, `repl` | только bash 4.2+ |
+| `bash4` (86) | **вся `lib/`**, все модули | только bash 4.2+ (ни один модуль `lib/` не POSIX) | точка входа находит bash и перезапускается в нём (трамплин); функции ядра — командой `bs call` |
 
 Что делает «доступным всем»:
 
@@ -273,17 +275,23 @@ source**, а не запускаться (при прямом запуске о�
      цветовые константы, флаги фреймворка (`FRAMEWORK_DEBUG`,
      `FRAMEWORK_DRY_RUN`);
    - `core/logger` — семейство `log::` (`log::info`, `log::warn`,
-     `log::error`, …);
+     `log::error`, …); `@shell posix`: настоящие функции `log_info`, `log_warn`, …,
+     `log::*` — их псевдонимы в bash и zsh;
    - `core/errorhandler` — `errorhandler::throw`, `errorhandler::setup_trap`,
      стек очистки (`cleanup::add`) и помощники выхода (`bs::exit`,
      `error::exit`);
    - `core/version` — экспорт `BS_VERSION` / `BS_NAME` и помощники
      `bs::version::*`;
-   - `core/utils` — помощники среды, включая идиомы тишины `utils::has`,
+   - `core/quiet` (`@shell posix`) — идиомы тишины `utils::has`,
      `utils::quiet`, `utils::quiet_err`, `utils::ignore`, `utils::attempt`
      (замены для `command -v … >/dev/null 2>&1`, `>/dev/null 2>&1`,
      `2>/dev/null`, `>/dev/null 2>&1 || true` и `2>/dev/null || true`
-     соответственно);
+     соответственно); настоящие имена `utils_has`, `utils_quiet`, …;
+   - `core/fmt` (`@shell posix`) — размеры и метки времени: `utils::human_size`,
+     `utils::head_bytes`, `utils::now_s`, `utils::now_ms`, `utils::now_float`,
+     `utils::stamp`, `utils::log_stamp` (настоящие имена `fmt_*`);
+   - `core/utils` — остальные помощники среды (`utils::tempfile`, `utils::split`,
+     `utils::ensure_source`, …);
    - `core/config` — единый загрузчик конфигурации (`config::load`,
      `config::get`, `config::set`);
    - `core/deps` — разбор зависимостей модулей (`# @depends`).

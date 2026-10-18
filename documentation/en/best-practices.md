@@ -22,7 +22,7 @@ documentation/   # Guides, API references, examples
 Key entry points:
 
 - Shebang mode: scripts start with `#!/usr/bin/env bs` (sets `BS_SHEBANG=1`).
-- CLI: `bs help|version|env|list|doctor|run|init-shell`.
+- CLI: `bs help|version|env|list|doctor|run|build|repl|calc|init-shell|shebang|call|update|uninstall|where` (the full list is `bs help`).
 - Initialization: source `bootstrap/init.sh` from `BS_ROOT` to load core and set flags.
 
 ## Test strategy

@@ -4,20 +4,24 @@
 
 ## What is BS
 
-**BS** is a modular framework and standard library written in Bash. It provides
+**BS** is a modular framework and standard library written in **Bash 4.2+**. It provides
 a module loader, logging, error handling, declarative script arguments, an
 I/O streams abstraction, and a set of system modules — all in one consistent
 code style and with zero external dependencies.
 
 ## Requirements
 
-- **bash 4.2+** somewhere in `PATH`: the kernel (the `bash4` tier) runs on it.
+- **bash 4.2+ is a hard requirement.** All of the `lib/` library (86 modules) and
+  7 of the 15 `core/` files are written in bash, so BS does not run without it.
   Versions 4.2 and 4.3 are accepted by the code, but CI checks from **4.4**
   (nearly every platform ships 4.4 or newer).
+- The exception is the 8 kernel files labelled `@shell posix`: they do not depend
+  on bash and can be sourced from dash, ash, ksh, mksh, zsh and bash (see "How the
+  kernel works"). That is a small set of helpers (constants, the version,
+  `utils_has`, `log_info`, `calc`, …), not the whole of BS.
 - You can start `bs` and `install.sh` **from any shell** (dash, ash, zsh, ksh,
-  fish, nushell): the prologue finds bash and re-runs itself in it. `@shell
-  posix` modules are sourced directly from bash, zsh, dash, ash, ksh, mksh (see
-  "How the kernel works").
+  fish, nushell): the prologue finds bash and re-runs itself in it, so bash must
+  be on the system but need not be your shell.
 - Linux (primary platform; macOS is partially supported: the system bash there
   is 3.2, install bash 4.2+ from Homebrew)
 

@@ -11,13 +11,29 @@ arguments:
 
 ## Цель / Goal
 
-Документация не должна говорить «ядро привязано к bash 4», если это верно
-только для части ядра. Правда в BS многоуровневая, и каждое утверждение
-называет свой уровень.
+**Главный факт нельзя прятать: BS требует bash 4.2+.** На bash написаны вся библиотека
+`lib/` (86 модулей, ни один не POSIX) и 7 из 15 файлов ядра `core/`. Исключение — 8 небольших
+файлов ядра `@shell posix` и пролог точек входа: они работают в любой оболочке. Любой текст,
+который говорит о требованиях BS, **сначала называет bash 4.2+**, и только потом — исключения.
+Оговорка про ярусы не должна заслонять требование: читатель, увидевший «ядро делится на ярусы»,
+не должен прийти к выводу, что bash ему не нужен.
 
-The documentation must not say "the kernel is bound to bash 4" when that is
-true of one part of the kernel only. The truth in BS is tiered, and every
-claim names its tier.
+Две ошибки одного класса, обе недопустимы:
+1. **Преуменьшение** — «ядро работает в любой оболочке», «bash нужен только ярусу bash4», «для
+   Bash» без версии, требование bash 4.2+ отсутствует в первом абзаце или в «Требованиях».
+2. **Преувеличение** — «BS работает только в bash», «ядро привязано к bash 4» без слов о том, что
+   8 файлов ядра и пролог от bash не зависят и что `bs`/`install.sh` запускаются из любой оболочки.
+
+**The main fact must not be hidden: BS requires bash 4.2+.** All of the `lib/` library (86
+modules, none of them POSIX) and 7 of the 15 `core/` files are written in bash. The exception is 8
+small `@shell posix` kernel files and the entry-point prologue: they run in any shell. Any text
+that speaks about BS requirements **names bash 4.2+ first** and only then the exceptions. The
+remark about tiers must not outshine the requirement.
+
+Two mistakes of one class, both unacceptable: **understating** ("the kernel works in any shell",
+"bash is needed only by the bash4 tier", "for Bash" with no version, no bash 4.2+ in the first
+paragraph or in "Requirements") and **overstating** ("BS works only in bash", "the kernel is bound
+to bash 4" with no word that 8 kernel files and the prologue do not depend on it).
 
 ## Что считается правдой / What counts as true
 
@@ -76,13 +92,17 @@ Three access levels (described in `shell-portability.md`):
 
 Использовать / Use:
 
+- «BS требует bash 4.2+: на нём написаны вся `lib/` и 7 из 15 файлов ядра. 8 файлов ядра (`@shell posix`) и пролог точек входа от bash не зависят; `bs` и `install.sh` можно запускать из любой оболочки.» — формула для первого абзаца и раздела «Требования».
+- «BS requires bash 4.2+: all of `lib/` and 7 of the 15 kernel files are written in it. The 8 `@shell posix` kernel files and the entry-point prologue do not depend on it; `bs` and `install.sh` can be started from any shell.» — the formula for the first paragraph and the Requirements section.
 - «Гейт bash 4.2+ относится к ярусу `bash4`: так запускается ядро. Модули `@shell posix` и мост `bs call` его не требуют.»
 - «The bash 4.2+ gate belongs to the `bash4` tier: that is how the kernel starts. `@shell posix` modules and the `bs call` bridge do not require it.»
 - «Запуск из dash, ash, ksh, mksh, fish: трамплин находит bash 4.2+ и перезапускает точку входа.»
 
 Не использовать / Avoid:
 
-- «BS работает только в bash» — неверно: точки входа запускаются из любой оболочки.
+- «Ядро делится на ярусы…» **как первая фраза** без «требуется bash 4.2+» — это преуменьшение.
+- «для Bash» / «на Bash» без версии 4.2+ в заголовочной фразе.
+- «BS работает только в bash» — неверно: точки входа запускаются из любой оболочки, 8 файлов ядра от bash не зависят.
 - «Ядро работает в zsh» — без уточнения яруса и без запуска.
 - «Поддерживаются все оболочки» — таблица говорит иначе (nushell, oksh, osh не проверялись).
 

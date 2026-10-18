@@ -2,7 +2,11 @@
 
 # Shell portability
 
-BS must be usable from most shells, not only bash and zsh. This page is the
+**BS requires bash 4.2+.** All of `lib/` (86 modules, none of them POSIX) and 7 of the 15 kernel
+files are written in bash; only 8 small `@shell posix` kernel files and the prologue of the entry
+points do not depend on it. "Usable from most shells" means: `bs` and `install.sh` can be started
+from any shell (they re-run in bash), kernel functions are called from any shell with `bs call`,
+and the POSIX files are sourced directly. This page is the
 design behind branch `fix/kernel-security-p0`; the working rules for authors
 are in the skill `.agents/skills/bs-shell-portability/SKILL.md`.
 

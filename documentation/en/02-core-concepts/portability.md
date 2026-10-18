@@ -7,9 +7,10 @@
 
 ## 1. Why
 
-BS claims "ubiquity": the kernel is split into **tiers** (`@shell posix` runs in
-any shell, `@shell bash4` needs bash 4.2+ as the host), and the other shells
-reach it through a re-run in bash and the `bs call` bridge (see
+BS runs on **bash 4.2+** (all of `lib/` and 7 of the 15 kernel files are written
+in it) and claims "ubiquity". The exception is 8 `@shell posix` kernel files that
+run in any shell; the other shells get BS through a re-run in bash and the `bs
+call` bridge (see
 [shell-portability](../08-development/shell-portability.md)). But "everywhere"
 is several worlds:
 

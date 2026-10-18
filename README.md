@@ -1,11 +1,11 @@
 # BS Framework
 
-**BS** — модульный фреймворк и стандартная библиотека на Bash (ядро требует bash 4.2+, POSIX-ярус работает в любой оболочке):
+**BS** — модульный фреймворк и стандартная библиотека на **Bash 4.2+** (вся `lib/` и 7 из 15 файлов ядра написаны на bash; 8 файлов ядра `@shell posix` работают в любой оболочке):
 загрузчик модулей, логирование, обработка ошибок, декларативные параметры
 скриптов, абстракция потоков ввода/вывода и набор системных модулей —
 всё в едином code style и без единой внешней зависимости.
 
-**BS** is a modular framework and standard library written in Bash (the kernel needs bash 4.2+, the POSIX tier runs in any shell):
+**BS** is a modular framework and standard library written in **Bash 4.2+** (all of `lib/` and 7 of the 15 kernel files are bash; the 8 `@shell posix` kernel files run in any shell):
 a module loader, logging, error handling, declarative script parameters,
 an I/O streams abstraction and a set of system modules — all in a
 consistent code style and with zero external dependencies.
@@ -61,7 +61,8 @@ consistent code style and with zero external dependencies.
 
 ## Требования / Requirements
 
-- Bash 4.4+ (CI-минимум; Bash 4.0–4.3 не проверяется)
+- **Bash 4.2+ — обязательно / required**: на нём написаны вся `lib/` (86 модулей) и ядро; CI проверяет с 4.4, версии 4.2–4.3 допускаются кодом, но не проверяются / all of `lib/` (86 modules) and the kernel are bash; CI checks from 4.4, 4.2–4.3 are accepted by the code but not verified
+- Запускать `bs` и `install.sh` можно из любой оболочки: пролог находит bash и перезапускается в нём / `bs` and `install.sh` can be started from any shell: the prologue finds bash and re-runs itself in it
 - Linux (основная платформа; macOS — частично)
 
 ## Быстрый старт / Quick start

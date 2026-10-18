@@ -10,6 +10,16 @@
 поэтому его функции доступны в любом модуле и любом скрипте после бутстрапа — явный
 `load "core/utils"` не нужен.
 
+**Где что лежит.** Часть функций `utils::*` вынесена в POSIX-модули ядра (`@shell posix`), чтобы их мог подключать любой скрипт на dash, ash, ksh, mksh, zsh и bash. Имена `utils::*` не изменились (в bash и zsh это псевдонимы настоящих функций):
+
+| Функции | Модуль | Настоящие имена |
+|---|---|---|
+| `utils::has`, `utils::quiet`, `utils::quiet_err`, `utils::ignore`, `utils::attempt` | [core/quiet.sh](../../../core/quiet.sh) | `utils_has`, `utils_quiet`, … |
+| `utils::human_size`, `utils::head_bytes`, `utils::now_s`, `utils::now_ms`, `utils::now_float`, `utils::stamp`, `utils::log_stamp` | [core/fmt.sh](../../../core/fmt.sh) | `fmt_human_size`, `fmt_stamp`, … |
+| остальное (`utils::tempfile`, `utils::split`, `utils::ensure_source`, …) | [core/utils.sh](../../../core/utils.sh) | — (ярус `bash4`) |
+
+Описание функций ниже остаётся верным: меняется только файл, в котором они определены. Подробнее о ярусах — [shell-portability](../08-development/shell-portability.md).
+
 Важно: `core/utils` загружается **последним** из core-модулей (`core/const`, `core/logger`,
 `core/errorhandler`, `core/version`, `core/utils`). Поэтому сами core-модули хелперы
 `utils::*` не используют — на момент их загрузки этих функций ещё нет.

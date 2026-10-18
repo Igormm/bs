@@ -10,6 +10,16 @@ General-purpose utility functions. Source: [core/utils.sh](../../../core/utils.s
 so its functions are available in every module and every script after bootstrap — no explicit
 `load "core/utils"` is needed.
 
+**Where things live.** Some `utils::*` functions moved into the POSIX modules of the kernel (`@shell posix`), so any script in dash, ash, ksh, mksh, zsh and bash can source them. The `utils::*` names did not change (in bash and zsh they are aliases of the real functions):
+
+| Functions | Module | Real names |
+|---|---|---|
+| `utils::has`, `utils::quiet`, `utils::quiet_err`, `utils::ignore`, `utils::attempt` | [core/quiet.sh](../../../core/quiet.sh) | `utils_has`, `utils_quiet`, … |
+| `utils::human_size`, `utils::head_bytes`, `utils::now_s`, `utils::now_ms`, `utils::now_float`, `utils::stamp`, `utils::log_stamp` | [core/fmt.sh](../../../core/fmt.sh) | `fmt_human_size`, `fmt_stamp`, … |
+| the rest (`utils::tempfile`, `utils::split`, `utils::ensure_source`, …) | [core/utils.sh](../../../core/utils.sh) | — (the `bash4` tier) |
+
+The function descriptions below stay valid: only the file that defines them changed. More about tiers: [shell-portability](../08-development/shell-portability.md).
+
 Note: `core/utils` is loaded **last** among the core modules (`core/const`, `core/logger`,
 `core/errorhandler`, `core/version`, `core/utils`). Because of that the core modules themselves
 do not use `utils::*` helpers — they simply are not available yet while core is loading.

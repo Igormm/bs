@@ -38,13 +38,15 @@ BS устанавливается модульным установщиком в
 - `TARGET_LIB=$LIB_DIR/bs` — файлы фреймворка: `bootstrap/`, `core/`, `lib/` и лаунчер `bs`, скопированные из репозитория.
 - `TARGET_BIN=$BIN_DIR/bs` — небольшой wrapper-скрипт:
 
-```bash
-#!/usr/bin/env bash
+```sh
+#!/bin/sh
 export BS_ROOT="${TARGET_LIB}"
 exec "${BS_ROOT}/bs" "$@"
 ```
 
-Wrapper экспортирует `BS_ROOT` и делегирует вызов настоящей точке входа `bs`, поэтому shebang `#!/usr/bin/env bs` работает в пользовательских скриптах, как только `BIN_DIR` добавлен в `PATH`.
+Wrapper — POSIX `sh` (он только передаёт управление), экспортирует `BS_ROOT` и делегирует вызов настоящей точке входа `bs`, поэтому shebang `#!/usr/bin/env bs` работает в пользовательских скриптах, как только `BIN_DIR` добавлен в `PATH`. Если на машине нет `/bin/sh` или `/usr/bin/env` (Termux), установщик и `bs update` подгоняют первую строку wrapper'а и копии `bs` под эту машину (`bs shebang`, раздел «Termux и shebang» ниже).
+
+Автодополнение bash ставится в `~/.local/share/bash-completion/completions/bs` (`--local`), в `/usr/share/bash-completion/completions/bs` (системная установка с префиксом по умолчанию) или в `$PREFIX/share/bash-completion/completions/bs` (свой `PREFIX`, например Termux). Не получилось установить — это замечание, а не ошибка: `bs` работает и без него.
 
 ## Манифест установки
 
@@ -314,7 +316,7 @@ bs shebang set --mode env --dry-run script.sh   # показать, что из�
   - `system` (по умолчанию): `/usr/local/lib/bs`;
   - `local` (`--local`): `~/.local/lib/bs`;
   - произвольный: значения `PREFIX`, `BIN_DIR`, `LIB_DIR`.
-- Для запуска ядра (ярус `bash4`) нужен bash 4.2+; установщик можно запустить из
+- **Нужен bash 4.2+** (на нём написаны ядро и вся `lib/`); установщик можно запустить из
   любой оболочки — точка входа сама найдёт bash (трамплин). Версию проверяет POSIX-пролог `install.sh`
   (`bs_shell_host_ok`, по реальному интерпретатору, а не по `$SHELL`) до всего
   остального; `init.sh` при source проверяет её ещё раз. `check_shell_environment`
