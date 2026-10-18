@@ -30,10 +30,11 @@ declare -gA BS_CONFIG
 
 # @global BS_CONFIG_USER_DIR — Env: user config dir ~/.config/bs (category: env)
 # @global BS_CONFIG_USER_DIR — Env: каталог конфигурации пользователя ~/.config/bs (категория: env)
-readonly BS_CONFIG_USER_DIR="${HOME}/.config/bs"
+# Без HOME (cron, systemd, env -i) пользовательского конфига нет: путь пуст / Without HOME (cron, systemd, env -i) there is no user config: the path is empty
+readonly BS_CONFIG_USER_DIR="${HOME:+${HOME}/.config/bs}"
 # @global BS_CONFIG_USER_FILE — Env: user config file (category: env)
 # @global BS_CONFIG_USER_FILE — Env: файл конфигурации пользователя (категория: env)
-readonly BS_CONFIG_USER_FILE="${BS_CONFIG_USER_DIR}/config.sh"
+readonly BS_CONFIG_USER_FILE="${BS_CONFIG_USER_DIR:+${BS_CONFIG_USER_DIR}/config.sh}"
 # @global BS_CONFIG_LOCAL_FILE — Env: local (cwd) config file name (category: env)
 # @global BS_CONFIG_LOCAL_FILE — Env: имя локального (cwd) конфиг-файла (категория: env)
 readonly BS_CONFIG_LOCAL_FILE=".bsrc"
@@ -145,12 +146,14 @@ config::load() {
   __config::set_defaults
 
   # Ensure user config directory exists / Создаём директорию пользовательского конфига
-  if ! is::dir "${BS_CONFIG_USER_DIR}"; then
+  if [[ -n "${BS_CONFIG_USER_DIR}" ]] && ! is::dir "${BS_CONFIG_USER_DIR}"; then
     utils::ignore mkdir -p "${BS_CONFIG_USER_DIR}"
   fi
 
   # Load user config / Пользовательский конфиг
-  __config::load_file "${BS_CONFIG_USER_FILE}"
+  if [[ -n "${BS_CONFIG_USER_FILE}" ]]; then
+    __config::load_file "${BS_CONFIG_USER_FILE}"
+  fi
 
   # Load project-local config / Локальный конфиг проекта
   if is::file "${BS_CONFIG_LOCAL_FILE}"; then
