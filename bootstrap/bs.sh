@@ -159,13 +159,6 @@ bs::regex::captures() {
   __bs_rx_out=("${BASH_REMATCH[@]}")
 }
 
-# @description Is the code running in a subshell (( ), $( ), pipeline)?
-# @description Исполняется ли код в подоболочке (( ), $( ), конвейер)?
-# @return 0 in a subshell, 1 in the main shell / 0 в подоболочке, 1 в основной оболочке
-bs::shell::in_subshell() {
-  (( BASH_SUBSHELL > 0 ))
-}
-
 # @description Send `set -x` traces to the open file descriptor FD.
 # @description Направить трассировку `set -x` в открытый дескриптор FD.
 # @param $1 fd / дескриптор
