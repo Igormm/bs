@@ -144,6 +144,22 @@ shebang `bs`, `install.sh --help`, проба возможностей. **Не �
 nushell (не установлен), oksh, osh. Для fish проверен только вызов команды
 `bs` и скрипта с shebang; его синтаксис ядро не читает.
 
+## Схемы доступа: перезапуск, мост, POSIX-ярус
+
+Три способа добраться до ядра из других оболочек. Полная картина — в [Начале работы](../01-getting-started/README.md).
+
+### Запуск из dash: перезапуск в bash
+
+![Сценарий 2: запуск из dash — перезапуск в bash](../../assets/uml/scenario-2-ru.svg)
+
+### Вызов из fish и nushell: `bs call`
+
+![Сценарий 3: bs call из fish или nushell](../../assets/uml/scenario-3-ru.svg)
+
+### POSIX-ярус без bash
+
+![Сценарий 4: POSIX-ярус без bash](../../assets/uml/scenario-4-ru.svg)
+
 ## Тесты и инструменты
 
 - `tests/unit/testshellunit.sh` — реестр; `testtrampolineunit.sh` — точки входа

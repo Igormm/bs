@@ -32,29 +32,28 @@ ok() { testframework::assert_true "$1" "$2" || true; }
 
 test_parses_everywhere() {
     local sh_name sh_bin
-    for sh_name in bash zsh dash; do
-        sh_bin="$(command -v "${sh_name}" || true)"
-        [[ -n "${sh_bin}" ]] || { printf '  skip: %s is not installed / не установлен\n' "${sh_name}"; continue; }
+    while IFS= read -r sh_bin; do
+        sh_name="${sh_bin##*/}"
         testframework::assert_command "'${sh_bin}' -n '${SHELL_SH}'" "shell.sh parses in ${sh_name}" || true
         testframework::assert_command "'${sh_bin}' -n '${BS_PROJECT_ROOT}/bootstrap/trampoline.sh'" "trampoline.sh parses in ${sh_name}" || true
-    done
+        testframework::assert_command "'${sh_bin}' -n '${BS_PROJECT_ROOT}/bootstrap/shebang.sh'" "shebang.sh parses in ${sh_name}" || true
+    done < <(testframework::posix_shells)
     if utils::has shellcheck; then
-        testframework::assert_command "shellcheck -s sh '${SHELL_SH}' '${BS_PROJECT_ROOT}/bootstrap/trampoline.sh'" "shellcheck -s sh is clean for the POSIX files" || true
+        testframework::assert_command "shellcheck -s sh '${SHELL_SH}' '${BS_PROJECT_ROOT}/bootstrap/trampoline.sh' '${BS_PROJECT_ROOT}/bootstrap/shebang.sh'" "shellcheck -s sh is clean for the POSIX files" || true
     fi
 }
 
 test_family_per_shell() {
     local sh_name sh_bin
-    for sh_name in bash zsh dash; do
-        sh_bin="$(command -v "${sh_name}" || true)"
-        [[ -n "${sh_bin}" ]] || continue
+    while IFS= read -r sh_bin; do
+        sh_name="${sh_bin##*/}"
         eq "${sh_name}" "$(probe "${sh_bin}" 'bs_shell_family')" "family detected by ${sh_name} itself"
-    done
-    eq "yes" "$(probe bash 'bs_shell_host_ok && echo yes || echo no' 2>/dev/null || probe "$(command -v bash)" 'bs_shell_host_ok && echo yes || echo no')" "bash 4.2+ is a capable host"
-    sh_bin="$(command -v zsh || true)"
-    [[ -z "${sh_bin}" ]] || eq "no" "$(probe "${sh_bin}" 'bs_shell_host_ok && echo yes || echo no')" "zsh is not a host"
-    sh_bin="$(command -v dash || true)"
-    [[ -z "${sh_bin}" ]] || eq "no" "$(probe "${sh_bin}" 'bs_shell_host_ok && echo yes || echo no')" "dash is not a host"
+        if [[ "${sh_name}" == bash ]]; then
+            eq "yes" "$(probe "${sh_bin}" 'bs_shell_host_ok && echo yes || echo no')" "bash 4.2+ is a capable host"
+        else
+            eq "no" "$(probe "${sh_bin}" 'bs_shell_host_ok && echo yes || echo no')" "${sh_name} is not a host"
+        fi
+    done < <(testframework::posix_shells)
 }
 
 test_of_name() {

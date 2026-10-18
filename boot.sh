@@ -48,7 +48,8 @@ BOOT_DIR="${BS_ENTRY_DIR}"
 if [[ -f "${BOOT_DIR}/bootstrap/bs.sh" ]]; then
   source "${BOOT_DIR}/bootstrap/bs.sh"
   bs::strict
-  bs::shell::ensure_version 4 || exit 1
+  # Версию bash уже проверил POSIX-пролог (bs_shell_host_ok) — повторять нечего
+  # The POSIX prologue (bs_shell_host_ok) has already checked the bash version
 else
   printf 'ERROR: bootstrap/bs.sh not found in %s\n' "$BOOT_DIR" >&2
   exit 1

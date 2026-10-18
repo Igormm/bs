@@ -26,16 +26,15 @@ run_in() {
 
 test_in_every_shell() {
     local sh_name sh_bin
-    for sh_name in bash zsh dash; do
-        sh_bin="$(command -v "${sh_name}" || true)"
-        [[ -n "${sh_bin}" ]] || { printf '  skip: %s is not installed / не установлен\n' "${sh_name}"; continue; }
+    while IFS= read -r sh_bin; do
+        sh_name="${sh_bin##*/}"
         testframework::assert_command "'${sh_bin}' -n '${SHEBANG_SH}'" "parses in ${sh_name}" || true
         eq "$(run_in "${sh_bin}" 'bs_shebang_line portable bs')" '#!/usr/bin/env bs' "${sh_name}: portable line"
         eq "$(run_in "${sh_bin}" 'bs_shebang_parse "#! /bin/bash -e"')" '/bin/bash -e' "${sh_name}: parse"
         eq "$(run_in "${sh_bin}" 'bs_shebang_works "#!/nonexistent/env bs" >/dev/null || echo broken')" 'broken' "${sh_name}: missing interpreter is broken"
         eq "$(run_in "${sh_bin}" 'bs_shebang_works "#!/usr/bin/env sh" && echo ok')" 'ok' "${sh_name}: env + sh works"
         eq "$(run_in "${sh_bin}" 'bs_shebang_works "#!/usr/bin/env no-such-prog-xyz" >/dev/null || echo broken')" 'broken' "${sh_name}: env + missing program is broken"
-    done
+    done < <(testframework::posix_shells)
 }
 
 test_termux_detection() {

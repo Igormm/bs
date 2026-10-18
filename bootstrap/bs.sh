@@ -672,10 +672,10 @@ bs::cli::doctor_cmd() {
   log::info "$(printf '  %-8s | %-30s | %s' "STATUS" "ITEM" "DETAIL")"
   log::info "$(printf '  %-8s | %-30s | %s' "--------" "------------------------------" "--------")"
 
-  # Bash version gate already ran in the pre-kernel namespace
-  # (bootstrap/bs.sh::bs::shell::ensure_version) — no re-check here.
-  # Гейт версии bash уже отработал в pre-kernel namespace
-  # (bootstrap/bs.sh::bs::shell::ensure_version) — повторная проверка не нужна.
+  # The bash version gate already ran in the POSIX prologue (bs_shell_host_ok)
+  # — no re-check here.
+  # Гейт версии bash уже отработал в POSIX-прологе (bs_shell_host_ok) —
+  # повторная проверка не нужна.
 
   # Required core files / Обязательные файлы ядра
   local req=(bootstrap/init.sh bootstrap/loader.sh bootstrap/bs.sh bootstrap/shell.sh bootstrap/trampoline.sh core/prereq.sh core/lang.sh core/const.sh core/logger.sh core/errorhandler.sh core/version.sh core/quiet.sh core/utils.sh core/config.sh core/deps.sh core/repl.sh core/calc.sh)

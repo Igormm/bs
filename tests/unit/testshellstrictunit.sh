@@ -90,9 +90,9 @@ test_file_tier() {
 test_cli() {
     printf '#!/usr/bin/env bs\nload "lib/io/streams"\nio::streams::print "ran"\n' > "${T}/s.sh"
     local sh_name sh_bin
-    for sh_name in dash zsh; do
-        sh_bin="$(command -v "${sh_name}" || true)"
-        [[ -n "${sh_bin}" ]] || { printf '  skip: %s is not installed\n' "${sh_name}"; continue; }
+    while IFS= read -r sh_bin; do
+        sh_name="${sh_bin##*/}"
+        [[ "${sh_name}" != bash ]] || continue
         run -- "${sh_bin}" ./bs run "${T}/s.sh"
         eq "ran" "${OUT}" "${sh_name} without the flag: the module runs through the trampoline"
         run -- "${sh_bin}" ./bs --strict-shell run "${T}/s.sh"
@@ -103,7 +103,7 @@ test_cli() {
         has "--strict-shell" "${sh_name} --strict-shell: bilingual hint" 
         run BS_SHELL_STRICT=1 -- "${sh_bin}" ./bs run "${T}/s.sh"
         eq "1" "${RC}" "${sh_name} BS_SHELL_STRICT=1: exit 1"
-    done
+    done < <(testframework::posix_shells 2>/dev/null)
     run -- "${TEST_BASH}" ./bs --strict-shell run "${T}/s.sh"
     eq "ran" "${OUT}" "bash --strict-shell: bash 4.2+ is allowed"
     run -- "${TEST_BASH}" ./bs --strict-shell version

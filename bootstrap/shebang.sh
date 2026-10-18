@@ -139,7 +139,7 @@ bs_shebang_line() {
   __bs_sb_prog=${2:-bs}
   __bs_sb_mode=${1:-auto}
   if [ "$__bs_sb_mode" = auto ]; then
-    if [ -x /usr/bin/env ]; then __bs_sb_mode=portable; else __bs_sb_mode=env; fi
+    if [ -x /usr/bin/env ]; then __bs_sb_mode=portable; else __bs_sb_mode="env"; fi
   fi
   case "$__bs_sb_mode" in
     portable) printf '#!/usr/bin/env %s\n' "$__bs_sb_prog" ;;

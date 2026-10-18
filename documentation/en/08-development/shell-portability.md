@@ -145,6 +145,22 @@ Run for real on this machine: bash 5.3.0, zsh 5.9, dash 0.5.12, busybox ash
 installed), oksh, osh. For fish only the `bs` command and a script with the
 shebang were run; the kernel does not read its syntax.
 
+## Access diagrams: re-run, bridge, POSIX tier
+
+Three ways to reach the kernel from other shells. The whole picture is in [Getting Started](../01-getting-started/README.md).
+
+### Start from dash: re-run in bash
+
+![Scenario 2: start from dash — re-run in bash](../../assets/uml/scenario-2-en.svg)
+
+### Call from fish and nushell: `bs call`
+
+![Scenario 3: bs call from fish or nushell](../../assets/uml/scenario-3-en.svg)
+
+### The POSIX tier without bash
+
+![Scenario 4: the POSIX tier without bash](../../assets/uml/scenario-4-en.svg)
+
 ## Tests and tools
 
 - `tests/unit/testshellunit.sh` — registry; `testtrampolineunit.sh` — entry

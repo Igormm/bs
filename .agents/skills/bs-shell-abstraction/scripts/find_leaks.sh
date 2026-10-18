@@ -23,7 +23,7 @@ paths=("$@")
 # Разрешено / allowed: слой абстракции и точки до загрузчика
 allowed='^(bootstrap/(bs|shell|trampoline)\.sh'
 # тесты самого слоя абстракции проверяют эти конструкции намеренно / tests of the layer itself check them on purpose
-allowed+='|tests/unit/test(bsismain|shell|trampoline|shelltier|shellstrict|[a-z]+portable)unit\.sh|tests/validatedocscode\.sh)$'
+allowed+='|tests/unit/test(bsismain|shell|trampoline|shelltier|shellstrict|posixtier|[a-z]+portable)unit\.sh|tests/validatedocscode\.sh)$'
 # Что ищем / what we look for
 pat='(^|[^A-Za-z0-9_])BASH_[A-Z_]+|FUNCNAME|ZSH_[A-Z]+|\$\{?SHELL\}?|\$\{?BASH\}?[^_A-Za-z]|/proc/\$\$|ps -p +\$\$|(dirname|readlink -f)[^|]*"\$0"'
 

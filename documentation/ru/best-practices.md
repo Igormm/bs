@@ -63,10 +63,10 @@ documentation/   # Гайды, справочники API, примеры
 - **Загрузчик модулей**: зависимости объявляются в комментарии
   `# @depends core/const, core/logger`; загрузчик отслеживает циклы через
   `BS_LOAD_STACK` и дедуплицирует через `BS_LOADED_MODULES`.
-- **Централизованные проверки shell**: проверяй Bash 4.2+ одним хелпером
-  (`bootstrap/bs.sh::bs::shell::ensure_version` — доступен до загрузки
-  loader'а и используется точками входа; `utils::ensure_shell_version`
-  устарела). Не разбрасывай ad-hoc проверки `BASH_VERSINFO` по файлам.
+- **Централизованные проверки shell**: версию Bash 4.2+ в точках входа проверяет
+  POSIX-пролог (`bs_shell_host_ok`); при подключении `init.sh` из своего скрипта —
+  `bootstrap/bs.sh::bs::shell::ensure_version` (доступен до загрузки loader'а;
+  `utils::ensure_shell_version` устарела). Не разбрасывай ad-hoc проверки `BASH_VERSINFO` по файлам.
 - **Логирование**: используй `log::info|warn|error|debug|trace|success|fatal`
   и настраивай вывод через `BS_LOG_LEVEL`, `BS_LOG_COLOR`, `BS_LOG_FORMAT`,
   `BS_LOG_TIMESTAMP`.

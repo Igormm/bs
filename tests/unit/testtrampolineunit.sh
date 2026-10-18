@@ -60,10 +60,9 @@ test_prologue_identical() {
 }
 
 test_entry_points_under_shells() {
-    local sh_name sh_bin entry
-    for sh_name in dash zsh bash; do
-        sh_bin="$(shell_bin "${sh_name}")"
-        [[ -n "${sh_bin}" ]] || { printf '  skip: %s is not installed / не установлен\n' "${sh_name}"; continue; }
+    local sh_name sh_bin
+    while IFS= read -r sh_bin; do
+        sh_name="${sh_bin##*/}"
         run "${sh_bin}" ./bs version
         eq "0" "${RC}" "${sh_name} ./bs version: exit 0"
         has "BS Framework version:" "${sh_name} ./bs version: prints the version"
@@ -73,7 +72,7 @@ test_entry_points_under_shells() {
         has "BS installer" "${sh_name} ./install.sh --help: the usage"
         run "${sh_bin}" ./boot.sh version
         has "BS Framework version:" "${sh_name} ./boot.sh version: hands over to bs"
-    done
+    done < <(testframework::posix_shells)
 }
 
 test_bash_as_sh() {
@@ -89,12 +88,11 @@ test_bash_as_sh() {
 
 test_arguments_survive() {
     local sh_name sh_bin
-    for sh_name in dash zsh; do
-        sh_bin="$(shell_bin "${sh_name}")"
-        [[ -n "${sh_bin}" ]] || continue
+    while IFS= read -r sh_bin; do
+        sh_name="${sh_bin##*/}"
         run "${sh_bin}" ./bs calc '2 3 + 4 *'
         eq "20" "${OUT}" "${sh_name}: an argument with spaces arrives intact"
-    done
+    done < <(testframework::posix_shells 2>/dev/null)
     local dash_bin; dash_bin="$(shell_bin dash)"
     if [[ -n "${dash_bin}" ]]; then
         printf '#!/usr/bin/env bs\nload "lib/io/streams"\nio::streams::print "[$1][$2]"\n' > "${T}/args.sh"
