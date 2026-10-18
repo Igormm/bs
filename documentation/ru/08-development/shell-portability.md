@@ -201,6 +201,26 @@ nushell (не установлен), oksh, osh. Для fish проверен т�
 `utils::*`). Загружается перед `core/utils.sh`; проверен в bash, zsh, dash,
 busybox ash, ksh93 и mksh (`unit/testquietportableunit.sh`).
 
+`core/calc.sh` (`@shell posix`) — RPN-калькулятор на `dc`: `calc_help`, `calc_autop`,
+`calc_eval`, `calc_interactive`, `calc_main` (в bash и zsh — прежние `calc::*`, их зовёт `bs calc`).
+Логгер он берёт, только если тот загружен (`calc_log`), иначе пишет в stderr; приглашение интерактивного режима —
+только на терминале (`[ -t 0 ]`), как у `read -p`. Проверен в bash, zsh, dash, busybox ash, ksh93 и mksh
+(`unit/testcalcportableunit.sh`).
+
+`core/fmt.sh` (`@shell posix`) — размеры и метки времени: `fmt_human_size`, `fmt_head_bytes`, `fmt_now_s`,
+`fmt_now_ms`, `fmt_now_float`, `fmt_stamp`, `fmt_log_stamp` (в bash и zsh — прежние `utils::human_size` и др.).
+Умножение размера считается в `awk`, а не в `$(( ))`: арифметика `mksh` 32-битная, и `3 GiB` в ней переполняется —
+это нашёл тест. Проверен в шести оболочках (`unit/testfmtportableunit.sh`).
+
+`core/logger.sh` (`@shell posix`) — логирование: `log_trace … log_fatal`, `log_print`, `log_header`, `log_list`,
+`log_table`, `log_progress`, `log_clear_line` и приватные `log_timestamp`, `log_is_color_enabled`,
+`log_level_to_number`, `log_format_message` и др. (в bash и zsh — прежние `log::*` и `log::__*`, ими пользуется
+весь фреймворк). От `core/lang.sh` больше не зависит. Вывод проверен **побайтно** против прежнего bash-логгера на
+48 комбинациях (формат text/structured/json × цвет × уровень × метка времени, кириллица, кавычки, переводы строк,
+рамки, прогресс), затем в шести оболочках (`unit/testloggerportableunit.sh`, 122 проверки). Единственное отличие:
+ширину рамки `log_header` считает `${#}`, а он в dash и ash считает байты, так что у заголовка с не-ASCII
+рамка в этих оболочках получится шире.
+
 ## Не сделано
 
 Автодополнение для zsh/fish/nushell (есть только bash); аннотации `@shell`

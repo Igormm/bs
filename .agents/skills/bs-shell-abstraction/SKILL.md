@@ -31,8 +31,8 @@ The bash 4 dependency used to be scattered: version checks in the entry points, 
 
 | Ярус / Tier | Где работает напрямую | Файлы сейчас |
 |---|---|---|
-| `posix` | bash, zsh, dash, busybox ash, ksh93, mksh | `bootstrap/shell.sh`, `trampoline.sh`, `shebang.sh`; `core/prereq`, `guard`, `const`, `version`, `quiet` |
-| `bash4` | bash 4.2+ (остальные оболочки — через перезапуск в bash или мост `bs call`) | `bootstrap/bs.sh`, `init.sh`, `loader.sh`; `core/lang`, `args`, `errorhandler`, `config`, `logger`, `utils`, `deps`, `calc`, `repl` |
+| `posix` | bash, zsh, dash, busybox ash, ksh93, mksh | `bootstrap/shell.sh`, `trampoline.sh`, `shebang.sh`; `core/prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc` |
+| `bash4` | bash 4.2+ (остальные оболочки — через перезапуск в bash или мост `bs call`) | `bootstrap/bs.sh`, `init.sh`, `loader.sh`; `core/lang`, `args`, `errorhandler`, `config`, `utils`, `deps`, `repl` |
 
 Следствия (правила для любого изменения):
 1. **Метка — единственный источник правды.** Хозяин (host), `--strict-shell`, `bs doctor`, документация и `tier_scan.sh` читают её; новый файл без метки — `bash4`. Метку ставят честно и меняют только вместе с кодом: файл не `posix`, пока `dash -n`, `zsh -n`, `busybox ash -n` и тест под этими оболочками не проходят.
@@ -107,9 +107,9 @@ Add the tag only when the registry really is unreachable; "it is simpler" is not
 **Decision: duplicating code per shell is fine.** When bash, zsh and ash do the same thing differently, write one branch per shell inside a layer function; the consumer calls one function. A branch for a shell that was not run is marked "not verified".
 
 **Tier каждого файла до lib/.** Метка `@shell` честно отражает язык файла:
-- `posix` — работает в bash, zsh, dash, ash, ksh93, mksh: `bootstrap/shell.sh`, `trampoline.sh`, `shebang.sh`, прологи точек входа (`bs_shell_strict` — здесь же: `bs::strict` в `bootstrap/bs.sh` лишь вызывает её), `core/prereq`, `guard`, `const`, `version`, `quiet`;
-- `bash4` — остальное: `bootstrap/bs.sh`, `init.sh`, `loader.sh`, `core/lang`, `args`, `errorhandler`, `config`, `logger`, `utils`, `deps`, `calc`, `repl` (массивы, ассоциативные массивы, `[[ ]]`, namerefs).
-Перевод файла из `bash4` в `posix` — отдельная задача на файл: сначала список конструкций (`tier_scan.sh --list`), затем замена или вынос в ветку оболочки, затем `dash -n`, `zsh -n`, `busybox ash -n`, `ksh -n`, `mksh -n`, тест во всех шести. Оставшийся порядок: `core/calc`, `core/utils` (остаток), `core/config`, `core/logger`, `core/deps`; `core/errorhandler` — позже (trap и `local -r`); `lang`, `args`, `repl` не переводятся. Каждый шаг — отдельный коммит с тестом.
+- `posix` — работает в bash, zsh, dash, ash, ksh93, mksh: `bootstrap/shell.sh`, `trampoline.sh`, `shebang.sh`, прологи точек входа (`bs_shell_strict` — здесь же: `bs::strict` в `bootstrap/bs.sh` лишь вызывает её), `core/prereq`, `guard`, `const`, `version`, `quiet`, `calc`;
+- `bash4` — остальное: `bootstrap/bs.sh`, `init.sh`, `loader.sh`, `core/lang`, `args`, `errorhandler`, `config`, `logger`, `utils`, `deps`, `repl` (массивы, ассоциативные массивы, `[[ ]]`, namerefs).
+Перевод файла из `bash4` в `posix` — отдельная задача на файл: сначала список конструкций (`tier_scan.sh --list`), затем замена или вынос в ветку оболочки, затем `dash -n`, `zsh -n`, `busybox ash -n`, `ksh -n`, `mksh -n`, тест во всех шести. Оставшийся порядок: `core/utils` (остаток), `core/deps`; `core/errorhandler` — позже (trap и `local -r`); `lang`, `args`, `repl` не переводятся. Каждый шаг — отдельный коммит с тестом.
 
 **Откуда берутся пути.** Источники пути только такие: `$0` в точке входа (пролог, тег `shell-gate`), `BS_ROOT`/`BS_ENTRY_DIR`/`BS_BOOTSTRAP_DIR`, `BS_CURRENT_FILE`, который ставит загрузчик на время `source`. Подключаемый файл не определяет свой путь сам.
 

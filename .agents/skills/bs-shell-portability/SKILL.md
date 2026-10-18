@@ -7,7 +7,7 @@ whenToUse: When writing or changing anything that touches the shell — an insta
 
 # Переносимость между оболочками / Shell portability
 
-Ядро BS делится на **два яруса**: `@shell posix` (5 файлов `core/` и слой `bootstrap/` —
+Ядро BS делится на **два яруса**: `@shell posix` (8 файлов `core/` и слой `bootstrap/` —
 работают в bash, zsh, dash, busybox ash, ksh93, mksh) и `@shell bash4` (остальное,
 требует bash 4.2+). Яруса bash4 не надо «лечить»: на ассоциативных массивах,
 namerefs и `[[ =~ ]]` стоят сотни функций (`lang`, `args`, `repl` в POSIX не перейдут).
@@ -45,7 +45,7 @@ ksh, mksh.
 
 * `@shell posix` — файл валиден как POSIX sh: его подключат dash, ash/busybox,
   bash, zsh, ksh, mksh. Сейчас: `bootstrap/shell.sh`, `trampoline.sh`, `shebang.sh`;
-  `core/prereq`, `guard`, `const`, `version`, `quiet`. **bash в этом ярусе не
+  `core/prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`. **bash в этом ярусе не
   участвует** — это проверяет `.agents/skills/bs-shell-abstraction/scripts/check_posix_tier.sh`
   (разбор в не-bash оболочках, запрет bash-конструкций, запуск в dash без bash в PATH).
   Стиль кода яруса — `documentation/*/code-style-guide.md`, раздел 12.
@@ -96,7 +96,7 @@ namerefs, `mapfile`, `${!x}`, `BASH_REMATCH` — это `@shell bash4` с опи
 модуль доступен через `bs` (hosted) и `bs call`. В POSIX переводят то, что (а) должно
 работать ДО bash — пролог, трамплин, реестр, шебанг; или (б) нужно скриптам на других
 оболочках и не держится на bash-конструкциях — `quiet`, `version`, `const`, `guard`,
-`prereq`; очередь: `calc`, `utils` (остаток), `config`, `logger`, `deps`. Перевод — отдельный
+`prereq`; очередь: `utils` (остаток), `deps` (`calc`, `quiet`, `fmt`, `logger` готовы; `config` держится на ассоциативном массиве и остаётся `bash4`). Перевод — отдельный
 коммит: код, тест в шести оболочках, `check_posix_tier.sh`, строка в документации.
 
 ## 5. Порядок работы / Workflow

@@ -202,6 +202,26 @@ shells without arrays; `const::*` names are aliases of `const_*`.
 and zsh). It loads before `core/utils.sh`; verified in bash, zsh, dash, busybox
 ash, ksh93 and mksh (`unit/testquietportableunit.sh`).
 
+`core/calc.sh` (`@shell posix`) — the RPN calculator on `dc`: `calc_help`, `calc_autop`, `calc_eval`,
+`calc_interactive`, `calc_main` (the old `calc::*` in bash and zsh, which `bs calc` calls). It uses the
+logger only when it is loaded (`calc_log`), otherwise stderr; the interactive prompt is shown only on a
+terminal (`[ -t 0 ]`), like `read -p`. Verified in bash, zsh, dash, busybox ash, ksh93 and mksh
+(`unit/testcalcportableunit.sh`).
+
+`core/fmt.sh` (`@shell posix`) — sizes and timestamps: `fmt_human_size`, `fmt_head_bytes`, `fmt_now_s`,
+`fmt_now_ms`, `fmt_now_float`, `fmt_stamp`, `fmt_log_stamp` (the old `utils::human_size` etc. in bash and zsh).
+The size multiplication is done in `awk`, not in `$(( ))`: `mksh` arithmetic is 32-bit and `3 GiB` overflows in
+it — the test found it. Verified in six shells (`unit/testfmtportableunit.sh`).
+
+`core/logger.sh` (`@shell posix`) — logging: `log_trace … log_fatal`, `log_print`, `log_header`, `log_list`,
+`log_table`, `log_progress`, `log_clear_line` and the private `log_timestamp`, `log_is_color_enabled`,
+`log_level_to_number`, `log_format_message` and others (the old `log::*` and `log::__*` in bash and zsh, which the
+whole framework uses). It no longer depends on `core/lang.sh`. The output was checked **byte for byte** against the
+previous bash logger on 48 combinations (text/structured/json × colour × level × timestamp, Cyrillic, quotes,
+newlines, frames, progress), then in six shells (`unit/testloggerportableunit.sh`, 122 checks). The one difference:
+the width of the `log_header` frame is counted with `${#}`, which counts bytes in dash and ash, so a non-ASCII
+header gets a wider frame in those shells.
+
 ## Not done yet
 
 Completions for zsh/fish/nushell (only bash completion exists); `@shell`

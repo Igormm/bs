@@ -95,7 +95,9 @@ BS — тонкий слой времени выполнения: ядро де�
    ├─ load core/logger      log::*
    ├─ load core/errorhandler  errorhandler::*, cleanup::add
    ├─ load core/version     BS_VERSION, bs::version::*
-   ├─ load core/utils       utils::has, utils::quiet, ...
+   ├─ load core/quiet       utils_has, utils_quiet, ...  (posix)
+   ├─ load core/fmt         fmt_human_size, fmt_stamp, ...   (posix)
+   ├─ load core/utils       остальное utils::*
    ├─ load core/config      config::*
    ├─ load core/deps        разбор # @depends
    ├─ config::load          конфигурация из файлов и окружения
@@ -128,8 +130,8 @@ BS — тонкий слой времени выполнения: ядро де�
 
 | Ярус | Файлы `core/` | Где работает напрямую | Как попадают остальные оболочки |
 |---|---|---|---|
-| `posix` (5) | `prereq`, `guard`, `const`, `version`, `quiet` | bash, zsh, dash, busybox ash, ksh93, mksh (проверено запуском) | — (подключаются сами) |
-| `bash4` (9) | `lang`, `args`, `errorhandler`, `config`, `logger`, `utils`, `deps`, `calc`, `repl` | только bash 4.2+ | точка входа находит bash и перезапускается в нём (трамплин); функции ядра — командой `bs call` |
+| `posix` (8) | `prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc` | bash, zsh, dash, busybox ash, ksh93, mksh (проверено запуском) | — (подключаются сами) |
+| `bash4` (7) | `lang`, `args`, `errorhandler`, `config`, `utils`, `deps`, `repl` | только bash 4.2+ | точка входа находит bash и перезапускается в нём (трамплин); функции ядра — командой `bs call` |
 
 Что делает «доступным всем»:
 
@@ -147,7 +149,7 @@ BS — тонкий слой времени выполнения: ядро де�
 ассоциативные массивы, nameref и `=~` с `BASH_REMATCH`, которых нет или которые
 ведут себя иначе. Оболочки без настоящего запуска (nushell, oksh, osh) не
 считаются проверенными. Перевод файлов `bash4` на `posix` идёт по одному
-(порядок: `calc`, `utils`, `config`, `logger`, `deps`); `lang`, `args` и `repl`
+(порядок: `utils` (остаток), `deps`; `calc`, `quiet`, `fmt`, `logger` уже переведены; `config` остаётся `bash4` из-за ассоциативного массива `BS_CONFIG`); `lang`, `args` и `repl`
 останутся ярусом `bash4`.
 
 ## Стадия 0: POSIX-пролог и `trampoline`

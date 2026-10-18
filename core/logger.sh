@@ -1,5 +1,7 @@
-#!/usr/bin/env bash
-# @shell bash4 — не переводится в posix пока: `local -r/-a/-i` и массив (`log::table`), `${1^^}`, `printf -v`, `$'\033'`, `[[ ]]`/`(( ))`; зависит от core/lang.sh (`is::empty`/`is::not_empty`, bash4, переводится последним); `log::*` вызывают 94 файла lib/core/bootstrap/examples / not converted to posix yet: `local -r/-a/-i` and an array (`log::table`), `${1^^}`, `printf -v`, `$'\033'`, `[[ ]]`/`(( ))`; depends on core/lang.sh (`is::empty`/`is::not_empty`, bash4, converted last); `log::*` is called from 94 files of lib/core/bootstrap/examples
+#!/bin/sh
+# shellcheck shell=sh
+# @shell posix — валидный POSIX sh: case, printf, подстановки параметров и $(( )) без local, массивов, ${1^^}, printf -v и $'..'; ширина рамки log::header считается ${#} (в dash/ash — байты) / valid POSIX sh: case, printf, parameter expansion and $(( )) with no local, arrays, ${1^^}, printf -v or $'..'; the width of the log::header frame is ${#} (bytes in dash/ash)
+# @tier core — builtins and date; works everywhere
 #
 # core/logger.sh — модуль логирования фреймворка BS
 # core/logger.sh — BS framework logging module
@@ -25,12 +27,22 @@
 #
 
 # Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
+# ИМЕНА / NAMES
+#   Real functions: log_trace, log_debug, log_info, log_success, log_warn, log_error, log_fatal,
+#   log_print, log_header, log_list, log_table, log_progress, log_clear_line and the private
+#   log_timestamp, log_is_color_enabled, log_level_to_number, log_is_level_allowed,
+#   log_get_level_color, log_json_escape, log_format_message; in bash and zsh also log::*
+#   (the old names, used by the whole framework) and log::__* for the private ones.
+#   Настоящие функции: log_trace … log_clear_line и приватные log_timestamp …
+#   log_format_message; в bash и zsh — ещё и log::* (прежние имена, их зовёт весь фреймворк)
+#   и log::__* для приватных.
+
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points
 
-bs::guard "LOGGER" || return 0
+bs_guard LOGGER || return 0
 
 # Dependencies / Зависимости
-bs::source_relative "const.sh" "lang.sh"
+bs_source_relative "const.sh"
 
 # @global BS_LOG_LEVEL — Env: log level (DEBUG/INFO/WARN/ERROR) (category: env)
 # @global BS_LOG_LEVEL — Env: уровень логирования (DEBUG/INFO/WARN/ERROR) (категория: env)
@@ -45,406 +57,359 @@ bs::source_relative "const.sh" "lang.sh"
 # @global BS_LOG_TIMESTAMP — Env: временная метка в логе: true/false (категория: env)
 : "${BS_LOG_TIMESTAMP:=true}"
 
+# Байт ESC из printf: без $'\033', которого нет в POSIX sh / the ESC byte from printf: no $'\033', it is not POSIX sh
+__bs_log_esc=$(printf '\033')
+
 # ==========================================
 # Приватные вспомогательные функции / Private helper functions
 # ==========================================
 
 # @private
 # @description Получить текущую временную метку / Get current timestamp
-# @return Timestamp in format YYYY-MM-DD HH:MM:SS / Метка времени в формате ГГГГ-ММ-ДД
-# ЧЧ:ММ:СС
-log::__timestamp() {
-    if [[ "${BS_LOG_TIMESTAMP}" == "true" ]]; then
-        date +"%Y-%m-%d %H:%M:%S"
-    fi
+# @return Timestamp in format YYYY-MM-DD HH:MM:SS / Метка времени в формате ГГГГ-ММ-ДД ЧЧ:ММ:СС
+log_timestamp() {
+  if [ "${BS_LOG_TIMESTAMP}" = "true" ]; then
+    date +"%Y-%m-%d %H:%M:%S"
+  fi
 }
 
 # @private
-# @description Проверить, разрешены ли цвета в терминале / Check if colors are enabled in
-# terminal
-# @param $1 [optional] Целевой fd для проверки tty (по умолчанию 1) / Target fd for the tty
-# test (default: 1)
-# @return 0 if colors enabled, 1 otherwise / 0 если цвета разрешены, иначе 1
-log::__is_color_enabled() {
-    local -r fd="${1:-1}"
+# @description Проверить, включён ли цвет для дескриптора / Check whether colour is on for a descriptor
+# @param $1 file descriptor, default 1 / дескриптор, по умолчанию 1
+log_is_color_enabled() {
+  if [ -n "${NO_COLOR:-}" ]; then
+    return 1
+  fi
+  case "${BS_LOG_COLOR}" in
+    always) return 0 ;;
+    never) return 1 ;;
+    *)
+      if [ -t "${1:-1}" ]; then return 0; fi
+      return 1 ;;
+  esac
+}
 
-    # NO_COLOR (no-color.org): задан и непуст — цвета запрещены всегда
-    # NO_COLOR (no-color.org): set and non-empty — colors are always disabled
-    if is::not_empty "${NO_COLOR:-}"; then
-        return 1
-    fi
+# @private
+# @description Числовой приоритет уровня (регистр не важен) / Numeric priority of a level (case-insensitive)
+# @param $1 level / уровень
+log_level_to_number() {
+  case "${1:-}" in
+    [Tt][Rr][Aa][Cc][Ee])             printf '%d\n' 0 ;;
+    [Dd][Ee][Bb][Uu][Gg])             printf '%d\n' 10 ;;
+    [Ii][Nn][Ff][Oo])                 printf '%d\n' 20 ;;
+    [Ss][Uu][Cc][Cc][Ee][Ss][Ss])     printf '%d\n' 25 ;;
+    [Ww][Aa][Rr][Nn])                 printf '%d\n' 30 ;;
+    [Ee][Rr][Rr][Oo][Rr])             printf '%d\n' 40 ;;
+    [Ff][Aa][Tt][Aa][Ll])             printf '%d\n' 50 ;;
+    [Nn][Oo][Nn][Ee])                 printf '%d\n' 1000 ;;
+    *)                                printf '%d\n' 20 ;;  # По умолчанию INFO / Default to INFO
+  esac
+}
 
-    case "${BS_LOG_COLOR}" in
-        always)
-            return 0
-            ;;
-        never)
-            return 1
-            ;;
-        auto|*)
-            # Цвета разрешены только если целевой fd — интерактивный терминал
-            # Colors only enabled if the target fd is an interactive terminal
-            [[ -t "${fd}" ]] && return 0 || return 1
-            ;;
+# @private
+# @description Разрешён ли вывод сообщения этого уровня / Whether a message of this level is printed
+# @param $1 level / уровень
+log_is_level_allowed() {
+  __bs_log_msg_num=$(log_level_to_number "${1:-}")
+  __bs_log_cfg_num=$(log_level_to_number "${BS_LOG_LEVEL}")
+  [ "$__bs_log_msg_num" -ge "$__bs_log_cfg_num" ]
+}
+
+# @private
+# @description ANSI-цвет уровня (уровень — заглавными) / ANSI colour of a level (upper-case level)
+# @param $1 level / уровень
+log_get_level_color() {
+  case "${1:-}" in
+    TRACE)   printf '%s\n' "${__bs_log_esc}[90m" ;;   # Серый / Gray
+    DEBUG)   printf '%s\n' "${__bs_log_esc}[36m" ;;   # Циан / Cyan
+    INFO)    printf '%s\n' "${__bs_log_esc}[34m" ;;   # Синий / Blue
+    SUCCESS) printf '%s\n' "${__bs_log_esc}[32m" ;;   # Зеленый / Green
+    WARN)    printf '%s\n' "${__bs_log_esc}[33m" ;;   # Желтый / Yellow
+    ERROR)   printf '%s\n' "${__bs_log_esc}[31m" ;;   # Красный / Red
+    FATAL)   printf '%s\n' "${__bs_log_esc}[35m" ;;   # Пурпурный / Purple
+    *)       printf '%s\n' "${__bs_log_esc}[0m" ;;    # Сброс / Reset
+  esac
+}
+
+# @private
+# @description Заменить все вхождения $2 на $3 в $1; результат в __bs_log_out / Replace every $2 with $3 in $1; the result is in __bs_log_out
+# (подстановка ${s//a/b} есть не везде / the ${s//a/b} substitution does not exist everywhere)
+log_replace_all() {
+  __bs_log_rs=$1
+  __bs_log_out=''
+  while :; do
+    case "$__bs_log_rs" in
+      *"$2"*)
+        __bs_log_out="${__bs_log_out}${__bs_log_rs%%"$2"*}$3"
+        __bs_log_rs=${__bs_log_rs#*"$2"} ;;
+      *)
+        __bs_log_out="${__bs_log_out}${__bs_log_rs}"
+        break ;;
     esac
+  done
 }
 
 # @private
-# @description Преобразовать уровень логирования в число для сравнения
-# @description Convert log level to number for comparison
-# @param $1 Log level string / Строка уровня логирования
-# @return Numeric level / Числовой уровень
-log::__level_to_number() {
-    local -r level="${1^^}"
-
-    case "${level}" in
-        TRACE)    printf '%d\n' 0 ;;
-        DEBUG)    printf '%d\n' 10 ;;
-        INFO)     printf '%d\n' 20 ;;
-        SUCCESS)  printf '%d\n' 25 ;;
-        WARN)     printf '%d\n' 30 ;;
-        ERROR)    printf '%d\n' 40 ;;
-        FATAL)    printf '%d\n' 50 ;;
-        NONE)     printf '%d\n' 1000 ;;
-        *)        printf '%d\n' 20 ;;  # По умолчанию INFO / Default to INFO
-    esac
+# @description Экранирование строки для JSON / Escape a string for JSON
+# @param $1 text / текст
+log_json_escape() {
+  __bs_log_js=$1
+  # shellcheck disable=SC1003  # '\' — один обратный слэш в одинарных кавычках / '\' is one backslash in single quotes
+  log_replace_all "$__bs_log_js" '\' '\\'; __bs_log_js=$__bs_log_out   # Обратный слэш / Backslash
+  log_replace_all "$__bs_log_js" '"' '\"';   __bs_log_js=$__bs_log_out   # Кавычка / Quote
+  log_replace_all "$__bs_log_js" '
+' '\n';                                       __bs_log_js=$__bs_log_out   # Перевод строки / Newline
+  log_replace_all "$__bs_log_js" "$(printf '\r')" '\r'; __bs_log_js=$__bs_log_out   # Возврат каретки / Carriage return
+  log_replace_all "$__bs_log_js" "$(printf '\t')" '\t'; __bs_log_js=$__bs_log_out   # Табуляция / Tab
+  printf '%s' "$__bs_log_js"
 }
 
 # @private
-# @description Проверить, разрешен ли вывод сообщения данного уровня
-# @description Check if message of this level is allowed to be output
-# @param $1 Message level / Уровень сообщения
-# @return 0 if allowed, 1 otherwise / 0 если разрешено, иначе 1
-log::__is_level_allowed() {
-    local msg_level="${1^^}"
-    local msg_num cfg_num
-    
-    msg_num="$(log::__level_to_number "${msg_level}")"
-    cfg_num="$(log::__level_to_number "${BS_LOG_LEVEL}")"
-    
-    [[ "${msg_num}" -ge "${cfg_num}" ]]
-}
-
-# @private
-# @description Получить цвет для уровня логирования
-# @description Get color for log level
-# @param $1 Log level / Уровень логирования
-# @return ANSI color code / ANSI код цвета
-log::__get_level_color() {
-    local -r level="${1^^}"
-
-    case "${level}" in
-        TRACE)   printf '%s\n' $'\033[90m' ;;     # Серый / Gray
-        DEBUG)   printf '%s\n' $'\033[36m' ;;     # Циан / Cyan
-        INFO)    printf '%s\n' $'\033[34m' ;;     # Синий / Blue
-        SUCCESS) printf '%s\n' $'\033[32m' ;;     # Зеленый / Green
-        WARN)    printf '%s\n' $'\033[33m' ;;     # Желтый / Yellow
-        ERROR)   printf '%s\n' $'\033[31m' ;;     # Красный / Red
-        FATAL)   printf '%s\n' $'\033[35m' ;;     # Пурпурный / Purple
-        *)       printf '%s\n' $'\033[0m' ;;      # Сброс / Reset
-    esac
-}
-
-# @private
-# @description Экранировать строку для вставки в JSON
-# @description Escape string for embedding into JSON
-# @param $1 Raw string / Исходная строка
-# @return Escaped string / Экранированная строка
-log::__json_escape() {
-    local s="${1}"
-    s="${s//\\/\\\\}"      # Обратный слэш / Backslash
-    s="${s//\"/\\\"}"      # Кавычка / Quote
-    s="${s//$'\n'/\\n}"    # Перевод строки / Newline
-    s="${s//$'\r'/\\r}"    # Возврат каретки / Carriage return
-    s="${s//$'\t'/\\t}"    # Табуляция / Tab
-    printf '%s' "${s}"
-}
-
-# @private
-# @description Форматировать сообщение для вывода
-# @description Format message for output
-# @param $1 Log level / Уровень логирования
-# @param $2 [optional] Целевой fd для вывода (по умолчанию 1) / Target fd for output
-# (default: 1)
-# @param $@ Message text / Текст сообщения
-# @return Formatted message / Отформатированное сообщение
-log::__format_message() {
-    local -r level="${1^^}"
-    local -r fd="${2:-1}"
-    shift 2
-    # "$*" склеивает аргументы первым символом IFS вызывающего — фиксируем пробел
-    # "$*" joins args with the caller's first IFS char — pin it to a space
-    local IFS=' '
-    local text="$*"
-    
-    local timestamp
-    timestamp="$(log::__timestamp)"
-    
-    case "${BS_LOG_FORMAT}" in
-        json)
-            # JSON формат / JSON format
-            local escaped_text
-            escaped_text="$(log::__json_escape "${text}")"
-            if is::not_empty "$timestamp"; then
-                printf '{"timestamp":"%s","level":"%s","message":"%s"}\n' \
-                    "$timestamp" "$level" "$escaped_text"
-            else
-                printf '{"level":"%s","message":"%s"}\n' "$level" "$escaped_text"
-            fi
-            ;;
-        structured)
-            # Структурированный формат / Structured format
-            if is::not_empty "$timestamp"; then
-                printf '[%s] %-5s | %s\n' "$timestamp" "$level" "$text"
-            else
-                printf '[%-5s] %s\n' "$level" "$text"
-            fi
-            ;;
-        text|*)
-            # Текстовый формат с цветами / Text format with colors
-            if log::__is_color_enabled "${fd}"; then
-                local -r color_reset=$'\033[0m'
-                local color="$(log::__get_level_color "$level")"
-                local -r bold=$'\033[1m'
-                
-                # Для ошибок и фатальных используем жирный шрифт
-                # For errors and fatal use bold
-                if [[ "$level" == "ERROR" ]] || [[ "$level" == "FATAL" ]]; then
-                    color="${color}${bold}"
-                fi
-                
-                if is::not_empty "$timestamp"; then
-                    printf '%s[%s]%s %s%-5s%s %s\n' \
-                        $'\033[90m' "$timestamp" "$color_reset" \
-                        "$color" "$level" "$color_reset" \
-                        "$text"
-                else
-                    printf '%s%-5s%s %s\n' \
-                        "$color" "$level" "$color_reset" \
-                        "$text"
-                fi
-            else
-                # Текстовый формат без цветов / Text format without colors
-                if is::not_empty "$timestamp"; then
-                    printf '[%s] %-5s %s\n' "$timestamp" "$level" "$text"
-                else
-                    printf '[%-5s] %s\n' "$level" "$text"
-                fi
-            fi
-            ;;
-    esac
-}
-
-# ==========================================
-# Публичные функции логирования / Public logging functions
-# ==========================================
-
-# @description Вывести сообщение уровня TRACE / Output TRACE level message
-# @param $@ Message text / Текст сообщения
-# @example
-#   log::trace "Entering function with args: $@"
-log::trace() {
-    log::__is_level_allowed "TRACE" || return 0
-    log::__format_message "TRACE" 1 "$@"
-}
-
-# @description Вывести сообщение уровня DEBUG / Output DEBUG level message
-# @param $@ Message text / Текст сообщения
-# @example
-#   log::debug "Processing item: $item"
-log::debug() {
-    log::__is_level_allowed "DEBUG" || return 0
-    log::__format_message "DEBUG" 1 "$@"
-}
-
-# @description Вывести информационное сообщение / Output INFO level message
-# @param $@ Message text / Текст сообщения
-# @example
-#   log::info "Starting process with PID: $$"
-log::info() {
-    log::__is_level_allowed "INFO" || return 0
-    log::__format_message "INFO" 1 "$@"
-}
-
-# @description Вывести сообщение об успехе / Output SUCCESS level message
-# @param $@ Message text / Текст сообщения
-# @example
-#   log::success "Operation completed successfully"
-log::success() {
-    log::__is_level_allowed "SUCCESS" || return 0
-    log::__format_message "SUCCESS" 1 "$@"
-}
-
-# @description Вывести предупреждение / Output WARN level message
-# @param $@ Message text / Текст сообщения
-# @example
-#   log::warn "Configuration file not found, using defaults"
-log::warn() {
-    log::__is_level_allowed "WARN" || return 0
-    log::__format_message "WARN" 2 "$@" >&2
-}
-
-# @description Вывести сообщение об ошибке / Output ERROR level message
-# @param $@ Message text / Текст сообщения
-# @example
-#   log::error "Failed to connect to database: $error"
-log::error() {
-    log::__is_level_allowed "ERROR" || return 0
-    log::__format_message "ERROR" 2 "$@" >&2
-}
-
-# @description Вывести фатальное сообщение и вернуть код ошибки
-# @description Output FATAL level message and return error code
-# @param $@ Message text / Текст сообщения
-# @return E_ERROR (или 1, если const.sh не загружен) / E_ERROR (or 1 if const.sh not
-# loaded)
-# @example
-#   log::fatal "Critical error, cannot continue" || exit 1
-log::fatal() {
-    if log::__is_level_allowed "FATAL"; then
-        log::__format_message "FATAL" 2 "$@" >&2
+# @description Форматировать и напечатать сообщение / Format and print a message
+# @param $1 level (upper-case) / уровень (заглавными)
+# @param $2 file descriptor / дескриптор
+# @param $@ message words / слова сообщения
+log_format_message() {
+  __bs_log_level=${1:-INFO}
+  __bs_log_fd=${2:-1}
+  shift 2
+  # слова склеиваются пробелом независимо от IFS вызывающего / words are joined with a space whatever the caller's IFS
+  __bs_log_text=''
+  __bs_log_first=1
+  for __bs_log_word in "$@"; do
+    if [ "$__bs_log_first" = 1 ]; then
+      __bs_log_text=$__bs_log_word
+      __bs_log_first=0
+    else
+      __bs_log_text="$__bs_log_text $__bs_log_word"
     fi
-    
-    # Библиотечная функция не завершает чужой скрипт: возвращаем код,
-    # решение о выходе остаётся за вызывающим
-    # Library function must not exit the caller's script: return a code,
-    # the decision to exit is up to the caller
-    return "${E_ERROR:-1}"
-}
-
-# @description Алиас для log::info для обратной совместимости
-# @description Alias for log::info for backward compatibility
-# @param $@ Message text / Текст сообщения
-# @example
-#   log::print "Simple message"
-log::print() {
-    log::info "$@"
-}
-
-# @description Вывести заголовок / Output header
-#   Default style: Unicode box / По умолчанию — Unicode-рамка:
-#     ╭─────────╮
-#     │  Text   │
-#     ╰─────────╯
-#   Pass a char as $2 for the classic underline / Передайте символ во $2 для
-#   классического подчёркивания:
-#     log::header "Text" "="  →  Text\n====
-# @param $1 Header text / Текст заголовка
-# @param $2 [optional] "box" (default) or a char for classic underline /
-#   "box" (по умолчанию) или символ классического подчёркивания
-# @example
-#   log::header "Starting deployment"
-log::header() {
-    local text="${1:?Missing header text}"
-    local char="${2:-box}"
-    local line
-
-    if [[ "${char}" == "box" ]]; then
-        # Рамка: ширина по длине текста + пробелы-паддинги
-        # Box: width = text length + padding spaces
-        local inner=" ${text} "
-        printf -v line '%*s' "${#inner}" ''
-        line="${line// /─}"
-
-        log::info "╭${line}╮"
-        log::info "│${inner}│"
-        log::info "╰${line}╯"
-        return 0
-    fi
-
-    # Классическое подчёркивание / Classic underline
-    printf -v line '%*s' "${#text}" ''
-    line="${line// /$char}"
-
-    log::info ""
-    log::info "$text"
-    log::info "$line"
-    log::info ""
-}
-
-# @description Вывести список с маркерами / Output bulleted list
-# @param $@ List items / Элементы списка
-# @example
-#   log::list "Item 1" "Item 2" "Item 3"
-log::list() {
-    local item
-    for item in "$@"; do
-        if log::__is_color_enabled; then
-            log::info "  • $item"
-        else
-            log::info "  * $item"
+  done
+  __bs_log_ts=$(log_timestamp)
+  case "${BS_LOG_FORMAT}" in
+    json)
+      __bs_log_esc_text=$(log_json_escape "$__bs_log_text")
+      if [ -n "$__bs_log_ts" ]; then
+        printf '{"timestamp":"%s","level":"%s","message":"%s"}\n' \
+          "$__bs_log_ts" "$__bs_log_level" "$__bs_log_esc_text"
+      else
+        printf '{"level":"%s","message":"%s"}\n' "$__bs_log_level" "$__bs_log_esc_text"
+      fi
+      ;;
+    structured)
+      if [ -n "$__bs_log_ts" ]; then
+        printf '[%s] %-5s | %s\n' "$__bs_log_ts" "$__bs_log_level" "$__bs_log_text"
+      else
+        printf '[%-5s] %s\n' "$__bs_log_level" "$__bs_log_text"
+      fi
+      ;;
+    *)
+      if log_is_color_enabled "$__bs_log_fd"; then
+        __bs_log_reset="${__bs_log_esc}[0m"
+        __bs_log_color=$(log_get_level_color "$__bs_log_level")
+        if [ "$__bs_log_level" = "ERROR" ] || [ "$__bs_log_level" = "FATAL" ]; then
+          __bs_log_color="${__bs_log_color}${__bs_log_esc}[1m"
         fi
-    done
+        if [ -n "$__bs_log_ts" ]; then
+          printf '%s[%s]%s %s%-5s%s %s\n' \
+            "${__bs_log_esc}[90m" "$__bs_log_ts" "$__bs_log_reset" \
+            "$__bs_log_color" "$__bs_log_level" "$__bs_log_reset" \
+            "$__bs_log_text"
+        else
+          printf '%s%-5s%s %s\n' \
+            "$__bs_log_color" "$__bs_log_level" "$__bs_log_reset" \
+            "$__bs_log_text"
+        fi
+      else
+        if [ -n "$__bs_log_ts" ]; then
+          printf '[%s] %-5s %s\n' "$__bs_log_ts" "$__bs_log_level" "$__bs_log_text"
+        else
+          printf '[%-5s] %s\n' "$__bs_log_level" "$__bs_log_text"
+        fi
+      fi
+      ;;
+  esac
 }
 
-# @description Вывести таблицу / Output table
-# @param $1...$n Table rows as "col1|col2|col3" / Строки таблицы как "кол1|кол2|кол3"
-# @example
-#   log::table "Name|Value" "----|-----" "Host|localhost" "Port|8080"
-log::table() {
-    local row
-    local -a rows=("$@")
-    
-    for row in "${rows[@]}"; do
-        log::info "  $row"
-    done
+# ==========================================
+# Публичный API / Public API
+# ==========================================
+
+# @description Трассировка / Trace message
+# @param $@ message / сообщение
+log_trace() {
+  log_is_level_allowed "TRACE" || return 0
+  log_format_message "TRACE" 1 "$@"
 }
 
-# @description Вывести прогресс бар / Output progress bar
-# @param $1 Current value / Текущее значение
-# @param $2 Maximum value / Максимальное значение
-# @param $3 Width of progress bar (optional, default: 50) / Ширина прогресс-бара
-# (опционально, по умолчанию: 50)
-# @example
-#   log::progress 25 100
-log::progress() {
-    local current="${1:?Missing current value}"
-    local max="${2:?Missing max value}"
-    local width="${3:-50}"
+# @description Отладка / Debug message
+# @param $@ message / сообщение
+log_debug() {
+  log_is_level_allowed "DEBUG" || return 0
+  log_format_message "DEBUG" 1 "$@"
+}
 
-    # Деление на ноль под set -e убьёт вызывающий скрипт / Division by zero
-    # under set -e would kill the calling script
-    (( max > 0 )) || return "${E_ERROR:-1}"
+# @description Информация / Information message
+# @param $@ message / сообщение
+log_info() {
+  log_is_level_allowed "INFO" || return 0
+  log_format_message "INFO" 1 "$@"
+}
 
-    local percentage=$(( current * 100 / max ))
-    local filled=$(( width * current / max ))
-    local empty=$(( width - filled ))
-    
-    local bar
-    printf -v bar '%*s' "$filled" ''
-    bar="${bar// /█}"
-    
-    local empty_bar
-    printf -v empty_bar '%*s' "$empty" ''
-    
-    printf '\r  [%s%s] %d%%' "$bar" "$empty_bar" "$percentage"
-    
-    if [[ $current -eq $max ]]; then
-        printf '\n'  # Новая строка при завершении / New line when done
+# @description Успех / Success message
+# @param $@ message / сообщение
+log_success() {
+  log_is_level_allowed "SUCCESS" || return 0
+  log_format_message "SUCCESS" 1 "$@"
+}
+
+# @description Предупреждение (stderr) / Warning (stderr)
+# @param $@ message / сообщение
+log_warn() {
+  log_is_level_allowed "WARN" || return 0
+  log_format_message "WARN" 2 "$@" >&2
+}
+
+# @description Ошибка (stderr) / Error (stderr)
+# @param $@ message / сообщение
+log_error() {
+  log_is_level_allowed "ERROR" || return 0
+  log_format_message "ERROR" 2 "$@" >&2
+}
+
+# @description Фатальная ошибка (stderr), возвращает E_ERROR / Fatal error (stderr), returns E_ERROR
+# @param $@ message / сообщение
+log_fatal() {
+  if log_is_level_allowed "FATAL"; then
+    log_format_message "FATAL" 2 "$@" >&2
+  fi
+  return "${E_ERROR:-1}"
+}
+
+# @description Алиас для log_info / Alias for log_info
+# @param $@ message / сообщение
+log_print() {
+  log_info "$@"
+}
+
+# @description Заголовок (рамка или линия) / A header (a frame or a line)
+# @param $1 text / текст
+# @param $2 char: box (по умолчанию) или символ линии / box (default) or the line character
+log_header() {
+  __bs_log_htext=${1:?Missing header text}
+  __bs_log_hchar=${2:-box}
+  if [ "$__bs_log_hchar" = "box" ]; then
+    __bs_log_inner=" ${__bs_log_htext} "
+    __bs_log_n=${#__bs_log_inner}
+    __bs_log_line=''
+    while [ "$__bs_log_n" -gt 0 ]; do
+      __bs_log_line="${__bs_log_line}─"
+      __bs_log_n=$((__bs_log_n - 1))
+    done
+    log_info "╭${__bs_log_line}╮"
+    log_info "│${__bs_log_inner}│"
+    log_info "╰${__bs_log_line}╯"
+    return 0
+  fi
+  __bs_log_n=${#__bs_log_htext}
+  __bs_log_line=''
+  while [ "$__bs_log_n" -gt 0 ]; do
+    __bs_log_line="${__bs_log_line}${__bs_log_hchar}"
+    __bs_log_n=$((__bs_log_n - 1))
+  done
+  log_info ""
+  log_info "$__bs_log_htext"
+  log_info "$__bs_log_line"
+  log_info ""
+}
+
+# @description Маркированный список / A bulleted list
+# @param $@ items / элементы
+log_list() {
+  for __bs_log_item in "$@"; do
+    if log_is_color_enabled; then
+      log_info "  • $__bs_log_item"
+    else
+      log_info "  * $__bs_log_item"
     fi
+  done
 }
 
-# @description Очистить текущую строку в терминале
-# @description Clear current line in terminal
-# @example
-#   log::clear_line
-log::clear_line() {
-    printf '\r\033[K'
+# @description Таблица (строки с отступом) / A table (indented rows)
+# @param $@ rows / строки
+log_table() {
+  for __bs_log_row in "$@"; do
+    log_info "  $__bs_log_row"
+  done
+}
+
+# @description Индикатор прогресса / A progress bar
+# @param $1 current / текущее
+# @param $2 max / максимум
+# @param $3 width, default 50 / ширина, по умолчанию 50
+log_progress() {
+  __bs_log_cur=${1:?Missing current value}
+  __bs_log_max=${2:?Missing max value}
+  __bs_log_width=${3:-50}
+  [ "$__bs_log_max" -gt 0 ] || return "${E_ERROR:-1}"
+  __bs_log_pct=$(( __bs_log_cur * 100 / __bs_log_max ))
+  __bs_log_filled=$(( __bs_log_width * __bs_log_cur / __bs_log_max ))
+  __bs_log_empty=$(( __bs_log_width - __bs_log_filled ))
+  __bs_log_bar=''
+  while [ "$__bs_log_filled" -gt 0 ]; do
+    __bs_log_bar="${__bs_log_bar}█"
+    __bs_log_filled=$((__bs_log_filled - 1))
+  done
+  __bs_log_ebar=''
+  while [ "$__bs_log_empty" -gt 0 ]; do
+    __bs_log_ebar="${__bs_log_ebar} "
+    __bs_log_empty=$((__bs_log_empty - 1))
+  done
+  printf '\r  [%s%s] %d%%' "$__bs_log_bar" "$__bs_log_ebar" "$__bs_log_pct"
+  if [ "$__bs_log_cur" -eq "$__bs_log_max" ]; then
+    printf '\n'  # Новая строка при завершении / New line when done
+  fi
+}
+
+# @description Очистить текущую строку / Clear the current line
+log_clear_line() {
+  printf '\r\033[K'
 }
 
 # ==========================================
-# Инициализация модуля / Module initialization
+# Инициализация / Initialization
 # ==========================================
 
-# Проверяем доступность core/const.sh / Check if core/const.sh is available
-if is::empty "${E_SUCCESS:-}"; then
-    echo "logger: warning: core/const.sh not loaded, using default constants" >&2
-    readonly E_SUCCESS=0
-    readonly E_ERROR=1
+# Резервные константы, если const.sh не загружен / Fallback constants if const.sh is not loaded
+if [ -z "${E_SUCCESS:-}" ]; then
+  printf '%s\n' "logger: warning: core/const.sh not loaded, using default constants" >&2
+  bs_shell_readonly E_SUCCESS=0
+  bs_shell_readonly E_ERROR=1
 fi
 
-# @global LOGGER_LOADED — Module loaded flag (category: module-flag)
-# @global LOGGER_LOADED — Флаг загрузки модуля (категория: module-flag)
-declare -g LOGGER_LOADED="1"
+# @global LOGGER_LOADED — Logger: loaded marker (category: module-flag)
+# @global LOGGER_LOADED — Logger: маркер загрузки (категория: module-flag)
+# shellcheck disable=SC2034  # читают тесты и другие модули / read by tests and other modules
+LOGGER_LOADED="1"
 
-log::debug "Logger module initialized with level: ${BS_LOG_LEVEL}, color: ${BS_LOG_COLOR}" 2>/dev/null || true
+bs_shell_alias log_timestamp log::__timestamp
+bs_shell_alias log_is_color_enabled log::__is_color_enabled
+bs_shell_alias log_level_to_number log::__level_to_number
+bs_shell_alias log_is_level_allowed log::__is_level_allowed
+bs_shell_alias log_get_level_color log::__get_level_color
+bs_shell_alias log_json_escape log::__json_escape
+bs_shell_alias log_format_message log::__format_message
+bs_shell_alias log_trace log::trace
+bs_shell_alias log_debug log::debug
+bs_shell_alias log_info log::info
+bs_shell_alias log_success log::success
+bs_shell_alias log_warn log::warn
+bs_shell_alias log_error log::error
+bs_shell_alias log_fatal log::fatal
+bs_shell_alias log_print log::print
+bs_shell_alias log_header log::header
+bs_shell_alias log_list log::list
+bs_shell_alias log_table log::table
+bs_shell_alias log_progress log::progress
+bs_shell_alias log_clear_line log::clear_line
+
+log_debug "Logger module initialized with level: ${BS_LOG_LEVEL}, color: ${BS_LOG_COLOR}" 2>/dev/null || true

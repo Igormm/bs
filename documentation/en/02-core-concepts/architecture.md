@@ -95,7 +95,9 @@ Read top to bottom. Three layers: the **POSIX prologue** (runs in any shell),
    ├─ load core/logger      log::*
    ├─ load core/errorhandler  errorhandler::*, cleanup::add
    ├─ load core/version     BS_VERSION, bs::version::*
-   ├─ load core/utils       utils::has, utils::quiet, ...
+   ├─ load core/quiet       utils_has, utils_quiet, ...  (posix)
+   ├─ load core/fmt         fmt_human_size, fmt_stamp, ...   (posix)
+   ├─ load core/utils       the rest of utils::*
    ├─ load core/config      config::*
    ├─ load core/deps        # @depends parsing
    ├─ config::load          configuration from files and the environment
@@ -128,8 +130,8 @@ what was really run is in the priority table of
 
 | Tier | `core/` files | Runs directly in | How the other shells get it |
 |---|---|---|---|
-| `posix` (5) | `prereq`, `guard`, `const`, `version`, `quiet` | bash, zsh, dash, busybox ash, ksh93, mksh (verified by running) | — (they source it themselves) |
-| `bash4` (9) | `lang`, `args`, `errorhandler`, `config`, `logger`, `utils`, `deps`, `calc`, `repl` | bash 4.2+ only | the entry point finds bash and re-runs itself in it (trampoline); kernel functions — the `bs call` command |
+| `posix` (8) | `prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc` | bash, zsh, dash, busybox ash, ksh93, mksh (verified by running) | — (they source it themselves) |
+| `bash4` (7) | `lang`, `args`, `errorhandler`, `config`, `utils`, `deps`, `repl` | bash 4.2+ only | the entry point finds bash and re-runs itself in it (trampoline); kernel functions — the `bs call` command |
 
 What makes it "available to all":
 
@@ -147,7 +149,7 @@ the other `bash4` files in dash, ash, ksh, mksh, fish or nushell. They need
 associative arrays, namerefs and `=~` with `BASH_REMATCH`, which are missing or
 behave differently there. Shells without a real run (nushell, oksh, osh) are
 not considered verified. Files move from `bash4` to `posix` one by one (order:
-`calc`, `utils`, `config`, `logger`, `deps`); `lang`, `args` and `repl` stay in
+`utils` (the rest), `deps`; `calc`, `quiet`, `fmt`, `logger` are done; `config` stays `bash4` because of the associative array `BS_CONFIG`); `lang`, `args` and `repl` stay in
 the `bash4` tier.
 
 ## Stage 0: POSIX prologue and the `trampoline`

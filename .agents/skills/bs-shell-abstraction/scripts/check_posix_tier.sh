@@ -38,7 +38,7 @@ done
 declare -a tier=()
 while IFS= read -r f; do
   head -n 14 "${f}" | grep -q '^# @shell posix' && tier+=("${f}")
-done < <(git ls-files 'bootstrap/*.sh' 'core/*.sh')
+done < <(git ls-files --cached --others --exclude-standard 'bootstrap/*.sh' 'core/*.sh')
 (( ${#files[@]} > 0 )) || files=("${tier[@]}")
 if (( list_only == 1 )); then printf '%s\n' "${files[@]}"; exit 0; fi
 
