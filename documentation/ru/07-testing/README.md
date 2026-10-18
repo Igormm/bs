@@ -140,7 +140,7 @@ main "$@"
 - **`check_posix_tier.sh`** (`.agents/skills/bs-shell-abstraction/scripts/`) — доказывает, что bash в ярусе `posix` не участвует: разбор в не-bash оболочках, запрет bash-конструкций, запуск яруса в dash с `PATH` без bash.
 - **Оболочки в остальных тестах**: `testshellunit.sh`, `testtrampolineunit.sh`, `testshellstrictunit.sh`, `testshebangunit.sh`, `testcallbridgeunit.sh` используют тот же список; `probe_shells.sh` показывает, что умеет каждая оболочка.
 
-Ловушки, найденные этими тестами: арифметика `$(( ))` в `mksh` 32-битная (большие числа считают в `awk`); `local -r a b` делает `b` тоже read-only; в скриптах `bs` строгий `IFS`, поэтому слова делят явно (`IFS=' ' read -ra`).
+Ловушки, найденные этими тестами: bash из Fedora читает `~/.bashrc` даже в `bash -c`, если его stdin — сокет, и тогда `PATH` портится (в тестах с `env -i bash -c` ставьте `</dev/null`); арифметика `$(( ))` в `mksh` 32-битная (большие числа считают в `awk`); `local -r a b` делает `b` тоже read-only; в скриптах `bs` строгий `IFS`, поэтому слова делят явно (`IFS=' ' read -ra`).
 
 ## Проверка синтаксиса
 

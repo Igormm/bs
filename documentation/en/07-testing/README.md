@@ -140,7 +140,7 @@ Modules labelled `# @shell posix` must work in six shells, so their tests run th
 - **`check_posix_tier.sh`** (`.agents/skills/bs-shell-abstraction/scripts/`) — proves that bash does not take part in the `posix` tier: parse in non-bash shells, no bash-only constructs, a run of the tier in dash with a `PATH` that has no bash.
 - **Shells in the other tests**: `testshellunit.sh`, `testtrampolineunit.sh`, `testshellstrictunit.sh`, `testshebangunit.sh`, `testcallbridgeunit.sh` use the same list; `probe_shells.sh` shows what each shell can do.
 
-Traps these tests found: `$(( ))` arithmetic is 32-bit in `mksh` (do big numbers in `awk`); `local -r a b` makes `b` read-only too; `bs` scripts have a strict `IFS`, so split words explicitly (`IFS=' ' read -ra`).
+Traps these tests found: Fedora's bash sources `~/.bashrc` even for `bash -c` when its stdin is a socket, and then `PATH` is spoiled (in tests with `env -i bash -c` add `</dev/null`); `$(( ))` arithmetic is 32-bit in `mksh` (do big numbers in `awk`); `local -r a b` makes `b` read-only too; `bs` scripts have a strict `IFS`, so split words explicitly (`IFS=' ' read -ra`).
 
 ## Syntax validation
 
