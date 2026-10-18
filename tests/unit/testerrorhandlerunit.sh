@@ -83,7 +83,7 @@ main() {
     }
     
     cleanup::add "test::cleanup_marker"
-    testframework::assert_true "'${BS_CLEANUP_STACK[*]}' == *'test::cleanup_marker'*" "Cleanup function added to stack"
+    testframework::assert_true "'$(bs_arr_join bs_cleanup_stack ' ')' == *'test::cleanup_marker'*" "Cleanup function added to stack"
     
     cleanup::__run_all
     cleanup::__run_all
@@ -91,7 +91,7 @@ main() {
     local lines
     lines=$(wc -l < "${tmp_file}")
     testframework::assert_equal "1" "$lines" "Cleanup ran exactly once (idempotent)"
-    testframework::assert_true "${#BS_CLEANUP_STACK[@]} -eq 0" "Cleanup stack empty after run"
+    testframework::assert_true "$(bs_arr_len bs_cleanup_stack) -eq 0" "Cleanup stack empty after run"
     
     rm -f "${tmp_file}"
     unset -f test::cleanup_marker

@@ -48,6 +48,7 @@ test_behaviour() {
         sh_name="${sh_bin##*/}"
         eq "$(probe "${sh_bin}" -- 'bs_utils_has ls && echo y')" "y" "${sh_name}: bs_utils_has finds ls"
         eq "$(probe "${sh_bin}" -- 'bs_utils_has no-such-cmd-xyz || echo n')" "n" "${sh_name}: bs_utils_has misses a missing command"
+        eq "$(probe "${sh_bin}" -- 'bs_utils_has no-such-cmd-xyz; echo rc=$?')" "rc=1" "${sh_name}: bs_utils_has returns exactly 1 (dash and ash give 127 for command -v)"
         eq "$(probe "${sh_bin}" -- 'bs_utils_quiet sh -c "echo out; echo err >&2; exit 3"; echo "rc=$?"')" "rc=3" "${sh_name}: bs_utils_quiet hides all output, keeps rc"
         out="$(probe "${sh_bin}" -- 'bs_utils_quiet_err sh -c "echo out; echo err >&2; exit 2"; echo "rc=$?"' | tr '\n' ' ')"
         eq "${out}" "out rc=2 " "${sh_name}: bs_utils_quiet_err keeps stdout and rc, hides stderr"
