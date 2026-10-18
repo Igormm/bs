@@ -134,5 +134,5 @@ bash tests/validatesyntax.sh && bash tests/validateshellcheck.sh && bash tests/r
 
 ## Strict mode / Строгий режим
 
-`bs --strict-shell` (or `BS_SHELL_STRICT=1`) makes the `@shell` tier binding at `load`: a `lib/` module runs only if its tier fits the origin shell (`BS_ORIGIN_SHELL`). Rules: `posix` — any, `bash4` — bash 4.2+, other word (`zsh`, `nu`, …) — the shell of that name, a list `a,b` — any. `core/` is always allowed. Write a new module's tier honestly: it is what strict mode enforces.
+`bs --strict-shell[=SHELL]` (or `BS_SHELL_STRICT=1`) makes the `@shell` tier binding at `load`: a `lib/` module runs only if its tier fits the origin shell (`BS_ORIGIN_SHELL`) — or, with a name (`--strict-shell=dash`), the NAMED shell, wherever bs is started ("will this work in dash"). `install.sh --strict-shell=SHELL` is the shell the install is for (like `--shell`, refused for tier unsupported). Rules: `posix` — any, `bash4` — bash 4.2+, other word (`zsh`, `nu`, …) — the shell of that name, a list `a,b` — any. `core/` is always allowed. Write a new module's tier honestly: it is what strict mode enforces.
 `bs --strict-shell` (или `BS_SHELL_STRICT=1`) делает tier `@shell` обязательным при `load`; правила выше. Tier нового модуля пишите честно — именно его проверяет строгий режим.

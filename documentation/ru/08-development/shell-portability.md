@@ -101,6 +101,16 @@ tier подходит оболочке, из которой BS **запущен*
 dash ./bs --strict-shell run script.sh   # модуль lib/io/streams (@shell bash4) нельзя исполнять из 'dash'
 ```
 
+**Параметр: указать оболочку.** `--strict-shell=ОБОЛОЧКА` (или `--strict-shell ОБОЛОЧКА`, если слово — известное имя оболочки) проверяет tier против **указанной** оболочки, где бы ни запустили `bs`: это ответ на вопрос «заработает ли это в dash». Имя — одно из `bash zsh ash dash sh ksh mksh oksh osh fish nu`; неизвестное имя — ошибка. Без имени поведение прежнее: проверка против оболочки запуска.
+
+```bash
+bs --strict-shell=dash run script.sh   # откажет, если скрипту нужен модуль @shell bash4
+bs --strict-shell=bash run script.sh   # bash 4.2+ допускает всё
+./install.sh --local --strict-shell=zsh   # ставить для zsh: PATH и rc под zsh; отказ, если на машине нет bash 4.2+
+```
+
+Установщик понимает ту же опцию как оболочку, **для которой ставится** BS (то же, что `--shell ОБОЛОЧКА`, но с отказом для tier `unsupported`).
+
 ## Где можно проверять оболочку
 
 Только в слое абстракции: `bootstrap/bs.sh`, `bootstrap/shell.sh`, `bootstrap/trampoline.sh`. Везде в другом месте прямое использование `BASH_SOURCE`, `BASH_VERSION`, `FUNCNAME`, `ZSH_*`, `$SHELL`, `$0` как пути должно либо звать слой (`bs::is_main`, `bs::script_dir`, `bs::func_name`, `bs::stack_*`, `bs_shell_host_ok`), либо нести тег `shell-gate` с причиной. Проверяет `.agents/skills/bs-shell-abstraction/scripts/find_leaks.sh`; у точек входа один общий пролог, каталог они берут из `BS_ENTRY_DIR` / `BS_BOOTSTRAP_DIR`.

@@ -156,9 +156,37 @@ UPDATE_RUN_SHORT=""
 # Global flag --strict-shell: lib/ module tiers against the shell BS was started from
 : "${BS_ORIGIN_SHELL:=bash}"
 export BS_ORIGIN_SHELL
-if [[ "${1:-}" == "--strict-shell" ]]; then
+# --strict-shell[=ОБОЛОЧКА]: без имени — против оболочки, из которой реально запущен bs;
+# с именем (--strict-shell=dash или --strict-shell dash) — против УКАЗАННОЙ оболочки: «будет ли
+# это работать в dash», где бы ни запустили. Имя отдельным словом принимается, только если это
+# известная оболочка (иначе это команда: `bs --strict-shell run x`).
+# --strict-shell[=SHELL]: without a name — against the shell bs was really started from; with a
+# name (--strict-shell=dash or --strict-shell dash) — against the NAMED shell: "will this work in
+# dash", wherever it is started. A separate-word name is taken only if it is a known shell
+# (otherwise it is a command: `bs --strict-shell run x`).
+if [[ "${1:-}" == "--strict-shell" || "${1:-}" == --strict-shell=* ]]; then
   export BS_SHELL_STRICT=1
-  shift
+  strict_name=""
+  if [[ "${1}" == --strict-shell=* ]]; then
+    strict_name="${1#--strict-shell=}"
+    shift
+    [[ -n "${strict_name}" ]] || bs::cli::die "--strict-shell=: shell name is empty (known: bash zsh ash dash sh ksh mksh oksh osh fish nu)"
+  else
+    shift
+    if [[ $# -ge 1 && "$(bs_shell_of_name "$1")" != "unknown" ]]; then
+      strict_name="$1"
+      shift
+    fi
+  fi
+  if [[ -n "${strict_name}" ]]; then
+    strict_family="$(bs_shell_of_name "${strict_name}")"
+    [[ "${strict_family}" != "unknown" ]] \
+      || bs::cli::die "--strict-shell: unknown shell: ${strict_name} (known: bash zsh ash dash sh ksh mksh oksh osh fish nu)"
+    BS_ORIGIN_SHELL="${strict_family}"
+    export BS_ORIGIN_SHELL
+    export BS_SHELL_STRICT_NAMED=1
+  fi
+  unset strict_name strict_family
 fi
 
 # 7. Shebang-режим

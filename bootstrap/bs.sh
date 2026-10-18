@@ -326,7 +326,7 @@ Maintenance / Обслуживание:
   init-shell [SHELL]  PATH snippet for your shell: bash zsh ash dash ksh fish nu / snippet для вашей оболочки
   call FUNC [ARGS]    Call a kernel/library function from any shell (fish, nu, dash...) / вызвать функцию из любой оболочки
   shebang <cmd>       Check and rewrite #! lines for this machine (Termux: no /usr/bin/env) / проверка и правка #! для этой машины
-  --strict-shell      (before the command) refuse lib/ modules whose @shell tier does not fit the shell bs was started from / отказывать модулям lib/, чей tier @shell не подходит оболочке запуска
+  --strict-shell[=SHELL]  (before the command) refuse lib/ modules whose @shell tier does not fit the shell bs was started from, or the NAMED SHELL (--strict-shell=dash: will it work in dash) / отказывать модулям lib/, чей tier @shell не подходит оболочке запуска или УКАЗАННОЙ оболочке
 
 Shebang mode:
   #!/usr/bin/env bs

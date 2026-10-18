@@ -102,6 +102,16 @@ refusal names the module, its tier and the origin shell, and exits 1:
 dash ./bs --strict-shell run script.sh   # module lib/io/streams (@shell bash4) cannot run from 'dash'
 ```
 
+**Parameter: name the shell.** `--strict-shell=SHELL` (or `--strict-shell SHELL` when the word is a known shell name) checks the tier against the **named** shell, wherever `bs` is started: it answers "will this work in dash". The name is one of `bash zsh ash dash sh ksh mksh oksh osh fish nu`; an unknown name is an error. Without a name the behaviour is as before: the check is against the shell bs was started from.
+
+```bash
+bs --strict-shell=dash run script.sh   # refuses if the script needs an @shell bash4 module
+bs --strict-shell=bash run script.sh   # bash 4.2+ allows everything
+./install.sh --local --strict-shell=zsh   # install for zsh: PATH and rc for zsh; refused if the machine has no bash 4.2+
+```
+
+The installer understands the same option as the shell BS is installed **for** (the same as `--shell SHELL`, but a tier `unsupported` is refused).
+
 ## Where shell-specific checks may live
 
 Only in the abstraction layer: `bootstrap/bs.sh`, `bootstrap/shell.sh`, `bootstrap/trampoline.sh`. Anywhere else a direct use of `BASH_SOURCE`, `BASH_VERSION`, `FUNCNAME`, `ZSH_*`, `$SHELL`, `$0`-as-path must either call the layer (`bs::is_main`, `bs::script_dir`, `bs::func_name`, `bs::stack_*`, `bs_shell_host_ok`) or carry a `shell-gate` tag with the reason. `.agents/skills/bs-shell-abstraction/scripts/find_leaks.sh` checks this; the entry points share one prologue and read the bootstrap directory from `BS_ENTRY_DIR` / `BS_BOOTSTRAP_DIR`.

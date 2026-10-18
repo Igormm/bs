@@ -20,7 +20,7 @@ usage() {
 BS installer / Установщик BS
 
 Usage / Использование:
-  ./install.sh [--local] [install|uninstall] [--path|--update-path] [--shell NAME]
+  ./install.sh [--local] [install|uninstall] [--path|--update-path] [--shell NAME | --strict-shell NAME]
   sudo ./install.sh [install|uninstall]
 
 Modes / Режимы:
@@ -89,6 +89,29 @@ while [[ $# -gt 0 ]]; do
       FLAG_PATH="1"; shift ;;
     --update-path)
       FLAG_UPDATE_PATH="1"; shift ;;
+    --strict-shell|--strict-shell=*)
+      # Оболочка, для которой ставится BS (PATH, rc, подсказки): то же, что --shell NAME,
+      # но жёстче: оболочка без bash 4.2+ на машине (tier unsupported) — отказ, а не подсказка
+      # The shell BS is installed for (PATH, rc, hints): the same as --shell NAME, but stricter:
+      # a shell with no bash 4.2+ on the machine (tier unsupported) is refused, not just hinted
+      if [[ "$1" == --strict-shell=* ]]; then
+        strict_name="${1#--strict-shell=}"; shift 1
+      else
+        strict_name="${2:-}"
+        if [[ $# -ge 2 ]]; then shift 2; else shift; fi
+      fi
+      if [[ -z "${strict_name}" || "$(bs_shell_of_name "${strict_name}")" == "unknown" ]]; then
+        printf "ERROR: --strict-shell требует имя оболочки: bash zsh ash dash sh ksh mksh oksh osh fish nu\n" >&2
+        printf "       --strict-shell needs a shell name: bash zsh ash dash sh ksh mksh oksh osh fish nu\n" >&2
+        exit 1
+      fi
+      BS_USER_SHELL="$(bs_shell_of_name "${strict_name}")"; export BS_USER_SHELL
+      if [[ "$(bs_shell_tier "${BS_USER_SHELL}")" == "unsupported" ]]; then
+        printf "ERROR: установка для '%s' отклонена: на машине нет bash 4.2+ (tier unsupported)\n" "${BS_USER_SHELL}" >&2
+        printf "       install for '%s' refused: there is no bash 4.2+ on this machine (tier unsupported)\n" "${BS_USER_SHELL}" >&2
+        exit 1
+      fi
+      unset strict_name ;;
     --shell)
       if [[ $# -lt 2 || -z "${2:-}" || "$(bs_shell_of_name "$2")" == "unknown" ]]; then
         printf "ERROR: --shell требует имя оболочки: bash zsh ash dash sh ksh mksh oksh osh fish nu\n" >&2
