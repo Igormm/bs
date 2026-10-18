@@ -32,29 +32,28 @@ ok() { testframework::assert_true "$1" "$2" || true; }
 
 test_parses_everywhere() {
     local sh_name sh_bin
-    for sh_name in bash zsh dash; do
-        sh_bin="$(command -v "${sh_name}" || true)"
-        [[ -n "${sh_bin}" ]] || { printf '  skip: %s is not installed / не установлен\n' "${sh_name}"; continue; }
+    while IFS= read -r sh_bin; do
+        sh_name="${sh_bin##*/}"
         testframework::assert_command "'${sh_bin}' -n '${SHELL_SH}'" "shell.sh parses in ${sh_name}" || true
         testframework::assert_command "'${sh_bin}' -n '${BS_PROJECT_ROOT}/bootstrap/trampoline.sh'" "trampoline.sh parses in ${sh_name}" || true
-    done
+        testframework::assert_command "'${sh_bin}' -n '${BS_PROJECT_ROOT}/bootstrap/shebang.sh'" "shebang.sh parses in ${sh_name}" || true
+    done < <(testframework::posix_shells)
     if utils::has shellcheck; then
-        testframework::assert_command "shellcheck -s sh '${SHELL_SH}' '${BS_PROJECT_ROOT}/bootstrap/trampoline.sh'" "shellcheck -s sh is clean for the POSIX files" || true
+        testframework::assert_command "shellcheck -s sh '${SHELL_SH}' '${BS_PROJECT_ROOT}/bootstrap/trampoline.sh' '${BS_PROJECT_ROOT}/bootstrap/shebang.sh'" "shellcheck -s sh is clean for the POSIX files" || true
     fi
 }
 
 test_family_per_shell() {
     local sh_name sh_bin
-    for sh_name in bash zsh dash; do
-        sh_bin="$(command -v "${sh_name}" || true)"
-        [[ -n "${sh_bin}" ]] || continue
+    while IFS= read -r sh_bin; do
+        sh_name="${sh_bin##*/}"
         eq "${sh_name}" "$(probe "${sh_bin}" 'bs_shell_family')" "family detected by ${sh_name} itself"
-    done
-    eq "yes" "$(probe bash 'bs_shell_host_ok && echo yes || echo no' 2>/dev/null || probe "$(command -v bash)" 'bs_shell_host_ok && echo yes || echo no')" "bash 4.2+ is a capable host"
-    sh_bin="$(command -v zsh || true)"
-    [[ -z "${sh_bin}" ]] || eq "no" "$(probe "${sh_bin}" 'bs_shell_host_ok && echo yes || echo no')" "zsh is not a host"
-    sh_bin="$(command -v dash || true)"
-    [[ -z "${sh_bin}" ]] || eq "no" "$(probe "${sh_bin}" 'bs_shell_host_ok && echo yes || echo no')" "dash is not a host"
+        if [[ "${sh_name}" == bash ]]; then
+            eq "yes" "$(probe "${sh_bin}" 'bs_shell_host_ok && echo yes || echo no')" "bash 4.2+ is a capable host"
+        else
+            eq "no" "$(probe "${sh_bin}" 'bs_shell_host_ok && echo yes || echo no')" "${sh_name} is not a host"
+        fi
+    done < <(testframework::posix_shells)
 }
 
 test_of_name() {
@@ -189,6 +188,45 @@ test_version_and_strict() {
     ok "-x '${out}'" "self_path: the running bash is executable (${out})"
 }
 
+# Правила tier в КАЖДОЙ оболочке: список через запятую не должен зависеть от деления по IFS (zsh его не делит)
+# Tier rules in EVERY shell: a comma list must not depend on IFS splitting (zsh does not split)
+test_tier_allows_everywhere() {
+    local sh_bin sh_name
+    while IFS= read -r sh_bin; do
+        sh_name="${sh_bin##*/}"
+        eq "yes" "$(probe "${sh_bin}" 'bs_shell_tier_allows "posix,bash4" dash && echo yes || echo no')" "${sh_name}: tier list 'posix,bash4' allows dash"
+        eq "yes" "$(probe "${sh_bin}" 'bs_shell_tier_allows "bash4,zsh" zsh && echo yes || echo no')" "${sh_name}: tier list 'bash4,zsh' allows zsh"
+        eq "no" "$(probe "${sh_bin}" 'bs_shell_tier_allows "bash4,fish" dash && echo yes || echo no')" "${sh_name}: tier list 'bash4,fish' refuses dash"
+        eq "yes" "$(probe "${sh_bin}" 'bs_shell_tier_allows bash4 bash && echo yes || echo no')" "${sh_name}: bash4 allows bash"
+        eq "yes" "$(probe "${sh_bin}" 'IFS=: ; bs_shell_tier_allows "posix,bash4" dash && echo yes || echo no')" "${sh_name}: the caller's IFS does not matter"
+    done < <(testframework::posix_shells)
+}
+
+# Кандидат в хозяева проверяется по напечатанной версии, а не по коду выхода
+# A host candidate is checked by the version it prints, not by its exit code
+test_host_candidate_is_checked() {
+    local bash_bin true_bin zsh_bin
+    bash_bin="$(command -v bash)"; true_bin="$(command -v true)"; zsh_bin="$(command -v zsh || true)"
+    eq "ok" "$(probe "${bash_bin}" 'bs_shell__bash_ok '"${bash_bin}"' && echo ok || echo no')" "a real bash 4.2+ is accepted"
+    eq "no" "$(probe "${bash_bin}" 'bs_shell__bash_ok '"${true_bin}"' && echo ok || echo no')" "/bin/true (ignores -c, exits 0) is refused"
+    eq "no" "$(probe "${bash_bin}" 'bs_shell__bash_ok /nonexistent/bash && echo ok || echo no')" "a missing file is refused"
+    if [[ -n "${zsh_bin}" ]]; then
+        eq "no" "$(probe "${bash_bin}" 'bs_shell__bash_ok '"${zsh_bin}"' && echo ok || echo no')" "zsh is not a bash 4.2+"
+    fi
+    eq "none" "$(PROBE_ENV="" probe "${bash_bin}" 'BS_HOST_BASH='"${true_bin}"' bs_shell_host_find >/dev/null && echo found || echo none')" "BS_HOST_BASH=/bin/true is an error, not a silent success"
+}
+
+# Ядро работает без HOME (cron, systemd, env -i): пользовательского конфига просто нет
+# The kernel works without HOME (cron, systemd, env -i): there is simply no user config
+test_works_without_home() {
+    local sh_bin sh_name out
+    while IFS= read -r sh_bin; do
+        sh_name="${sh_bin##*/}"
+        out="$(cd "${BS_PROJECT_ROOT}" && env -i PATH=/usr/bin:/bin "${sh_bin}" ./bs version 2>&1 || true)"
+        eq "BS Framework version:" "$(printf '%s' "${out}" | cut -c1-21)" "${sh_name} ./bs version works with no HOME"
+    done < <(testframework::posix_shells)
+}
+
 main() {
     print_header "Shell Registry Unit Tests / Модульные тесты реестра оболочек"
 
@@ -210,6 +248,15 @@ main() {
 
     testframework::section "Host and tier / Хозяин и tier"
     test_host_and_tier
+
+    testframework::section "Tier lists in every shell / Списки tier в каждой оболочке"
+    test_tier_allows_everywhere
+
+    testframework::section "Host candidate / Кандидат в хозяева"
+    test_host_candidate_is_checked
+
+    testframework::section "No HOME / Без HOME"
+    test_works_without_home
 
     testframework::section "bs init-shell"
     test_bs_init_shell

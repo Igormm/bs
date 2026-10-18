@@ -44,8 +44,9 @@ before ANY kernel code exists. A function belongs here if it must work before
   `@exitcode`/`@return` when relevant — `bs lang-doc` parses these.
 - Add `# @tier core` to the file header: the pre-kernel namespace is pure
   Bash 4+, no GNU tools — works everywhere. This replaces ad-hoc runtime
-  checks: the tier declares the requirement, the single canonical gate
-  (`bs::shell::ensure_version`) enforces it at the entry points.
+  checks: the tier declares the requirement, the POSIX prologue
+  (`bs_shell_host_ok`) enforces it at the entry points; `bs::shell::ensure_version`
+  is the gate for sourcing `init.sh` as a library.
 
 ## Wiring checklist for a NEW function
 

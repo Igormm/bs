@@ -7,8 +7,11 @@
 
 ## 1. Why
 
-BS runs on Bash 4.2+ and claims "ubiquity". But "everywhere" is several
-worlds:
+BS claims "ubiquity": the kernel is split into **tiers** (`@shell posix` runs in
+any shell, `@shell bash4` needs bash 4.2+ as the host), and the other shells
+reach it through a re-run in bash and the `bs call` bridge (see
+[shell-portability](../08-development/shell-portability.md)). But "everywhere"
+is several worlds:
 
 - **GNU/Linux** — `grep -P`, `sed -z`, `sha256sum`, `stat -c`, `/proc`, `/sys`;
 - **macOS and FreeBSD (BSD userland)** — `shasum`, `stat -f`, no `grep -P`
@@ -85,13 +88,17 @@ Compatibility tiers (for the version and `bs doctor`):
 - `posix` — POSIX-only tools (fallback mode);
 - `bsd` — macOS/FreeBSD compatibility layers.
 
-**The shell is part of the capability vector** (facts `shell`,
-`shell_version`, `shell_ok`, `user_shell`, `shell_tier`). The code always
-runs in a host bash 4.2+ (`shell_ok=1`); the user's shell may be any of
-bash, zsh, dash, ash, sh, ksh, fish, nushell. `shell_tier` says how BS works
-for it: `native` (bash 4.2+, `source` works too), `hosted` (another shell,
-BS runs as the `bs` command) or `unsupported` (no bash 4.2+ on the machine).
-The per-file `@shell posix | bash4` tier and strict mode are described in
+**The shell is part of the capability vector** (facts `shell`, `shell_ok`,
+`bash_version`): bash 4.2+ — the whole kernel (both tiers); the other shells
+(zsh, dash, busybox ash, ksh, mksh) — `@shell posix` modules directly and
+everything else through a re-run in bash; fish and nushell — only through the
+`bs` command and the `bs call` bridge. The tiers below assume `shell_ok=1`,
+checked via `platform::get shell_ok`. What was really run is in the priority
+table of [shell-portability](../08-development/shell-portability.md).
+`platform::get shell_tier` says how BS works for the user's shell: `native`
+(bash 4.2+, `source` works too), `hosted` (another shell, BS runs as the `bs`
+command) or `unsupported` (no bash 4.2+ on the machine); the per-file `@shell`
+tier and strict mode are in
 [01-getting-started](../01-getting-started/README.md#running-from-any-shell).
 
 A script checks the required tier at startup and fails with a clear

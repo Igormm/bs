@@ -7,22 +7,29 @@ whenToUse: When writing or changing anything that touches the shell — an insta
 
 # Переносимость между оболочками / Shell portability
 
-Ядро BS — код для **bash 4.2+**. Это не недостаток, который надо «вылечить»: на
-ассоциативных массивах, namerefs и `[[ =~ ]]` стоят сотни функций. Поэтому BS
-сделан доступным из большинства оболочек не переписыванием ядра, а разделением
-ролей. Полное описание — `documentation/{en,ru}/08-development/shell-portability.md`.
+Ядро BS делится на **два яруса**: `@shell posix` (5 файлов `core/` и слой `bootstrap/` —
+работают в bash, zsh, dash, busybox ash, ksh93, mksh) и `@shell bash4` (остальное,
+требует bash 4.2+). Яруса bash4 не надо «лечить»: на ассоциативных массивах,
+namerefs и `[[ =~ ]]` стоят сотни функций (`lang`, `args`, `repl` в POSIX не перейдут).
+BS доступен из большинства оболочек разделением ролей, а не переписыванием всего.
+Полное описание и таблица оболочек —
+`documentation/{en,ru}/08-development/shell-portability.md`.
 
 ## 1. Модель: три разных «оболочки» / Three different shells
 
 | Роль | Что это | Кто решает |
 | --- | --- | --- |
-| **Хозяин / host** | интерпретатор, ИСПОЛНЯЮЩИЙ код BS | всегда bash 4.2+ (`bs_shell_host_ok`, `bs_shell_host_find`) |
+| **Хозяин / host** | интерпретатор, ИСПОЛНЯЮЩИЙ код BS | зависит от яруса файла: `posix` — любая оболочка из таблицы; `bash4` — bash 4.2+ (`bs_shell_host_ok`, `bs_shell_host_find`) |
 | **Оболочка пользователя / user shell** | та, где человек набирает команды; чьи rc-файлы правим | `bs_shell_user` (BS_USER_SHELL → родительский процесс → `$SHELL`) |
 | **Оболочка скрипта / script shell** | интерпретатор шебанга `#!/usr/bin/env bs` | `bs` (bash) |
 
-Три способа доступа: **exec** — команда `bs` из ЛЮБОЙ оболочки (универсально,
+Четыре способа доступа: **exec** — команда `bs` из ЛЮБОЙ оболочки (универсально,
 включая nushell и fish); **source** — `source bootstrap/init.sh`, только bash 4.2+;
-**trampoline** — `sh install.sh`, `dash ./bs`, `zsh ./bs` перезапускаются в bash.
+**trampoline** — `sh install.sh`, `dash ./bs`, `zsh ./bs` перезапускаются в bash;
+**call** — `bs call [--load МОДУЛЬ] ФУНКЦИЯ` вызывает функцию ядра из fish, nushell и
+любой другой оболочки (она исполняется в bash, вывод и код возвращаются). Файлы
+`@shell posix` дополнительно подключаются напрямую (`. файл`) из bash, zsh, dash, ash,
+ksh, mksh.
 
 `$SHELL` — логин-оболочка, а не интерпретатор и не обязательно оболочка, где
 набрана команда. Никогда не выводите по `$SHELL`, что исполняет ваш код.
@@ -37,8 +44,11 @@ whenToUse: When writing or changing anything that touches the shell — an insta
 ```
 
 * `@shell posix` — файл валиден как POSIX sh: его подключат dash, ash/busybox,
-  bash, zsh, ksh. Только `bootstrap/shell.sh`, `bootstrap/trampoline.sh` и
-  подобное.
+  bash, zsh, ksh, mksh. Сейчас: `bootstrap/shell.sh`, `trampoline.sh`, `shebang.sh`;
+  `core/prereq`, `guard`, `const`, `version`, `quiet`. **bash в этом ярусе не
+  участвует** — это проверяет `.agents/skills/bs-shell-abstraction/scripts/check_posix_tier.sh`
+  (разбор в не-bash оболочках, запрет bash-конструкций, запуск в dash без bash в PATH).
+  Стиль кода яруса — `documentation/*/code-style-guide.md`, раздел 12.
 * `@shell bash4` — нужен bash 4.2+ как хозяин. **Значение по умолчанию** для
   файла без аннотации (всё ядро и `lib/`).
 * После тире — **описание причины** (обязательно, на двух языках, если зависимость
@@ -82,18 +92,25 @@ bash; PATH/rc/подсказки — под его оболочку), **unsuppor
 
 Не «портируйте» ради галочки. Если модуль держится на ассоциативных массивах,
 namerefs, `mapfile`, `${!x}`, `BASH_REMATCH` — это `@shell bash4` с описанием
-причины. Для пользователя другой оболочки модуль доступен через `bs` (hosted).
-Переписывать под POSIX стоит только то, что должно работать ДО bash:
-пролог, трамплин, реестр, определение оболочки.
+причины (так остаются `lang`, `args`, `repl`). Для пользователя другой оболочки такой
+модуль доступен через `bs` (hosted) и `bs call`. В POSIX переводят то, что (а) должно
+работать ДО bash — пролог, трамплин, реестр, шебанг; или (б) нужно скриптам на других
+оболочках и не держится на bash-конструкциях — `quiet`, `version`, `const`, `guard`,
+`prereq`; очередь: `calc`, `utils` (остаток), `config`, `logger`, `deps`. Перевод — отдельный
+коммит: код, тест в шести оболочках, `check_posix_tier.sh`, строка в документации.
 
 ## 5. Порядок работы / Workflow
 
 ```bash
-bash .agents/skills/bs-shell-portability/scripts/probe_shells.sh        # что умеют установленные оболочки
+bash .agents/skills/bs-shell-portability/scripts/probe_shells.sh        # что умеют установленные оболочки (busybox как `busybox ash`)
 bash .agents/skills/bs-shell-portability/scripts/tier_scan.sh --check   # аннотации vs конструкции; 1 при нарушении
-dash -n FILE && shellcheck -s sh FILE                                   # для posix-файлов
+bash .agents/skills/bs-shell-abstraction/scripts/check_posix_tier.sh    # bash в ярусе posix не участвует; 1 при нарушении
+dash -n FILE && shellcheck -s sh FILE                                   # для posix-файлов; также busybox ash -n, ksh -n, mksh -n, zsh -n
 bash tests/unit/testshellunit.sh                                        # реестр, определение, tier, init-shell
 bash tests/unit/testtrampolineunit.sh                                   # dash/zsh/bash-as-sh, отказ без bash
+bash tests/unit/testposixtierunit.sh                                    # ярус posix без bash (то же, что check_posix_tier.sh)
+bash tests/unit/testquietportableunit.sh                                # образец теста posix-модуля в 6 оболочках
+bash tests/unit/testcallbridgeunit.sh                                   # мост bs call из 7 оболочек
 bash tests/integration/testinstallshells.sh                             # PATH и удаление по оболочкам
 bash tests/validatesyntax.sh && bash tests/validateshellcheck.sh && bash tests/runalltests.sh
 ```
@@ -105,7 +122,9 @@ bash tests/validatesyntax.sh && bash tests/validateshellcheck.sh && bash tests/r
 
 - [ ] заголовок файла: `@shell` + описание причины (двуязычно) для сильной зависимости;
 - [ ] нет литералов `.bashrc`/`.zshrc`/`source ~/` вне реестра и тестов;
-- [ ] POSIX-файл разбирается в dash, bash, zsh; `shellcheck -s sh` чист;
+- [ ] POSIX-файл разбирается в dash, busybox ash, ksh, mksh, bash, zsh; `shellcheck -s sh` чист;
+- [ ] `check_posix_tier.sh` — OK: bash в ярусе `posix` не участвует; непроверенные оболочки названы;
+- [ ] стиль POSIX-яруса соблюдён (`code-style-guide.md`, раздел 12): настоящие имена `модуль_функция` + псевдонимы `::`, без `local`, префикс `__bs_<функция>_` для временных;
 - [ ] пролог точек входа не разошёлся (тест трамплина);
 - [ ] тест для оболочки, которой нет на машине, — на генерацию текста, и честная
       пометка «не запускалось на реальной оболочке» в документации;

@@ -26,16 +26,15 @@ run_in() {
 
 test_in_every_shell() {
     local sh_name sh_bin
-    for sh_name in bash zsh dash; do
-        sh_bin="$(command -v "${sh_name}" || true)"
-        [[ -n "${sh_bin}" ]] || { printf '  skip: %s is not installed / не установлен\n' "${sh_name}"; continue; }
+    while IFS= read -r sh_bin; do
+        sh_name="${sh_bin##*/}"
         testframework::assert_command "'${sh_bin}' -n '${SHEBANG_SH}'" "parses in ${sh_name}" || true
         eq "$(run_in "${sh_bin}" 'bs_shebang_line portable bs')" '#!/usr/bin/env bs' "${sh_name}: portable line"
         eq "$(run_in "${sh_bin}" 'bs_shebang_parse "#! /bin/bash -e"')" '/bin/bash -e' "${sh_name}: parse"
         eq "$(run_in "${sh_bin}" 'bs_shebang_works "#!/nonexistent/env bs" >/dev/null || echo broken')" 'broken' "${sh_name}: missing interpreter is broken"
         eq "$(run_in "${sh_bin}" 'bs_shebang_works "#!/usr/bin/env sh" && echo ok')" 'ok' "${sh_name}: env + sh works"
         eq "$(run_in "${sh_bin}" 'bs_shebang_works "#!/usr/bin/env no-such-prog-xyz" >/dev/null || echo broken')" 'broken' "${sh_name}: env + missing program is broken"
-    done
+    done < <(testframework::posix_shells)
 }
 
 test_termux_detection() {
@@ -85,6 +84,33 @@ test_hardening() {
     testframework::assert_false "'${BS_PROJECT_ROOT}/bs' shebang check '${T}/nope' >/dev/null 2>&1" "check: missing path -> exit 1" || true
 }
 
+test_fix() {
+    local envp
+    envp="$(run_in bash 'bs_shebang_env_path')"
+    # Termux-like: env is not where the file says -> env of this machine
+    printf '#!/nonexistent/env bash\necho a\n' > "${T}/f1.sh"
+    run_in bash 'bs_shebang_fix "'"${T}"'/f1.sh"' >/dev/null
+    eq "$(head -n1 "${T}/f1.sh")" "#!${envp} bash" "fix: broken env path is replaced"
+    # a working line is not touched
+    printf '#!/usr/bin/env sh\necho b\n' > "${T}/f2.sh"
+    run_in bash 'bs_shebang_fix "'"${T}"'/f2.sh"' >/dev/null
+    eq "$(head -n1 "${T}/f2.sh")" '#!/usr/bin/env sh' "fix: a working line is kept"
+    # /bin/sh missing -> the sh found in PATH
+    printf '#!/nonexistent/sh\necho c\n' > "${T}/f3.sh"
+    run_in bash 'bs_shebang_fix "'"${T}"'/f3.sh"' >/dev/null
+    eq "$(head -n1 "${T}/f3.sh" | sed 's|^#!||' | xargs basename)" 'sh' "fix: sh interpreter is taken from PATH"
+    local newsh
+    newsh="$(head -n1 "${T}/f3.sh" | sed 's|^#!||')"
+    eq "$([[ -x "${newsh}" ]] && echo yes)" 'yes' "fix: the new interpreter exists"
+    # lines with flags and non-scripts are left alone
+    printf '#!/nonexistent/env -S bash -e\n' > "${T}/f4.sh"
+    run_in bash 'bs_shebang_fix "'"${T}"'/f4.sh"' >/dev/null
+    eq "$(head -n1 "${T}/f4.sh")" '#!/nonexistent/env -S bash -e' "fix: a line with flags is kept"
+    printf 'plain\n' > "${T}/f5.sh"
+    run_in bash 'bs_shebang_fix "'"${T}"'/f5.sh"' >/dev/null
+    eq "$(cat "${T}/f5.sh")" 'plain' "fix: a file without #! is kept"
+}
+
 test_cli() {
     local bs_bin="${BS_PROJECT_ROOT}/bs"
     printf '#!/usr/bin/env bs\necho hi\n' > "${T}/c.sh"
@@ -111,6 +137,7 @@ main() {
     testframework::section "rewrite"; test_rewrite_keeps_body_and_mode
     testframework::section "bs shebang"; test_cli
     testframework::section "Hardening / Устойчивость"; test_hardening
+    testframework::section "bs_shebang_fix"; test_fix
     rm -rf "${T:?}"
     testframework::summary
 }

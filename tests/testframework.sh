@@ -221,7 +221,35 @@ testframework::section() {
 # Функция вывода сводки тестов
 # @description Print test summary
 # @example testframework::summary
+# Оболочки для тестов ярусов: bash zsh dash ash ksh mksh — по одному пути в строке.
+# Нет оболочки — строка «skip» в stderr (в отчёт «не проверено»), не молчаливый пропуск.
+# ash берётся настоящая; иначе апплет busybox через крошечный лаунчер `ash` (один путь, как у остальных).
+# Shells for tier tests: bash zsh dash ash ksh mksh — one path per line. A missing shell prints a
+# "skip" line to stderr (it goes to the report as "not verified"), never a silent skip. A real ash is
+# preferred; otherwise the busybox applet runs through a tiny launcher named `ash` (one path like the rest).
+testframework::posix_shells() {
+  local name path dir="${TMPDIR:-/tmp}/bs-test-shells.$$"
+  for name in bash zsh dash ash ksh mksh; do
+    path="$(command -v "${name}" 2>/dev/null || true)"
+    if [[ -z "${path}" && "${name}" == ash ]]; then
+      path="$(command -v busybox 2>/dev/null || true)"
+      if [[ -n "${path}" ]]; then
+        mkdir -p "${dir}"
+        printf '#!/bin/sh\nexec %s ash "$@"\n' "${path}" > "${dir}/ash"
+        chmod +x "${dir}/ash"
+        path="${dir}/ash"
+      fi
+    fi
+    if [[ -n "${path}" ]]; then
+      printf '%s\n' "${path}"
+    else
+      printf 'skip: %s is not installed / не установлен\n' "${name}" >&2
+    fi
+  done
+}
+
 testframework::summary() {
+  rm -rf "${TMPDIR:-/tmp}/bs-test-shells.$$" 2>/dev/null || true
   echo
   print_header "TEST SUMMARY / СВОДКА ТЕСТОВ"
   echo -e "${BLUE}Tests run / Тестов запущено:${NC} $tests_run"

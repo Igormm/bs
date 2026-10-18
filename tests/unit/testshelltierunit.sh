@@ -64,10 +64,11 @@ test_repository() {
 
     # Каждый posix-файл репозитория разбирается во всех установленных оболочках
     local f sh_name sh_bin
+    local -a tier_shells=()
+    mapfile -t tier_shells < <(testframework::posix_shells)
     while IFS= read -r f; do
-        for sh_name in bash zsh dash; do
-            sh_bin="$(command -v "${sh_name}" || true)"
-            [[ -n "${sh_bin}" ]] || continue
+        for sh_bin in "${tier_shells[@]}"; do
+            sh_name="${sh_bin##*/}"
             testframework::assert_command "'${sh_bin}' -n '${f}'" "${f#"${BS_PROJECT_ROOT}"/} parses in ${sh_name}" || true
         done
     done < <(grep -rlE '^# @shell posix' "${BS_PROJECT_ROOT}/bootstrap" "${BS_PROJECT_ROOT}/core" "${BS_PROJECT_ROOT}/lib" "${BS_PROJECT_ROOT}/install" 2>/dev/null | sort)

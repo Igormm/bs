@@ -38,68 +38,10 @@ utils::guard() {
   bs::guard_loaded "${module}"
 }
 
-# Проверяет наличие команды в PATH.
-# Заменяет идиому: command -v foo >/dev/null 2>&1
-# @description Check if command exists in PATH.
-# @description Проверить наличие команды в PATH.
-# @function utils::has
-# @param $1 {string} Имя команды
-# @returns 0  команда доступна
-# @returns 1  команда не найдена
-# @example
-#   if utils::has dnf; then ...; fi
-utils::has() {
-  local -r cmd="${1}"
-  command -v "${cmd}" >/dev/null 2>&1
-}
-
-# Выполняет команду, полностью подавляя вывод. Код возврата сохраняется.
-# Заменяет идиому: cmd >/dev/null 2>&1
-# @description Run command suppressing all output (stdout and stderr).
-# @description Выполнить команду, подавляя весь вывод (stdout и stderr).
-# @function utils::quiet
-# @param $@ {string} Команда и её аргументы
-# @returns код возврата команды
-# @example
-#   if utils::quiet grep -q foo file; then ...; fi
-utils::quiet() {
-  "$@" >/dev/null 2>&1
-}
-
-# Выполняет команду, подавляя только stderr. Код возврата сохраняется.
-# Заменяет идиому: cmd 2>/dev/null
-# @description Run command suppressing stderr only.
-# @description Выполнить команду, подавляя только stderr.
-# @function utils::quiet_err
-# @param $@ {string} Команда и её аргументы
-# @returns код возврата команды
-utils::quiet_err() {
-  "$@" 2>/dev/null
-}
-
-# Выполняет команду, подавляя вывод и игнорируя результат.
-# Явная замена идиомы: cmd >/dev/null 2>&1 || true
-# Использовать только там, где неудача команды действительно не важна.
-# @function utils::ignore
-# @description Run command ignoring result (always succeeds).
-# @description Выполнить команду, игнорируя результат (всегда успех).
-# @param $@ {string} Команда и её аргументы
-# @returns всегда 0
-utils::ignore() {
-  "$@" >/dev/null 2>&1 || :
-}
-
-# Выполняет команду, игнорируя результат; stderr подавляется, stdout сохраняется.
-# Явная замена идиомы: cmd 2>/dev/null || true (и utils::quiet_err cmd || true)
-# Использовать для best-effort операций, где неудача допустима.
-# @function utils::attempt
-# @description Best-effort command, ignore failure (always succeeds).
-# @description Выполнить команду best-effort, игнорируя сбой (всегда успех).
-# @param $@ {string} Команда и её аргументы
-# @returns всегда 0
-utils::attempt() {
-  "$@" 2>/dev/null || :
-}
+# utils::has, utils::quiet, utils::quiet_err, utils::ignore, utils::attempt —
+# в core/quiet.sh (@shell posix); init.sh загружает его перед этим модулем.
+# utils::has, utils::quiet, utils::quiet_err, utils::ignore, utils::attempt live
+# in core/quiet.sh (@shell posix); init.sh loads it before this module.
 
 # @global UTILS_TMP_REGISTRY — Utils: temp file registry ($$-scoped) (category: constant)
 # @global UTILS_TMP_REGISTRY — Utils: реестр временных файлов (в скоупе $$) (категория: constant)

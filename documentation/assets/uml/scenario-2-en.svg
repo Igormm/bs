@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="656" viewBox="0 0 780 656" role="img"><title>Scenario 2: start from dash — re-run in bash</title><defs><marker id="h" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker></defs><style>
+svg{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.life{stroke:#8b949e;stroke-width:1;stroke-dasharray:4 4;opacity:.7}
+.box{fill:#ddf4ff;stroke:#0969da;stroke-width:1}
+.head{font-size:13px;font-weight:600;fill:#0a3069}
+.arr{stroke:#0969da;stroke-width:1.6}
+.ret{stroke:#6e7781;stroke-dasharray:5 3}
+.lab{font-size:12.5px;fill:#24292f}
+.num{font-size:11px;fill:#6e7781}
+.note{fill:#fff8c5;stroke:#bf8700;stroke-width:1}
+.nt{font-size:12px;fill:#4d2d00}
+.dot{fill:#cf222e}
+.ttl{font-size:14px;font-weight:600;fill:#24292f}
+@media (prefers-color-scheme:dark){
+.box{fill:#0c2d6b;stroke:#58a6ff}.head{fill:#cae8ff}.arr{stroke:#58a6ff}.ret{stroke:#8b949e}
+.lab{fill:#e6edf3}.num{fill:#8b949e}.note{fill:#3b2e00;stroke:#d29922}.nt{fill:#f2cc60}.dot{fill:#ff7b72}.ttl{fill:#e6edf3}
+.life{stroke:#6e7681}}
+@media (prefers-reduced-motion:reduce){[class^="m"],[class*=" m"],.dot{animation:none!important;opacity:1!important}.dot{opacity:0!important}}
+@keyframes a0{0%,0.00%{opacity:0}2.50%,94%{opacity:1}100%{opacity:0}}.m0{opacity:0;animation:a0 14.0s infinite}@keyframes r0{0%,0.00%{transform:translateX(0);opacity:0}0.01%{opacity:1}4.50%{transform:translateX(155.0px);opacity:1}4.60%,100%{transform:translateX(155.0px);opacity:0}}.d0{animation:r0 14.0s infinite;opacity:0}@keyframes a1{0%,7.86%{opacity:0}10.36%,94%{opacity:1}100%{opacity:0}}.m1{opacity:0;animation:a1 14.0s infinite}@keyframes r1{0%,7.86%{transform:translateX(0);opacity:0}7.87%{opacity:1}12.36%{transform:translateX(155.0px);opacity:1}12.46%,100%{transform:translateX(155.0px);opacity:0}}.d1{animation:r1 14.0s infinite;opacity:0}@keyframes a2{0%,15.71%{opacity:0}18.21%,94%{opacity:1}100%{opacity:0}}.m2{opacity:0;animation:a2 14.0s infinite}@keyframes r2{0%,15.71%{transform:translateX(0);opacity:0}15.72%{opacity:1}20.21%{transform:translateX(-155.0px);opacity:1}20.31%,100%{transform:translateX(-155.0px);opacity:0}}.d2{animation:r2 14.0s infinite;opacity:0}@keyframes a3{0%,23.57%{opacity:0}26.07%,94%{opacity:1}100%{opacity:0}}.m3{opacity:0;animation:a3 14.0s infinite}@keyframes r3{0%,23.57%{transform:translateX(0);opacity:0}23.58%{opacity:1}28.07%{transform:translateX(310.0px);opacity:1}28.17%,100%{transform:translateX(310.0px);opacity:0}}.d3{animation:r3 14.0s infinite;opacity:0}@keyframes a4{0%,31.43%{opacity:0}33.93%,94%{opacity:1}100%{opacity:0}}.m4{opacity:0;animation:a4 14.0s infinite}@keyframes r4{0%,31.43%{transform:translateX(0);opacity:0}31.44%{opacity:1}35.93%{transform:translateX(-155.0px);opacity:1}36.03%,100%{transform:translateX(-155.0px);opacity:0}}.d4{animation:r4 14.0s infinite;opacity:0}@keyframes a5{0%,39.29%{opacity:0}41.79%,94%{opacity:1}100%{opacity:0}}.m5{opacity:0;animation:a5 14.0s infinite}@keyframes r5{0%,39.29%{transform:translateX(0);opacity:0}39.30%{opacity:1}43.79%{transform:translateX(155.0px);opacity:1}43.89%,100%{transform:translateX(155.0px);opacity:0}}.d5{animation:r5 14.0s infinite;opacity:0}@keyframes a6{0%,47.14%{opacity:0}49.64%,94%{opacity:1}100%{opacity:0}}.m6{opacity:0;animation:a6 14.0s infinite}@keyframes r6{0%,47.14%{transform:translateX(0);opacity:0}47.15%{opacity:1}51.64%{transform:translateX(155.0px);opacity:1}51.74%,100%{transform:translateX(155.0px);opacity:0}}.d6{animation:r6 14.0s infinite;opacity:0}@keyframes a7{0%,55.00%{opacity:0}57.50%,94%{opacity:1}100%{opacity:0}}.m7{opacity:0;animation:a7 14.0s infinite}@keyframes a8{0%,62.86%{opacity:0}65.36%,94%{opacity:1}100%{opacity:0}}.m8{opacity:0;animation:a8 14.0s infinite}@keyframes r8{0%,62.86%{transform:translateX(0);opacity:0}62.87%{opacity:1}67.36%{transform:translateX(-620.0px);opacity:1}67.46%,100%{transform:translateX(-620.0px);opacity:0}}.d8{animation:r8 14.0s infinite;opacity:0}@keyframes a9{0%,70.71%{opacity:0}73.21%,94%{opacity:1}100%{opacity:0}}.m9{opacity:0;animation:a9 14.0s infinite}</style><text class="ttl" x="12" y="26" dominant-baseline="hanging" opacity="0">.</text><line class="life" x1="80.0" y1="60" x2="80.0" y2="644"/>
+<rect class="box" x="21.0" y="22" width="118" height="36" rx="4"/>
+<text class="head" x="80.0" y="44" text-anchor="middle">User</text>
+<line class="life" x1="235.0" y1="60" x2="235.0" y2="644"/>
+<rect class="box" x="176.0" y="22" width="118" height="36" rx="4"/>
+<text class="head" x="235.0" y="44" text-anchor="middle">dash ./bs</text>
+<line class="life" x1="390.0" y1="60" x2="390.0" y2="644"/>
+<rect class="box" x="331.0" y="22" width="118" height="36" rx="4"/>
+<text class="head" x="390.0" y="44" text-anchor="middle">shell.sh</text>
+<line class="life" x1="545.0" y1="60" x2="545.0" y2="644"/>
+<rect class="box" x="486.0" y="22" width="118" height="36" rx="4"/>
+<text class="head" x="545.0" y="44" text-anchor="middle">trampoline.sh</text>
+<line class="life" x1="700.0" y1="60" x2="700.0" y2="644"/>
+<rect class="box" x="641.0" y="22" width="118" height="36" rx="4"/>
+<text class="head" x="700.0" y="44" text-anchor="middle">bash 4.2+</text>
+<g class="m0">
+<line class="arr" x1="86.0" y1="112" x2="229.0" y2="112" marker-end="url(#h)"/>
+<text class="lab" x="157.5" y="104" text-anchor="middle">dash ./bs version</text>
+<text class="num" x="84.0" y="126">1</text>
+<circle class="dot d0" cx="80.0" cy="112" r="4"/>
+</g>
+<g class="m1">
+<line class="arr" x1="241.0" y1="164" x2="384.0" y2="164" marker-end="url(#h)"/>
+<text class="lab" x="312.5" y="156" text-anchor="middle">bs_shell_host_ok?</text>
+<text class="num" x="239.0" y="178">2</text>
+<circle class="dot d1" cx="235.0" cy="164" r="4"/>
+</g>
+<g class="m2">
+<line class="arr ret" x1="384.0" y1="216" x2="241.0" y2="216" marker-end="url(#h)"/>
+<text class="lab" x="312.5" y="208" text-anchor="middle">no: this is dash</text>
+<text class="num" x="239.0" y="230">3</text>
+<circle class="dot d2" cx="390.0" cy="216" r="4"/>
+</g>
+<g class="m3">
+<line class="arr" x1="241.0" y1="268" x2="539.0" y2="268" marker-end="url(#h)"/>
+<text class="lab" x="390.0" y="260" text-anchor="middle">source trampoline.sh</text>
+<text class="num" x="239.0" y="282">4</text>
+<circle class="dot d3" cx="235.0" cy="268" r="4"/>
+</g>
+<g class="m4">
+<line class="arr" x1="539.0" y1="320" x2="396.0" y2="320" marker-end="url(#h)"/>
+<text class="lab" x="467.5" y="312" text-anchor="middle">bs_shell_host_find</text>
+<text class="num" x="394.0" y="334">5</text>
+<circle class="dot d4" cx="545.0" cy="320" r="4"/>
+</g>
+<g class="m5">
+<line class="arr ret" x1="396.0" y1="372" x2="539.0" y2="372" marker-end="url(#h)"/>
+<text class="lab" x="467.5" y="364" text-anchor="middle">bash 4.2+ found</text>
+<text class="num" x="394.0" y="386">6</text>
+<circle class="dot d5" cx="390.0" cy="372" r="4"/>
+</g>
+<g class="m6">
+<line class="arr" x1="551.0" y1="424" x2="694.0" y2="424" marker-end="url(#h)"/>
+<text class="lab" x="622.5" y="416" text-anchor="middle">exec bash ./bs version</text>
+<text class="num" x="549.0" y="438">7</text>
+<circle class="dot d6" cx="545.0" cy="424" r="4"/>
+</g>
+<g class="m7">
+<rect class="note" x="493.0" y="456" width="259.0" height="34" rx="3"/>
+<text class="nt" x="622.5" y="472.0" text-anchor="middle">BS_ORIGIN_SHELL=dash</text>
+</g>
+<g class="m8">
+<line class="arr ret" x1="694.0" y1="528" x2="86.0" y2="528" marker-end="url(#h)"/>
+<text class="lab" x="390.0" y="520" text-anchor="middle">goes on as in scenario 1</text>
+<text class="num" x="84.0" y="542">9</text>
+<circle class="dot d8" cx="700.0" cy="528" r="4"/>
+</g>
+<g class="m9">
+<rect class="note" x="28.0" y="560" width="569.0" height="34" rx="3"/>
+<text class="nt" x="312.5" y="576.0" text-anchor="middle">no bash found: what to install; exit 1</text>
+</g></svg>

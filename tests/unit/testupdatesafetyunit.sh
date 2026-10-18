@@ -37,6 +37,9 @@ make_src() {
     local -r dir="$1" ver="${2:-9.9.9}"
     mkdir -p "${dir}/core" "${dir}/lib" "${dir}/bootstrap"
     printf '#!/usr/bin/env bash\ncase "${1:-}" in version) echo "BS Framework version: %s";; esac\n' "${ver}" > "${dir}/bs"
+    chmod +x "${dir}/bs"
+    # файлы, без которых update отвергает источник / files without which update refuses a source
+    : > "${dir}/bootstrap/shell.sh"; : > "${dir}/bootstrap/trampoline.sh"; : > "${dir}/bootstrap/shebang.sh"; : > "${dir}/bootstrap/bs.sh"; : > "${dir}/core/prereq.sh"
     printf '#!/usr/bin/env bash\n' > "${dir}/bootstrap/init.sh"
     printf '#!/usr/bin/env bash\n' > "${dir}/bootstrap/loader.sh"
     printf 'export BS_VERSION="%s"\n' "${ver}" > "${dir}/core/version.sh"

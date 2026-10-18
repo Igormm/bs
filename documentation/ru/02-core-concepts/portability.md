@@ -7,8 +7,11 @@
 
 ## 1. Зачем это
 
-Проект BS работает на bash 4.2+ и претендует на «вездесущность». Но
-«везде» — это разные миры:
+Проект BS претендует на «вездесущность»: ядро делится на **ярусы** (`@shell
+posix` работает в любой оболочке, `@shell bash4` требует bash 4.2+ как хозяина), а
+остальные оболочки получают его через перезапуск в bash и мост `bs call` (см.
+[shell-portability](../08-development/shell-portability.md)). Но «везде» — это
+разные миры:
 
 - **GNU/Linux** — `grep -P`, `sed -z`, `sha256sum`, `stat -c`, `/proc`, `/sys`;
 - **macOS и FreeBSD (BSD userland)** — `shasum`, `stat -f`, нет `grep -P` и `sed -z`, нет `/proc`/`/sys`;
@@ -83,13 +86,17 @@ GNU-only инструменты и их fallback:
 - `posix` — только POSIX-инструменты (fallback-режим);
 - `bsd` — macOS/FreeBSD слои совместимости.
 
-**Оболочка — часть вектора возможностей** (факты `shell`,
-`shell_version`, `shell_ok`, `user_shell`, `shell_tier`). Код всегда
-исполняет bash 4.2+ (`shell_ok=1`); оболочка пользователя может быть любой:
-bash, zsh, dash, ash, sh, ksh, fish, nushell. `shell_tier` говорит, как BS
-работает для неё: `native` (bash 4.2+, работает и `source`), `hosted` (другая
-оболочка, BS работает командой `bs`) или `unsupported` (bash 4.2+ на машине
-нет). Tier файла `@shell posix | bash4` и строгий режим описаны в
+**Оболочка — часть вектора возможностей** (факты `shell`, `shell_ok`,
+`bash_version`): bash 4.2+ — всё ядро (оба яруса); остальные оболочки (zsh,
+dash, busybox ash, ksh, mksh) — модули `@shell posix` напрямую и всё остальное
+через перезапуск в bash; fish и nushell — только командой `bs` и мостом
+`bs call`. Тиры ниже предполагают `shell_ok=1`, проверяется через
+`platform::get shell_ok`. Что реально запускалось — таблица приоритетов в
+[shell-portability](../08-development/shell-portability.md).
+`platform::get shell_tier` говорит, как BS работает для оболочки пользователя:
+`native` (bash 4.2+, работает и `source`), `hosted` (другая оболочка, BS
+работает командой `bs`) или `unsupported` (bash 4.2+ на машине нет); tier файла
+`@shell` и строгий режим — в
 [01-getting-started](../01-getting-started/README.md#работа-из-любой-оболочки).
 
 Скрипт при старте проверяет нужный тир и падает с понятной ошибкой,

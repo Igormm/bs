@@ -4,7 +4,7 @@
 
 ## Что такое BS
 
-**BS** — модульный фреймворк и стандартная библиотека shell-скриптов. В его
+**BS** — модульный фреймворк и стандартная библиотека на Bash. В его
 состав входят загрузчик модулей, логирование, обработка ошибок,
 декларативные параметры скриптов, абстракция потоков ввода/вывода и набор
 системных модулей — всё в едином стиле кода и без единой внешней
@@ -17,11 +17,18 @@ dash, ash/busybox, sh, ksh, fish, nushell. Какой bash исполнит ко
 
 ## Требования
 
-- Linux (основная платформа; macOS поддерживается частично, Termux — через
-  [`bs shebang`](#shebang-под-эту-машину)).
-- На машине должен **быть** bash 4.2+. Это не обязательно ваша оболочка:
-  BS сам найдёт его и запустит в нём свой код. Если bash нет, BS не падает
-  с «Bad substitution», а говорит, что установить.
+- **bash 4.2+** где-то в `PATH`: на нём исполняется ядро (ярус `bash4`). Версии
+  4.2 и 4.3 допускаются кодом, но CI проверяет с **4.4** (почти все платформы
+  поставляют 4.4 и новее).
+- Запускать `bs` и `install.sh` можно **из любой оболочки** (dash, ash, zsh, ksh,
+  fish, nushell): пролог найдёт bash и перезапустится в нём. Модули `@shell
+  posix` подключаются из bash, zsh, dash, ash, ksh, mksh напрямую (см. раздел
+  «Как устроено ядро»); fish и nushell вызывают функции ядра через `bs call`.
+  Подробнее — [«Работа из любой оболочки»](#работа-из-любой-оболочки).
+- Linux (основная платформа; macOS поддерживается частично: системный bash там
+  3.2, нужен bash 4.2+ из Homebrew)
+- Termux (Android): первую строку скриптов подгоняет
+  [`bs shebang`](#shebang-под-эту-машину).
 
 Ничего больше не требуется: BS использует только встроенные команды
 оболочки и стандартные системные утилиты.
@@ -190,7 +197,9 @@ flowchart TD
 
 В bash 4.2+ пролог — одна проверка, ничего не перезапускается. Повторный
 заход в трамплин после `exec` считается сбоем и останавливается, поэтому
-зациклиться запуск не может.
+зациклиться запуск не может. Пошагово эти пути, а также `bs call`, POSIX-ярус
+без bash, установка и обновление, — в разделе
+[«Как устроено ядро: схемы UML»](#как-устроено-ядро-схемы-uml).
 
 ### Tier вашей оболочки
 
@@ -264,6 +273,21 @@ BS: модуль 'lib/io/streams' (@shell bash4) нельзя исполнять
   не передать — используйте `BS_SHELL_STRICT=1`, а проверку по конкретной
   оболочке делайте запуском `<оболочка> ./bs --strict-shell run script.sh`.
 
+### Вызов из fish и nushell: `bs call`
+
+У fish и nushell другой синтаксис, подключить ядро в них нельзя. Функцию ядра
+или модуля можно вызвать командой: она исполняется в bash, stdout, stderr и
+код выхода — её.
+
+```bash
+bs call utils::human_size 1536000                  # 1.5 MiB
+bs call --load lib/system/info system::info::os     # с загрузкой модуля
+```
+
+Из fish: `set size (bs call utils::human_size 1536000)`. Исполняется только
+существующая функция с допустимым именем (иначе код 2 или 127); путь модуля —
+только `core/...` или `lib/...`.
+
 ### Переменные, которые задают оболочку явно
 
 | Переменная | Что задаёт |
@@ -290,6 +314,245 @@ bs shebang set --mode auto examples/   # переписать, где нужно
 
 Подробности — в [«Переносимость между оболочками»](../08-development/shell-portability.md)
 и [«Архитектура»](../02-core-concepts/architecture.md).
+
+## Как устроено ядро: схемы UML
+
+Схемы ниже — в формате [Mermaid](https://mermaid.js.org/) (GitHub рисует их сам). Цвет несёт смысл: **бирюзовый** — ярус `@shell posix` (работает в любой оболочке), **фиолетовый** — ярус `@shell bash4` (нужен bash 4.2+), серый — точки входа. Сначала общая картина, затем шесть сценариев.
+
+### Компоненты
+
+```mermaid
+flowchart TB
+  classDef entry fill:#F1EFE8,stroke:#5F5E5A,color:#2C2C2A
+  classDef posix fill:#E1F5EE,stroke:#0F6E56,color:#04342C
+  classDef bash4 fill:#EEEDFE,stroke:#534AB7,color:#26215C
+  subgraph E["entry points"]
+    bs["bs"]:::entry
+    boot["boot.sh"]:::entry
+    inst["install.sh"]:::entry
+  end
+  subgraph P["bootstrap/ · POSIX"]
+    shell["shell.sh<br/>shell registry"]:::posix
+    tramp["trampoline.sh<br/>re-run in bash"]:::posix
+    sheb["shebang.sh<br/>#! management"]:::posix
+  end
+  subgraph B["bootstrap/ · bash4"]
+    bssh["bs.sh<br/>pre-kernel, bs::cli"]:::bash4
+    init["init.sh"]:::bash4
+    loader["loader.sh<br/>load, @depends"]:::bash4
+  end
+  subgraph C["core/"]
+    direction TB
+    subgraph CP["@shell posix"]
+      prereq:::posix
+      guard:::posix
+      const:::posix
+      version:::posix
+      quiet:::posix
+    end
+    subgraph CB["@shell bash4"]
+      lang:::bash4
+      args:::bash4
+      errorhandler:::bash4
+      config:::bash4
+      logger:::bash4
+      utils:::bash4
+      deps:::bash4
+      calc:::bash4
+      repl:::bash4
+    end
+  end
+  bs -.-> shell
+  boot -.-> shell
+  inst -.-> shell
+  shell -.-> tramp
+  bs -.-> bssh
+  bssh -.-> init
+  init -.-> loader
+  loader -.-> CP
+  loader -.-> CB
+  CB -.-> CP
+  inst -.-> sheb
+```
+
+Стрелки — зависимости (кто кого подключает). Файлы `core/` внутри пакета загружает `init.sh`, в порядке сверху вниз.
+
+### Сценарии
+
+#### 1. `bs script.sh` или `#!/usr/bin/env bs` из bash 4.2+
+
+![Сценарий 1: bs script.sh из bash 4.2+](../../assets/uml/scenario-1-ru.svg)
+
+<details>
+<summary>Текст диаграммы (Mermaid)</summary>
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as Пользователь
+  participant bs as bs
+  participant sh as shell.sh
+  participant bsh as bs.sh
+  participant init as init.sh
+  participant core as core/*
+  participant S as script.sh
+  U->>bs: ./script.sh (через shebang запускается bs)
+  bs->>sh: bs_shell_host_ok (пролог: оболочка годится?)
+  sh-->>bs: да: bash ≥ 4.2, не режим POSIX
+  bs->>bsh: source (bs::strict, bs::cli::*)
+  bs->>init: source
+  init->>core: load prereq, lang, const, logger, errorhandler, version, quiet, utils, config, deps
+  init-->>bs: BS_INITIALIZED=1
+  bs->>bs: BS_SHEBANG=1: первый аргумент — файл
+  bs->>S: новый bash: init.sh, затем source скрипта
+  S->>core: load "lib/..." по требованию
+  S-->>U: выход: EXIT-trap, стек очистки (LIFO)
+```
+
+</details>
+
+#### 2. Запуск из dash, ash или другой оболочки: перезапуск в bash
+
+![Сценарий 2: запуск из dash — перезапуск в bash](../../assets/uml/scenario-2-ru.svg)
+
+<details>
+<summary>Текст диаграммы (Mermaid)</summary>
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as Пользователь
+  participant d as dash ./bs
+  participant sh as shell.sh
+  participant tr as trampoline.sh
+  participant b as bash 4.2+
+  U->>d: dash ./bs version
+  d->>sh: bs_shell_host_ok
+  sh-->>d: нет: это dash
+  d->>tr: source
+  tr->>sh: bs_shell_host_find (ищет bash 4.2+: BS_HOST_BASH, PATH, типовые пути)
+  alt bash 4.2+
+    tr->>b: найден: exec bash тот же файл и аргументы
+    Note over tr,b: BS_ORIGIN_SHELL=dash (для --strict-shell)
+    b-->>U: продолжение как в сценарии 1
+  else
+    tr-->>U: не найден: сообщение, что установить (apk, apt, dnf, brew)
+  end
+```
+
+</details>
+
+#### 3. Вызов функции ядра из fish или nushell: `bs call`
+
+![Сценарий 3: bs call из fish или nushell](../../assets/uml/scenario-3-ru.svg)
+
+<details>
+<summary>Текст диаграммы (Mermaid)</summary>
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant F as fish / nushell
+  participant bs as bs call
+  participant core as ядро загружено (как в сценарии 1)
+  participant fn as FUNCTION
+  F->>bs: bs call --load lib/system/info system::info::os
+  bs->>core: ядро загружено (как в сценарии 1)
+  bs->>bs: проверка: имя функции и путь модуля по шаблону
+  alt ✗
+    bs-->>F: неверно: код 2
+  else
+    bs->>core: --load: load модуля
+    alt ✗ declare -F
+      bs-->>F: функции нет: код 127
+    else
+      bs->>fn: run
+      fn-->>F: stdout, stderr и код функции
+    end
+  end
+```
+
+</details>
+
+#### 4. POSIX-ярус напрямую, без bash
+
+![Сценарий 4: POSIX-ярус без bash](../../assets/uml/scenario-4-ru.svg)
+
+<details>
+<summary>Текст диаграммы (Mermaid)</summary>
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant D as скрипт на dash: подключает слой
+  participant sh as shell.sh
+  participant pre as prereq.sh
+  participant q as quiet.sh
+  D->>sh: . bootstrap/shell.sh
+  D->>pre: . core/prereq.sh
+  D->>q: . core/quiet.sh
+  D->>q: utils_has ls
+  q-->>D: код 0 или 1; bash не запускался
+```
+
+</details>
+
+#### 5. Установка: `./install.sh --local`
+
+![Сценарий 5: установка](../../assets/uml/scenario-5-ru.svg)
+
+<details>
+<summary>Текст диаграммы (Mermaid)</summary>
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as Пользователь
+  participant i as install.sh
+  participant k as kernel
+  participant a as install/actions.sh
+  participant sb as shebang.sh
+  participant fs as ~/.local/lib/bs
+  U->>i: ./install.sh --local
+  i->>k: пролог и ядро: как в сценарии 1 или 2
+  i->>a: копия bootstrap, core, bs, lib в staging
+  a->>sb: подгоняет #! под машину (Termux)
+  a->>a: манифест .install и обёртка
+  a->>fs: атомарный rename staging в ~/.local/lib/bs
+  i-->>U: PATH для оболочки пользователя
+```
+
+</details>
+
+#### 6. Обновление: `bs update`
+
+![Сценарий 6: обновление](../../assets/uml/scenario-6-ru.svg)
+
+<details>
+<summary>Текст диаграммы (Mermaid)</summary>
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as Пользователь
+  participant bs as bs update
+  participant sb as shebang.sh
+  participant t as копия источника во в…
+  participant inst as installed bs
+  U->>bs: bs update
+  bs->>t: копия источника во временный каталог
+  bs->>sb: shebang bs и обёртки под машину
+  bs->>inst: обмен частей, старое в .update-old
+  bs->>inst: smoke-test: bs version как программа
+  alt ok
+    bs-->>U: ок: манифест, чистка
+  else
+    bs-->>U: сбой: откат
+  end
+```
+
+</details>
+
 
 ## Куда идти дальше
 

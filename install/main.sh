@@ -169,8 +169,12 @@ TARGET_BIN="${BIN_DIR}/bs"  # wrapper executable
 # Bash completion location
 if [[ "${MODE}" == "local" ]]; then
   TARGET_COMPLETION="${HOME}/.local/share/bash-completion/completions/bs"
-else
+elif [[ "${PREFIX}" == "${BS_SYSTEM_PREFIX}" ]]; then
   TARGET_COMPLETION="/usr/share/bash-completion/completions/bs"
+else
+  # Свой PREFIX (Termux: $PREFIX, /opt/x): рядом с ним, а не в /usr, которого там может не быть
+  # A custom PREFIX (Termux: $PREFIX, /opt/x): next to it, not in /usr, which may not exist there
+  TARGET_COMPLETION="${PREFIX}/share/bash-completion/completions/bs"
 fi
 
 # PATH flags are local-only (help: valid only with --local)

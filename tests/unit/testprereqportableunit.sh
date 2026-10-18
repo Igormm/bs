@@ -31,10 +31,7 @@ eq() { testframework::assert_equal "$1" "$2" "$3" || true; }
 # Оболочки, которые есть на машине (bash — всегда)
 # Shells present on the machine (bash is always there)
 installed_shells() {
-    local n
-    for n in bash zsh dash; do
-        command -v "${n}" 2>/dev/null || printf 'skip: %s is not installed / не установлен\n' "${n}" >&2
-    done
+    testframework::posix_shells
 }
 
 test_parses_and_lints() {

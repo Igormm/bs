@@ -1,6 +1,6 @@
 # BS Documentation
 
-**BS** is a modular framework and standard library for shell scripts, started from any shell (the code runs in a bash 4.2+ found on the machine):
+**BS** is a modular framework and standard library written in Bash (the kernel needs bash 4.2+, the POSIX tier runs in any shell):
 a module loader, logging, error handling, declarative script arguments,
 an I/O streams abstraction and a set of system modules.
 

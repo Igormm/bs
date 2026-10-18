@@ -21,25 +21,20 @@ get_current_shell_name() {
 
 # check_shell_environment
 #
-# Установщик исполняется только в bash 4.2+: точка входа сама перезапускается
-# в нём (bootstrap/trampoline.sh), а гейт bootstrap/bs.sh отсекает старые
-# версии. Здесь остаётся проверка целостности — и оболочка ПОЛЬЗОВАТЕЛЯ, для
-# которой дальше настраиваются PATH и подсказки.
-# The installer runs only in bash 4.2+: the entry point re-runs itself in it
-# (bootstrap/trampoline.sh) and the bootstrap/bs.sh gate rejects old versions.
-# What remains is an integrity check. The USER's shell (PATH and hints are set
-# up for it) is computed later and lazily — after the arguments are parsed,
-# because --shell can set it.
+# Установщик исполняется только в bash 4.2+: версию проверяет POSIX-пролог
+# install.sh (bs_shell_host_ok), а при необходимости точка входа перезапускается
+# в подходящем bash (bootstrap/trampoline.sh). Здесь повторной проверки нет:
+# запоминается оболочка ПОЛЬЗОВАТЕЛЯ, для которой дальше настраиваются PATH и
+# подсказки.
+# The installer runs only in bash 4.2+: the POSIX prologue of install.sh checks
+# the version (bs_shell_host_ok) and, when needed, the entry point re-runs
+# itself in a capable bash (bootstrap/trampoline.sh). There is no second check
+# here: the USER's shell is recorded (PATH and hints are set up for it). It is
+# computed later and lazily — after the arguments are parsed, because --shell
+# can set it.
 check_shell_environment() {
     local shell_name
     shell_name="$(get_current_shell_name)"
-
-    if ! bs_shell_host_ok; then
-        printf "ERROR: установщик исполняется в '%s', а нужен bash 4.2+ / the installer runs in '%s', bash 4.2+ is needed\n" \
-            "${shell_name}" "${shell_name}" >&2
-        printf "Запустите / Run: %s %s\n" "$(bs_shell_host_find 2>/dev/null || printf 'bash')" "$0" >&2
-        exit 1
-    fi
 
     # Сохраняем для других функций
     readonly CURRENT_SHELL="$shell_name"

@@ -295,6 +295,18 @@ bs shebang set --mode env --dry-run script.sh   # show what would change
 
 `set` rewrites only files whose shebang already starts the program (`--prog`, default `bs`), keeps the body and the file mode, and `--dry-run` changes nothing. The same functions are POSIX (`bootstrap/shebang.sh`: `bs_shebang_line`, `bs_shebang_works`, `bs_shebang_rewrite`), so they run in dash, zsh and bash. Before running the installer on Termux, install the shells: `pkg install bash zsh dash busybox`; then `bs shebang check` for the files you installed.
 
+## Diagrams: install and update
+
+The animated diagrams show what happens during `./install.sh` and `bs update`. The other scenarios (start, re-run in bash, `bs call`) are in "How the kernel works" of the [Getting Started](01-getting-started/README.md) guide.
+
+### Install
+
+![Scenario 5: install](../assets/uml/scenario-5-en.svg)
+
+### Update
+
+![Scenario 6: update](../assets/uml/scenario-6-en.svg)
+
 ## Notes
 
 - **The source repository can be removed.**  
@@ -305,10 +317,11 @@ bs shebang set --mode env --dry-run script.sh   # show what would change
   - `system` (default): `/usr/local/lib/bs`;
   - `local` (`--local`): `~/.local/lib/bs`;
   - custom: values of `PREFIX`, `BIN_DIR`, `LIB_DIR`.
-- The installer can be started from any shell (`sh install.sh`,
-  `zsh ./install.sh`, …): its POSIX prologue re-runs it in a bash 4.2+ found
-  on the machine (`bootstrap/trampoline.sh`), or explains what to install.
-  The version gate (`bs::shell::ensure_version`, based on the real
-  interpreter, not `$SHELL`) runs in the bootstrap before anything else.
+- bash 4.2+ is required to start the kernel (the `bash4` tier); the installer can
+  be started from any shell — the entry point finds bash itself (trampoline). The POSIX prologue of `install.sh` checks the
+  version (`bs_shell_host_ok`, based on the real interpreter, not `$SHELL`)
+  before anything else; `init.sh` checks it once more when sourced.
+  `check_shell_environment` does not check the version: it only records the
+  user's shell.
 - If BS is already installed at the target (`is_already_installed`), the installer stops and suggests uninstalling first or overriding `PREFIX`/`BIN_DIR`/`LIB_DIR`; to bring an existing install up to date use `bs update` instead.
 - The installer runs under strict mode (`utils::strict`: `set -euo pipefail`) and validates every file it sources via `utils::ensure_source`.

@@ -70,7 +70,10 @@ readonly -a PROBES=(
 run_probe() {
   local -r bin="$1" code="${2//\\|/|}" want="$3"
   local out rc=0
-  out="$("${bin}" -c "${code}" 2>/dev/null)" || rc=$?
+  local -a launcher=("${bin}")
+  # busybox — набор апплетов: оболочка это `busybox ash` / busybox is an applet set: the shell is `busybox ash`
+  [[ "${bin##*/}" == busybox ]] && launcher+=(ash)
+  out="$("${launcher[@]}" -c "${code}" 2>/dev/null)" || rc=$?
   if [[ -n "${want}" ]]; then
     [[ ${rc} -eq 0 && "${out}" == "${want}" ]] && printf 'ok' || printf 'no'
   else
@@ -104,7 +107,11 @@ done
 if (( tsv == 0 )); then
   printf '\nversions / версии:\n'
   for i in "${!names[@]}"; do
-    v="$("${bins[i]}" --version 2>&1 | head -n 1 || true)"
+    if [[ "${bins[i]##*/}" == busybox ]]; then
+      v="$("${bins[i]}" 2>&1 | head -n 1 || true)"
+    else
+      v="$("${bins[i]}" --version 2>&1 | head -n 1 || true)"
+    fi
     [[ "${v}" != *[Ii]llegal* && "${v}" != *"invalid option"* ]] || v="(no --version)"
     printf '  %-8s %s\n' "${names[i]}" "${v}"
   done

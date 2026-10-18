@@ -599,3 +599,48 @@ busybox (Alpine), glibc and musl. Rules:
 6. **Full description** — see "Portability and capability vector —
    recommendations": [documentation/en/02-core-concepts/portability.md](02-core-concepts/portability.md);
    the rules above are the canon.
+
+## 12. Style of the POSIX tier (`@shell posix`)
+
+A file labelled `# @shell posix` is sourced by bash, zsh, dash, busybox ash, ksh93 and mksh, and **bash does not take
+part in it**. That is why it has its own rules; the rest of the code style (bilingual comments, `bs_guard`,
+`snake_case`) still applies. Check: `bash .agents/skills/bs-shell-abstraction/scripts/check_posix_tier.sh`.
+
+**File header.**
+
+```sh
+#!/bin/sh
+# shellcheck shell=sh
+# @shell posix — валидный POSIX sh: <что держит файл> / valid POSIX sh: <what holds the file>
+# @tier core — builtins only; works everywhere
+bs_guard MODULE || return 0
+```
+
+**Names.** The real function is an identifier without `::`: `module_function` (`bs_guard`, `utils_has`,
+`const_version`, `bs_version_get`). The old `::` name is created as an alias by `bs_shell_alias real module::function`
+at the very end of the file: it works in bash and zsh, so old calls such as `utils::has` do not change. New `bash4`
+code still writes `module::function`; POSIX code calls the real name.
+
+**Variables.** No `local` (POSIX has none) and no `local -r`: temporaries are global, so they carry a
+`__bs_<function abbreviation>_` prefix (for example `__bs_sb_` in `shebang.sh`, `__bs_vo_` in `version.sh`) to avoid
+clobbering others. Constants go through `bs_shell_readonly NAME=value` (`readonly -g` in zsh).
+
+**Constructs.** Allowed: `case`, `[ ]`/`test`, the expansions `${v#p}`, `${v%p}`, `${v:-d}`, `$(( ))`, `$( )`,
+`command -v`, `printf`, `while read`, `for x in list`. Forbidden: `[[ ]]`, `(( ))`, arrays, `declare`/`typeset`,
+`local -x`, `${!x}`, `${x^^}`/`${x,,}`, `=~`, `<( )`, `source`, the `function` keyword, `$'..'`, `mapfile`, `shopt`.
+Split into words with parameter expansion (`${s%% *}`/`${s#* }`), not `for w in $s`: zsh does not split a variable's
+value. `::` names are forbidden inside the file.
+
+**Output and errors.** `printf` only (not `echo -e`). Functions return a code (`return N`); `exit` belongs to
+`trampoline.sh` alone. `${1:?message}` is the BS idiom for a **mandatory** argument (a programmer error): in every shell it ends the
+script, and in dash the whole non-interactive shell. For input that can be empty through the user's fault, write
+`[ -n "$1" ] || return 2`.
+Do not enable strict mode or `trap` in a POSIX file.
+
+**Sourcing and paths.** Dependencies go through `bs_source_relative`; the directory of a sourced file comes from
+`BS_CURRENT_FILE` (the loader sets it while it sources). `BASH_*`, `ZSH_*`, `FUNCNAME` are allowed only in the layer
+files (`bootstrap/shell.sh`, `trampoline.sh`); a string the layer hands to a **child** shell is the one exception.
+
+**Test.** A POSIX module has `tests/unit/test<module>portableunit.sh`: it sources the file in every installed shell
+under `env -i` and compares the answers (the model is `testquietportableunit.sh`); shells that are not installed are
+reported as "not verified". Before a commit: `X -n` in all six shells, `shellcheck -s sh`, `check_posix_tier.sh`.

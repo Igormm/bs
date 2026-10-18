@@ -55,7 +55,8 @@ BS_DIR="${BS_ENTRY_DIR}"
 if [[ -f "${BS_DIR}/bootstrap/bs.sh" ]]; then
   source "${BS_DIR}/bootstrap/bs.sh"
   bs::strict
-  bs::shell::ensure_version 4 || exit 1
+  # Версию bash уже проверил POSIX-пролог (bs_shell_host_ok) — повторять нечего
+  # The POSIX prologue (bs_shell_host_ok) has already checked the bash version
 else
   printf 'ERROR: bootstrap/bs.sh not found in %s\n' "$BS_DIR" >&2
   exit 2
@@ -165,7 +166,7 @@ fi
 # первый аргумент — путь к существующему скрипту, а не команда.
 if [[ $# -ge 1 && -f "$1" ]]; then
   case "$1" in
-    help|-h|--help|version|env|list|lang-doc|lsp|chat|sync|rfc|api|ts|audit|doctor|run|build|repl|calc|init-shell|shebang|update|uninstall|where) : ;;
+    help|-h|--help|version|env|list|lang-doc|lsp|chat|sync|rfc|api|ts|audit|doctor|run|build|repl|calc|init-shell|shebang|call|update|uninstall|where) : ;;
     *) BS_SHEBANG=1 ;;
   esac
 fi
@@ -214,5 +215,6 @@ case "${1:-help}" in
                   calc::main "$@" ;;
   init-shell)     shift; bs::cli::init_shell_cmd "$@" ;;
   shebang)        shift; bs::cli::shebang_cmd "$@" ;;
+  call)           shift; bs::cli::call_cmd "$@" ;;
   *)              bs::cli::die "unknown command: $1" ;;
 esac

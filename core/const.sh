@@ -230,7 +230,7 @@ bs_shell_readonly SYS_TMP="/tmp"
 bs_shell_readonly SYS_USR_LOCAL="/usr/local"
 # @global SYS_HOME — Standard system path (category: constant)
 # @global SYS_HOME — Стандартный системный путь (категория: constant)
-bs_shell_readonly SYS_HOME="${HOME}"
+bs_shell_readonly SYS_HOME="${HOME:-}"
 
 # 
 # Массивы констант для валидации / Constant arrays for validation

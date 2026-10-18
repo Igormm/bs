@@ -324,6 +324,7 @@ Maintenance / Обслуживание:
   uninstall [opts]    Remove installed BS copies / удаление
   where [--deep]      Find every trace of BS on this machine / все следы BS на машине
   init-shell [SHELL]  PATH snippet for your shell: bash zsh ash dash ksh fish nu / snippet для вашей оболочки
+  call FUNC [ARGS]    Call a kernel/library function from any shell (fish, nu, dash...) / вызвать функцию из любой оболочки
   shebang <cmd>       Check and rewrite #! lines for this machine (Termux: no /usr/bin/env) / проверка и правка #! для этой машины
   --strict-shell      (before the command) refuse lib/ modules whose @shell tier does not fit the shell bs was started from / отказывать модулям lib/, чей tier @shell не подходит оболочке запуска
 
@@ -369,6 +370,7 @@ bs::cli::help_cmd() {
     where)          bs::cli::where_cmd --help ;;
     init-shell)     bs::cli::init_shell_usage ;;
     shebang)        bs::cli::shebang_usage ;;
+    call)           bs::cli::call_usage ;;
     rfc)            bs::cli::rfc_cmd --help ;;
     *)              bs::cli::die "help: unknown command: ${cmd}" ;;
   esac
@@ -432,11 +434,12 @@ bs::cli::bs_running_block() {
 bs::cli::version_cmd() {
   case "${1:-}" in
     "")          bs::version::print; return 0 ;;
-    -f|--full)   bs::version::print; printf 'Codename: %s\n' "$(bs::version::codename)" ;;
+    -f|--full)   bs::version::print ;;
     *)           bs::cli::die "version: unknown argument: $1 (try: bs version --full)" ;;
   esac
 
   bs::cli::bs_full_info_lines
+  printf '  codename:  %s\n' "$(bs::version::codename)"
 }
 
 # @private Значение ключа из манифеста установки (<lib>/.install, key=value).
@@ -669,13 +672,13 @@ bs::cli::doctor_cmd() {
   log::info "$(printf '  %-8s | %-30s | %s' "STATUS" "ITEM" "DETAIL")"
   log::info "$(printf '  %-8s | %-30s | %s' "--------" "------------------------------" "--------")"
 
-  # Bash version gate already ran in the pre-kernel namespace
-  # (bootstrap/bs.sh::bs::shell::ensure_version) — no re-check here.
-  # Гейт версии bash уже отработал в pre-kernel namespace
-  # (bootstrap/bs.sh::bs::shell::ensure_version) — повторная проверка не нужна.
+  # The bash version gate already ran in the POSIX prologue (bs_shell_host_ok)
+  # — no re-check here.
+  # Гейт версии bash уже отработал в POSIX-прологе (bs_shell_host_ok) —
+  # повторная проверка не нужна.
 
   # Required core files / Обязательные файлы ядра
-  local req=(bootstrap/init.sh bootstrap/loader.sh bootstrap/bs.sh bootstrap/shell.sh bootstrap/trampoline.sh core/prereq.sh core/lang.sh core/const.sh core/logger.sh core/errorhandler.sh core/version.sh core/utils.sh core/config.sh core/deps.sh core/repl.sh core/calc.sh)
+  local req=(bootstrap/init.sh bootstrap/loader.sh bootstrap/bs.sh bootstrap/shell.sh bootstrap/trampoline.sh core/prereq.sh core/lang.sh core/const.sh core/logger.sh core/errorhandler.sh core/version.sh core/quiet.sh core/utils.sh core/config.sh core/deps.sh core/repl.sh core/calc.sh)
   local f
   for f in "${req[@]}"; do
     if is::file "${BS_ROOT}/${f}"; then
@@ -1225,6 +1228,60 @@ bs::cli::shebang_cmd() {
   esac
 }
 
+bs::cli::call_usage() {
+  printf 'Usage: bs call [--load MODULE]... FUNCTION [ARGS...]\n\n'
+  printf 'Call a function of the BS kernel or of a library module from ANY shell\n'
+  printf '(dash, ash, ksh, fish, nushell, ...): the function runs in the bash that bs\n'
+  printf 'starts; its stdout and stderr are yours, its exit code becomes the exit code.\n\n'
+  printf '  --load MODULE   load lib/... or core/... first (repeat for several), e.g. lib/io/streams\n'
+  printf '  FUNCTION        a function that exists after loading: utils::human_size, log::info, ...\n\n'
+  printf 'Examples:\n'
+  printf '  bs call utils::human_size 1536000\n'
+  printf '  bs call --load lib/system/info system::info::os\n'
+  printf '  fish: set size (bs call utils::human_size 1536000)\n\n'
+  printf 'Exit: 0..255 of the function; 2 bad usage or name; 127 no such function.\n'
+  printf 'Вызывает функцию ядра или модуля BS из ЛЮБОЙ оболочки: функция исполняется в\n'
+  printf 'bash, который запускает bs; её stdout/stderr и код выхода становятся вашими.\n'
+}
+
+# @private Мост для оболочек без bash-синтаксиса (fish, nu, dash, ash, ksh): вызов функции
+# ядра как команды. Имя проверяется по шаблону и по тому, что функция существует, —
+# произвольная команда через мост не исполняется.
+# @private Bridge for shells without bash syntax: call a kernel function as a command.
+# The name is checked against a pattern and for being a defined function — an
+# arbitrary command does not run through the bridge.
+bs::cli::call_cmd() {
+  local -a modules=()
+  local fn
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -h|--help) bs::cli::call_usage; return 0 ;;
+      --load)    [[ $# -ge 2 ]] || { printf 'bs call: --load needs a module\n' >&2; return 2; }
+                 modules+=("$2"); shift 2 ;;
+      --load=*)  modules+=("${1#--load=}"); shift ;;
+      --)        shift; break ;;
+      -*)        printf 'bs call: unknown option: %s\n' "$1" >&2; return 2 ;;
+      *)         break ;;
+    esac
+  done
+  [[ $# -ge 1 ]] || { bs::cli::call_usage >&2; return 2; }
+  fn="$1"
+  shift
+  local mod
+  for mod in ${modules[@]+"${modules[@]}"}; do
+    [[ "${mod}" =~ ^(core|lib)/[A-Za-z0-9_/.-]+$ && "${mod}" != *..* ]] \
+      || { printf 'bs call: bad module path: %s\n' "${mod}" >&2; return 2; }
+    load "${mod}" || return 1
+  done
+  [[ "${fn}" =~ ^[A-Za-z_][A-Za-z0-9_:]*$ ]] \
+    || { printf 'bs call: bad function name: %s\n' "${fn}" >&2; return 2; }
+  if ! declare -F -- "${fn}" >/dev/null 2>&1; then
+    printf 'bs call: no such function: %s (load its module: --load lib/...)\n' "${fn}" >&2
+    return 127
+  fi
+  "${fn}" "$@"
+}
+
 # @private Boxed notice printed WITHOUT log prefixes — timestamps would
 # break the frame (log::header suffers from this in timestamped output).
 # Рамка-уведомление БЕЗ лог-префиксов — таймстампы ломают рамку
@@ -1321,11 +1378,11 @@ bs::cli::update_fetch() {
 
   local err="" repo_reachable=0
   if utils::has git; then
-    if err="$(GIT_TERMINAL_PROMPT=0 "${limit[@]}" git clone --quiet --depth 1 --branch "${ref}" -- "${repo}" "${dest}" 2>&1)"; then
+    if err="$(GIT_TERMINAL_PROMPT=0 ${limit[@]+"${limit[@]}"} git clone --quiet --depth 1 --branch "${ref}" -- "${repo}" "${dest}" 2>&1)"; then
       return 0
     fi
     rm -rf -- "${dest}"
-    if GIT_TERMINAL_PROMPT=0 "${limit[@]}" git ls-remote --exit-code -- "${repo}" HEAD >/dev/null 2>&1; then
+    if GIT_TERMINAL_PROMPT=0 ${limit[@]+"${limit[@]}"} git ls-remote --exit-code -- "${repo}" HEAD >/dev/null 2>&1; then
       repo_reachable=1
     fi
   fi
@@ -1369,7 +1426,7 @@ bs::cli::update_local_state() {
   local -a limit=()
   utils::has timeout && limit=(timeout 15)
   local remote_sha head_sha
-  remote_sha="$(GIT_TERMINAL_PROMPT=0 "${limit[@]}" git ls-remote -- "${repo}" "refs/heads/${ref}" 2>/dev/null | cut -f1)" || remote_sha=""
+  remote_sha="$(GIT_TERMINAL_PROMPT=0 ${limit[@]+"${limit[@]}"} git ls-remote -- "${repo}" "refs/heads/${ref}" 2>/dev/null | cut -f1)" || remote_sha=""
   head_sha="$(git -C "${dir}" rev-parse HEAD 2>/dev/null)" || head_sha=""
   if [[ -z "${remote_sha}" || -z "${head_sha}" ]]; then
     printf 'unknown\n'
@@ -1504,6 +1561,10 @@ bs::cli::update_source_missing() {
   [[ -f "${d}/bs" ]] || printf '%s\n' "bs"
   [[ -f "${d}/bootstrap/init.sh" ]] || printf '%s\n' "bootstrap/init.sh"
   [[ -f "${d}/bootstrap/loader.sh" ]] || printf '%s\n' "bootstrap/loader.sh"
+  local f
+  for f in bootstrap/shell.sh bootstrap/trampoline.sh bootstrap/shebang.sh bootstrap/bs.sh core/prereq.sh; do
+    [[ -f "${d}/${f}" ]] || printf '%s\n' "${f}"
+  done
   [[ -d "${d}/core" ]] || printf '%s\n' "core/"
   [[ -d "${d}/lib" ]] || printf '%s\n' "lib/"
   if [[ ! -f "${d}/core/version.sh" ]]; then
@@ -1613,16 +1674,16 @@ bs::cli::update_rollback() {
   for part in bs bootstrap core lib; do
     if [[ -e "${old}/${part}" ]]; then
       if [[ "${part}" == "bs" ]]; then
-        "${r[@]}" mv -f -- "${old}/bs" "${target}/bs" || true
+        ${r[@]+"${r[@]}"} mv -f -- "${old}/bs" "${target}/bs" || true
       else
-        "${r[@]}" rm -rf -- "${target:?}/${part}" || true
-        "${r[@]}" mv -- "${old}/${part}" "${target}/${part}" || true
+        ${r[@]+"${r[@]}"} rm -rf -- "${target:?}/${part}" || true
+        ${r[@]+"${r[@]}"} mv -- "${old}/${part}" "${target}/${part}" || true
       fi
     elif [[ -e "${old}/.added-${part}" ]]; then
-      "${r[@]}" rm -rf -- "${target:?}/${part}" || true
+      ${r[@]+"${r[@]}"} rm -rf -- "${target:?}/${part}" || true
     fi
   done
-  "${r[@]}" rm -rf -- "${tmp}" "${old}" || true
+  ${r[@]+"${r[@]}"} rm -rf -- "${tmp}" "${old}" || true
 }
 
 # @private EXIT/сигнал: незавершённая замена откатывается, замки снимаются.
@@ -1666,7 +1727,7 @@ bs::cli::update_cleanup_stale() {
       bs::cli::update_rollback "${target}" "${target}/.update.${pid}" "${d}" "${sudo}"
       log::info "update: восстановлена установка после прерванного запуска / restored after an interrupted run: ${target}"
     fi
-    "${r[@]}" rm -rf -- "${d}" || true
+    ${r[@]+"${r[@]}"} rm -rf -- "${d}" || true
   done
   return 0
 }
@@ -1681,8 +1742,8 @@ bs::cli::update_lock() {
   local -a r=()
   [[ -z "${sudo}" ]] || r=(sudo)
   for _ in 1 2; do
-    if "${r[@]}" mkdir -- "${lock}" 2>/dev/null; then
-      printf '%s\n' "$$" | "${r[@]}" tee -- "${lock}/pid" >/dev/null || true
+    if ${r[@]+"${r[@]}"} mkdir -- "${lock}" 2>/dev/null; then
+      printf '%s\n' "$$" | ${r[@]+"${r[@]}"} tee -- "${lock}/pid" >/dev/null || true
       UPDATE_LOCKS+=("${lock}")
       UPDATE_LOCK_SUDO+=("${sudo}")
       return 0
@@ -1692,7 +1753,7 @@ bs::cli::update_lock() {
     if [[ "${pid}" =~ ^[0-9]+$ ]] && kill -0 "${pid}" 2>/dev/null; then
       return 1
     fi
-    "${r[@]}" rm -rf -- "${lock}" || return 1
+    ${r[@]+"${r[@]}"} rm -rf -- "${lock}" || return 1
   done
   return 1
 }
@@ -1709,15 +1770,29 @@ bs::cli::update_unlock() {
   return 0
 }
 
+# @private Починить shebang файла под эту машину (bs_shebang_fix), от имени sudo при необходимости.
+# @private Repair the shebang of a file for this machine (bs_shebang_fix), as sudo if needed.
+# @param $1 file / файл
+# @param $@ optional command prefix (sudo) / необязательный префикс (sudo)
+bs::cli::update_fix_shebang() {
+  local -r f="$1"
+  shift
+  "$@" "$(bs::shell::host)" -c '. "$1"; bs_shebang_fix "$2"' _ "${BS_BOOTSTRAP_DIR}/shebang.sh" "${f}"
+}
+
 # @private Самопроверка установленной копии: bs version печатает версию источника.
+# bs запускается КАК ПРОГРАММА (через свой shebang), чтобы сломанный shebang
+# (Termux без /usr/bin/env) не проходил проверку.
 # @private Smoke test of the installed copy: bs version prints the source's version.
+# bs runs AS A PROGRAM (through its own shebang), so a broken shebang (Termux
+# without /usr/bin/env) does not pass the test.
 bs::cli::update_smoke() {
   local -r t="$1" want="$2"
   local out
   local -a limit=()
   utils::has timeout && limit=(timeout 60)
   out="$(env -u BS_INITIALIZED -u BS_VERSION BS_ROOT="${t}" BS_HOME="${t}" BS_SILENT=1 \
-    "${limit[@]}" "$(bs::shell::host)" "${t}/bs" version 2>&1)" || return 1
+    ${limit[@]+"${limit[@]}"} "${t}/bs" version 2>&1)" || return 1
   [[ "${out}" == *"version: ${want}"* ]]
 }
 
@@ -1732,31 +1807,41 @@ bs::cli::update_apply() {
   local -a r=("$@")
   local -r tmp="${target}/.update.$$" old="${target}/.update-old.$$"
   local part
-  "${r[@]}" rm -rf -- "${tmp}" "${old}" || return 1
-  "${r[@]}" mkdir -p -- "${tmp}" "${old}" || { "${r[@]}" rm -rf -- "${tmp}" "${old}"; return 1; }
+  ${r[@]+"${r[@]}"} rm -rf -- "${tmp}" "${old}" || return 1
+  ${r[@]+"${r[@]}"} mkdir -p -- "${tmp}" "${old}" || { ${r[@]+"${r[@]}"} rm -rf -- "${tmp}" "${old}"; return 1; }
   UPDATE_INF_TARGET="${target}" UPDATE_INF_TMP="${tmp}" UPDATE_INF_OLD="${old}"
   UPDATE_INF_SUDO="${r[*]:-}"
-  if ! "${r[@]}" cp -a "${from}/bootstrap" "${from}/core" "${from}/lib" "${from}/bs" "${tmp}/"; then
+  if ! ${r[@]+"${r[@]}"} cp -a "${from}/bootstrap" "${from}/core" "${from}/lib" "${from}/bs" "${tmp}/"; then
     bs::cli::update_rollback "${target}" "${tmp}" "${old}" "${UPDATE_INF_SUDO}"
     UPDATE_INF_TARGET=""
     return 1
+  fi
+  # shebang bs и обёртки — под эту машину (Termux: нет /usr/bin/env, /bin/sh)
+  # the shebang of bs and of the wrapper — for this machine (Termux: no /usr/bin/env, /bin/sh)
+  bs::cli::update_fix_shebang "${tmp}/bs" ${r[@]+"${r[@]}"} \
+    || bs::cli::update_warn "update: не удалось подогнать shebang у ${tmp}/bs / could not adapt the shebang"
+  local wrapper
+  wrapper="$(bs::cli::update_install_wrapper "${target}")"
+  if [[ -n "${wrapper}" && -f "${wrapper}" ]]; then
+    bs::cli::update_fix_shebang "${wrapper}" ${r[@]+"${r[@]}"} \
+      || bs::cli::update_warn "update: не удалось подогнать shebang у обёртки ${wrapper} / could not adapt the wrapper shebang"
   fi
   local ok=1
   for part in bs bootstrap core lib; do
     if [[ "${part}" == "bs" ]]; then
       if [[ -e "${target}/bs" ]]; then
-        "${r[@]}" cp -a -- "${target}/bs" "${old}/bs" || { ok=0; break; }
+        ${r[@]+"${r[@]}"} cp -a -- "${target}/bs" "${old}/bs" || { ok=0; break; }
       else
-        "${r[@]}" touch -- "${old}/.added-bs" || { ok=0; break; }
+        ${r[@]+"${r[@]}"} touch -- "${old}/.added-bs" || { ok=0; break; }
       fi
-      "${r[@]}" mv -f -- "${tmp}/bs" "${target}/bs" || { ok=0; break; }
+      ${r[@]+"${r[@]}"} mv -f -- "${tmp}/bs" "${target}/bs" || { ok=0; break; }
     else
       if [[ -e "${target}/${part}" ]]; then
-        "${r[@]}" mv -- "${target}/${part}" "${old}/${part}" || { ok=0; break; }
+        ${r[@]+"${r[@]}"} mv -- "${target}/${part}" "${old}/${part}" || { ok=0; break; }
       else
-        "${r[@]}" touch -- "${old}/.added-${part}" || { ok=0; break; }
+        ${r[@]+"${r[@]}"} touch -- "${old}/.added-${part}" || { ok=0; break; }
       fi
-      "${r[@]}" mv -- "${tmp}/${part}" "${target}/${part}" || { ok=0; break; }
+      ${r[@]+"${r[@]}"} mv -- "${tmp}/${part}" "${target}/${part}" || { ok=0; break; }
     fi
   done
   if (( ok == 0 )); then
@@ -1769,9 +1854,9 @@ bs::cli::update_apply() {
     UPDATE_INF_TARGET=""
     return 2
   fi
-  "${r[@]}" touch -- "${old}/.committed" || true
+  ${r[@]+"${r[@]}"} touch -- "${old}/.committed" || true
   UPDATE_INF_TARGET=""
-  "${r[@]}" rm -rf -- "${tmp}" "${old}" || true
+  ${r[@]+"${r[@]}"} rm -rf -- "${tmp}" "${old}" || true
   return 0
 }
 
@@ -1889,7 +1974,7 @@ bs::cli::update_pull_checkout() {
   before="$(git -C "${dir}" rev-parse --short=7 HEAD 2>/dev/null || printf '?')"
   local -a limit=()
   utils::has timeout && limit=(timeout 120)
-  if ! out="$(GIT_TERMINAL_PROMPT=0 "${limit[@]}" git -C "${dir}" pull --ff-only 2>&1)"; then
+  if ! out="$(GIT_TERMINAL_PROMPT=0 ${limit[@]+"${limit[@]}"} git -C "${dir}" pull --ff-only 2>&1)"; then
     bs::cli::update_warn "update: git pull --ff-only не удался в ${dir} (история разошлась или нет сети) / failed (diverged history or no network): ${out//$'\n'/ | }"
     return 1
   fi

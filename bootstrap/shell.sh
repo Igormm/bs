@@ -434,7 +434,19 @@ bs_shell_host_ok() {
 # shellcheck disable=SC2016  # скрипт для -c разбирает дочерний bash
 bs_shell__bash_ok() {
   [ -x "$1" ] || return 1
-  "$1" -c '[[ ${BASH_VERSINFO[0]:-0} -gt 4 || ( ${BASH_VERSINFO[0]:-0} -eq 4 && ${BASH_VERSINFO[1]:-0} -ge 2 ) ]]' 2>/dev/null
+  # Версию спрашиваем у самого кандидата и сверяем напечатанное: двоичный файл, который
+  # игнорирует -c и просто выходит с 0 (например /bin/true), bash 4.2+ не считается.
+  # We ask the candidate itself and check what it printed: a binary that ignores -c and just
+  # exits 0 (for example /bin/true) is not a bash 4.2+.
+  __bs_bv=$("$1" -c 'printf "%s.%s" "${BASH_VERSINFO[0]:-0}" "${BASH_VERSINFO[1]:-0}"' 2>/dev/null) || return 1
+  case "$__bs_bv" in
+    [0-9]*.[0-9]*) ;;
+    *) return 1 ;;
+  esac
+  __bs_bmaj=${__bs_bv%%.*}
+  __bs_bmin=${__bs_bv#*.}
+  [ "$__bs_bmaj" -gt 4 ] && return 0
+  [ "$__bs_bmaj" -eq 4 ] && [ "$__bs_bmin" -ge 2 ]
 }
 
 # @description Find a bash 4.2+ on this machine: BS_HOST_BASH (authoritative
@@ -541,17 +553,19 @@ bs_shell_tier_allows() {
       [ "$__bs_to" != unknown ] || __bs_to=${2:-} ;;
   esac
   __bs_tl=${1:-bash4}
-  __bs_tifs=$IFS
-  IFS=,
-  for __bs_tk in $__bs_tl; do
-    IFS=$__bs_tifs
+  # список режем подстановкой параметров: zsh не делит неокавыченную переменную по IFS,
+  # а менять IFS здесь незачем
+  # the list is cut with parameter expansion: zsh does not split an unquoted variable by IFS,
+  # and there is no need to touch IFS here
+  while [ -n "$__bs_tl" ]; do
+    __bs_tk=${__bs_tl%%,*}
+    case "$__bs_tl" in *,*) __bs_tl=${__bs_tl#*,} ;; *) __bs_tl= ;; esac
+    [ -n "$__bs_tk" ] || continue
     __bs_tk=$(bs_shell_tier_word "$__bs_tk")
     [ "$__bs_tk" != posix ] || return 0
     [ "$__bs_tk" != "$__bs_to" ] || return 0
     if [ "$__bs_tk" = bash4 ] && [ "$__bs_to" = bash ]; then return 0; fi
-    IFS=,
   done
-  IFS=$__bs_tifs
   return 1
 }
 

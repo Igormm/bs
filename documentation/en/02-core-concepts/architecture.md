@@ -2,7 +2,9 @@
 
 # Architecture
 
-BS is a thin runtime layer over bash 4.2+. It consists of two entry scripts
+BS is a thin runtime layer: the kernel is split into a POSIX tier (any shell)
+and a `bash4` tier (bash 4.2+; the other shells reach it through a re-run or
+`bs call`). It consists of two entry scripts
 (`boot.sh`, `bs`) with a shared POSIX prologue, a shell registry
 (`bootstrap/shell.sh`), a bootstrapper (`bootstrap/init.sh`), a module loader
 (`bootstrap/loader.sh`), the always-loaded `core/` modules and the on-demand
@@ -38,12 +40,12 @@ Read top to bottom. Three layers: the **POSIX prologue** (runs in any shell),
               ▼                                                       ▼
    stage-1: boot.sh                                          stage-2: bs
     · source bootstrap/bs.sh (pre-kernel)                      (boot.sh execs into it)
-    · bs::strict, bs::shell::ensure_version 4                        │
+    · bs::strict (prologue checked the version)                      │
     · BS_ROOT: env → next to boot.sh →                               ▼
       ~/.local/lib/bs → /usr/local/lib/bs        · BS_CALLER_PATH = the caller's PATH
       (not found → exit 2)                       · source bootstrap/bs.sh:
     · exec "$BS_ROOT/bs" "$@" ─────────────────►     bs::cli::*, bs::shell::*, bs::is_main
-                                                 · bs::strict, ensure_version 4
+                                                 · bs::strict (prologue checked the version)
                                                  · BS_ROOT (own dir → ~/.local/lib/bs
                                                    → $BS_SYSTEM_PREFIX/lib/bs), BS_HOME,
                                                    BS_SILENT=1
@@ -83,7 +85,7 @@ Read top to bottom. Three layers: the **POSIX prologue** (runs in any shell),
    ├─ source bootstrap/bs.sh  (pre-kernel); BS_BOOTSTRAP_DIR
    ├─ BS_INITIALIZED set and bs::guard exists? → return 0   (idempotency)
    ├─ BS_ROOT (given, else the parent of bootstrap/ that holds the bs file)
-   ├─ bs::shell::ensure_version 4
+   ├─ bs::shell::ensure_version 4   (source mode: there is no prologue)
    ├─ bs::append_local_bin_to_path   (~/.local/bin in the PATH of this process)
    ├─ BS_HOME (defaults to BS_ROOT)
    ├─ source bootstrap/loader.sh      → load and bs::load appear
@@ -116,6 +118,38 @@ Read top to bottom. Three layers: the **POSIX prologue** (runs in any shell),
    └─ BS_LOADED_MODULES[path]=1
 ```
 
+## The kernel by tiers: what every shell gets
+
+The kernel is neither "bash only" nor "POSIX only": each `core/` file carries a
+`# @shell posix` or `# @shell bash4` label, and that label says where it runs.
+The labels are checked by `bash .agents/skills/bs-shell-portability/scripts/tier_scan.sh`;
+what was really run is in the priority table of
+[shell-portability](../08-development/shell-portability.md).
+
+| Tier | `core/` files | Runs directly in | How the other shells get it |
+|---|---|---|---|
+| `posix` (5) | `prereq`, `guard`, `const`, `version`, `quiet` | bash, zsh, dash, busybox ash, ksh93, mksh (verified by running) | — (they source it themselves) |
+| `bash4` (9) | `lang`, `args`, `errorhandler`, `config`, `logger`, `utils`, `deps`, `calc`, `repl` | bash 4.2+ only | the entry point finds bash and re-runs itself in it (trampoline); kernel functions — the `bs call` command |
+
+What makes it "available to all":
+
+1. **Any shell runs `bs` and scripts with `#!/usr/bin/env bs`**: the entry-point
+   prologue is POSIX and re-runs the file in bash 4.2+ when needed.
+2. **The POSIX tier is sourced directly** from bash, zsh, dash, ash, ksh, mksh:
+   constants, the version, `utils_has`/`utils_quiet` and the rest, the shell
+   registry (`bootstrap/shell.sh`), shebang management (`bootstrap/shebang.sh`).
+3. **The bridge `bs call [--load MODULE] FUNCTION [ARGS]`** calls any kernel
+   function from fish, nushell and other shells with another syntax; the
+   function runs in bash, the output and the exit code go back to the caller.
+
+What the kernel does **not** promise: to run `lang`, `args`, `errorhandler` and
+the other `bash4` files in dash, ash, ksh, mksh, fish or nushell. They need
+associative arrays, namerefs and `=~` with `BASH_REMATCH`, which are missing or
+behave differently there. Shells without a real run (nushell, oksh, osh) are
+not considered verified. Files move from `bash4` to `posix` one by one (order:
+`calc`, `utils`, `config`, `logger`, `deps`); `lang`, `args` and `repl` stay in
+the `bash4` tier.
+
 ## Stage 0: POSIX prologue and the `trampoline`
 
 The entry points (`bs`, `boot.sh`, `install.sh`) start with the same short
@@ -141,9 +175,10 @@ on `@shell posix|bash4` tiers and shells: [shell-portability](../08-development/
 the environment and hand control to `bs` as fast as possible:
 
 1. **Pre-kernel namespace.** It sources `bootstrap/bs.sh` — a dependency-free,
-   bash-3.2-compatible file — and runs the shell version gate
-   `bs::shell::ensure_version 4`; otherwise it prints an error and exits with
-   code `1`.
+   bash-3.2-compatible file — and enables strict mode
+   (`bs::strict`). The POSIX prologue (`bs_shell_host_ok`) has already checked
+   the bash version: it replaces an unsuitable bash with a re-run (trampoline)
+   or exits with code `1`.
 2. **BS_ROOT lookup**, in priority order:
    - already exported `BS_ROOT`;
    - the directory containing `boot.sh` itself, if `bs` and
@@ -165,8 +200,10 @@ prologue (see the diagram), then enables strict mode through `bs::strict` and
 performs the following:
 
 - Takes its own directory from `BS_ENTRY_DIR` (set by the prologue), sources `bootstrap/bs.sh` (pre-kernel namespace)
-  and runs `bs::shell::ensure_version 4`, so the bash 4.2+ gate runs before
-  anything else is loaded.
+  and enables `bs::strict`. The bash 4.2+ gate has already run in the prologue
+  (`bs_shell_host_ok`), before anything else is loaded. It belongs to the `bash4` tier (that is how the
+  kernel starts); `@shell posix` modules and the `bs call` bridge do not
+  require it.
 - Pulls in `BS_VERSION` from `core/version.sh` (currently `0.8.0`); `const.sh` has no number of its own.
 - Resolves `BS_ROOT` if it is not already set: first the script's own
   directory (when it contains `bootstrap/init.sh`), then
@@ -210,7 +247,8 @@ Its steps:
    presence of the `bs` script. If that fails, initialization aborts with an
    error asking to set `BS_ROOT` manually.
 3. **Pre-kernel namespace.** Sources `bootstrap/bs.sh` and runs the shell
-   version gate `bs::shell::ensure_version 4` before any kernel code loads —
+   version gate `bs::shell::ensure_version 4` before any kernel code loads (in
+   source mode there is no prologue, so `init.sh` checks the version itself) —
    runtime detection via `BASH_VERSION`/`ZSH_VERSION`, never `$SHELL` (the
    login shell lies when sourcing from another shell).
 4. **PATH tweak.** `~/.local/bin` is prepended to `PATH` once

@@ -1,17 +1,17 @@
 # BS Framework
 
-**BS** — модульный фреймворк и стандартная библиотека shell-скриптов:
+**BS** — модульный фреймворк и стандартная библиотека на Bash (ядро требует bash 4.2+, POSIX-ярус работает в любой оболочке):
 загрузчик модулей, логирование, обработка ошибок, декларативные параметры
 скриптов, абстракция потоков ввода/вывода и набор системных модулей —
 всё в едином code style и без единой внешней зависимости. Запускается из
-любой оболочки (bash, zsh, dash, ash, sh, ksh, fish, nushell): код исполняет
+любой оболочки (bash, zsh, dash, ash, sh, ksh, fish, nushell): ядро исполняет
 найденный на машине bash 4.2+.
 
-**BS** is a modular framework and standard library for shell scripts:
+**BS** is a modular framework and standard library written in Bash (the kernel needs bash 4.2+, the POSIX tier runs in any shell):
 a module loader, logging, error handling, declarative script parameters,
 an I/O streams abstraction and a set of system modules — all in a
 consistent code style and with zero external dependencies. It starts from
-any shell (bash, zsh, dash, ash, sh, ksh, fish, nushell): the code is run by
+any shell (bash, zsh, dash, ash, sh, ksh, fish, nushell): the kernel is run by
 a bash 4.2+ found on the machine.
 
 ## Возможности / Features

@@ -2,7 +2,9 @@
 
 # Архитектура
 
-BS — тонкий слой времени выполнения поверх bash 4.2+. Он состоит из двух
+BS — тонкий слой времени выполнения: ядро делится на POSIX-ярус (любая
+оболочка) и ярус `bash4` (bash 4.2+, остальные оболочки попадают в него через
+перезапуск или `bs call`). Он состоит из двух
 входных скриптов (`boot.sh`, `bs`) с общим POSIX-прологом, реестра оболочек
 (`bootstrap/shell.sh`), инициализатора (`bootstrap/init.sh`),
 загрузчика модулей (`bootstrap/loader.sh`), всегда загружаемых модулей `core/`
@@ -38,12 +40,12 @@ BS — тонкий слой времени выполнения поверх ba
               ▼                                                       ▼
    stage-1: boot.sh                                          stage-2: bs
     · source bootstrap/bs.sh (pre-kernel)                      (boot.sh делает exec сюда)
-    · bs::strict, bs::shell::ensure_version 4                        │
+    · bs::strict (версию проверил пролог)                            │
     · BS_ROOT: env → рядом с boot.sh →                               ▼
       ~/.local/lib/bs → /usr/local/lib/bs        · BS_CALLER_PATH = PATH вызвавшего
       (не найден → exit 2)                       · source bootstrap/bs.sh:
     · exec "$BS_ROOT/bs" "$@" ─────────────────►     bs::cli::*, bs::shell::*, bs::is_main
-                                                 · bs::strict, ensure_version 4
+                                                 · bs::strict (версию проверил пролог)
                                                  · BS_ROOT (свой каталог → ~/.local/lib/bs
                                                    → $BS_SYSTEM_PREFIX/lib/bs), BS_HOME,
                                                    BS_SILENT=1
@@ -83,7 +85,7 @@ BS — тонкий слой времени выполнения поверх ba
    ├─ source bootstrap/bs.sh  (pre-kernel); BS_BOOTSTRAP_DIR
    ├─ уже BS_INITIALIZED и есть bs::guard? → return 0   (идемпотентность)
    ├─ BS_ROOT (задан, иначе родитель bootstrap/ с файлом bs)
-   ├─ bs::shell::ensure_version 4
+   ├─ bs::shell::ensure_version 4   (source-режим: пролога нет)
    ├─ bs::append_local_bin_to_path   (~/.local/bin в PATH этого процесса)
    ├─ BS_HOME (по умолчанию BS_ROOT)
    ├─ source bootstrap/loader.sh      → появляются load, bs::load
@@ -116,6 +118,38 @@ BS — тонкий слой времени выполнения поверх ba
    └─ BS_LOADED_MODULES[путь]=1
 ```
 
+## Ядро по ярусам: что доступно всем оболочкам
+
+Ядро не «только bash» и не «только POSIX»: каждый файл `core/` несёт метку
+`# @shell posix` или `# @shell bash4`, и от неё зависит, где он работает. Метки
+проверяет `bash .agents/skills/bs-shell-portability/scripts/tier_scan.sh`; что
+реально запускалось — таблица приоритетов в
+[shell-portability](../08-development/shell-portability.md).
+
+| Ярус | Файлы `core/` | Где работает напрямую | Как попадают остальные оболочки |
+|---|---|---|---|
+| `posix` (5) | `prereq`, `guard`, `const`, `version`, `quiet` | bash, zsh, dash, busybox ash, ksh93, mksh (проверено запуском) | — (подключаются сами) |
+| `bash4` (9) | `lang`, `args`, `errorhandler`, `config`, `logger`, `utils`, `deps`, `calc`, `repl` | только bash 4.2+ | точка входа находит bash и перезапускается в нём (трамплин); функции ядра — командой `bs call` |
+
+Что делает «доступным всем»:
+
+1. **Любая оболочка запускает `bs` и скрипты с `#!/usr/bin/env bs`**: пролог точки
+   входа написан на POSIX, при необходимости перезапускает файл в bash 4.2+.
+2. **POSIX-ярус подключается напрямую** из bash, zsh, dash, ash, ksh, mksh:
+   константы, версия, `utils_has`/`utils_quiet` и др., реестр оболочек
+   (`bootstrap/shell.sh`), управление шебангом (`bootstrap/shebang.sh`).
+3. **Мост `bs call [--load МОДУЛЬ] ФУНКЦИЯ [АРГУМЕНТЫ]`** вызывает любую функцию
+   ядра из fish, nushell и прочих оболочек с другим синтаксисом; функция
+   исполняется в bash, вывод и код выхода возвращаются вызывающему.
+
+Чего ядро **не** обещает: исполнять `lang`, `args`, `errorhandler` и другие файлы
+яруса `bash4` в dash, ash, ksh, mksh, fish или nushell. В них нужны
+ассоциативные массивы, nameref и `=~` с `BASH_REMATCH`, которых нет или которые
+ведут себя иначе. Оболочки без настоящего запуска (nushell, oksh, osh) не
+считаются проверенными. Перевод файлов `bash4` на `posix` идёт по одному
+(порядок: `calc`, `utils`, `config`, `logger`, `deps`); `lang`, `args` и `repl`
+останутся ярусом `bash4`.
+
 ## Стадия 0: POSIX-пролог и `trampoline`
 
 Точки входа (`bs`, `boot.sh`, `install.sh`) начинаются с одинакового короткого
@@ -142,8 +176,9 @@ BS — тонкий слой времени выполнения поверх ba
 которого — проверить среду и как можно быстрее передать управление `bs`:
 
 1. **Pre-kernel namespace.** Подключает `bootstrap/bs.sh` — файл без
-   зависимостей, совместимый с bash 3.2 — и выполняет гейт версии оболочки
-   `bs::shell::ensure_version 4`; иначе выводится ошибка и выход с кодом `1`.
+   зависимостей, совместимый с bash 3.2 — и включает строгий режим
+   (`bs::strict`). Версию bash уже проверил POSIX-пролог (`bs_shell_host_ok`):
+   неподходящий bash он заменяет перезапуском (трамплин) или выходом с кодом `1`.
 2. **Поиск BS_ROOT** в порядке приоритета:
    - уже экспортированный `BS_ROOT`;
    - каталог, где лежит сам `boot.sh`, если рядом есть `bs` и
@@ -166,8 +201,9 @@ BS — тонкий слой времени выполнения поверх ba
 следующее:
 
 - Берёт свой каталог из `BS_ENTRY_DIR` (его задал пролог), подключает `bootstrap/bs.sh` (pre-kernel
-  namespace) и выполняет `bs::shell::ensure_version 4` — гейт bash 4.2+
-  срабатывает до загрузки чего-либо ещё.
+  namespace) и включает `bs::strict`. Гейт bash 4.2+ уже сработал в
+  прологе (`bs_shell_host_ok`) — до загрузки чего-либо ещё. Он относится к ярусу `bash4` (так
+  запускается ядро); модули `@shell posix` и мост `bs call` его не требуют.
 - Подключает `BS_VERSION` из `core/version.sh` (сейчас `0.8.0`); собственного номера у `const.sh` нет.
 - Определяет `BS_ROOT`, если тот ещё не задан: сначала каталог самого скрипта
   (если в нём есть `bootstrap/init.sh`), затем `~/.local/lib/bs` и
@@ -213,7 +249,7 @@ source**, а не запускаться (при прямом запуске о�
    с ошибкой и просьбой задать `BS_ROOT` вручную.
 3. **Pre-kernel namespace.** Подключает `bootstrap/bs.sh` и выполняет гейт
    версии оболочки `bs::shell::ensure_version 4` до загрузки любого кода
-   ядра — рантайм-детект через `BASH_VERSION`/`ZSH_VERSION`, никогда не
+   ядра (в режиме source пролога нет, поэтому `init.sh` проверяет версию сам) — рантайм-детект через `BASH_VERSION`/`ZSH_VERSION`, никогда не
    `$SHELL` (логин-оболочка врёт при source из другой оболочки).
 4. **Твик PATH.** `~/.local/bin` добавляется в начало `PATH` один раз
    (`bs::append_local_bin_to_path`), что покрывает локальные установки.
