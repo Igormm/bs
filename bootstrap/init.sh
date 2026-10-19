@@ -137,6 +137,8 @@ load "core/config"
 load "core/deps"
 # мост совместимости: deps::missing_tools с массивом bash (вне ядра) / compatibility bridge: deps::missing_tools with a bash array (outside the kernel)
 load "lib/compat/deps"
+# языковые примитивы bash: bs::func_name, str::*, arr::*, map::* (вне ядра) / bash language primitives (outside the kernel)
+load "lib/compat/lang"
 
 # Load configuration from files and env
 config::load

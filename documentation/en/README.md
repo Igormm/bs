@@ -5,7 +5,7 @@
 - **Install for your shell:** `./install.sh --local --update-path --shell fish` (PATH and hints are set for that shell).
 - **Run for a specific shell:** `bs --strict-shell=dash COMMAND` checks whether the command fits that shell; from fish and nushell, kernel functions are called with `bs call FUNCTION`.
 
-**The main library `lib/` is bash 4.2+ only for now.** So BS as a whole requires bash 4.2+, while the kernel is becoming shell-independent step by step: 13 of 15 `core/` files are already POSIX.
+**The main library `lib/` is bash 4.2+ only for now.** So BS as a whole requires bash 4.2+, while the kernel is becoming shell-independent step by step: 14 of 15 `core/` files are already POSIX.
 
 Русская версия: [documentation/ru/](../ru/README.md)
 

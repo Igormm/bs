@@ -11,11 +11,11 @@ BS is a modular Bash 4.2+ framework and standard library. It provides:
 - `bootstrap/bs.sh` — pre-kernel root namespace: dependency-free helpers available
   before the loader (shell detection `bs::shell::*`, `bs::script_dir`, PATH tweak);
   sourced by entry points, `bootstrap/init.sh` and the loader itself
-- `core/` — framework kernel: `args`, `logger`, `errorhandler`, `const`, `utils`, `version`, `config`, `deps`, `prereq`, `lang`
+- `core/` — framework kernel: `args`, `logger`, `errorhandler`, `const`, `utils`, `version`, `config`, `deps`, `prereq`, `lang` (predicates `is::*`; the other bash primitives are in `lib/compat/lang`)
 - `lib/` — standard library: `io/streams`, `io/files`, `io/process`, `system/*`, `integration/*`, `ui/*`, etc.
 - `tests/` — custom test framework, ShellCheck validation, syntax validation
 
-**BS requires bash 4.2+**: all of `lib/` (87 modules) and 2 of the 15 `core/` files, plus the CLI `bootstrap/bs.sh`, the loader and the installer are Bash 4.2+ scripts. Only the 13 `@shell posix` files of `core/` (and the prologue of the entry points) are shell-independent. No external dependencies are required at runtime.
+**BS requires bash 4.2+**: all of `lib/` (87 modules) and 1 of the 15 `core/` files, plus the CLI `bootstrap/bs.sh`, the loader and the installer are Bash 4.2+ scripts. Only the 14 `@shell posix` files of `core/` (and the prologue of the entry points) are shell-independent. No external dependencies are required at runtime.
 
 ## How AI should work with this framework
 
