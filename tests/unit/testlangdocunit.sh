@@ -108,8 +108,8 @@ EOF
 test_index_real_tree() {
     local json tmp_file
     tmp_file="$(mktemp)"
-    langdoc::parse_file "${BS_PROJECT_ROOT}/core/lang.sh" > "${tmp_file}"
-    testframework::assert_command "jq -se 'map(.name) | index(\"arr::slice\")' '${tmp_file}'" "langdoc indexes arr::slice from core/lang.sh"
+    langdoc::parse_file "${BS_PROJECT_ROOT}/lib/compat/lang.sh" > "${tmp_file}"
+    testframework::assert_command "jq -se 'map(.name) | index(\"arr::slice\")' '${tmp_file}'" "langdoc indexes arr::slice from lib/compat/lang.sh"
     testframework::assert_command "jq -se 'map(.name) | index(\"bs::__slice_bounds\")' '${tmp_file}'" "langdoc indexes private helpers too"
     testframework::assert_command "jq -se '.[] | select(.name == \"arr::slice\") | .params | length >= 2' '${tmp_file}'" "langdoc arr::slice has params"
     rm -f "${tmp_file}"

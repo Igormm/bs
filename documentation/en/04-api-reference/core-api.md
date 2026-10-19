@@ -62,12 +62,14 @@ bs::source_relative "../core/logger.sh" "../core/utils.sh"  # dependencies relat
 
 ---
 
-## Language primitives — `core/lang.sh`
+## Language primitives — `core/lang.sh` and `lib/compat/lang.sh`
 
 The "language kernel": introspection, types, strings and collections over
 pure Bash 4.2+ built-ins (no external commands). Autoloaded right after
-`core/prereq`.
-
+`core/prereq`. The file is split in two: `core/lang.sh` (`@shell posix`) holds only
+the `is::*` predicates below (real names `bs_is_*`, `is::*` are aliases in bash and zsh);
+introspection, types, `str::*`, `arr::*`, `map::*` and `is::function` live in
+`lib/compat/lang.sh`, which `bootstrap/init.sh` loads in bash 4.2+ (the `full` kernel mode).
 ### Introspection
 
 #### `bs::func_name [depth]`
@@ -116,7 +118,8 @@ Friendly replacements for `[[ ... ]]` test flags — no need to remember that
 | `command -v c >/dev/null 2>&1` | `is::command c` |
 | `declare -F f >/dev/null 2>&1` | `is::function f` |
 
-Negation reads naturally: `if ! is::file "${path}"; then`.
+Negation reads naturally: `if ! is::file "${path}"; then`. In code that must run
+in any shell (`@shell posix`) call the real names: `bs_is_file`, `bs_is_dir`, `bs_is_number`, …
 
 ---
 

@@ -8,14 +8,16 @@
 # Назначение: определить корень проекта, экспортировать BS_ROOT и загрузить ядро через loader.
 #
 # Режимы ядра / Kernel modes (BS_KERNEL_MODE)
-#   full  — bash 4.2+: все 19 файлов core/ (включая lang) и мост lib/compat/deps;
-#   posix — dash, ash, ksh, mksh, zsh и bash ниже 4.2 не нужен: только POSIX-часть core/
-#           (prereq, const, var, str, num, msg, logger, quiet, fmt, data, errorhandler, version,
-#           utils, config, deps); lang, args и всё lib/ — только в режиме full.
-#   full  — bash 4.2+: all 19 core/ files (lang included) and the bridge lib/compat/deps;
-#   posix — dash, ash, ksh, mksh and zsh: only the POSIX part of core/ (prereq, const, var, str, num,
-#           msg, logger, quiet, fmt, data, errorhandler, version, utils, config, deps); lang, args and
-#           all of lib/ are in the full mode only. A bash older than 4.2 is refused.
+#   full  — bash 4.2+: 16 модулей core/ (prereq, lang, const, var, str, num, msg, logger, quiet, fmt,
+#           data, errorhandler, version, utils, config, deps) и мосты lib/compat/deps, lib/compat/lang;
+#           args и calc подключаются по запросу;
+#   posix — dash, ash, ksh, mksh, zsh: те же 16 модулей core/, без мостов; args и всё lib/ — только
+#           в режиме full (bash ниже 4.2 отклоняется).
+#   full  — bash 4.2+: 16 core/ modules (prereq, lang, const, var, str, num, msg, logger, quiet, fmt,
+#           data, errorhandler, version, utils, config, deps) and the bridges lib/compat/deps,
+#           lib/compat/lang; args and calc are loaded on demand;
+#   posix — dash, ash, ksh, mksh and zsh: the same 16 core/ modules, no bridges; args and all of lib/
+#           are in the full mode only (a bash older than 4.2 is refused).
 #
 # Каталог bootstrap/ / The bootstrap/ directory
 #   bash берёт его из пути этого файла; остальные оболочки — из BS_BOOTSTRAP_DIR, BS_ENTRY_DIR
@@ -158,7 +160,7 @@ fi
 # Load core modules via loader
 # core/prereq must come first: it provides bs_guard and bs_source_relative
 bs_load "core/prereq"
-if [ "$BS_KERNEL_MODE" = full ]; then bs_load "core/lang"; fi
+bs_load "core/lang"
 bs_load "core/const"
 bs_load "core/var"
 bs_load "core/str"
@@ -174,8 +176,9 @@ bs_load "core/utils"
 bs_load "core/config"
 bs_load "core/deps"
 if [ "$BS_KERNEL_MODE" = full ]; then
-  # мост совместимости: deps::missing_tools с массивом bash (вне ядра) / compatibility bridge: deps::missing_tools with a bash array (outside the kernel)
+  # мосты совместимости (вне ядра): deps::missing_tools с массивом bash; языковые примитивы bash: bs::func_name, str::*, arr::*, map::* / compatibility bridges (outside the kernel): deps::missing_tools with a bash array; bash language primitives: bs::func_name, str::*, arr::*, map::*
   bs_load "lib/compat/deps"
+  bs_load "lib/compat/lang"
 fi
 # Load configuration from files and env / Загрузить конфигурацию из файлов и окружения
 bs_config_load

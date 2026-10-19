@@ -3,8 +3,8 @@
 # Архитектура
 
 BS — тонкий слой времени выполнения **поверх bash 4.2+**: на нём написаны вся
-библиотека `lib/` (87 модулей) и 2 из 19 файлов ядра (ярус `bash4`). Исключение —
-17 небольших файлов ядра `@shell posix`, которые работают в любой оболочке;
+библиотека `lib/` (87 модулей) и 1 из 19 файлов ядра (ярус `bash4`). Исключение —
+18 небольших файлов ядра `@shell posix`, которые работают в любой оболочке;
 остальные оболочки попадают в BS через перезапуск в bash или `bs call`. Он состоит из двух
 входных скриптов (`boot.sh`, `bs`) с общим POSIX-прологом, реестра оболочек
 (`bootstrap/shell.sh`), инициализатора (`bootstrap/init.sh`),
@@ -91,7 +91,7 @@ BS — тонкий слой времени выполнения **поверх 
    ├─ BS_HOME (по умолчанию BS_ROOT)
    ├─ source bootstrap/loader.sh      → появляется bs_load (в bash и zsh — ещё load и bs::load)
    ├─ load core/prereq      bs::guard, bs::source_relative (первым!)
-   ├─ load core/lang        str::, arr::, map::, bs::func_name
+   ├─ load core/lang        bs_is_* (is::* в bash и zsh)               (posix)
    ├─ load core/const       коды ошибок, цвета, флаги
    ├─ load core/logger      log::*
    ├─ load core/errorhandler  errorhandler::*, cleanup::add
@@ -102,6 +102,7 @@ BS — тонкий слой времени выполнения **поверх 
    ├─ load core/utils       остальное utils::*
    ├─ load core/config      config::*
    ├─ load core/deps        разбор # @depends
+   ├─ load lib/compat/deps, lib/compat/lang   (только full) deps::missing_tools, str::*, arr::*, map::*, bs::func_name
    ├─ config::load          конфигурация из файлов и окружения
    └─ BS_INITIALIZED=1
 ```
@@ -132,8 +133,8 @@ BS — тонкий слой времени выполнения **поверх 
 
 | Ярус | Файлы `core/` | Где работает напрямую | Как попадают остальные оболочки |
 |---|---|---|---|
-| `posix` (17) | `prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `config`, `var`, `str`, `num`, `msg` | bash, zsh, dash, busybox ash, ksh93, mksh (проверено запуском) | — (подключаются сами) |
-| `bash4` (2) | `lang`, `args` (`repl` вынесен в `lib/ui/repl`) | только bash 4.2+ |
+| `posix` (18) | `prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `config`, `lang`, `var`, `str`, `num`, `msg` | bash, zsh, dash, busybox ash, ksh93, mksh (проверено запуском) | — (подключаются сами) |
+| `bash4` (1) | `args` (`repl` вынесен в `lib/ui/repl`, остальной `lang` — в `lib/compat/lang`) | только bash 4.2+ |
 | `bash4` (87) | **вся `lib/`**, все модули | только bash 4.2+ (ни один модуль `lib/` не POSIX) | точка входа находит bash и перезапускается в нём (трамплин); функции ядра — командой `bs call` |
 
 Что делает «доступным всем»:
@@ -147,14 +148,14 @@ BS — тонкий слой времени выполнения **поверх 
    ядра из fish, nushell и прочих оболочек с другим синтаксисом; функция
    исполняется в bash, вывод и код выхода возвращаются вызывающему.
 
-Чего ядро **не** обещает: исполнять `lang`, `args` и другие файлы
+Чего ядро **не** обещает: исполнять `args` и другие файлы
 яруса `bash4` в dash, ash, ksh, mksh, fish или nushell. В них нужны
 ассоциативные массивы, nameref и `=~` с `BASH_REMATCH`, которых нет или которые
 ведут себя иначе. Оболочки без настоящего запуска (nushell, oksh, osh) не
 считаются проверенными. Перевод файлов `bash4` на `posix` идёт по одному
 (переведены: `calc`, `quiet`, `fmt`, `logger`, `data`,
-`utils`, `deps`, `errorhandler`, `config` (его ассоциативный массив `BS_CONFIG` стал словарём слоя данных `bs_config`) и новые базовые модули `var`, `str`, `num`, `msg`; `lang` и `args`
-останутся ярусом `bash4`, `repl` вне ядра).
+`utils`, `deps`, `errorhandler`, `config` (его ассоциативный массив `BS_CONFIG` стал словарём слоя данных `bs_config`), `lang` (предикаты `bs_is_*`) и новые базовые модули `var`, `str`, `num`, `msg`; `args`
+останется ярусом `bash4`; остальные языковые примитивы bash (`str::*`, `arr::*`, `map::*`, интроспекция) вынесены из `lang` в `lib/compat/lang`; `repl` вне ядра).
 
 ## Стадия 0: POSIX-пролог и `trampoline`
 
@@ -257,7 +258,7 @@ source**, а не запускаться (при прямом запуске о�
 3. **Pre-kernel namespace и режим ядра.** Подключает `bootstrap/base.sh`
    (POSIX: `bs_strict`, `bs_append_local_bin_to_path`, `bs_shell_*`) и, в bash,
    `bootstrap/bs.sh`. Затем выбирает `BS_KERNEL_MODE`: `full` в bash 4.2+,
-   `posix` в остальных оболочках (15 POSIX-модулей, без `lang`), а bash
+   `posix` в остальных оболочках (16 POSIX-модулей, без мостов), а bash
    старше 4.2 отклоняет (`bs_shell_ensure_version`) — рантайм-детект через реестр
    оболочек, никогда не `$SHELL` (логин-оболочка врёт при source из другой оболочки).
 4. **Твик PATH.** `~/.local/bin` добавляется в начало `PATH` один раз
@@ -273,9 +274,11 @@ source**, а не запускаться (при прямом запуске о�
       остальным модулям (модули не подключают `prereq.sh` вручную);
       хелперы определения оболочки, жившие здесь ранее, теперь в
       `bootstrap/bs.sh`;
-   - `core/lang` — языковые примитивы поверх встроенных возможностей Bash:
-     интроспекция (`bs::func_name`, `bs::call_stack`, `bs::type_of`),
-     строки (`str::*`), коллекции (`arr::*`, `map::*`);
+   - `core/lang` — `@shell posix`: предикаты `bs_is_empty`, `bs_is_file`,
+     `bs_is_dir`, `bs_is_number`, `bs_is_command`, … (`is::*` — псевдонимы в bash
+     и zsh). Интроспекция (`bs::func_name`, `bs::call_stack`, `bs::type_of`),
+     строки (`str::*`) и коллекции (`arr::*`, `map::*`) вынесены в мост
+     `lib/compat/lang`, который `init.sh` грузит в bash;
    - `core/const` — коды ошибок (`E_SUCCESS`, `E_ERROR`, `LIB_ERROR_*`),
      цветовые константы, флаги фреймворка (`FRAMEWORK_DEBUG`,
      `FRAMEWORK_DRY_RUN`);

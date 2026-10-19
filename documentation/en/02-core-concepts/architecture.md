@@ -3,8 +3,8 @@
 # Architecture
 
 BS is a thin runtime layer **on top of bash 4.2+**: all of the `lib/` library (86
-modules) and 2 of the 19 kernel files (the `bash4` tier) are written in it. The
-exception is 17 small `@shell posix` kernel files that run in any shell; the other
+modules) and 1 of the 19 kernel files (the `bash4` tier) are written in it. The
+exception is 18 small `@shell posix` kernel files that run in any shell; the other
 shells reach BS through a re-run in bash or `bs call`. It consists of two entry scripts
 (`boot.sh`, `bs`) with a shared POSIX prologue, a shell registry
 (`bootstrap/shell.sh`), a bootstrapper (`bootstrap/init.sh`), a module loader
@@ -91,7 +91,7 @@ Read top to bottom. Three layers: the **POSIX prologue** (runs in any shell),
    ├─ BS_HOME (defaults to BS_ROOT)
    ├─ source bootstrap/loader.sh      → bs_load appears (load and bs::load in bash and zsh)
    ├─ load core/prereq      bs::guard, bs::source_relative (first!)
-   ├─ load core/lang        str::, arr::, map::, bs::func_name
+   ├─ load core/lang        bs_is_* (is::* in bash and zsh)            (posix)
    ├─ load core/const       error codes, colours, flags
    ├─ load core/logger      log::*
    ├─ load core/errorhandler  errorhandler::*, cleanup::add
@@ -102,6 +102,7 @@ Read top to bottom. Three layers: the **POSIX prologue** (runs in any shell),
    ├─ load core/utils       the rest of utils::*
    ├─ load core/config      config::*
    ├─ load core/deps        # @depends parsing
+   ├─ load lib/compat/deps, lib/compat/lang   (full mode only) deps::missing_tools, str::*, arr::*, map::*, bs::func_name
    ├─ config::load          configuration from files and the environment
    └─ BS_INITIALIZED=1
 ```
@@ -132,8 +133,8 @@ what was really run is in the priority table of
 
 | Tier | `core/` files | Runs directly in | How the other shells get it |
 |---|---|---|---|
-| `posix` (17) | `prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `config`, `var`, `str`, `num`, `msg` | bash, zsh, dash, busybox ash, ksh93, mksh (verified by running) | — (they source it themselves) |
-| `bash4` (2) | `lang`, `args` (`repl` moved to `lib/ui/repl`) | bash 4.2+ only |
+| `posix` (18) | `prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `config`, `lang`, `var`, `str`, `num`, `msg` | bash, zsh, dash, busybox ash, ksh93, mksh (verified by running) | — (they source it themselves) |
+| `bash4` (1) | `args` (`repl` moved to `lib/ui/repl`, the rest of `lang` to `lib/compat/lang`) | bash 4.2+ only |
 | `bash4` (87) | **all of `lib/`**, every module | bash 4.2+ only (no `lib/` module is POSIX) | the entry point finds bash and re-runs itself in it (trampoline); kernel functions — the `bs call` command |
 
 What makes it "available to all":
@@ -147,13 +148,13 @@ What makes it "available to all":
    function from fish, nushell and other shells with another syntax; the
    function runs in bash, the output and the exit code go back to the caller.
 
-What the kernel does **not** promise: to run `lang`, `args` and
+What the kernel does **not** promise: to run `args` and
 the other `bash4` files in dash, ash, ksh, mksh, fish or nushell. They need
 associative arrays, namerefs and `=~` with `BASH_REMATCH`, which are missing or
 behave differently there. Shells without a real run (nushell, oksh, osh) are
 not considered verified. Files move from `bash4` to `posix` one by one (done: `calc`, `quiet`, `fmt`, `logger`, `data`,
-`utils`, `deps`, `errorhandler`, `config` (its associative array `BS_CONFIG` became the data-layer map `bs_config`), and the new base modules `var`, `str`, `num`, `msg`; `lang` and `args` stay in
-the `bash4` tier, `repl` is outside the kernel).
+`utils`, `deps`, `errorhandler`, `config` (its associative array `BS_CONFIG` became the data-layer map `bs_config`), `lang` (the predicates `bs_is_*`) and the new base modules `var`, `str`, `num`, `msg`; `args` stays in
+the `bash4` tier; the other bash language primitives (`str::*`, `arr::*`, `map::*`, introspection) moved out of `lang` into `lib/compat/lang`; `repl` is outside the kernel).
 
 ## Stage 0: POSIX prologue and the `trampoline`
 
@@ -254,7 +255,7 @@ Its steps:
 3. **Pre-kernel namespace and the kernel mode.** Sources `bootstrap/base.sh`
    (POSIX: `bs_strict`, `bs_append_local_bin_to_path`, `bs_shell_*`) and, in
    bash, `bootstrap/bs.sh`. Then it chooses `BS_KERNEL_MODE`: `full` in bash
-   4.2+, `posix` in every other shell (the 15 POSIX modules, no `lang`),
+   4.2+, `posix` in every other shell (the 16 POSIX modules, no bridges),
    and refuses a bash older than 4.2 (`bs_shell_ensure_version`) — runtime
    detection through the shell registry, never `$SHELL` (the login shell lies
    when sourcing from another shell).
@@ -269,9 +270,11 @@ Its steps:
      `bs::guard_loaded` and `bs::source_relative`, available a priori to all
      other modules (modules never source `prereq.sh` manually); shell
      detection helpers previously here now live in `bootstrap/bs.sh`;
-   - `core/lang` — language primitives over Bash built-ins: introspection
-     (`bs::func_name`, `bs::call_stack`, `bs::type_of`), strings (`str::*`),
-     collections (`arr::*`, `map::*`);
+   - `core/lang` — `@shell posix`: the predicates `bs_is_empty`, `bs_is_file`,
+     `bs_is_dir`, `bs_is_number`, `bs_is_command`, … (`is::*` are aliases in bash
+     and zsh). Introspection (`bs::func_name`, `bs::call_stack`, `bs::type_of`),
+     strings (`str::*`) and collections (`arr::*`, `map::*`) moved to the bridge
+     `lib/compat/lang`, which `init.sh` loads in bash;
    - `core/const` — error codes (`E_SUCCESS`, `E_ERROR`, `LIB_ERROR_*`),
      color constants, framework flags (`FRAMEWORK_DEBUG`,
      `FRAMEWORK_DRY_RUN`);

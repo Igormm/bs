@@ -62,11 +62,13 @@ bs::source_relative "../core/logger.sh" "../core/utils.sh"  # зависимос
 
 ---
 
-## Языковые примитивы — `core/lang.sh`
+## Языковые примитивы — `core/lang.sh` и `lib/compat/lang.sh`
 
 «Языковое ядро»: интроспекция, типы, строки и коллекции поверх чистого
-Bash 4.2+ (без внешних команд). Автозагружается сразу после `core/prereq`.
-
+Bash 4.2+ (без внешних команд). Автозагружается сразу после `core/prereq`. Файл разделён надвое:
+`core/lang.sh` (`@shell posix`) держит только предикаты `is::*` ниже (настоящие имена `bs_is_*`,
+`is::*` — псевдонимы в bash и zsh); интроспекция, типы, `str::*`, `arr::*`, `map::*` и `is::function`
+живут в `lib/compat/lang.sh`, который `bootstrap/init.sh` подключает в bash 4.2+ (режим ядра `full`).
 ### Интроспекция
 
 #### `bs::func_name [depth]`
@@ -115,7 +117,8 @@ Bash 4.2+ (без внешних команд). Автозагружается �
 | `command -v c >/dev/null 2>&1` | `is::command c` |
 | `declare -F f >/dev/null 2>&1` | `is::function f` |
 
-Отрицание читается естественно: `if ! is::file "${path}"; then`.
+Отрицание читается естественно: `if ! is::file "${path}"; then`. В коде, который должен работать
+в любой оболочке (`@shell posix`), зовите настоящие имена: `bs_is_file`, `bs_is_dir`, `bs_is_number`, …
 
 ---
 

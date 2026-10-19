@@ -39,15 +39,16 @@ test_parses_and_lints() {
 }
 
 test_modes() {
-    local sh_bin sh_name want_mode want_count want_lang
+    local sh_bin sh_name want_mode want_count want_bridge
     while IFS= read -r sh_bin; do
         sh_name="${sh_bin##*/}"
-        want_mode=posix; want_count=15; want_lang=no-lang
-        if [[ "${sh_name}" == bash ]]; then want_mode=full; want_count=17; want_lang=lang; fi
+        want_mode=posix; want_count=16; want_bridge=no-bridge
+        if [[ "${sh_name}" == bash ]]; then want_mode=full; want_count=18; want_bridge=bridge; fi
         eq "mode=${want_mode} modules=${want_count}" "$(probe "${sh_bin}" 'printf "mode=%s modules=%s" "$BS_KERNEL_MODE" "$(bs_map_count bs_loaded_modules)"')" "${sh_name}: the kernel mode and the number of loaded modules"
         eq "ok" "$(probe "${sh_bin}" 'bs_map_has bs_loaded_modules core/logger && bs_map_has bs_loaded_modules core/deps && bs_map_has bs_loaded_modules core/num && echo ok')" "${sh_name}: logger, deps and num are loaded"
         eq "ok|false" "$(probe "${sh_bin}" 'bs_map_has bs_loaded_modules core/config && printf "ok|"; bs_config_get BS_FILES_ATOMIC')" "${sh_name}: config is loaded and bs_config_load ran, in both kernel modes"
-        eq "${want_lang}" "$(probe "${sh_bin}" 'if bs_map_has bs_loaded_modules core/lang; then echo lang; else echo no-lang; fi')" "${sh_name}: lang is loaded only in the full mode"
+        eq "ok|dir" "$(probe "${sh_bin}" 'if bs_map_has bs_loaded_modules core/lang && bs_is_dir /; then printf "ok|dir"; fi')" "${sh_name}: lang is loaded and bs_is_dir works, in both kernel modes"
+        eq "${want_bridge}" "$(probe "${sh_bin}" 'if bs_map_has bs_loaded_modules lib/compat/lang && bs_map_has bs_loaded_modules lib/compat/deps; then echo bridge; else echo no-bridge; fi')" "${sh_name}: the bridges lib/compat/lang and lib/compat/deps are loaded only in the full mode"
     done < <(testframework::posix_shells)
 }
 
