@@ -15,7 +15,7 @@ BS is a modular Bash 4.2+ framework and standard library. It provides:
 - `lib/` — standard library: `io/streams`, `io/files`, `io/process`, `system/*`, `integration/*`, `ui/*`, etc.
 - `tests/` — custom test framework, ShellCheck validation, syntax validation
 
-**BS requires bash 4.2+**: all of `lib/` (87 modules) and 6 of the 15 `core/` files are Bash 4.2+ scripts. Only the 9 `@shell posix` files of `core/` (and the prologue of the entry points) are shell-independent. No external dependencies are required at runtime.
+**BS requires bash 4.2+**: all of `lib/` (87 modules) and 3 of the 15 `core/` files are Bash 4.2+ scripts. Only the 12 `@shell posix` files of `core/` (and the prologue of the entry points) are shell-independent. No external dependencies are required at runtime.
 
 ## How AI should work with this framework
 
@@ -118,6 +118,7 @@ Reusable workflow skills live in `.agents/skills/` (Kimi Code / agents-compatibl
 - `bs-shell-portability` — shell-independence of BS: host/user/script shell, `@shell posix|bash4` tiers, POSIX layer (`bootstrap/shell.sh`, trampoline), `tier_scan.sh` and `probe_shells.sh`.
 - `bs-shell-abstraction` — the shell dependency is set once, by the `@shell posix|bash4` tier of a file: no `BASH_SOURCE`/`ZSH_*`/`$SHELL` checks outside the abstraction layer (`bs::is_main`, `bs::script_dir`, `bs::shell::*`), commands as `bs::cli::*`, no bash version checks in modules; `scripts/find_leaks.sh`, `scripts/check_posix_tier.sh` (bash does not take part in the `posix` tier).
 - `bs-docs-shell-claims` — find and fix documentation that says the whole kernel needs bash 4 when only the `bash4` tier does; every shell/version/tier claim must match the code and a real run.
+- `bs-kernel-code` — write or convert a kernel function/module into the one `bs_` namespace as `@shell posix` code: names and `::` aliases, skeleton, six-shell validation, portable test, differential run against the old implementation (`scripts/diff_old_new.sh`, `scripts/fuzz_arr_vs_native.sh`), docs/tier lists/CHANGELOG; rules in code-style-guide chapter 12.
 
 ### Imported shell-safety skills (external)
 

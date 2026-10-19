@@ -1,0 +1,138 @@
+---
+name: bs-kernel-code
+description: Write or convert a kernel function/module (bootstrap/, core/, install/) into the one bs_ namespace as shell-independent `@shell posix` code — decide the real name and the `::` alias, write the file from a skeleton, validate in dash/ash/ksh/mksh/zsh/bash, write the portable test, prove the behaviour is unchanged by a differential run against the old implementation, update docs and tier lists, commit. Code style rules live in documentation/*/code-style-guide.md chapter 12.
+type: prompt
+whenToUse: When adding a function or a file to the kernel, or moving a core/ file from bash4 to posix (phase work "X на POSIX"); before claiming that a kernel file "works in dash/zsh/ksh"
+arguments:
+  - target
+---
+
+# Код ядра в пространстве `bs_` / Kernel code in the `bs_` namespace
+
+Правила (имена, переменные, запрещённые конструкции с причинами, `eval`, возврат значений) — **глава 12** `documentation/ru|en/code-style-guide.md`; здесь только процедура. Что такое ярус и кто его проверяет — навыки `bs-shell-abstraction` и `bs-shell-portability` (не дублируются). Образцы: `core/quiet.sh` (минимальный), `core/data.sh` (слой данных), `core/logger.sh` (вывод), `core/utils.sh` + `core/errorhandler.sh` (на слое данных).
+Rules live in chapter 12 of the code style guide; this is the procedure only.
+
+Файлы навыка / skill files:
+- `references/module.sh.tmpl`, `references/portable-test.sh.tmpl` — заготовки (плейсхолдеры `@FILE@ @NS@ @PFX@ @PFXU@ @GUARD@ @MODULE@ @PURPOSE_RU@ @PURPOSE_EN@ @DEPS_RU@ @DEPS_EN@`); проверены на временном модуле: `check_posix_tier.sh` OK, 59 проверок в 6 оболочках.
+- `scripts/diff_old_new.sh` — дифференциальный прогон старый/новый файл, побайтно.
+- `scripts/fuzz_arr_vs_native.sh` — случайные операции `bs_arr_*` против настоящего массива bash.
+
+## Процедура / Procedure
+
+Работа — на ветке задачи (обычно `fix/kernel-security-p0` или её worktree), не в `main`. Историю не менять; `push` — только по просьбе. Один модуль = один коммит.
+
+### 1. Инвентаризация старого файла
+```bash
+bash .agents/skills/bs-shell-portability/scripts/tier_scan.sh --list core/МОДУЛЬ.sh   # какие bash-конструкции держат файл
+grep -n '^[A-Za-z_:]*()' core/МОДУЛЬ.sh                                               # публичные и приватные функции
+grep -rn 'МОДУЛЬ::' --include='*.sh' bootstrap core lib install bs boot.sh install.sh tests | head -50   # кто зовёт
+```
+Выпишите: функции, глобальные переменные (`@global`), структуры данных (массивы/словари → слой данных), зависимости и место в порядке загрузки `bootstrap/init.sh`, внешние команды (`@tier`). Если файл держится на том, что по смыслу bash (`lang`, `args`), он остаётся `bash4` — остановитесь и скажите об этом.
+
+### 2. Имена до кода
+Составьте таблицу «старое → настоящее → псевдоним» для **каждой** функции (глава 12.2): `bs_` + имя с `::`→`_`, приватные без `__` и с `# @private`. Проверьте коллизии (`grep -rn 'bs_модуль_имя' …`), выберите код переменных `__bs_<код>_` (уникальный: `grep -rhoE '__bs_[a-z0-9]+_' bootstrap core install bs boot.sh install.sh | sort -u`), имя `bs_guard` (литерал заглавными). Старые имена и переменные **не переименовываются**.
+
+### 3. Заморозить старое поведение
+- Сохраните прогон существующих тестов модуля: `./bs tests/unit/testМОДУЛЬunit.sh` (если есть) — он должен остаться зелёным без правок (правки допустимы, только если тест лезет во внутренности, которые переехали на слой данных).
+- Составьте файл кейсов для дифференциального прогона (шаг 7): по сниппету bash в строке, звать старые имена (`log::info …`), покрыть: обычный вход, пустой, с пробелами, кавычками, `*`, `$`, `\`, переводом строки, кириллицей, `-n`, ошибочный вызов (код возврата), каждую ветку `case`. Ось окружения — `--env NAME=v1,v2` (для логгера: формат × цвет × уровень × метка времени).
+- Старая версия для сравнения уже лежит в git: `--ref HEAD` (работаем до коммита) или `--ref <коммит>^`.
+
+### 4. Написать файл
+```bash
+sed -e 's/@FILE@/МОДУЛЬ/g; s/@NS@/пространство/g; s/@PFX@/код/g; s/@PFXU@/КОД/g; s/@GUARD@/МОДУЛЬ/g; s/@MODULE@/МОДУЛЬ/g' \
+    -e 's/@PURPOSE_RU@/…/g; s/@PURPOSE_EN@/…/g; s/@DEPS_RU@/…/g; s/@DEPS_EN@/…/g' \
+    .agents/skills/bs-kernel-code/references/module.sh.tmpl > core/МОДУЛЬ.sh
+```
+Затем функция за функцией по главе 12: `local` → глобальные `__bs_<код>_…`; `[[ ]]`/`=~` → `case`; массивы → `bs_arr_*`/`bs_map_*`; `printf -v`, `${x^^}`, `$'..'`, `echo -e` → переносимые замены; `nameref`/`${!x}` → `eval` с проверенным именем; результат — статус / stdout / выходная переменная; сообщения — `bs_log_*` (до логгера — stderr). Блок `bs_shell_alias` — в самом конце, по строке на функцию, включая приватные. Двуязычные doc-комментарии на каждой функции. Если функции переносятся из другого файла (как `fmt` из `utils`), старое определение **удаляется** оттуда (два определения — молчаливая перезапись), а псевдонимы едут вместе с функциями.
+
+### 5. Быстрая проверка (цикл на каждой правке)
+```bash
+for sh in dash ksh mksh zsh bash; do "$sh" -n core/МОДУЛЬ.sh || echo "FAIL $sh"; done
+busybox ash -n core/МОДУЛЬ.sh
+shellcheck -s sh core/МОДУЛЬ.sh
+bash .agents/skills/bs-shell-abstraction/scripts/check_posix_tier.sh core/МОДУЛЬ.sh
+```
+Не писать `for sh in dash "busybox ash"; do $sh …` — zsh не делит `$sh`. Оболочка, которой нет на машине, — «не проверено» в отчёте, никогда не «пройдено».
+
+### 6. Переносимый тест
+```bash
+sed -e 's/@FILE@/МОДУЛЬ/g; s/@NS@/пространство/g' .agents/skills/bs-kernel-code/references/portable-test.sh.tmpl \
+    > tests/unit/testМОДУЛЬportableunit.sh && chmod +x tests/unit/testМОДУЛЬportableunit.sh
+./bs tests/unit/testМОДУЛЬportableunit.sh
+```
+Образцы: `testquietportableunit.sh` (минимальный), `testdataportableunit.sh` (структуры данных, «трудные» значения), `testloggerportableunit.sh` (вывод). Допишите: `PROBE_FILES` по порядку зависимостей; по проверке на каждую функцию и каждую ветку; «трудные» значения; коды возврата (`rc=1`/`rc=2` точно); **плохое имя/ввод для каждого `eval`** (`a;touch /tmp/x`, `$(id)` → код 2, файла нет); мутирующие функции не через `$(...)`; псевдонимы в bash и zsh. Каждая проба — свежий процесс под `env -i` (повторный `source` в процессе — no-op из-за `bs_guard`). Запускайте тест `./bs …` (интерпретатор `bs`), не `bash …`.
+
+### 7. Доказать, что поведение не изменилось
+Выбор метода:
+
+| Что переведено | Метод |
+|---|---|
+| Функции с выводом (логгер, форматирование, калькулятор) | `bash .agents/skills/bs-kernel-code/scripts/diff_old_new.sh --file core/МОДУЛЬ.sh --ref HEAD --cases КЕЙСЫ.txt --env …` |
+| Структура данных вместо массива bash | `bash .agents/skills/bs-kernel-code/scripts/fuzz_arr_vs_native.sh --shell dash` (и zsh, mksh, ksh, ash, bash; по 2500 операций × 6 зёрен) |
+| Любая функция в шести оболочках | сам переносимый тест (шаг 6) сравнивает ответы оболочек |
+
+`diff_old_new.sh` копирует дерево без `.git`, кладёт в копию старую версию файла, грузит ядро через `bootstrap/init.sh` и сравнивает stdout, stderr и код возврата на каждой комбинации матрицы; путь к дереву маскирует как `@TREE@`; код выхода 1 при различиях. Каждый прогон грузит ядро (~1 с), поэтому матрицу делайте точной, а не полной. Нестабильное в кейсах (метка времени, `$$`) фиксируйте окружением (`BS_LOG_TIMESTAMP=false`). Отрицательный контроль обязателен хотя бы раз: внесите намеренную поломку, убедитесь, что скрипт её видит, верните файл.
+Каждое различие — одно из трёх: **ошибка** (чинить), **намеренное** (записать в CHANGELOG и в абзац модуля в `shell-portability.md`, как ширину рамки `bs_log_header` в dash/ash), **шум прогона** (поправить кейс).
+
+### 8. Подключить
+- Новый файл — в `bootstrap/init.sh` (порядок загрузки: после зависимостей) и в список `req` команды `bs doctor` в `bootstrap/bs.sh`.
+- Все, кто читал убранные внутренности (старый массив `BS_…`, `declare -A`), — на слой данных или через мост (`lib/compat/…`); `grep -rn СТАРАЯ_ПЕРЕМЕННАЯ`.
+- `lib/` не трогать: старые `::`-имена работают через псевдонимы.
+
+### 9. Документация, ярусы, changelog
+Меняется **вместе с кодом**, в одном коммите; en и ru вместе (`bs-docs-sync`):
+1. Абзац модуля в `documentation/{en,ru}/08-development/shell-portability.md` (функции, что проверено в каких оболочках, число проверок, намеренные различия) и счётчик «готово N из 15» в «Heading for shell independence».
+2. Таблица ярусов в `documentation/{en,ru}/02-core-concepts/architecture.md` («Ядро по ярусам»): строки `posix (N)` и `bash4 (M)`, фраза «порядок: …».
+3. **Списки ярусов в навыках** `bs-shell-abstraction` (таблица «Зависимость от оболочки задаётся tier-ом», абзац «Tier каждого файла до lib/», пункт 6 «Документация сначала называет требование») и `bs-shell-portability` (первый абзац «два яруса», пункт о ярусе `posix`, фраза «очередь: …»). Найти все места: `grep -rnE "quiet.*fmt|fmt.*logger|logger.*calc|calc.*data|N из 15|of the 15" .agents AGENTS.md README.md documentation`. Счётчики в `AGENTS.md`, `README.md`, `documentation/*/README.md`, Getting Started, `portability.md` — по навыку `bs-docs-shell-claims`.
+4. `documentation/{en,ru}/07-testing/README.md` — только если появился новый приём.
+5. `CHANGELOG.md`, `[Unreleased]` → `Added`/`Changed`: одна строка на модуль по образцу соседних («refactor(core): `core/МОДУЛЬ.sh` is `@shell posix` — … ; N проверок в шести оболочках; побайтно равен прежнему на K комбинациях»).
+
+### 10. Полный цикл проверки
+```bash
+bash tests/validatesyntax.sh
+bash tests/validateshellcheck.sh
+bash tests/validatedocscode.sh
+bash .agents/skills/bs-shell-abstraction/scripts/check_posix_tier.sh
+bash .agents/skills/bs-shell-portability/scripts/tier_scan.sh --check core lib bootstrap install
+bash tests/runalltests.sh
+./bs doctor
+```
+`tests/unit/testposixtierunit.sh` требует переносимый тест для каждого `posix`-файла `core/`.
+
+### 11. Коммит
+По `bs-commit-style` / `bs-commit-pro`: `refactor(core): фаза N — МОДУЛЬ на POSIX (bs_…_*, псевдонимы ::)` + список: число проверок и оболочек, результат дифференциального прогона, найденное по дороге; в конце атрибуция. Не `push`, не `rebase`/`reset`.
+
+## Чек-лист / Checklist
+- [ ] таблица «старое → настоящее → псевдоним» составлена до кода; коллизии проверены; ничего не переименовано
+- [ ] заголовок (`#!/bin/sh`, `shellcheck shell=sh`, `@shell posix — причина`, `@tier core`), `bs_guard`, блок «ИМЕНА / NAMES»
+- [ ] нет `local`, `[[ ]]`, `(( ))`, массивов, `printf -v`, `$'..'`, `echo -e`, `${x^^}`, `exit`, `trap` при загрузке
+- [ ] временные `__bs_<код>_`, не затираются вложенными вызовами; константы — `bs_shell_readonly`
+- [ ] каждый `eval`: имя проверено до, значения по ссылке; есть тест на плохое имя
+- [ ] мутирующие функции документированы «не `$(...)`»; выходные переменные названы в doc-комментарии
+- [ ] блок `bs_shell_alias` в конце, включая приватные; старое определение удалено из прежнего файла
+- [ ] `X -n` ×6, `shellcheck -s sh`, `check_posix_tier.sh` — OK; отсутствующие оболочки названы «не проверено»
+- [ ] `test<модуль>portableunit.sh`: все шесть оболочек, «трудные» значения, коды 1/2, псевдонимы
+- [ ] дифференциальный прогон (или случайное сравнение) — 0 различий либо различия объяснены; отрицательный контроль делался
+- [ ] `init.sh` и `bs doctor` обновлены; прежние тесты модуля зелёные
+- [ ] документация en+ru, списки ярусов в двух навыках, CHANGELOG; полный цикл проверки зелёный
+
+## Типичные ошибки (найдены в проекте) / Common mistakes
+1. **`$(( ))` в mksh 32-битная:** `3*1073741824` → `-1073741824`; 3 GiB переполнялось в `fmt` (нашёл тест). Большие числа — `awk`/`dc`.
+2. **`command -v` отсутствующей команды даёт 127 в dash и ash** — функции-предикаты нормализуют статус до 1 (`bs_utils_has`, `bs_function_exists`); тест проверяет ровно `rc=1`.
+3. **zsh не делит значение переменной на слова** (`for w in $s`, `set -- $s`); в скриптах BS ещё и `IFS` = перевод строки+табуляция, `"$*"` склеивает переводом строки (логгер склеивает слова пробелом сам). Тот же эффект бьёт по циклам `for sh in … "busybox ash"` в командах для zsh.
+4. **Мутирующая функция в `$(...)`:** `v=$(bs_arr_pop a)` вернул значение, но массив не изменился. Результат — в переменную.
+5. **Временные затирают друг друга:** `bs_arr_new` держит имя в `__bs_dat_nn`, потому что `bs_arr_clear` меняет `__bs_dat_nm`; рекурсия и обратные вызовы — то же. Нужны разные имена, позиционные параметры или счётчик глубины.
+6. **`readonly` внутри подключаемого файла в zsh локален** для функции `load`; константы только через `bs_shell_readonly`.
+7. **`${1:?}` не завершает скрипт в mksh** — это диагностика; пользовательский ввод проверять `[ -n "${1-}" ] || return 2`.
+8. **`[ … ] && команда` последней строкой** убивает вызывающего под `set -e`; писать `if` или `return 0`.
+9. **`cmd | while read`** теряет переменные в bash/dash/ash/mksh и не теряет в zsh/ksh93 — читать из файла/heredoc.
+10. **`${#s}` на не-ASCII** считает байты в dash и mksh (рамка `bs_log_header`) — тест и запись о намеренном различии.
+11. **`$((08))`** — ошибка в dash и bash, `8` в mksh: ведущие нули срезать самим (`bs_error_retry`).
+12. **`eval` без проверки имени** или с вставкой значения текстом вместо `\${var}`.
+13. **Забытые псевдонимы приватных функций** (`log::__timestamp`) и дубли определений при переносе функций между файлами.
+14. **Файл не зарегистрирован** в `init.sh` / `bs doctor`, либо загружается раньше своей зависимости.
+15. **Тест подключает файл дважды в одном процессе** (guard `readonly` → no-op/ошибка) или без `BS_CURRENT_FILE` (в dash `bs_source_relative` останавливается).
+16. **Оболочка не установлена = «пройдено»** — нельзя; писать «не проверено».
+17. **`printf %-*s` и `${#}` выравнивают по байтам** в dash/ash — рамки с кириллицей считать по символам (`bs-cli-noop-output`).
+18. **Метка `@shell posix` ниже 14-й строки** — проверка её не увидит; `# shellcheck disable` без причины на двух языках.
+19. **Списки ярусов в документации и навыках остались старыми** — после перевода файла обновлять все места (шаг 9.3), иначе счётчики расходятся с кодом.

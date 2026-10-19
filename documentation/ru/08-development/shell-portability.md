@@ -2,8 +2,8 @@
 
 # Переносимость между оболочками
 
-**BS требует bash 4.2+.** На bash написаны вся `lib/` (87 модулей, ни один не POSIX) и 7 из
-15 файлов ядра; от bash не зависят только 9 небольших файлов ядра `@shell posix` и пролог точек
+**BS требует bash 4.2+.** На bash написаны вся `lib/` (87 модулей, ни один не POSIX) и 3 из
+15 файлов ядра; от bash не зависят только 12 небольших файлов ядра `@shell posix` и пролог точек
 входа. «Работает из большинства оболочек» значит: `bs` и `install.sh` можно запустить из любой
 оболочки (они перезапускаются в bash), функции ядра вызываются из любой оболочки через
 `bs call`, а POSIX-файлы подключаются напрямую. Эта
@@ -225,6 +225,10 @@ busybox ash, ksh93 и mksh (`unit/testquietportableunit.sh`).
 ширину рамки `bs_log_header` считает `${#}`, а он в dash и ash считает байты, так что у заголовка с не-ASCII
 рамка в этих оболочках получится шире.
 
+`core/utils.sh` и `core/deps.sh` (`@shell posix`, фаза 2) — `bs_utils_strict/guard/tempfile/split/ensure_source/ensure_shell_version/detect_root/boot_dir` и `bs_deps_has/require/list_missing/check_module/missing_tools/parse_optdeps` (прежние `::`-имена в bash и zsh). `bs_utils_split` заполняет массив слоя данных и совпадает с `read -ra` на 3000 случайных входов; `detect_root`/`boot_dir` читают `BS_ROOT`/`BS_BOOTSTRAP_DIR` вместо стека вызовов; `deps::missing_tools` (результат — настоящий массив bash, 10 вызывающих) живёт в мосте `lib/compat/deps.sh`. Проверено в шести оболочках (`unit/testutilsportableunit.sh`, 126 проверок; `unit/testdepsportableunit.sh`, 108 проверок); второй тест нашёл ловушку ksh93: голая `|` в шаблоне `${x%%|*}` — это альтернатива, её надо экранировать.
+
+`core/errorhandler.sh` (`@shell posix`, фаза 2) — `bs_cleanup_add/run_all`, `bs_on_exit`, `bs_errorhandler_*`, `bs_error_*`, `bs_signal_on/ignore/reset`, `bs_exit` (число или имя кода, проверяется до `eval`), `bs_function_exists`. Стек очистки — массив слоя данных `bs_cleanup_stack`, обработчики — словарь `bs_error_handlers`. Проверено в шести оболочках (`unit/testerrorhandlerportableunit.sh`, 248 проверок); найдено тестами: `command -v` отсутствующей команды даёт 127 в dash и ash, поэтому `bs_utils_has` и `bs_function_exists` возвращают ровно 1.
+
 ## Пространство имён `bs_`
 
 Весь код ядра (`bootstrap/`, `core/`, `install/`, точки входа) живёт в **одном** пространстве имён: настоящая функция называется `bs_` + имя через `::`, где `::` заменено на `_` (`utils::has` ↔ `bs_utils_has`, `log::info` ↔ `bs_log_info`, `bs::version::get` ↔ `bs_version_get`). Прежние имена с `::` остаются псевдонимами для bash и zsh (их создаёт `bs_shell_alias`), поэтому 87 модулей `lib/` и все скрипты работают без правок. Правило проверяет `check_posix_tier.sh`: функция вне `bs_`/`__bs_` или определённая с `::` — нарушение. Приватные функции теряют ведущие `__` (`log::__timestamp` ↔ `bs_log_timestamp`); временные переменные внутри — `__bs_<модуль>_…`.
@@ -245,7 +249,7 @@ busybox ash, ksh93 и mksh (`unit/testquietportableunit.sh`).
 
 ## Курс на независимость от оболочки
 
-Цель — чтобы `bootstrap/`, `core/`, `install/`, `boot.sh`, `bs` и `install.sh` жили в одном пространстве имён `bs_*` и не зависели от оболочки. Состояние: готово 9 из 15 файлов `core/` (`prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`), слой оболочек и шебанга в `bootstrap/` и пролог точек входа. Дальше: `lang`, `utils`, `deps`, `errorhandler`, `config`, `args` на слое данных, затем `init.sh`, `loader.sh`, команды `bs::cli::*`, `install/*`, и в конце точки входа. До тех пор BS требует bash 4.2+ (см. начало страницы).
+Цель — чтобы `bootstrap/`, `core/`, `install/`, `boot.sh`, `bs` и `install.sh` жили в одном пространстве имён `bs_*` и не зависели от оболочки. Состояние: готово 12 из 15 файлов `core/` (`prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`), слой оболочек и шебанга в `bootstrap/` и пролог точек входа. Дальше: `config` (`BS_CONFIG` на `bs_map_*`), `lang`, `args`, затем `init.sh`, `loader.sh`, команды `bs::cli::*`, `install/*`, и в конце точки входа. До тех пор BS требует bash 4.2+ (см. начало страницы).
 
 ## Не сделано
 

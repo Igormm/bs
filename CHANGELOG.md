@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+- docs: the tier counts match the code after phase 2 — `core/` is 12 `posix` files (`prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`) and 3 `bash4` (`lang`, `args`, `config`): README, AGENTS, Getting Started, architecture tier table, portability, shell-portability (new paragraphs for `utils`, `deps`, `errorhandler`) and the tier lists of the skills `bs-shell-abstraction`, `bs-shell-portability`, `bs-docs-shell-claims` (en/ru)
+- docs: code-style-guide chapter 12 rewritten as a self-contained guide to code in the `bs_` namespace (en/ru): names and aliases, file header, guards, sourcing, variables, allowed/forbidden constructs with verified reasons, returning values, `eval` safety, errors, logging, the data layer, doc comments, tests, review checklist; `${1:?}` is documented as NOT ending the script in mksh
+- skill `bs-kernel-code` — procedure for writing/converting a kernel module into `bs_` (module and portable-test templates, `diff_old_new.sh` byte-for-byte differential run, `fuzz_arr_vs_native.sh` random comparison with native bash arrays; both checked, incl. a negative control), registered in `AGENTS.md` and `.agents/README.md`
+
 ## [0.8.0] - 2026-10-17 "Lingoa"
 
 ### Added

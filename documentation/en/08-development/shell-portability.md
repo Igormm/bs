@@ -2,8 +2,8 @@
 
 # Shell portability
 
-**BS requires bash 4.2+.** All of `lib/` (87 modules, none of them POSIX) and 6 of the 15 kernel
-files are written in bash; only 9 small `@shell posix` kernel files and the prologue of the entry
+**BS requires bash 4.2+.** All of `lib/` (87 modules, none of them POSIX) and 3 of the 15 kernel
+files are written in bash; only 12 small `@shell posix` kernel files and the prologue of the entry
 points do not depend on it. "Usable from most shells" means: `bs` and `install.sh` can be started
 from any shell (they re-run in bash), kernel functions are called from any shell with `bs call`,
 and the POSIX files are sourced directly. This page is the
@@ -226,6 +226,10 @@ newlines, frames, progress), then in six shells (`unit/testloggerportableunit.sh
 the width of the `bs_log_header` frame is counted with `${#}`, which counts bytes in dash and ash, so a non-ASCII
 header gets a wider frame in those shells.
 
+`core/utils.sh` and `core/deps.sh` (`@shell posix`, phase 2) — `bs_utils_strict/guard/tempfile/split/ensure_source/ensure_shell_version/detect_root/boot_dir` and `bs_deps_has/require/list_missing/check_module/missing_tools/parse_optdeps` (the old `::` names in bash and zsh). `bs_utils_split` fills a data-layer array and matches `read -ra` on 3000 random inputs; `detect_root`/`boot_dir` read `BS_ROOT`/`BS_BOOTSTRAP_DIR` instead of the call stack; `deps::missing_tools` (the result is a real bash array, 10 callers) lives in the bridge `lib/compat/deps.sh`. Verified in six shells (`unit/testutilsportableunit.sh`, 126 checks; `unit/testdepsportableunit.sh`, 108 checks); the latter found a ksh93 trap: a bare `|` in a `${x%%|*}` pattern is an alternation, so quote it.
+
+`core/errorhandler.sh` (`@shell posix`, phase 2) — `bs_cleanup_add/run_all`, `bs_on_exit`, `bs_errorhandler_*`, `bs_error_*`, `bs_signal_on/ignore/reset`, `bs_exit` (a number or a code name, checked before `eval`), `bs_function_exists`. The cleanup stack is the data-layer array `bs_cleanup_stack` and the handlers are the map `bs_error_handlers`. Verified in six shells (`unit/testerrorhandlerportableunit.sh`, 248 checks); found by the tests: `command -v` of a missing command returns 127 in dash and ash, so `bs_utils_has` and `bs_function_exists` return exactly 1.
+
 ## The `bs_` namespace
 
 All kernel code (`bootstrap/`, `core/`, `install/`, the entry points) lives in **one** namespace: the real function is named `bs_` + the `::` name with `::` turned into `_` (`utils::has` ↔ `bs_utils_has`, `log::info` ↔ `bs_log_info`, `bs::version::get` ↔ `bs_version_get`). The old `::` names stay as aliases for bash and zsh (made by `bs_shell_alias`), so the 87 modules of `lib/` and every script work without changes. `check_posix_tier.sh` checks the rule: a function outside `bs_`/`__bs_` or defined with `::` is a violation. Private functions lose the leading `__` (`log::__timestamp` ↔ `bs_log_timestamp`); temporaries inside are `__bs_<module>_…`.
@@ -246,7 +250,7 @@ Worth knowing: functions that change state and return a value (`bs_arr_pop`, `bs
 
 ## Heading for shell independence
 
-The goal is for `bootstrap/`, `core/`, `install/`, `boot.sh`, `bs` and `install.sh` to live in one namespace `bs_*` and be shell-independent. State: 9 of the 15 `core/` files are done (`prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`), plus the shell and shebang layer in `bootstrap/` and the prologue of the entry points. Next: `lang`, `utils`, `deps`, `errorhandler`, `config`, `args` on the data layer, then `init.sh`, `loader.sh`, the `bs::cli::*` commands, `install/*`, and finally the entry points. Until then BS requires bash 4.2+ (see the top of this page).
+The goal is for `bootstrap/`, `core/`, `install/`, `boot.sh`, `bs` and `install.sh` to live in one namespace `bs_*` and be shell-independent. State: 12 of the 15 `core/` files are done (`prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`), plus the shell and shebang layer in `bootstrap/` and the prologue of the entry points. Next: `config` (`BS_CONFIG` on `bs_map_*`), `lang`, `args`, then `init.sh`, `loader.sh`, the `bs::cli::*` commands, `install/*`, and finally the entry points. Until then BS requires bash 4.2+ (see the top of this page).
 
 ## Not done yet
 

@@ -1,0 +1,81 @@
+#!/usr/bin/env bs
+# shellcheck shell=bash
+# tests/unit/test@FILE@portableunit.sh — core/@FILE@.sh as POSIX code under dash, ash, ksh, mksh, zsh and bash
+# tests/unit/test@FILE@portableunit.sh — core/@FILE@.sh как POSIX-код под dash, ash, ksh, mksh, zsh и bash
+#
+# core/@FILE@.sh is "@shell posix": the functions must give the same answers in every shell.
+# core/@FILE@.sh — "@shell posix": функции обязаны давать одинаковые ответы в любой оболочке.
+
+set -euo pipefail
+
+readonly TEST_SCRIPT_DIR="$(bs::script_dir)"
+readonly BS_PROJECT_ROOT="$(cd "${TEST_SCRIPT_DIR}/../.." && pwd)"
+readonly MODULE_SH="${BS_PROJECT_ROOT}/core/@FILE@.sh"
+# the files the probe sources, in dependency order / файлы, которые подключает проба, по порядку зависимостей
+readonly PROBE_FILES=(bootstrap/shell.sh core/prereq.sh core/@FILE@.sh)
+
+source "${TEST_SCRIPT_DIR}/../testframework.sh"
+
+T=""
+
+# probe <shell> <snippet> — the files are sourced (BS_CURRENT_FILE is set, as the loader does), then the snippet
+# (stdout+stderr); a fresh process under env -i: the guard makes a second source in one process a no-op
+probe() {
+    local -r sh_bin="$1" snippet="$2"
+    local f
+    : > "${T}/probe.sh"
+    for f in "${PROBE_FILES[@]}"; do
+        printf 'BS_CURRENT_FILE="%s/%s"\n. "%s/%s"\n' "${BS_PROJECT_ROOT}" "${f}" "${BS_PROJECT_ROOT}" "${f}" >> "${T}/probe.sh"
+    done
+    printf '%s\n' "${snippet}" >> "${T}/probe.sh"
+    env -i HOME="${T}/h" PATH="/usr/bin:/bin" "${sh_bin}" "${T}/probe.sh" 2>&1
+}
+
+eq() { testframework::assert_equal "$1" "$2" "$3" || true; }
+
+test_parses_and_lints() {
+    local sh_bin
+    while IFS= read -r sh_bin; do
+        testframework::assert_command "'${sh_bin}' -n '${MODULE_SH}'" "@FILE@.sh parses in ${sh_bin##*/}" || true
+    done < <(testframework::posix_shells)
+    if utils::has shellcheck; then
+        testframework::assert_command "shellcheck -s sh '${MODULE_SH}'" "shellcheck -s sh is clean for core/@FILE@.sh" || true
+    fi
+    testframework::assert_command "grep -q '^# @shell posix' '${MODULE_SH}'" "core/@FILE@.sh is declared @shell posix" || true
+    testframework::assert_command "! grep -v '^#' '${MODULE_SH}' | grep -E 'BASH_|ZSH_|FUNCNAME|declare| \\[\\[ '" "no shell-specific constructs in core/@FILE@.sh" || true
+}
+
+test_behaviour() {
+    local sh_bin sh_name
+    while IFS= read -r sh_bin; do
+        sh_name="${sh_bin##*/}"
+        eq "hello, world" "$(probe "${sh_bin}" 'bs_@NS@_greet')" "${sh_name}: the default name"
+        eq "hello, a b" "$(probe "${sh_bin}" 'bs_@NS@_greet "a b"')" "${sh_name}: a name with a space"
+        eq "hello, it's" "$(probe "${sh_bin}" 'bs_@NS@_greet "it'"'"'s"')" "${sh_name}: a quote in the name"
+        eq "hello, *" "$(probe "${sh_bin}" 'bs_@NS@_greet "*"')" "${sh_name}: a star is not globbed"
+        eq "hello, \$HOME" "$(probe "${sh_bin}" 'bs_@NS@_greet "\$HOME"')" "${sh_name}: a dollar is not expanded"
+        eq "hello, Привет" "$(probe "${sh_bin}" 'bs_@NS@_greet "Привет"')" "${sh_name}: Cyrillic"
+        eq "hello, -n" "$(probe "${sh_bin}" 'bs_@NS@_greet "-n"')" "${sh_name}: a name that looks like an option"
+        eq "rc=0" "$(probe "${sh_bin}" 'bs_@NS@_greet >/dev/null; echo "rc=$?"')" "${sh_name}: status 0"
+    done < <(testframework::posix_shells)
+}
+
+test_aliases() {
+    local sh_name sh_bin
+    for sh_name in bash zsh; do
+        sh_bin="$(command -v "${sh_name}" || true)"
+        [[ -n "${sh_bin}" ]] || continue
+        eq "hello, world" "$(probe "${sh_bin}" '@NS@::greet')" "${sh_name}: @NS@::greet is an alias of bs_@NS@_greet"
+    done
+}
+
+main() {
+    T="$(mktemp -d)"
+    testframework::section "Parse and lint / Разбор и линт"; test_parses_and_lints
+    testframework::section "Behaviour in every shell / Поведение в каждой оболочке"; test_behaviour
+    testframework::section "Aliases / Псевдонимы"; test_aliases
+    rm -rf "${T:?}"
+    testframework::summary
+}
+
+main "$@"
