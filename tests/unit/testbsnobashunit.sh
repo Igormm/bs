@@ -4,7 +4,7 @@
 # tests/unit/testbsnobashunit.sh — команда bs на машине БЕЗ bash: ash, dash, ksh, mksh и zsh
 #
 # The `bs` entry point is "@shell posix": with no bash 4.2+ it stays in the current shell and serves the
-# commands that are POSIX already (help, version, env, list, calc, init-shell, shebang, call); the others answer that they need bash,
+# commands that are POSIX already (help, version, env, list, calc, init-shell, shebang, call, doctor); the others answer that they need bash,
 # with exit code 1. Every bash is hidden behind a mount namespace (unshare -Urm). A machine where the
 # namespace cannot be made is reported, never counted as passed.
 # Точка входа `bs` — "@shell posix": без bash 4.2+ она остаётся в текущей оболочке и обслуживает команды,
@@ -47,7 +47,9 @@ echo "init-shell=\$(run init-shell dash 2>&1 | head -n 1 | cut -d' ' -f1-4)"
 echo "shebang=\$(run shebang line --mode portable 2>&1 | head -n 1 | cut -c1-2)"
 echo "call=\$(run call bs_utils_human_size 1536000 2>&1)"
 run doctor > "\$H/doctor.txt" 2>&1; echo "doctor=\$?"
-grep -q 'требует bash 4.2+' "\$H/doctor.txt" && echo doctor-says-bash
+grep -o 'doctor: [0-9]* passed, 0 failed' "\$H/doctor.txt" | sed 's/[0-9][0-9]*/N/'
+run where > "\$H/where.txt" 2>&1; echo "where=\$?"
+grep -q 'требует bash 4.2+' "\$H/where.txt" && echo where-says-bash
 run nonsense > "\$H/bad.txt" 2>&1; echo "unknown=\$?"
 RUNNER
 }
@@ -78,7 +80,7 @@ main() {
         if [[ ! -x "${sb}/bin/${sh_name}" ]]; then echo "skip: ${sh_name} is not installed — NOT verified / не установлен — НЕ проверено" >&2; continue; fi
         H="${T}/home-${sh_name}"; mkdir -p "${H}"
         out="$(timeout 300 unshare -Urm busybox sh "${T}/runner.sh" "${sh_name}" "${H}" 2>&1 | tr '\n' ' ' | sed 's/ $//')" || true
-        testframework::assert_equal "version=BS Framework version: 0.8.0 help=BS Framework 0.8.0 list=N modules calc=35 init-shell=# BS for dash shebang=#! call=1.5 MiB doctor=1 doctor-says-bash unknown=1" "${out}" "${sh_name}: version, help, list, calc work; doctor and an unknown command fail clearly" || true
+        testframework::assert_equal "version=BS Framework version: 0.8.0 help=BS Framework 0.8.0 list=N modules calc=35 init-shell=# BS for dash shebang=#! call=1.5 MiB doctor=0 doctor: N passed, 0 failed where=1 where-says-bash unknown=1" "${out}" "${sh_name}: version, help, list, calc work; doctor and an unknown command fail clearly" || true
     done
     rm -rf "${T:?}"
     testframework::summary

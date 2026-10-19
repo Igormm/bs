@@ -6,11 +6,11 @@
 # bootstrap/cli.sh — команды bs, которые работают в любой оболочке (POSIX-часть bs::cli::*)
 # bootstrap/cli.sh — the bs commands that run in any shell (the POSIX part of bs::cli::*)
 #
-# Остальные команды (lang-doc, lsp, chat, api, ts, audit, doctor, build, rfc, run, update,
+# Остальные команды (lang-doc, lsp, chat, api, ts, audit, build, rfc, run, update,
 # uninstall, where, repl) пока в bootstrap/bs.sh на bash; в оболочке
 # без bash bs_cli_delegate отвечает, что команде нужен bash. Тела функций вызывают ядро и
 # выполняются только после его загрузки.
-# The other commands (lang-doc, lsp, chat, api, ts, audit, doctor, build, rfc, run, update,
+# The other commands (lang-doc, lsp, chat, api, ts, audit, build, rfc, run, update,
 # uninstall, where, repl) are still in bootstrap/bs.sh in bash; in a
 # shell without bash bs_cli_delegate answers that the command needs bash. The function bodies call
 # the kernel and run only after it is loaded.
@@ -131,7 +131,7 @@ bs_cli_help_cmd() {
     api)            bs_cli_delegate api bs::cli::api_cmd --help ;;
     ts)             bs_cli_delegate ts bs::cli::ts_cmd --help ;;
     audit)          bs_cli_delegate audit bs::cli::audit_cmd --help ;;
-    doctor)         bs_cli_delegate doctor bs::cli::doctor_cmd --help ;;
+    doctor)         bs_cli_doctor_cmd --help ;;
     run)            printf 'Usage: bs run <script> [args...]\n\nExecute a script inside the BS environment.\n' ;;
     build)          bs_cli_delegate build bs::cli::build_cmd --help ;;
     repl)           printf 'Usage: bs repl\n\nInteractive REPL (BS shell).\n' ;;
@@ -573,6 +573,105 @@ bs_cli_call_cmd() {
   "${__bs_cli_cfn}" "$@"
 }
 
+# bs doctor: проверка целостности установки / the integrity check of the installation
+bs_cli_doctor_cmd() {
+  __bs_cli_dfail=0
+  __bs_cli_dpass=0
+  __bs_cli_dstart=$(bs_utils_now_ms)
+
+  # Вектор возможностей / Capability vector
+  if [ "${1:-}" = "--capabilities" ]; then
+    if [ "${BS_KERNEL_MODE:-}" != full ]; then bs_cli_need_bash "doctor --capabilities"; fi
+    bs_load "lib/platform/facts"
+    platform::dump
+    return 0
+  fi
+  if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
+    printf 'Usage: bs doctor [--capabilities]\n'
+    printf '  --capabilities  print the platform capability vector\n'
+    return 0
+  fi
+
+  bs_log_info "BS doctor report"
+  bs_log_info "BS_ROOT: ${BS_ROOT}"
+
+  # Единая таблица статусов: STATUS | ITEM | DETAIL
+  # One aligned status table: STATUS | ITEM | DETAIL
+  bs_log_info "$(printf '  %-8s | %-30s | %s' "STATUS" "ITEM" "DETAIL")"
+  bs_log_info "$(printf '  %-8s | %-30s | %s' "--------" "------------------------------" "--------")"
+
+  # The bash version gate already ran in the POSIX prologue (bs_shell_host_ok)
+  # — no re-check here.
+  # Гейт версии bash уже отработал в POSIX-прологе (bs_shell_host_ok) —
+  # повторная проверка не нужна.
+
+  # Required core files / Обязательные файлы ядра
+  for __bs_cli_df2 in bootstrap/init.sh bootstrap/loader.sh bootstrap/base.sh bootstrap/cli.sh bootstrap/bs.sh bootstrap/shell.sh bootstrap/trampoline.sh core/prereq.sh core/lang.sh core/const.sh core/var.sh core/str.sh core/num.sh core/msg.sh core/logger.sh core/errorhandler.sh core/version.sh core/quiet.sh core/fmt.sh core/data.sh core/utils.sh core/config.sh core/deps.sh core/calc.sh; do
+    if [ -f "${BS_ROOT}/${__bs_cli_df2}" ]; then
+      bs_log_success "$(printf '  %-8s | %-30s | %s' "OK" "${__bs_cli_df2}" "required core file")"
+      __bs_cli_dpass=$((__bs_cli_dpass + 1))
+    else
+      bs_log_error "$(printf '  %-8s | %-30s | %s' "FAIL" "${__bs_cli_df2}" "required core file missing")"
+      __bs_cli_dfail=1
+    fi
+  done
+
+  # Required directories / Обязательные директории
+  for __bs_cli_dd in core lib; do
+    if [ -d "${BS_ROOT}/${__bs_cli_dd}" ]; then
+      bs_log_success "$(printf '  %-8s | %-30s | %s' "OK" "dir ${__bs_cli_dd}" "required directory")"
+      __bs_cli_dpass=$((__bs_cli_dpass + 1))
+    else
+      bs_log_error "$(printf '  %-8s | %-30s | %s' "FAIL" "dir ${__bs_cli_dd}" "required directory missing")"
+      __bs_cli_dfail=1
+    fi
+  done
+
+  # Оболочка: кто исполняет BS, чья оболочка у пользователя, tier, аннотации модулей
+  # The shell: who runs BS, whose shell the user has, the tier, module annotations
+  __bs_cli_dfam="$(bs_shell_family)"
+  __bs_cli_duser="$(bs_shell_user)"
+  __bs_cli_dtier="$(bs_shell_tier "${__bs_cli_duser}")"
+  bs_log_success "$(printf '  %-8s | %-30s | %s' "OK" "shell (host)" "${__bs_cli_dfam} $(bs_shell_version_string)")"
+  bs_log_success "$(printf '  %-8s | %-30s | %s' "OK" "shell (yours)" "${__bs_cli_duser}, tier ${__bs_cli_dtier}")"
+  bs_log_info "$(printf '  %-8s | %-30s | %s' "" "" "$(bs_shell_tier_desc "${__bs_cli_dtier}")")"
+  __bs_cli_dpass=$((__bs_cli_dpass + 2))
+  __bs_cli_dap="$(grep -rlE '^# @shell posix' "${BS_ROOT}/bootstrap" "${BS_ROOT}/core" "${BS_ROOT}/lib" 2>/dev/null | wc -l || true)"
+  __bs_cli_dab="$(grep -rlE '^# @shell bash4' "${BS_ROOT}/bootstrap" "${BS_ROOT}/core" "${BS_ROOT}/lib" 2>/dev/null | wc -l || true)"
+  bs_log_success "$(printf '  %-8s | %-30s | %s' "OK" "module shell tiers" "posix=$((__bs_cli_dap)) bash4=$((__bs_cli_dab)) (без аннотации = bash4 / unmarked = bash4)")"
+  __bs_cli_dpass=$((__bs_cli_dpass + 1))
+
+  # Optional external tools / Опциональные внешние инструменты
+  for __bs_cli_do in shellcheck jq curl wget kubectl; do
+    if bs_utils_has "${__bs_cli_do}"; then
+      bs_log_success "$(printf '  %-8s | %-30s | %s' "OK" "tool ${__bs_cli_do}" "found")"
+      __bs_cli_dpass=$((__bs_cli_dpass + 1))
+    else
+      bs_log_warn "$(printf '  %-8s | %-30s | %s' "OPTIONAL" "tool ${__bs_cli_do}" "not found")"
+    fi
+  done
+
+  # Optional dependency check for lib modules / Проверка опциональных зависимостей lib-модулей
+  if command -v bs_deps_check_module >/dev/null 2>&1; then
+    for __bs_cli_dm in lib/integration/result lib/integration/http lib/integration/llm lib/integration/k8s; do
+      if [ -f "${BS_ROOT}/${__bs_cli_dm}.sh" ]; then
+        if bs_utils_quiet bs_deps_check_module "${__bs_cli_dm}"; then
+          bs_log_success "$(printf '  %-8s | %-30s | %s' "OK" "module ${__bs_cli_dm}" "dependencies satisfied")"
+          __bs_cli_dpass=$((__bs_cli_dpass + 1))
+        else
+          __bs_cli_dmiss="$(bs_utils_attempt bs_deps_list_missing "${__bs_cli_dm}")"
+          bs_log_warn "$(printf '  %-8s | %-30s | %s' "OPTIONAL" "module ${__bs_cli_dm}" "missing dependencies: ${__bs_cli_dmiss}")"
+        fi
+      fi
+    done
+  fi
+
+  __bs_cli_dend=$(bs_utils_now_ms)
+  bs_log_info "doctor: ${__bs_cli_dpass} passed, ${__bs_cli_dfail} failed ($(bs_num_sub "${__bs_cli_dend}" "${__bs_cli_dstart}") ms)"
+
+  return "${__bs_cli_dfail}"
+}
+
 bs_shell_alias bs_cli_die bs::cli::die
 bs_shell_alias bs_cli_help bs::cli::help
 bs_shell_alias bs_cli_help_cmd bs::cli::help_cmd
@@ -592,3 +691,4 @@ bs_shell_alias bs_cli_shebang_files bs::cli::shebang_files
 bs_shell_alias bs_cli_shebang_cmd bs::cli::shebang_cmd
 bs_shell_alias bs_cli_call_usage bs::cli::call_usage
 bs_shell_alias bs_cli_call_cmd bs::cli::call_cmd
+bs_shell_alias bs_cli_doctor_cmd bs::cli::doctor_cmd

@@ -222,7 +222,7 @@ case "${1:-help}" in
   api)            shift; bs_cli_delegate api bs::cli::api_cmd "$@" ;;
   ts)             shift; bs_cli_delegate ts bs::cli::ts_cmd "$@" ;;
   audit)          shift; bs_cli_delegate audit bs::cli::audit_cmd "$@" ;;
-  doctor)         shift || true; bs_cli_delegate doctor bs::cli::doctor_cmd "$@" ;;
+  doctor)         shift || true; bs_cli_doctor_cmd "$@" ;;
   run)            shift; bs_cli_delegate run bs::cli::run_cmd "$@" ;;
   build)          shift; bs_cli_delegate build bs::cli::build_cmd "$@" ;;
   repl)           shift
