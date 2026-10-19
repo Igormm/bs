@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### Changed
+- refactor(core): second readability pass — the map functions of `core/data.sh` read, write and drop a key's variable through four helpers (`bs_data_var_is_set/read/write/drop`), `bs_utils_split` calls two helpers (`bs_utils_split_classify`, `bs_utils_split_skip_ws`) instead of three copies of one loop (byte-for-byte equal to the old version on 1500 random strings, checked by `diff_old_new.sh`), the header of `core/logger.sh` keeps each Russian/English note pair together
+### Changed
 - refactor(core): readability pass on the kernel — `core/data.sh` reads and writes array slots through five small helpers (`bs_data_len_of/set_len/get_at/put_at/drop_at`) and assigns results with `bs_var_set`; `bs_exit` resolves a code name with `bs_str_upper` + `bs_var_get` (`bs_exit_code`), `bs_error_retry` checks its count with `bs_num_*`; `bs_utils_error` (utils) and `bs_calc_log` (calc) are replaced by `bs_msg_*` (calc no longer looked for the `log::*` alias, so it ignored the logger in dash). Same number of passing checks in the portable tests of data, errorhandler, utils, deps, calc; random comparison of `bs_arr_*` with native bash arrays unchanged. Visible: without the logger an error is `ERROR: text`; `bs_error_retry` quotes its argument as given. `core/data.sh`, `core/errorhandler.sh`, `core/utils.sh`, `core/calc.sh` now load `var`/`str`/`num`/`msg` through `bs_source_relative`
 
 ### Added

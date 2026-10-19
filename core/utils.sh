@@ -105,6 +105,34 @@ bs_utils_tmp_cleanup() {
   return 0
 }
 
+# @private
+# @description Разделить символы-разделители на пробельные (→ __bs_ut_ws) и прочие (→ __bs_ut_nw) / Split the delimiter characters into whitespace (→ __bs_ut_ws) and others (→ __bs_ut_nw)
+# @param $1 delimiter characters / символы-разделители
+bs_utils_split_classify() {
+  __bs_ut_ws=''
+  __bs_ut_nw=''
+  __bs_ut_d=$1
+  while [ -n "$__bs_ut_d" ]; do
+    __bs_ut_rest=${__bs_ut_d#?}
+    __bs_ut_c=${__bs_ut_d%"$__bs_ut_rest"}
+    __bs_ut_d=$__bs_ut_rest
+    case "$__bs_ut_c" in
+      ' '|'	'|'
+') __bs_ut_ws="${__bs_ut_ws}${__bs_ut_c}" ;;
+      *) __bs_ut_nw="${__bs_ut_nw}${__bs_ut_c}" ;;
+    esac
+  done
+}
+
+# @private
+# @description Пропустить в начале __bs_ut_s все пробельные разделители (__bs_ut_ws) / Skip the whitespace delimiters (__bs_ut_ws) at the start of __bs_ut_s
+bs_utils_split_skip_ws() {
+  while [ -n "$__bs_ut_s" ]; do
+    __bs_ut_c=${__bs_ut_s%"${__bs_ut_s#?}"}
+    case "$__bs_ut_ws" in *"$__bs_ut_c"*) __bs_ut_s=${__bs_ut_s#?} ;; *) break ;; esac
+  done
+}
+
 # Разбивает строку на массив по символам-разделителям, как read -ra с IFS=разделители:
 # пробельные разделители склеиваются, остальные дают пустые поля, конечный разделитель
 # пустого поля не добавляет. Результат — массив слоя данных (bs_arr_*), а не массив bash.
@@ -123,26 +151,10 @@ bs_utils_split() {
   __bs_ut_delim=${3:- }
   bs_arr_clear "$__bs_ut_arr" || return 2
   [ -n "$__bs_ut_str" ] || return 0
-  # пробельные и прочие символы разделителя отдельно / the whitespace and the other delimiter characters apart
-  __bs_ut_ws=''
-  __bs_ut_nw=''
-  __bs_ut_d=$__bs_ut_delim
-  while [ -n "$__bs_ut_d" ]; do
-    __bs_ut_rest=${__bs_ut_d#?}
-    __bs_ut_c=${__bs_ut_d%"$__bs_ut_rest"}
-    __bs_ut_d=$__bs_ut_rest
-    case "$__bs_ut_c" in
-      ' '|'	'|'
-') __bs_ut_ws="${__bs_ut_ws}${__bs_ut_c}" ;;
-      *) __bs_ut_nw="${__bs_ut_nw}${__bs_ut_c}" ;;
-    esac
-  done
+  bs_utils_split_classify "$__bs_ut_delim"
   __bs_ut_s=$__bs_ut_str
   # ведущие пробельные разделители пропускаем / skip the leading whitespace delimiters
-  while [ -n "$__bs_ut_s" ]; do
-    __bs_ut_c=${__bs_ut_s%"${__bs_ut_s#?}"}
-    case "$__bs_ut_ws" in *"$__bs_ut_c"*) __bs_ut_s=${__bs_ut_s#?} ;; *) break ;; esac
-  done
+  bs_utils_split_skip_ws
   while [ -n "$__bs_ut_s" ]; do
     # поле: символы до разделителя / a field: the characters up to a delimiter
     __bs_ut_cur=''
@@ -156,19 +168,13 @@ bs_utils_split() {
     bs_arr_push "$__bs_ut_arr" "$__bs_ut_cur"
     [ -n "$__bs_ut_s" ] || break
     # разделитель: пробелы, затем необязательный непробельный символ, затем снова пробелы / the delimiter: spaces, an optional other character, spaces again
-    while [ -n "$__bs_ut_s" ]; do
-      __bs_ut_c=${__bs_ut_s%"${__bs_ut_s#?}"}
-      case "$__bs_ut_ws" in *"$__bs_ut_c"*) __bs_ut_s=${__bs_ut_s#?} ;; *) break ;; esac
-    done
+    bs_utils_split_skip_ws
     if [ -n "$__bs_ut_s" ]; then
       __bs_ut_c=${__bs_ut_s%"${__bs_ut_s#?}"}
       case "$__bs_ut_nw" in
         *"$__bs_ut_c"*)
           __bs_ut_s=${__bs_ut_s#?}
-          while [ -n "$__bs_ut_s" ]; do
-            __bs_ut_c=${__bs_ut_s%"${__bs_ut_s#?}"}
-            case "$__bs_ut_ws" in *"$__bs_ut_c"*) __bs_ut_s=${__bs_ut_s#?} ;; *) break ;; esac
-          done ;;
+          bs_utils_split_skip_ws ;;
       esac
     fi
   done

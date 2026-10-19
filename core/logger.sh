@@ -26,7 +26,6 @@
 # BS_LOG_TIMESTAMP=true|false (по умолчанию true / default: true)
 #
 
-# Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
 # ИМЕНА / NAMES
 #   Real functions: bs_log_trace, bs_log_debug, bs_log_info, bs_log_success, bs_log_warn, bs_log_error, bs_log_fatal,
 #   bs_log_print, bs_log_header, bs_log_list, bs_log_table, bs_log_progress, bs_log_clear_line and the private
@@ -37,6 +36,7 @@
 #   bs_log_format_message; в bash и zsh — ещё и log::* (прежние имена, их зовёт весь фреймворк)
 #   и log::__* для приватных.
 
+# Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points
 
 bs_guard LOGGER || return 0

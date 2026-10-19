@@ -453,13 +453,41 @@ bs_map_var() {
   __bs_dat_var="__bs_dat_m_${1}__${__bs_dat_enc}"
 }
 
+# Переменная значения ключа — __bs_dat_var (её задаёт bs_map_var); читают и пишут её четыре помощника.
+# The variable of a key's value is __bs_dat_var (bs_map_var sets it); four helpers read and write it.
+
+# @private
+# @description Задана ли переменная значения (статус) / Whether the value variable is set (status)
+bs_data_var_is_set() {
+  eval "[ \"\${${__bs_dat_var}+x}\" = x ]"
+}
+
+# @private
+# @description Значение ключа → __bs_dat_out / The value of the key → __bs_dat_out
+bs_data_var_read() {
+  eval "__bs_dat_out=\${${__bs_dat_var}}"
+}
+
+# @private
+# @description Записать значение ключа / Write the value of the key
+# @param $1 value / значение
+bs_data_var_write() {
+  eval "${__bs_dat_var}=\${1}"
+}
+
+# @private
+# @description Удалить значение ключа / Remove the value of the key
+bs_data_var_drop() {
+  eval "unset ${__bs_dat_var}"
+}
+
 # @description Есть ли ключ (статус) / Whether a key exists (status)
 # @param $1 map / словарь
 # @param $2 key / ключ
 bs_map_has() {
   bs_data_check "$1" || return 2
   bs_map_var "$1" "${2-}"
-  eval "[ \"\${${__bs_dat_var}+x}\" = x ]"
+  bs_data_var_is_set
 }
 
 # @description Записать значение по ключу / Set a value by key
@@ -475,7 +503,7 @@ bs_map_set() {
     bs_arr_push "mk_${__bs_dat_mn}" "$__bs_dat_mk"
   fi
   bs_map_var "$__bs_dat_mn" "$__bs_dat_mk"
-  eval "${__bs_dat_var}=\${__bs_dat_mv}"
+  bs_data_var_write "$__bs_dat_mv"
 }
 
 # @description Значение по ключу; нет ключа — статус 1 (или значение по умолчанию, если оно дано) / The value by key; a missing key is status 1 (or the default if given)
@@ -485,7 +513,7 @@ bs_map_set() {
 bs_map_get() {
   bs_data_check "$1" || return 2
   if bs_map_has "$1" "${2-}"; then
-    eval "__bs_dat_out=\${${__bs_dat_var}}"
+    bs_data_var_read
     printf '%s\n' "$__bs_dat_out"
     return 0
   fi
@@ -504,7 +532,7 @@ bs_map_remove() {
   __bs_dat_mn=$1
   __bs_dat_mk=${2-}
   bs_map_has "$__bs_dat_mn" "$__bs_dat_mk" || return 1
-  eval "unset ${__bs_dat_var}"
+  bs_data_var_drop
   __bs_dat_pos=$(bs_arr_index_of "mk_${__bs_dat_mn}" "$__bs_dat_mk") || return 0
   bs_arr_remove_at "mk_${__bs_dat_mn}" "$__bs_dat_pos"
 }
@@ -547,7 +575,7 @@ bs_map_clear() {
   eval "$(bs_arr_to_args "mk_${__bs_dat_mn}")"
   for __bs_dat_key in "$@"; do
     bs_map_var "$__bs_dat_mn" "$__bs_dat_key"
-    eval "unset ${__bs_dat_var}"
+    bs_data_var_drop
   done
   bs_arr_clear "mk_${__bs_dat_mn}"
 }
@@ -563,7 +591,8 @@ bs_map_each() {
   eval "$(bs_arr_to_args "mk_${1}")"
   for __bs_dat_key in "$@"; do
     eval "bs_map_var \"\${__bs_dat_mmap_${__bs_dat_depth}}\" \"\$__bs_dat_key\""
-    eval "__bs_dat_val=\${${__bs_dat_var}}"
+    bs_data_var_read
+    __bs_dat_val=$__bs_dat_out
     eval "\"\${__bs_dat_mcmd_${__bs_dat_depth}}\" \"\$__bs_dat_key\" \"\$__bs_dat_val\""
   done
   __bs_dat_depth=$((__bs_dat_depth - 1))
