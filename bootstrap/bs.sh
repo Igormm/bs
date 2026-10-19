@@ -4,8 +4,8 @@
 # bootstrap/bs.sh — корневой namespace bs::, доступный ДО загрузки loader'а
 # @tier core — pure Bash 4+, no GNU tools: works everywhere
 # @tier core — чистый Bash 4+, без GNU-инструментов: работает везде
-# @shell bash4 — pre-kernel bash layer; the POSIX part is bootstrap/shell.sh
-# @shell bash4 — pre-kernel слой на bash; POSIX-часть — bootstrap/shell.sh
+# @shell bash4 — pre-kernel bash layer (call stack, BASH_REMATCH, BASH_SOURCE, bs::cli::*); the POSIX part is bootstrap/base.sh and bootstrap/shell.sh
+# @shell bash4 — pre-kernel слой на bash (стек вызовов, BASH_REMATCH, BASH_SOURCE, bs::cli::*); POSIX-часть — bootstrap/base.sh и bootstrap/shell.sh
 #
 # This file has no dependencies and must stay bash-3.2-compatible (pure
 # builtins, no associative arrays): it is sourced by entry points and by
@@ -23,49 +23,17 @@
 [[ -n "${__BS_SH_SOURCED:-}" ]] && return 0
 readonly __BS_SH_SOURCED=1
 
-# POSIX-реестр оболочек (bootstrap/shell.sh): определение семейства, rc-файлы,
-# строки PATH, tier. Его же подключают оболочки, не являющиеся bash.
-# The POSIX shell registry (bootstrap/shell.sh): family detection, rc files,
-# PATH lines, tier. Shells other than bash source it too.
+# POSIX-часть pre-kernel (bootstrap/base.sh: bs_strict, bs_append_local_bin_to_path, bs_shell_*)
+# подключает реестр оболочек bootstrap/shell.sh; её же подключают оболочки, не являющиеся bash.
+# The POSIX part of the pre-kernel (bootstrap/base.sh: bs_strict, bs_append_local_bin_to_path,
+# bs_shell_*) sources the shell registry bootstrap/shell.sh; shells other than bash source it too.
 # Каталог bootstrap/ задают init.sh и точки входа; запасной путь — от BS_ROOT / BS_ENTRY_DIR
 # The bootstrap/ directory is set by init.sh and the entry points; fallback: from BS_ROOT / BS_ENTRY_DIR
 : "${BS_BOOTSTRAP_DIR:=${BS_ROOT:-${BS_ENTRY_DIR:-.}}/bootstrap}"
-if [[ -f "${BS_BOOTSTRAP_DIR}/shell.sh" ]]; then
-  # shellcheck source=bootstrap/shell.sh
-  source "${BS_BOOTSTRAP_DIR}/shell.sh"
+if [[ -f "${BS_BOOTSTRAP_DIR}/base.sh" ]]; then
+  # shellcheck source=bootstrap/base.sh
+  source "${BS_BOOTSTRAP_DIR}/base.sh"
 fi
-
-# ==========================================
-# Strict mode / Строгий режим
-# ==========================================
-
-# @description Enable strict bash mode (set -euo pipefail) and a safe IFS.
-# @description Включить строгий режим bash (set -euo pipefail) и безопасный IFS.
-# @description Pre-kernel equivalent of utils::strict (core/utils.sh): available
-# @description BEFORE the loader runs, so plain-bash entry points (bs, boot.sh)
-# @description can enable strict mode via a named helper instead of a raw line.
-# @description Pre-kernel аналог utils::strict (core/utils.sh): доступна ДО
-# @description запуска loader'а, чтобы обычные bash-точки входа (bs, boot.sh)
-# @description включали строгий режим именованной функцией, а не сырой строкой.
-# @note Entry points only, never inside library modules.
-# @note Только в точках входа, никогда в библиотечных модулях.
-bs::strict() {
-  bs_shell_strict
-}
-
-# ==========================================
-# PATH / Local bin
-# ==========================================
-
-# @description Prepend ~/.local/bin to PATH once (local installs).
-# @description Добавить ~/.local/bin в PATH один раз (локальные установки).
-bs::append_local_bin_to_path() {
-  local -r needle="${HOME:-}/.local/bin"
-  case ":${PATH}:" in
-    *":${needle}:"*) return 0 ;;
-    *) export PATH="${needle}:${PATH}" ;;
-  esac
-}
 
 # ==========================================
 # Script directory / Каталог скрипта
@@ -174,48 +142,13 @@ bs::trace_prefix() {
 }
 
 # ==========================================
-# Shell detection / Определение оболочки
+# Source vs executed / Подключён или исполнен
 #
-# Определение — в реестре bootstrap/shell.sh (bs_shell_family и версии): это
-# единственное место, знающее BASH_VERSION/ZSH_VERSION; здесь только обёртки.
-# The detection lives in the registry bootstrap/shell.sh (bs_shell_family and the
-# version functions): the only place that knows BASH_VERSION/ZSH_VERSION; only
-# wrappers are here.
+# Определение оболочки и гейт версии — в bootstrap/base.sh (POSIX): bs_shell_name, bs_shell_host,
+# bs_shell_version, bs_shell_ok, bs_shell_ensure_version. Здесь осталось только то, что читает BASH_SOURCE.
+# The shell detection and the version gate are in bootstrap/base.sh (POSIX): bs_shell_name,
+# bs_shell_host, bs_shell_version, bs_shell_ok, bs_shell_ensure_version. Only what reads BASH_SOURCE stays here.
 # ==========================================
-
-# @description Current shell name: bash, zsh, dash, ash, ksh, ... or unknown.
-# @description Имя текущей оболочки: bash, zsh, dash, ash, ksh, ... или unknown.
-# @stdout shell name / имя оболочки
-bs::shell::name() {
-  bs_shell_family
-}
-
-# @description Absolute path of the interpreter that runs this code (the host bash),
-#   to start child shells in the SAME bash instead of whichever `bash` is first in PATH.
-# @description Абсолютный путь интерпретатора, исполняющего этот код (host bash):
-#   дочерние оболочки запускаются в ТОМ ЖЕ bash, а не в первом попавшемся в PATH.
-# @stdout path / путь
-bs::shell::host() {
-  if bs_shell_host_ok && bs_shell_self_path 2>/dev/null; then
-    return 0
-  fi
-  bs_shell_host_find 2>/dev/null || printf 'bash\n'
-}
-
-# @description Major shell version (bash: BASH_VERSINFO[0], zsh: ZSH_VERSION).
-# @description Старшая версия оболочки (bash: BASH_VERSINFO[0], zsh: ZSH_VERSION).
-# @stdout major version / старшая версия
-bs::shell::version() {
-  bs_shell_version_major
-}
-
-# @description Capability gate: bash 4.2+ = full kernel (0/1).
-# @description Гейт возможностей: bash 4.2+ = полное ядро (0/1).
-# @stdout 1 bash 4.2+, 0 otherwise / 1 для bash 4.2+, 0 иначе
-bs::shell::ok() {
-  if bs_shell_host_ok; then printf '1\n'; else printf '0\n'; fi
-  return 0
-}
 
 # @description Sourced vs executed for the DIRECT CALLER: 0 sourced, 1 executed.
 # @description Source vs исполнение ПРЯМОГО ВЫЗЫВАЮЩЕГО: 0 при source, 1 при исполнении.
@@ -238,33 +171,6 @@ bs::shell::is_sourced() {
 # @return 0 the caller's file is the running program / запускаемая программа; 1 sourced module
 bs::is_main() {
   [[ "${BASH_SOURCE[1]:-}" == "$0" || "${BASH_SOURCE[1]:-}" == "${BS_RUN_SCRIPT:-}" ]]
-}
-
-# @description Gate: ensure the runtime shell meets a version requirement.
-# @description Гейт: проверить, что текущая оболочка не старше требуемой версии.
-# @description Checks the bash version only (BASH_VERSINFO), not the shell kind;
-# @description Проверяет только версию bash (BASH_VERSINFO), а не вид оболочки;
-# @description silent on success, error to stderr on failure, never exits.
-# @description молчит при успехе, ошибка в stderr при провале, не вызывает exit.
-# @arg $1 int Required major version, default 4.
-# @arg $2 int Required minor version, default 2 (framework needs bash 4.2+).
-# @arg $1 int Требуемая старшая версия, по умолчанию 4.
-# @arg $2 int Требуемая младшая версия, по умолчанию 2 (фреймворку нужен bash 4.2+).
-# @exitcode 0 version ok / версия подходит
-# @exitcode 1 too old or undetectable / старая или не определена
-bs::shell::ensure_version() {
-  local -r required_major="${1:-4}"
-  local -r required_minor="${2:-2}"
-  if ! [[ "${required_major}" =~ ^[0-9]+$ ]] || ! [[ "${required_minor}" =~ ^[0-9]+$ ]]; then
-    printf 'ERROR: ensure_version: required version must be numbers, got %s.%s\n' "${required_major}" "${required_minor}" >&2
-    return 1
-  fi
-  local -r major="$(bs_shell_version_major)" minor="$(bs_shell_version_minor)"
-  if (( major < required_major || ( major == required_major && minor < required_minor ) )); then
-    printf 'ERROR: %s %s.%s+ required, found %s.%s\n' "$(bs_shell_family)" "${required_major}" "${required_minor}" "${major}" "${minor}" >&2
-    return 1
-  fi
-  return 0
 }
 
 # ==========================================================================

@@ -90,6 +90,17 @@ if [ -n "$__bs_t_host" ]; then
   exec "$__bs_t_host" "$__bs_t_self" "$@"
 fi
 
+# Точка входа, которая умеет работать без bash (BS_POSIX_ENTRY, её ставит сама точка входа): bash 4.2+
+# не найден — продолжаем в текущей оболочке с POSIX-частью ядра. Явный BS_HOST_BASH, не подошедший
+# по версии, остаётся ошибкой: молчаливой замены нет.
+# An entry point that can run without bash (BS_POSIX_ENTRY, set by the entry point itself): no
+# bash 4.2+ found — carry on in the current shell with the POSIX part of the kernel. An explicit
+# BS_HOST_BASH that does not fit stays an error: there is no silent fallback.
+if [ -n "${BS_POSIX_ENTRY:-}" ] && [ -z "${BS_HOST_BASH:-}" ]; then
+  unset __bs_t_self __bs_t_first __bs_t_host
+  return 0
+fi
+
 # Подходящего bash нет — объясняем, а не падаем на «Bad substitution»
 # No capable bash — explain instead of failing with "Bad substitution"
 __bs_t_fam=$(bs_shell_family)
