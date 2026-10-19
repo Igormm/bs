@@ -1,6 +1,7 @@
-#!/usr/bin/env bash
-# @shell bash4 — bash 4.2+ file behind a POSIX prologue: sh/dash/zsh/bash 3.2 re-run it in bash (bootstrap/trampoline.sh)
-# @shell bash4 — файл bash 4.2+ за POSIX-прологом: sh/dash/zsh/bash 3.2 перезапускают его в bash (bootstrap/trampoline.sh)
+#!/bin/sh
+# shellcheck shell=sh
+# @shell posix — валидный POSIX sh: ставит BS из dash, ash, ksh, mksh, zsh и bash; ядро в них — его POSIX-часть (BS_KERNEL_MODE=posix) / valid POSIX sh: installs BS from dash, ash, ksh, mksh, zsh and bash; the kernel in them is its POSIX part (BS_KERNEL_MODE=posix)
+# @tier core — builtins, cp, mv, rm, mkdir, mktemp, chmod, grep, sed, readlink; works everywhere
 #
 # BS installer (Linux) / Установщик BS (Linux)
 #
@@ -40,6 +41,11 @@
 #   BS_SYSTEM_PREFIX=...                 (system prefix, default /usr/local)
 #
 
+# Установщик умеет работать и без bash (POSIX-часть ядра): трамплин перезапускает его в bash 4.2+,
+# если такой есть, иначе оставляет в текущей оболочке (dash, ash, ksh, mksh, zsh).
+# The installer can run without bash too (the POSIX part of the kernel): the trampoline re-runs it
+# in bash 4.2+ when there is one and otherwise leaves it in the current shell (dash, ash, ksh, mksh, zsh).
+BS_POSIX_ENTRY=1
 # --- POSIX-пролог (валиден в sh/dash/ash/zsh/bash) / POSIX prologue ---------
 # Если запущены не bash 4+ (sh install.sh, zsh ./bs, bash 3.2, bash как sh),
 # перезапускаемся в подходящем bash или объясняем, что поставить. В bash 4+
@@ -65,6 +71,7 @@ if ! bs_shell_host_ok; then
 fi
 unset __BS_TRAMPOLINE __bs_p __bs_r __bs_s
 # --- конец пролога / end of the prologue ------------------------------------
+unset BS_POSIX_ENTRY
 
 # Определить каталог запуска скрипта
 SCRIPT_DIR="${BS_ENTRY_DIR}"
@@ -76,20 +83,20 @@ INSTALLER_DIR="${SCRIPT_DIR}/install"
 # Печатаем СРАЗУ ВСЁ, чего не хватает, а не первый попавшийся файл.
 # Verify the files and directories the installer depends on are present.
 # Report EVERYTHING that is missing at once, not just the first file.
-installer_missing=()
+installer_missing=""
 for installer_item in core bootstrap lib install; do
-  [[ -d "${SCRIPT_DIR}/${installer_item}" ]] || installer_missing+=("${installer_item}/")
+  if [ ! -d "${SCRIPT_DIR}/${installer_item}" ]; then installer_missing="${installer_missing} ${installer_item}/"; fi
 done
 for installer_item in bs core/utils.sh core/const.sh core/errorhandler.sh core/logger.sh \
-  core/version.sh bootstrap/init.sh bootstrap/loader.sh install/main.sh install/actions.sh \
+  core/version.sh bootstrap/init.sh bootstrap/loader.sh bootstrap/base.sh install/main.sh install/actions.sh \
   install/checks.sh install/path_manager.sh install/notice.sh; do
-  [[ -f "${SCRIPT_DIR}/${installer_item}" ]] || installer_missing+=("${installer_item}")
+  if [ ! -f "${SCRIPT_DIR}/${installer_item}" ]; then installer_missing="${installer_missing} ${installer_item}"; fi
 done
-if (( ${#installer_missing[@]} > 0 )); then
+if [ -n "${installer_missing}" ]; then
   printf 'ERROR: Источник установщика неполон: %s\n' "${SCRIPT_DIR}" >&2
   printf '       The installer source is incomplete: %s\n' "${SCRIPT_DIR}" >&2
   printf '  Не хватает / Missing:\n' >&2
-  for installer_item in "${installer_missing[@]}"; do
+  for installer_item in ${installer_missing}; do
     printf '    - %s\n' "${installer_item}" >&2
   done
   printf '  Запускайте install.sh из полного клона или архива BS (git clone ... && cd bs).\n' >&2
@@ -99,10 +106,10 @@ fi
 unset installer_missing installer_item
 
 # modules sourcing
-# Подключаем полное ядро через bootstrap (utils.sh больше нельзя
-# подключать в одиночку: он использует bs::guard, is::*, log::*).
-# Bootstrap loads the full core (utils.sh can no longer be sourced alone:
-# it relies on bs::guard, is::*, log::*).
+# Подключаем ядро через bootstrap: в bash — целиком, в остальных оболочках — его POSIX-часть
+# (BS_KERNEL_MODE=posix); utils.sh больше нельзя подключать в одиночку.
+# Bootstrap loads the kernel: the whole of it in bash, its POSIX part in other shells
+# (BS_KERNEL_MODE=posix); utils.sh can no longer be sourced alone.
 
 # Ранние проверки local-режима — ДО bootstrap: загрузка core/config.sh создаёт
 # $HOME/.config/bs, т.е. под «sudo --local» (HOME пользователя) bootstrap сам
@@ -111,8 +118,8 @@ unset installer_missing installer_item
 # creates $HOME/.config/bs, so under "sudo --local" (the user's HOME) the
 # bootstrap itself would leave a root-owned directory in the user's home
 # before we get to refuse.
-# shellcheck disable=SC1090
-source -- "${INSTALLER_DIR}/notice.sh"
+# shellcheck disable=SC1090,SC1091
+. "${INSTALLER_DIR}/notice.sh"
 INSTALL_EARLY_CHECKED=0
 installer_local=0 installer_action=install installer_help=0
 for installer_arg in "$@"; do
@@ -123,9 +130,9 @@ for installer_arg in "$@"; do
     *) ;;
   esac
 done
-if [[ "${installer_local}" == "1" && "${installer_help}" == "0" ]]; then
-  install_require_home || exit 1
-  install_check_sudo_local "${installer_action}" || exit 1
+if [ "${installer_local}" = "1" ] && [ "${installer_help}" = "0" ]; then
+  bs_install_require_home || exit 1
+  bs_install_check_sudo_local "${installer_action}" || exit 1
   # shellcheck disable=SC2034  # read by install/main.sh
   INSTALL_EARLY_CHECKED=1
 fi
@@ -139,34 +146,36 @@ unset installer_local installer_action installer_help installer_arg
 INSTALL_ORIG_PATH="${PATH}"
 
 BS_SILENT=1
-# shellcheck disable=SC1090
-if ! source -- "${SCRIPT_DIR}/bootstrap/init.sh"; then
+# shellcheck disable=SC1090,SC1091
+if ! . "${SCRIPT_DIR}/bootstrap/init.sh"; then
   printf 'ERROR: failed to source bootstrap: %s\n' "${SCRIPT_DIR}/bootstrap/init.sh" >&2
   exit 1
 fi
 
 # Использовать строгий режим (как только функция доступна)
-utils::strict
+bs_utils_strict
 
-if ! source -- "${INSTALLER_DIR}/actions.sh"; then
+# shellcheck disable=SC1090,SC1091
+if ! . "${INSTALLER_DIR}/actions.sh"; then
   printf 'ERROR: failed to source file: %s\n' "${INSTALLER_DIR}/actions.sh" >&2
   exit 1
 fi
 
-if ! declare -F -- "utils::strict" >/dev/null 2>&1; then
-  printf 'ERROR: required function %q not defined\n' "utils::strict" >&2
+if ! command -v bs_utils_strict >/dev/null 2>&1; then
+  printf 'ERROR: required function %s not defined\n' "bs_utils_strict" >&2
   exit 1
 fi
 
-# Подключить checks.sh и проверить функцию check_shell_environment
-if ! utils::ensure_source "${INSTALLER_DIR}/checks.sh" "check_shell_environment"; then
+# Подключить checks.sh и проверить функцию bs_check_shell_environment
+if ! bs_utils_ensure_source "${INSTALLER_DIR}/checks.sh" "bs_check_shell_environment"; then
   exit 1
 fi
 
 # Проверка интерпретатора: по реальному процессу, а не по $SHELL
-# (utils::ensure_shell_version смотрит в $SHELL и ложно падает при SHELL=zsh)
 # Interpreter check: based on the real process, not on $SHELL
-check_shell_environment
+bs_check_shell_environment
 
 # Run the modular installer / Запустить модуль инсталляции
-source "${INSTALLER_DIR}/main.sh" "$@"
+# shellcheck disable=SC1090,SC1091
+. "${INSTALLER_DIR}/main.sh"
+bs_install_main "$@"

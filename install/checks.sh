@@ -1,41 +1,51 @@
-#!/usr/bin/env bash
-# @tier core — bash 4+ only (gated by bootstrap/bs.sh), works everywhere
-# @tier core — только bash 4+ (гейт в bootstrap/bs.sh), работает везде
-# @shell bash4 — installer code: runs in bash 4.2+, writes PATH/rc for the shell of the USER (bootstrap/shell.sh)
-# @shell bash4 — код установщика: исполняется в bash 4.2+, пишет PATH/rc для оболочки ПОЛЬЗОВАТЕЛЯ (bootstrap/shell.sh)
-
+#!/bin/sh
+# shellcheck shell=sh
+# @shell posix — валидный POSIX sh: test и реестр оболочек bootstrap/shell.sh / valid POSIX sh: test and the shell registry bootstrap/shell.sh
+# @tier core — builtins only; works everywhere
+#
 # Environment checking functions for the installer
+# Проверки окружения для установщика
+#
+# ИМЕНА / NAMES
+#   Real functions: bs_is_already_installed, bs_get_current_shell_name, bs_check_shell_environment;
+#   in bash and zsh also is_already_installed, get_current_shell_name, check_shell_environment
+#   (the old names).
+#   Настоящие функции — bs_*; в bash и zsh — ещё и прежние is_already_installed,
+#   get_current_shell_name, check_shell_environment.
+
+# Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
+# Note: strict mode (set -euo pipefail) and IFS are set only in entry points
 
 # Check if already installed
-is_already_installed() {
-  is::dir "${TARGET_LIB}" && is::file "${TARGET_BIN}"
+bs_is_already_installed() {
+  [ -d "${TARGET_LIB}" ] && [ -f "${TARGET_BIN}" ]
 }
 
 # Имя интерпретатора, который исполняет установщик (по реестру оболочек).
 # Это НЕ оболочка пользователя: пользовательская — bs_shell_user.
 # The interpreter that runs the installer (from the shell registry). This is
 # NOT the user's shell: that one is bs_shell_user.
-get_current_shell_name() {
-    bs_shell_family
+bs_get_current_shell_name() {
+  bs_shell_family
 }
 
 # check_shell_environment
 #
-# Установщик исполняется только в bash 4.2+: версию проверяет POSIX-пролог
-# install.sh (bs_shell_host_ok), а при необходимости точка входа перезапускается
-# в подходящем bash (bootstrap/trampoline.sh). Здесь повторной проверки нет:
-# запоминается оболочка ПОЛЬЗОВАТЕЛЯ, для которой дальше настраиваются PATH и
-# подсказки.
-# The installer runs only in bash 4.2+: the POSIX prologue of install.sh checks
-# the version (bs_shell_host_ok) and, when needed, the entry point re-runs
-# itself in a capable bash (bootstrap/trampoline.sh). There is no second check
-# here: the USER's shell is recorded (PATH and hints are set up for it). It is
-# computed later and lazily — after the arguments are parsed, because --shell
-# can set it.
-check_shell_environment() {
-    local shell_name
-    shell_name="$(get_current_shell_name)"
+# Установщик исполняется в оболочке, которую выбрал POSIX-пролог install.sh
+# (bs_shell_host_ok), а при необходимости точка входа перезапускается в
+# подходящем bash (bootstrap/trampoline.sh). Здесь повторной проверки нет:
+# запоминается оболочка, исполняющая установщик.
+# The installer runs in the shell the POSIX prologue of install.sh chose
+# (bs_shell_host_ok) and, when needed, the entry point re-runs itself in a
+# capable bash (bootstrap/trampoline.sh). There is no second check here: the
+# shell that runs the installer is recorded.
+bs_check_shell_environment() {
+  __bs_ck_name=$(bs_get_current_shell_name)
 
-    # Сохраняем для других функций
-    readonly CURRENT_SHELL="$shell_name"
+  # Сохраняем для других функций
+  bs_shell_readonly CURRENT_SHELL="${__bs_ck_name}"
 }
+
+bs_shell_alias bs_is_already_installed is_already_installed
+bs_shell_alias bs_get_current_shell_name get_current_shell_name
+bs_shell_alias bs_check_shell_environment check_shell_environment

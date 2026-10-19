@@ -1,22 +1,31 @@
-#!/usr/bin/env bash
-# @tier core — bash 4+ only (the installer runs in bash; see bootstrap/trampoline.sh)
-# @tier core — только bash 4+ (установщик работает в bash; см. bootstrap/trampoline.sh)
-# @shell bash4 — runs in bash; WRITES for every shell through the registry
-# @shell bash4 — исполняется в bash; ПИШЕТ для любой оболочки через реестр
-
+#!/bin/sh
+# shellcheck shell=sh
+# @shell posix — валидный POSIX sh: case, printf, test, grep/mktemp/cat; карты — из core/data.sh; ПИШЕТ rc-файлы любой оболочки через реестр / valid POSIX sh: case, printf, test, grep/mktemp/cat; maps come from core/data.sh; WRITES the rc files of every shell through the registry
+# @tier core — builtins, grep, mktemp, cat, dirname; works everywhere
+#
 # PATH management functions — the shell of the USER, not the shell of the
 # installer: the rc file, the PATH syntax and the reload command come from
 # the registry in bootstrap/shell.sh (bash, zsh, ash/dash/sh, ksh, osh, fish, nu).
 # Функции PATH — для оболочки ПОЛЬЗОВАТЕЛЯ, а не оболочки установщика: rc-файл,
 # синтаксис PATH и команда перезагрузки берутся из реестра bootstrap/shell.sh.
+#
+# ИМЕНА / NAMES
+#   Real functions: bs_confirm, bs_install_user_shell, bs_path_manager_line, bs_print_path_hint,
+#   bs_remove_path_entry, bs_remove_path_entries_all, bs_path_manager_targets, bs_auto_update_path,
+#   bs_path_manager_add_for, bs_path_manager_add_line; in bash and zsh also the old names
+#   confirm, install_user_shell, print_path_hint, … (aliases).
+#   Настоящие функции — bs_*; в bash и zsh — ещё и прежние confirm, install_user_shell,
+#   print_path_hint, … (псевдонимы).
+
+# Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
+# Note: strict mode (set -euo pipefail) and IFS are set only in entry points
 
 # Ask a yes/no question, default is "No" / Вопрос да/нет, по умолчанию «нет»
-confirm() {
-  local prompt="${1:-Are you sure?}"
-  local answer
-  printf "%s [y/N] " "${prompt}" >&2
-  read -r answer || return 1
-  case "${answer}" in
+# @param $1 prompt / вопрос
+bs_confirm() {
+  printf "%s [y/N] " "${1:-Are you sure?}" >&2
+  read -r __bs_pm_answer || return 1
+  case "${__bs_pm_answer}" in
     [yY]|[yY][eE][sS]) return 0 ;;
     *) return 1 ;;
   esac
@@ -24,8 +33,8 @@ confirm() {
 
 # Оболочка пользователя (по реестру), считается один раз за запуск.
 # The user's shell (from the registry), computed once per run.
-install_user_shell() {
-  if [[ -z "${INSTALL_USER_SHELL:-}" ]]; then
+bs_install_user_shell() {
+  if [ -z "${INSTALL_USER_SHELL:-}" ]; then
     INSTALL_USER_SHELL="$(bs_shell_user)"
   fi
   printf '%s\n' "${INSTALL_USER_SHELL}"
@@ -33,30 +42,30 @@ install_user_shell() {
 
 # Строка PATH для стандартного ~/.local/bin в синтаксисе семейства.
 # The PATH line for the standard ~/.local/bin in the syntax of a family.
-path_manager_line() {
+bs_path_manager_line() {
+  # shellcheck disable=SC2016  # $HOME должен попасть в rc-файл как текст / $HOME must reach the rc file as text
   bs_shell_path_line "$1" '$HOME/.local/bin'
 }
 
 # Print PATH hint after local install / Подсказка про PATH после локальной установки
-print_path_hint() {
-  local fam rc line reload
-  fam="$(install_user_shell)"
-  bs_shell_known "${fam}" || fam="bash"
-  rc="$(bs_shell_rc_file "${fam}")"
-  line="$(bs_shell_path_line "${fam}" "${BIN_DIR}")"
-  reload="$(bs_shell_reload_hint "${fam}")"
+bs_print_path_hint() {
+  __bs_pm_fam=$(bs_install_user_shell)
+  bs_shell_known "${__bs_pm_fam}" || __bs_pm_fam="bash"
+  __bs_pm_rc=$(bs_shell_rc_file "${__bs_pm_fam}")
+  __bs_pm_line=$(bs_shell_path_line "${__bs_pm_fam}" "${BIN_DIR}")
+  __bs_pm_reload=$(bs_shell_reload_hint "${__bs_pm_fam}")
   cat <<EOF
 Каталога ${BIN_DIR} нет в PATH — команда bs не найдётся / ${BIN_DIR} is not in PATH — the bs command will not be found.
-Добавьте каталог с bs в PATH / Add the bs bin directory to PATH (shell: ${fam}):
+Добавьте каталог с bs в PATH / Add the bs bin directory to PATH (shell: ${__bs_pm_fam}):
 
-  ${line}
+  ${__bs_pm_line}
 
-Строку — в ${rc}, затем в этом терминале / Put the line into ${rc}, then in this terminal:
-  ${reload}
+Строку — в ${__bs_pm_rc}, затем в этом терминале / Put the line into ${__bs_pm_rc}, then in this terminal:
+  ${__bs_pm_reload}
 EOF
   # Авто-настройка умеет только стандартный ~/.local/bin.
   # The automatic setup handles only the standard ~/.local/bin.
-  if [[ "${MODE:-}" == "local" && "${BIN_DIR}" == "${HOME:-}/.local/bin" ]]; then
+  if [ "${MODE:-}" = "local" ] && [ "${BIN_DIR}" = "${HOME:-}/.local/bin" ]; then
     printf '\nИли выполните авто-настройку / Or run the automatic setup:\n  ./install.sh --local --update-path\n'
   fi
 }
@@ -77,19 +86,21 @@ EOF
 #     at the top of .bashrc is NOT removed: it is not an exact line match,
 #     so grep -Fvx skips it (user-edit protection).
 #   - read-only rc-файл: запись падает, функция возвращает 1, вызывающий код
-#     (do_uninstall) продолжает с || true — удаление не прерывается.
+#     (bs_do_uninstall) продолжает с || true — удаление не прерывается.
 #     A read-only rc file: the write fails, the function returns 1 and the
-#     caller (do_uninstall) continues with || true — uninstall is not aborted.
-remove_path_entry() {
-  local rc_file="$1"
-  local line="${2:-export PATH=\"\$HOME/.local/bin:\$PATH\"}"
-  local tmp_file
+#     caller (bs_do_uninstall) continues with || true — uninstall is not aborted.
+bs_remove_path_entry() {
+  __bs_pm_rcf=$1
+  # строка POSIX-оболочек по умолчанию; в переменной, чтобы кавычки не зависели от оболочки / the default POSIX-shell line, in a variable so the quotes do not depend on the shell
+  # shellcheck disable=SC2016  # строка для rc-файла: $HOME и $PATH не раскрываются / a line for an rc file: $HOME and $PATH are not expanded
+  __bs_pm_dl='export PATH="$HOME/.local/bin:$PATH"'
+  __bs_pm_ln=${2:-$__bs_pm_dl}
 
-  if ! is::file "${rc_file}"; then
+  if [ ! -f "${__bs_pm_rcf}" ]; then
     return 0
   fi
 
-  if ! utils::quiet grep -Fqx "${line}" "${rc_file}"; then
+  if ! bs_utils_quiet grep -Fqx "${__bs_pm_ln}" "${__bs_pm_rcf}"; then
     return 0
   fi
 
@@ -101,32 +112,35 @@ remove_path_entry() {
   # Rewrite in place (cat >), not mv: keeps owner, mode and symlink (an rc
   # file managed by a dotfiles repo) — mv would replace them and, under
   # sudo, make the file root-owned. The temporary file lives in TMPDIR.
-  tmp_file="$(mktemp 2>/dev/null)" || tmp_file=""
-  if [[ -z "${tmp_file}" ]]; then
-    printf "Не удалось создать временный файл для %s\n" "${rc_file}" >&2
+  __bs_pm_tmp=$(mktemp 2>/dev/null) || __bs_pm_tmp=""
+  if [ -z "${__bs_pm_tmp}" ]; then
+    printf "Не удалось создать временный файл для %s\n" "${__bs_pm_rcf}" >&2
     return 1
   fi
-  if ! utils::attempt grep -Fvx "${line}" "${rc_file}" > "${tmp_file}"; then
-    rm -f "${tmp_file}"
-    printf "Не удалось прочитать %s\n" "${rc_file}" >&2
+  if ! bs_utils_attempt grep -Fvx "${__bs_pm_ln}" "${__bs_pm_rcf}" > "${__bs_pm_tmp}"; then
+    rm -f "${__bs_pm_tmp}"
+    printf "Не удалось прочитать %s\n" "${__bs_pm_rcf}" >&2
     return 1
   fi
-  if ! cat -- "${tmp_file}" > "${rc_file}" 2>/dev/null; then
-    rm -f "${tmp_file}"
-    printf "Не удалось изменить %s (нет прав записи?) — удалите строку PATH вручную\nCannot modify %s (read-only?) — remove the PATH line by hand\n" "${rc_file}" "${rc_file}" >&2
+  if ! cat -- "${__bs_pm_tmp}" > "${__bs_pm_rcf}" 2>/dev/null; then
+    rm -f "${__bs_pm_tmp}"
+    printf "Не удалось изменить %s (нет прав записи?) — удалите строку PATH вручную\nCannot modify %s (read-only?) — remove the PATH line by hand\n" "${__bs_pm_rcf}" "${__bs_pm_rcf}" >&2
     return 1
   fi
-  rm -f "${tmp_file}"
-  printf "Удалена строка PATH из %s\nPath line removed from %s\n" "${rc_file}" "${rc_file}"
+  rm -f "${__bs_pm_tmp}"
+  printf "Удалена строка PATH из %s\nPath line removed from %s\n" "${__bs_pm_rcf}" "${__bs_pm_rcf}"
 
   # Файл, который создал сам установщик (fish: conf.d/bs.fish), без нашей
   # строки пуст — убираем и его; чужие файлы остаются.
   # A file the installer created itself (fish: conf.d/bs.fish) is empty
   # without our line — it goes too; other people's files stay.
-  if [[ "${rc_file}" == */conf.d/bs.fish ]] && ! grep -q '[^[:space:]]' -- "${rc_file}" 2>/dev/null; then
-    rm -f -- "${rc_file}"
-    printf "Удалён пустой файл %s\n" "${rc_file}"
-  fi
+  case "${__bs_pm_rcf}" in
+    */conf.d/bs.fish)
+      if ! grep -q '[^[:space:]]' -- "${__bs_pm_rcf}" 2>/dev/null; then
+        rm -f -- "${__bs_pm_rcf}"
+        printf "Удалён пустой файл %s\n" "${__bs_pm_rcf}"
+      fi ;;
+  esac
   return 0
 }
 
@@ -136,16 +150,15 @@ remove_path_entry() {
 # Remove the PATH line from the rc files of ALL known shells (each in its own
 # syntax). Needed on uninstall: the user may have changed the shell since the
 # install. Shared files (~/.profile of dash/ash/ksh) are handled once.
-remove_path_entries_all() {
-  local fam rc line key
-  local -A done_keys=()
-  for fam in bash zsh sh ksh osh fish nu; do
-    rc="$(bs_shell_rc_file "${fam}")" || continue
-    line="$(path_manager_line "${fam}")"
-    key="${rc}|${line}"
-    [[ -z "${done_keys[${key}]:-}" ]] || continue
-    done_keys["${key}"]=1
-    remove_path_entry "${rc}" "${line}" || true
+bs_remove_path_entries_all() {
+  bs_map_clear bs_pm_done
+  for __bs_pm_efam in bash zsh sh ksh osh fish nu; do
+    __bs_pm_erc=$(bs_shell_rc_file "${__bs_pm_efam}") || continue
+    __bs_pm_eline=$(bs_path_manager_line "${__bs_pm_efam}")
+    __bs_pm_ekey="${__bs_pm_erc}|${__bs_pm_eline}"
+    if bs_map_has bs_pm_done "${__bs_pm_ekey}"; then continue; fi
+    bs_map_set bs_pm_done "${__bs_pm_ekey}" 1
+    bs_remove_path_entry "${__bs_pm_erc}" "${__bs_pm_eline}" || true
   done
   return 0
 }
@@ -155,52 +168,59 @@ remove_path_entries_all() {
 # Auto-setup targets: "family<TAB>rc file". The user's shell (the file is
 # created if missing) and the bash and zsh rc files that already exist (as it
 # always was).
-path_manager_targets() {
-  local user fam rc
-  local -A seen=()
-  user="$(install_user_shell)"
-  if bs_shell_known "${user}"; then
-    rc="$(bs_shell_rc_file "${user}")"
-    seen["${rc}"]=1
-    printf '%s\t%s\n' "${user}" "${rc}"
+bs_path_manager_targets() {
+  bs_map_clear bs_pm_seen
+  __bs_pm_tuser=$(bs_install_user_shell)
+  if bs_shell_known "${__bs_pm_tuser}"; then
+    __bs_pm_trc=$(bs_shell_rc_file "${__bs_pm_tuser}")
+    bs_map_set bs_pm_seen "${__bs_pm_trc}" 1
+    printf '%s\t%s\n' "${__bs_pm_tuser}" "${__bs_pm_trc}"
   fi
-  for fam in bash zsh; do
-    rc="$(bs_shell_rc_file "${fam}")"
-    [[ -f "${rc}" && -z "${seen[${rc}]:-}" ]] || continue
-    seen["${rc}"]=1
-    printf '%s\t%s\n' "${fam}" "${rc}"
+  for __bs_pm_tfam in bash zsh; do
+    __bs_pm_trc=$(bs_shell_rc_file "${__bs_pm_tfam}")
+    if [ -f "${__bs_pm_trc}" ] && ! bs_map_has bs_pm_seen "${__bs_pm_trc}"; then
+      bs_map_set bs_pm_seen "${__bs_pm_trc}" 1
+      printf '%s\t%s\n' "${__bs_pm_tfam}" "${__bs_pm_trc}"
+    fi
   done
 }
 
 # Auto add PATH for the user's shell (idempotent)
-auto_update_path() {
-  local user reload fam rc
-  user="$(install_user_shell)"
+bs_auto_update_path() {
+  __bs_pm_user=$(bs_install_user_shell)
 
   # Авто-настройка пишет строку с $HOME/.local/bin. Для другого BIN_DIR она
   # была бы неверной (и её не снял бы uninstall) — объясняем и отдаём подсказку.
   # The auto setup writes a $HOME/.local/bin line. For another BIN_DIR it
   # would be wrong (and uninstall would not remove it) — explain and hint.
-  if [[ "${BIN_DIR}" != "${HOME}/.local/bin" ]]; then
-    install_box "АВТО-НАСТРОЙКА PATH НЕ ВЫПОЛНЕНА / PATH AUTO-SETUP SKIPPED" \
+  if [ "${BIN_DIR}" != "${HOME}/.local/bin" ]; then
+    bs_install_box "АВТО-НАСТРОЙКА PATH НЕ ВЫПОЛНЕНА / PATH AUTO-SETUP SKIPPED" \
       "• BIN_DIR=${BIN_DIR} — не стандартный ~/.local/bin / is not the standard ~/.local/bin" \
       "Авто-настройка знает только ~/.local/bin; rc-файлы не изменены / The auto setup knows only ~/.local/bin; rc files are untouched"
-    if ! install_in_path "${BIN_DIR}"; then
-      print_path_hint
+    if ! bs_install_in_path "${BIN_DIR}"; then
+      bs_print_path_hint
     fi
     return 0
   fi
 
-  if ! bs_shell_known "${user}"; then
-    install_box "ОБОЛОЧКА НЕ РАСПОЗНАНА / SHELL NOT RECOGNISED" \
-      "• оболочка '${user}' не известна установщику / the shell '${user}' is not known to the installer" \
+  if ! bs_shell_known "${__bs_pm_user}"; then
+    bs_install_box "ОБОЛОЧКА НЕ РАСПОЗНАНА / SHELL NOT RECOGNISED" \
+      "• оболочка '${__bs_pm_user}' не известна установщику / the shell '${__bs_pm_user}' is not known to the installer" \
       "PATH настроен для bash и zsh (если их rc-файлы есть); для вашей оболочки добавьте ${BIN_DIR} в PATH сами / PATH is set for bash and zsh (when their rc files exist); add ${BIN_DIR} to PATH in your shell yourself"
   fi
 
-  while IFS=$'\t' read -r fam rc; do
-    [[ -n "${fam}" ]] || continue
-    path_manager_add_for "${fam}" "${rc}"
-  done < <(path_manager_targets)
+  # Цели собираются заранее: цикл читает их из here-document в ТЕКУЩЕЙ оболочке.
+  # The targets are collected first: the loop reads them from a here-document in the CURRENT shell.
+  __bs_pm_targets=$(bs_path_manager_targets)
+  __bs_pm_tab=$(printf '\t')
+  if [ -n "${__bs_pm_targets}" ]; then
+    while IFS="${__bs_pm_tab}" read -r __bs_pm_tfam2 __bs_pm_trc2; do
+      if [ -z "${__bs_pm_tfam2}" ]; then continue; fi
+      bs_path_manager_add_for "${__bs_pm_tfam2}" "${__bs_pm_trc2}"
+    done <<EOF
+${__bs_pm_targets}
+EOF
+  fi
 
   # Установщик — дочерний процесс и не может изменить PATH запустившей его
   # оболочки: rc-файл подхватит только новый терминал. Подсказываем команду
@@ -208,11 +228,10 @@ auto_update_path() {
   # The installer is a child process and cannot change the PATH of the shell
   # that started it: only a new terminal reads the rc file. Hint the command
   # for the current one.
-  if ! install_in_path "${BIN_DIR}" && bs_shell_known "${user}"; then
-    reload="$(bs_shell_reload_hint "${user}")"
-    local login_bin flags
-    login_bin="$(bs_shell_login_path)"
-    flags="$(bs_shell_fresh_flags "${user}")"
+  if ! bs_install_in_path "${BIN_DIR}" && bs_shell_known "${__bs_pm_user}"; then
+    __bs_pm_reload=$(bs_shell_reload_hint "${__bs_pm_user}")
+    __bs_pm_login=$(bs_shell_login_path)
+    __bs_pm_flags=$(bs_shell_fresh_flags "${__bs_pm_user}")
 
     # В терминале применяем сами: заменяем установщик новой оболочкой
     # пользователя — она читает rc-файл, как при source. Сделать source в
@@ -222,18 +241,18 @@ auto_update_path() {
     # user shell — it reads the rc file, just like source would. A child
     # process cannot source into the shell that is already running. Only when
     # the login shell is exactly the shell we wrote the PATH for.
-    if [[ -t 0 && -t 1 && -x "${login_bin}" \
-          && "$(bs_shell_of_name "${login_bin}")" == "${user}" ]]; then
-      log::header "PATH ПРИМЕНЁН / PATH APPLIED"
-      log::success "выполнено: ${reload} — запущена новая оболочка ${user}, bs доступен"
-      log::success "done: ${reload} — a fresh ${user} is started, bs is available"
-      log::info "exit — вернуться в прежнюю оболочку / back to the previous shell"
+    if [ -t 0 ] && [ -t 1 ] && [ -x "${__bs_pm_login}" ] \
+       && [ "$(bs_shell_of_name "${__bs_pm_login}")" = "${__bs_pm_user}" ]; then
+      bs_log_header "PATH ПРИМЕНЁН / PATH APPLIED"
+      bs_log_success "выполнено: ${__bs_pm_reload} — запущена новая оболочка ${__bs_pm_user}, bs доступен"
+      bs_log_success "done: ${__bs_pm_reload} — a fresh ${__bs_pm_user} is started, bs is available"
+      bs_log_info "exit — вернуться в прежнюю оболочку / back to the previous shell"
       # shellcheck disable=SC2086  # flags — либо пусто, либо один флаг
-      exec "${login_bin}" ${flags}
+      exec "${__bs_pm_login}" ${__bs_pm_flags}
     fi
 
     printf "\nВ ЭТОМ терминале bs появится после / In THIS terminal run:\n"
-    printf "  %s\n" "${reload}"
+    printf "  %s\n" "${__bs_pm_reload}"
     printf "или откройте новый терминал / or open a new terminal.\n"
   fi
 }
@@ -244,34 +263,46 @@ auto_update_path() {
 # Add the PATH line for family $1 to rc file $2. For nushell the file is not
 # created: a bare env.nu would keep nu from creating its own configuration —
 # the exact line is printed instead.
-path_manager_add_for() {
-  local -r fam="$1" rc="$2"
-  local line
-  line="$(path_manager_line "${fam}")"
-  if ! bs_shell_rc_create_ok "${fam}" && [[ ! -f "${rc}" ]]; then
+bs_path_manager_add_for() {
+  __bs_pm_afam=$1
+  __bs_pm_arc=$2
+  __bs_pm_aline=$(bs_path_manager_line "${__bs_pm_afam}")
+  if ! bs_shell_rc_create_ok "${__bs_pm_afam}" && [ ! -f "${__bs_pm_arc}" ]; then
     printf "ВНИМАНИЕ: %s не существует — nushell не настроен; добавьте строку сами:\nNOTE: %s does not exist — nushell is not set up; add the line yourself:\n  %s\n" \
-      "${rc}" "${rc}" "${line}"
+      "${__bs_pm_arc}" "${__bs_pm_arc}" "${__bs_pm_aline}"
     return 0
   fi
-  path_manager_add_line "${rc}" "${line}"
+  bs_path_manager_add_line "${__bs_pm_arc}" "${__bs_pm_aline}"
 }
 
 # Добавить строку PATH в rc-файл $1 (идемпотентно, только точное совпадение
 # строки). Нельзя записать — объясняем и не обрываем установку.
 # Add the PATH line $2 to rc file $1 (idempotent, exact line match only).
 # If it cannot be written, explain instead of aborting the install.
-path_manager_add_line() {
-  local -r rc="$1" line="$2"
-  if utils::quiet_err grep -Fqx "${line}" "${rc}"; then
-    printf "PATH уже настроен в %s\n" "${rc}"
+bs_path_manager_add_line() {
+  __bs_pm_lrc=$1
+  __bs_pm_lline=$2
+  if bs_utils_quiet_err grep -Fqx "${__bs_pm_lline}" "${__bs_pm_lrc}"; then
+    printf "PATH уже настроен в %s\n" "${__bs_pm_lrc}"
     return 0
   fi
-  if mkdir -p -- "$(dirname -- "${rc}")" 2>/dev/null \
-     && printf "\n%s\n" "${line}" >> "${rc}" 2>/dev/null; then
-    printf "Автоматически добавлено ~/.local/bin в PATH в %s\n" "${rc}"
+  if mkdir -p -- "$(dirname -- "${__bs_pm_lrc}")" 2>/dev/null \
+     && printf "\n%s\n" "${__bs_pm_lline}" >> "${__bs_pm_lrc}" 2>/dev/null; then
+    printf "Автоматически добавлено ~/.local/bin в PATH в %s\n" "${__bs_pm_lrc}"
   else
     printf "ВНИМАНИЕ: не удалось записать в %s (нет прав?). Добавьте строку вручную:\nNOTE: cannot write to %s (read-only?). Add the line by hand:\n  %s\n" \
-      "${rc}" "${rc}" "${line}"
+      "${__bs_pm_lrc}" "${__bs_pm_lrc}" "${__bs_pm_lline}"
   fi
   return 0
 }
+
+bs_shell_alias bs_confirm confirm
+bs_shell_alias bs_install_user_shell install_user_shell
+bs_shell_alias bs_path_manager_line path_manager_line
+bs_shell_alias bs_print_path_hint print_path_hint
+bs_shell_alias bs_remove_path_entry remove_path_entry
+bs_shell_alias bs_remove_path_entries_all remove_path_entries_all
+bs_shell_alias bs_path_manager_targets path_manager_targets
+bs_shell_alias bs_auto_update_path auto_update_path
+bs_shell_alias bs_path_manager_add_for path_manager_add_for
+bs_shell_alias bs_path_manager_add_line path_manager_add_line
