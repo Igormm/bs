@@ -7,7 +7,7 @@ whenToUse: When writing or changing anything that touches the shell — an insta
 
 # Переносимость между оболочками / Shell portability
 
-Ядро BS делится на **два яруса**: `@shell posix` (12 файлов `core/` и слой `bootstrap/` —
+Ядро BS делится на **два яруса**: `@shell posix` (16 файлов `core/` и слой `bootstrap/` —
 работают в bash, zsh, dash, busybox ash, ksh93, mksh) и `@shell bash4` (остальное,
 требует bash 4.2+). Яруса bash4 не надо «лечить»: на ассоциативных массивах,
 namerefs и `[[ =~ ]]` стоят сотни функций; для ядра эти конструкции заменяются слоем `core/data.sh` и переводятся по плану (см. `bs-shell-abstraction`), а `lib/` остаётся bash.
@@ -45,7 +45,7 @@ ksh, mksh.
 
 * `@shell posix` — файл валиден как POSIX sh: его подключат dash, ash/busybox,
   bash, zsh, ksh, mksh. Сейчас: `bootstrap/shell.sh`, `trampoline.sh`, `shebang.sh`;
-  `core/prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`. **bash в этом ярусе не
+  `core/prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `var`, `str`, `num`, `msg`. **bash в этом ярусе не
   участвует** — это проверяет `.agents/skills/bs-shell-abstraction/scripts/check_posix_tier.sh`
   (разбор в не-bash оболочках, запрет bash-конструкций, запуск в dash без bash в PATH).
   Стиль кода яруса — `documentation/*/code-style-guide.md`, раздел 12.
@@ -96,7 +96,7 @@ namerefs, `mapfile`, `${!x}`, `BASH_REMATCH` — это `@shell bash4` с опи
 модуль доступен через `bs` (hosted) и `bs call`. В POSIX переводят то, что (а) должно
 работать ДО bash — пролог, трамплин, реестр, шебанг; или (б) нужно скриптам на других
 оболочках и не держится на bash-конструкциях — `quiet`, `version`, `const`, `guard`,
-`prereq`; очередь: `config`, `lang`, `args` (`calc`, `quiet`, `fmt`, `logger`, `data`, `utils`, `deps`, `errorhandler` готовы). Перевод — по навыку `bs-kernel-code`, отдельный
+`prereq`; очередь: `config`, `lang`, `args` (`calc`, `quiet`, `fmt`, `logger`, `data`, `utils`, `deps`, `errorhandler`, `var`, `str`, `num`, `msg` готовы). Перевод — по навыку `bs-kernel-code`, отдельный
 коммит: код, тест в шести оболочках, `check_posix_tier.sh`, строка в документации.
 
 ## 5. Порядок работы / Workflow

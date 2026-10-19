@@ -3,7 +3,7 @@
 # Переносимость между оболочками
 
 **BS требует bash 4.2+.** На bash написаны вся `lib/` (87 модулей, ни один не POSIX) и 3 из
-15 файлов ядра; от bash не зависят только 12 небольших файлов ядра `@shell posix` и пролог точек
+19 файлов ядра; от bash не зависят только 16 небольших файлов ядра `@shell posix` и пролог точек
 входа. «Работает из большинства оболочек» значит: `bs` и `install.sh` можно запустить из любой
 оболочки (они перезапускаются в bash), функции ядра вызываются из любой оболочки через
 `bs call`, а POSIX-файлы подключаются напрямую. Эта
@@ -229,6 +229,13 @@ busybox ash, ksh93 и mksh (`unit/testquietportableunit.sh`).
 
 `core/errorhandler.sh` (`@shell posix`, фаза 2) — `bs_cleanup_add/run_all`, `bs_on_exit`, `bs_errorhandler_*`, `bs_error_*`, `bs_signal_on/ignore/reset`, `bs_exit` (число или имя кода, проверяется до `eval`), `bs_function_exists`. Стек очистки — массив слоя данных `bs_cleanup_stack`, обработчики — словарь `bs_error_handlers`. Проверено в шести оболочках (`unit/testerrorhandlerportableunit.sh`, 248 проверок); найдено тестами: `command -v` отсутствующей команды даёт 127 в dash и ash, поэтому `bs_utils_has` и `bs_function_exists` возвращают ровно 1.
 
+`core/var.sh`, `core/str.sh`, `core/num.sh`, `core/msg.sh` (`@shell posix`) — базовые абстракции ядра: то, что копировалось из файла в файл, теперь живёт в одном месте, у каждой группы своё пространство и свой переносимый тест. Грузятся сразу после `core/const`, кроме оболочки ничего не используют; прежних имён с `::` у них нет, поэтому псевдонимов нет.
+- `bs_var_*` — переменные по имени: `is_name`, `is_set`, `is_readonly` (проба в подоболочке: присваивание readonly-переменной завершает неинтерактивную оболочку во всех оболочках, которые мы запускали), `get` (в stdout или в переменную), `set`, `unset`, `default`, `append`. Имя проверяется до каждого `eval`; имена на `__bs_var_` зарезервированы. 147 проверок в шести оболочках (`unit/testvarportableunit.sh`).
+- `bs_str_*` — `upper`, `lower`, `trim`, `ltrim`, `rtrim`, `replace` (ДОСЛОВНАЯ подстрока), `contains`, `starts_with`, `ends_with`, `repeat`, `join` (не зависит от `IFS`), `before`, `after`. Имена `str::upper` … `str::repeat` принадлежат `core/lang.sh` (bash, шаблон замены — glob) и остаются как есть: псевдонимы не создаются, тест проверяет, что `str::replace` не подменён. Длины и дополнения до ширины намеренно нет: `${#s}` считает байты в dash и mksh и символы в остальных. 238 проверок (`unit/teststrportableunit.sh`).
+- `bs_num_*` — целые до 15 цифр через `awk`, а не `$(( ))`: `is_uint`, `is_int`, `dec` (`007` → `7`), `add`, `sub`, `mul`, `div`, `mod`, `cmp`. Вход или результат за пределом — статус 1, деление на ноль — 2. Совпадает с `$(( ))` bash на 300 случайных парах в dash, ksh, zsh, bash и ash (и на 120 в mksh: первый прогон испортил его собственный 32-битный генератор — та самая ловушка, ради которой модуль и нужен). 117 проверок (`unit/testnumportableunit.sh`).
+- `bs_msg_*` — сообщения модулей: `error`, `warn`, `info` через логгер, если он загружен, иначе `УРОВЕНЬ: текст` в stderr (info — в stdout); `fail` возвращает `E_ERROR`, `invalid ФУНКЦИЯ текст` — `E_INVALID`; ни одна не завершает скрипт. 93 проверки (`unit/testmsgportableunit.sh`).
+Существующий код со своими копиями этих помощников (`bs_data_check`, `bs_utils_error`, `bs_calc_log`, вызовы `tr` в `prereq` и `errorhandler`, `bs_log_replace_all`) пока не менялся: перевод на новые модули — отдельный шаг на каждый файл.
+
 ## Пространство имён `bs_`
 
 Весь код ядра (`bootstrap/`, `core/`, `install/`, точки входа) живёт в **одном** пространстве имён: настоящая функция называется `bs_` + имя через `::`, где `::` заменено на `_` (`utils::has` ↔ `bs_utils_has`, `log::info` ↔ `bs_log_info`, `bs::version::get` ↔ `bs_version_get`). Прежние имена с `::` остаются псевдонимами для bash и zsh (их создаёт `bs_shell_alias`), поэтому 87 модулей `lib/` и все скрипты работают без правок. Правило проверяет `check_posix_tier.sh`: функция вне `bs_`/`__bs_` или определённая с `::` — нарушение. Приватные функции теряют ведущие `__` (`log::__timestamp` ↔ `bs_log_timestamp`); временные переменные внутри — `__bs_<модуль>_…`.
@@ -249,7 +256,7 @@ busybox ash, ksh93 и mksh (`unit/testquietportableunit.sh`).
 
 ## Курс на независимость от оболочки
 
-Цель — чтобы `bootstrap/`, `core/`, `install/`, `boot.sh`, `bs` и `install.sh` жили в одном пространстве имён `bs_*` и не зависели от оболочки. Состояние: готово 12 из 15 файлов `core/` (`prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`), слой оболочек и шебанга в `bootstrap/` и пролог точек входа. Дальше: `config` (`BS_CONFIG` на `bs_map_*`), `lang`, `args`, затем `init.sh`, `loader.sh`, команды `bs::cli::*`, `install/*`, и в конце точки входа. До тех пор BS требует bash 4.2+ (см. начало страницы).
+Цель — чтобы `bootstrap/`, `core/`, `install/`, `boot.sh`, `bs` и `install.sh` жили в одном пространстве имён `bs_*` и не зависели от оболочки. Состояние: готово 16 из 19 файлов `core/` (`prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`), слой оболочек и шебанга в `bootstrap/` и пролог точек входа. Дальше: `config` (`BS_CONFIG` на `bs_map_*`), `lang`, `args`, затем `init.sh`, `loader.sh`, команды `bs::cli::*`, `install/*`, и в конце точки входа. До тех пор BS требует bash 4.2+ (см. начало страницы).
 
 ## Не сделано
 

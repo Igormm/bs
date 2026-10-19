@@ -2,8 +2,8 @@
 
 # Shell portability
 
-**BS requires bash 4.2+.** All of `lib/` (87 modules, none of them POSIX) and 3 of the 15 kernel
-files are written in bash; only 12 small `@shell posix` kernel files and the prologue of the entry
+**BS requires bash 4.2+.** All of `lib/` (87 modules, none of them POSIX) and 3 of the 19 kernel
+files are written in bash; only 16 small `@shell posix` kernel files and the prologue of the entry
 points do not depend on it. "Usable from most shells" means: `bs` and `install.sh` can be started
 from any shell (they re-run in bash), kernel functions are called from any shell with `bs call`,
 and the POSIX files are sourced directly. This page is the
@@ -230,6 +230,13 @@ header gets a wider frame in those shells.
 
 `core/errorhandler.sh` (`@shell posix`, phase 2) — `bs_cleanup_add/run_all`, `bs_on_exit`, `bs_errorhandler_*`, `bs_error_*`, `bs_signal_on/ignore/reset`, `bs_exit` (a number or a code name, checked before `eval`), `bs_function_exists`. The cleanup stack is the data-layer array `bs_cleanup_stack` and the handlers are the map `bs_error_handlers`. Verified in six shells (`unit/testerrorhandlerportableunit.sh`, 248 checks); found by the tests: `command -v` of a missing command returns 127 in dash and ash, so `bs_utils_has` and `bs_function_exists` return exactly 1.
 
+`core/var.sh`, `core/str.sh`, `core/num.sh`, `core/msg.sh` (`@shell posix`) — the base abstractions of the kernel: what used to be copied from file to file now lives in one place, each in its own namespace and with its own portable test. They load right after `core/const` and use nothing but the shell; they have no old `::` names, so no aliases.
+- `bs_var_*` — variables by name: `is_name`, `is_set`, `is_readonly` (probed in a subshell: assigning to a read-only variable ends a non-interactive shell in every shell we run), `get` (to stdout or into a variable), `set`, `unset`, `default`, `append`. The name is checked before every `eval`; names starting with `__bs_var_` are reserved. 147 checks in six shells (`unit/testvarportableunit.sh`).
+- `bs_str_*` — `upper`, `lower`, `trim`, `ltrim`, `rtrim`, `replace` (a LITERAL substring), `contains`, `starts_with`, `ends_with`, `repeat`, `join` (independent of `IFS`), `before`, `after`. The names `str::upper` … `str::repeat` belong to `core/lang.sh` (bash, the replace pattern is a glob) and stay as they are: no aliases are made, a test checks that `str::replace` is not overridden. Length and padding are deliberately absent: `${#s}` counts bytes in dash and mksh and characters elsewhere. 238 checks (`unit/teststrportableunit.sh`).
+- `bs_num_*` — integers up to 15 digits through `awk`, not `$(( ))`: `is_uint`, `is_int`, `dec` (`007` → `7`), `add`, `sub`, `mul`, `div`, `mod`, `cmp`. An input or result beyond the limit is status 1, a division by zero is 2. Equal to bash `$(( ))` on 300 random pairs in dash, ksh, zsh, bash and ash (and on 120 in mksh: its own 32-bit generator spoiled the first run — the same trap the module exists for). 117 checks (`unit/testnumportableunit.sh`).
+- `bs_msg_*` — module messages: `error`, `warn`, `info` through the logger when it is loaded, otherwise `LEVEL: text` to stderr (info to stdout); `fail` returns `E_ERROR`, `invalid FUNCTION text` returns `E_INVALID`; none of them ends the script. 93 checks (`unit/testmsgportableunit.sh`).
+The existing code that has its own copy of these helpers (`bs_data_check`, `bs_utils_error`, `bs_calc_log`, the `tr` calls in `prereq` and `errorhandler`, `bs_log_replace_all`) is not changed yet: moving it onto the new modules is a separate step per file.
+
 ## The `bs_` namespace
 
 All kernel code (`bootstrap/`, `core/`, `install/`, the entry points) lives in **one** namespace: the real function is named `bs_` + the `::` name with `::` turned into `_` (`utils::has` ↔ `bs_utils_has`, `log::info` ↔ `bs_log_info`, `bs::version::get` ↔ `bs_version_get`). The old `::` names stay as aliases for bash and zsh (made by `bs_shell_alias`), so the 87 modules of `lib/` and every script work without changes. `check_posix_tier.sh` checks the rule: a function outside `bs_`/`__bs_` or defined with `::` is a violation. Private functions lose the leading `__` (`log::__timestamp` ↔ `bs_log_timestamp`); temporaries inside are `__bs_<module>_…`.
@@ -250,7 +257,7 @@ Worth knowing: functions that change state and return a value (`bs_arr_pop`, `bs
 
 ## Heading for shell independence
 
-The goal is for `bootstrap/`, `core/`, `install/`, `boot.sh`, `bs` and `install.sh` to live in one namespace `bs_*` and be shell-independent. State: 12 of the 15 `core/` files are done (`prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`), plus the shell and shebang layer in `bootstrap/` and the prologue of the entry points. Next: `config` (`BS_CONFIG` on `bs_map_*`), `lang`, `args`, then `init.sh`, `loader.sh`, the `bs::cli::*` commands, `install/*`, and finally the entry points. Until then BS requires bash 4.2+ (see the top of this page).
+The goal is for `bootstrap/`, `core/`, `install/`, `boot.sh`, `bs` and `install.sh` to live in one namespace `bs_*` and be shell-independent. State: 16 of the 19 `core/` files are done (`prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`), plus the shell and shebang layer in `bootstrap/` and the prologue of the entry points. Next: `config` (`BS_CONFIG` on `bs_map_*`), `lang`, `args`, then `init.sh`, `loader.sh`, the `bs::cli::*` commands, `install/*`, and finally the entry points. Until then BS requires bash 4.2+ (see the top of this page).
 
 ## Not done yet
 

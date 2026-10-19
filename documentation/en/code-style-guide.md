@@ -737,6 +737,8 @@ Dependencies go through `bs_source_relative "file.sh" …` (paths from the direc
 
 ### 12.7 Constructs: allowed and forbidden
 
+Before you write a helper by hand look at the base modules: `bs_var_*` (variables by name, checked names), `bs_str_*` (case, trim, literal replace, join), `bs_num_*` (exact integers), `bs_msg_*` (messages with a logger-less fallback), `bs_arr_*`/`bs_map_*` (data). Duplicating them is how the kernel grew five copies of the same name check.
+
 Allowed: `case`, `[ ]`/`test`, the expansions `${v#p}`, `${v%p}`, `${v:-d}`, `${v-}`, `${v:?}`, `$(( ))` on small integers, `$( )`, `command -v`, `printf`, `while read -r`, `for x in list`, `. file`, heredocs, `trap` (inside a function), `eval` (see §12.10).
 
 | Do not write | Write | Why (verified) |

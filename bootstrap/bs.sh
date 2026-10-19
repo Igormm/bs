@@ -671,7 +671,7 @@ bs::cli::doctor_cmd() {
   # повторная проверка не нужна.
 
   # Required core files / Обязательные файлы ядра
-  local req=(bootstrap/init.sh bootstrap/loader.sh bootstrap/bs.sh bootstrap/shell.sh bootstrap/trampoline.sh core/prereq.sh core/lang.sh core/const.sh core/logger.sh core/errorhandler.sh core/version.sh core/quiet.sh core/fmt.sh core/data.sh core/utils.sh core/config.sh core/deps.sh core/calc.sh)
+  local req=(bootstrap/init.sh bootstrap/loader.sh bootstrap/bs.sh bootstrap/shell.sh bootstrap/trampoline.sh core/prereq.sh core/lang.sh core/const.sh core/var.sh core/str.sh core/num.sh core/msg.sh core/logger.sh core/errorhandler.sh core/version.sh core/quiet.sh core/fmt.sh core/data.sh core/utils.sh core/config.sh core/deps.sh core/calc.sh)
   local f
   for f in "${req[@]}"; do
     if is::file "${BS_ROOT}/${f}"; then
