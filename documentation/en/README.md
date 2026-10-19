@@ -1,8 +1,8 @@
 # BS Documentation
 
-**BS** is a modular framework and standard library written in **Bash 4.2+** (all of `lib/` and 2 of the 15 kernel files, plus the CLI `bootstrap/bs.sh`, the loader and the installer are bash; the 13 `@shell posix` kernel files run in any shell):
-a module loader, logging, error handling, declarative script arguments,
-an I/O streams abstraction and a set of system modules.
+**BS** is a modular framework and standard library for **Bash 4.2+**: a module loader, logging, error handling, declarative script parameters, an I/O streams abstraction and a set of system modules. One code style, zero external dependencies.
+
+**BS requires bash 4.2+.** All of `lib/` is written in bash. The `core/` kernel is moving to POSIX: 13 of 15 files already run in any shell; `lang` and `args` stay on bash, as do the CLI, the loader and the installer.
 
 Русская версия: [documentation/ru/](../ru/README.md)
 
