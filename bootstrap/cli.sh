@@ -7,11 +7,11 @@
 # bootstrap/cli.sh — the bs commands that run in any shell (the POSIX part of bs::cli::*)
 #
 # Остальные команды (lang-doc, lsp, chat, api, ts, audit, doctor, build, rfc, run, update,
-# uninstall, where, init-shell, shebang, call, repl) пока в bootstrap/bs.sh на bash; в оболочке
+# uninstall, where, repl) пока в bootstrap/bs.sh на bash; в оболочке
 # без bash bs_cli_delegate отвечает, что команде нужен bash. Тела функций вызывают ядро и
 # выполняются только после его загрузки.
 # The other commands (lang-doc, lsp, chat, api, ts, audit, doctor, build, rfc, run, update,
-# uninstall, where, init-shell, shebang, call, repl) are still in bootstrap/bs.sh in bash; in a
+# uninstall, where, repl) are still in bootstrap/bs.sh in bash; in a
 # shell without bash bs_cli_delegate answers that the command needs bash. The function bodies call
 # the kernel and run only after it is loaded.
 #
@@ -19,7 +19,7 @@
 #   Real functions: bs_cli_die, bs_cli_need_bash, bs_cli_delegate, bs_cli_help, bs_cli_help_cmd,
 #   bs_cli_short_sha, bs_cli_install_info_get, bs_cli_update_manifest_valid,
 #   bs_cli_bs_full_info_lines, bs_cli_bs_running_block, bs_cli_version_cmd, bs_cli_env_cmd,
-#   bs_cli_list_cmd; in bash and zsh also bs::cli::die, bs::cli::help, … (the old names).
+#   bs_cli_list_cmd, bs_cli_init_shell_*, bs_cli_shebang_*, bs_cli_call_*; in bash and zsh also bs::cli::die, bs::cli::help, … (the old names).
 #   Настоящие функции — bs_cli_*; в bash и zsh — ещё и прежние bs::cli::die, bs::cli::help, …
 
 # Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
@@ -139,9 +139,9 @@ bs_cli_help_cmd() {
     update|sync)    bs_cli_delegate update bs::cli::update_cmd --help ;;
     uninstall)      bs_cli_delegate uninstall bs::cli::uninstall_cmd --help ;;
     where)          bs_cli_delegate where bs::cli::where_cmd --help ;;
-    init-shell)     bs_cli_delegate init-shell bs::cli::init_shell_usage ;;
-    shebang)        bs_cli_delegate shebang bs::cli::shebang_usage ;;
-    call)           bs_cli_delegate call bs::cli::call_usage ;;
+    init-shell)     bs_cli_init_shell_usage ;;
+    shebang)        bs_cli_shebang_usage ;;
+    call)           bs_cli_call_usage ;;
     rfc)            bs_cli_delegate rfc bs::cli::rfc_cmd --help ;;
     *)              bs_cli_die "help: unknown command: ${__bs_cli_hc}" ;;
   esac
@@ -291,6 +291,288 @@ LIST_END
   printf '%d modules\n' "${__bs_cli_lc}"
 }
 
+# @private Каталог с командой bs для PATH: из манифеста (bin=), иначе рядом с
+# установкой (<prefix>/bin), иначе сам BS_ROOT (репозиторий с лаунчером bs).
+# Для ~/.local/bin возвращается буквальный $HOME/.local/bin — как в установщике.
+# @private The directory with the bs command for PATH: from the manifest
+# (bin=), else next to the install (<prefix>/bin), else BS_ROOT itself (a
+# repository with the bs launcher). ~/.local/bin is returned as a literal
+# $HOME/.local/bin — as the installer writes it.
+bs_cli_init_shell_bin_dir() {
+  __bs_cli_ib=$(bs_cli_install_info_get "${BS_ROOT}" bin)
+  if [ -n "${__bs_cli_ib}" ]; then
+    __bs_cli_id=$(dirname -- "${__bs_cli_ib}")
+  elif [ -f "${BS_ROOT%/lib/bs}/bin/bs" ]; then
+    __bs_cli_id="${BS_ROOT%/lib/bs}/bin"
+  else
+    __bs_cli_id="${BS_ROOT}"
+  fi
+  if [ "${__bs_cli_id}" = "${HOME}/.local/bin" ]; then
+    # shellcheck disable=SC2016  # $HOME должен попасть в rc-файл как текст / $HOME must reach the rc file as text
+    printf '%s' '$HOME/.local/bin'
+  else
+    printf '%s' "${__bs_cli_id}"
+  fi
+}
+
+bs_cli_init_shell_usage() {
+  printf 'Usage: bs init-shell [SHELL | --list]\n\n'
+  printf 'Print what to add to the rc file of your shell so that the bs command is found,\n'
+  printf 'in the syntax of that shell, and how to apply it in the current terminal.\n'
+  printf 'SHELL: bash zsh ash dash sh ksh mksh oksh osh fish nu (default: your shell).\n'
+  # «--» нужен: строка начинается с «--list», и printf принял бы её за свою опцию (прежняя версия печатала ошибку)
+  # «--» is needed: the string starts with "--list" and printf would take it for its own option (the old version printed an error)
+  printf -- '--list  show every known shell: rc file, reload command, BS tier.\n\n'
+  printf 'Tiers: native (bash 4.2+: library and commands), hosted (other shells: the bs\n'
+  printf 'command, run by a bash 4.2+), unsupported (no bash 4.2+ on the machine).\n'
+  printf 'Печатает, что добавить в rc-файл вашей оболочки, чтобы находилась команда bs,\n'
+  printf 'в синтаксисе этой оболочки, и как применить это в текущем терминале.\n'
+}
+
+bs_cli_init_shell_cmd() {
+  __bs_cli_ifam=""
+  __bs_cli_iarg=${1:-}
+  case "${__bs_cli_iarg}" in
+    -h|--help) bs_cli_init_shell_usage; return 0 ;;
+    --list)
+      printf '%-6s %-9s %-52s %s\n' "shell" "tier" "rc file" "reload"
+      for __bs_cli_if2 in bash zsh ash dash sh ksh mksh oksh osh fish nu; do
+        printf '%-6s %-9s %-52s %s\n' "${__bs_cli_if2}" "$(bs_shell_tier "${__bs_cli_if2}")" \
+          "$(bs_shell_rc_file "${__bs_cli_if2}")" "$(bs_shell_reload_hint "${__bs_cli_if2}")"
+      done
+      return 0 ;;
+    "") __bs_cli_ifam="$(bs_shell_user)" ;;
+    *)
+      __bs_cli_ifam="$(bs_shell_of_name "${__bs_cli_iarg}")"
+      if [ "${__bs_cli_ifam}" = "unknown" ]; then
+        bs_cli_die "init-shell: unknown shell: ${__bs_cli_iarg} (known: bash zsh ash dash sh ksh mksh oksh osh fish nu; see: bs init-shell --list)"
+      fi
+      ;;
+  esac
+  bs_shell_known "${__bs_cli_ifam}" \
+    || bs_cli_die "init-shell: no rc recipe for the shell '${__bs_cli_ifam}' (see: bs init-shell --list)"
+
+  __bs_cli_irc="$(bs_shell_rc_file "${__bs_cli_ifam}")"
+  __bs_cli_itier="$(bs_shell_tier "${__bs_cli_ifam}")"
+  __bs_cli_idir="$(bs_cli_init_shell_bin_dir)"
+  printf '# BS for %s (tier: %s) - add to %s\n' "${__bs_cli_ifam}" "${__bs_cli_itier}" "${__bs_cli_irc}"
+  if bs_shell_can_source "${__bs_cli_ifam}"; then
+    # Только bash 4.2+ может подключить BS как библиотеку (source)
+    # Only bash 4.2+ can source BS as a library
+    printf 'export BS_ROOT="%s"\n' "${BS_ROOT}"
+    # shellcheck disable=SC2016  # ${BS_ROOT} раскроет rc-файл, не мы
+    printf 'source "${BS_ROOT}/bootstrap/init.sh"\n'
+  fi
+  bs_shell_path_line "${__bs_cli_ifam}" "${__bs_cli_idir}"
+  printf '# apply in this terminal: %s\n' "$(bs_shell_reload_hint "${__bs_cli_ifam}")"
+  if ! bs_shell_can_source "${__bs_cli_ifam}"; then
+    printf '# %s\n' "$(bs_shell_tier_desc "${__bs_cli_itier}")"
+  fi
+}
+
+bs_cli_shebang_usage() {
+  printf 'Usage: bs shebang <command> [options]\n\n'
+  printf 'Manage the first line (#!) of scripts so that it works on THIS machine.\n'
+  # shellcheck disable=SC2016  # $PREFIX — текст справки / $PREFIX is help text
+  printf 'Termux has no /usr/bin/env: env lives in $PREFIX/bin/env.\n\n'
+  printf 'Commands:\n'
+  printf '  info                      this machine: env path, Termux, which modes work\n'
+  printf '  line [--mode M] [--prog P] print the shebang line for the mode\n'
+  printf '  check [PATH...]           does the shebang of each file work here (default: bs entry points)\n'
+  printf '  set [--mode M] [--prog P] [--dry-run] PATH...   rewrite the shebang of files / directories\n\n'
+  printf 'Modes: portable (#!/usr/bin/env P) | env (env found on this machine) | abs (full path of P) | auto (default)\n'
+  printf 'set rewrites only files whose shebang already starts P (default P=bs); exit 1 if check finds a broken file.\n'
+  printf 'Управляет первой строкой (#!) скриптов, чтобы она работала на ЭТОЙ машине.\n'
+  # shellcheck disable=SC2016  # $PREFIX — текст справки / $PREFIX is help text
+  printf 'В Termux нет /usr/bin/env: env лежит в $PREFIX/bin/env.\n'
+}
+
+# @private Files to look at: the arguments, directories expanded (shebang files only).
+bs_cli_shebang_files() {
+  for __bs_cli_sp in "$@"; do
+    case "${__bs_cli_sp}" in
+      -*) __bs_cli_sp="./${__bs_cli_sp}" ;;
+    esac
+    if [ -d "${__bs_cli_sp}" ]; then
+      find "${__bs_cli_sp}" -type f -not -path '*/.git/*' -print
+    elif [ -e "${__bs_cli_sp}" ]; then
+      printf '%s\n' "${__bs_cli_sp}"
+    else
+      printf 'bs shebang: no such file: %s\n' "${__bs_cli_sp}" >&2
+      return 1
+    fi
+  done
+}
+
+bs_cli_shebang_cmd() {
+  __bs_cli_ssub=${1:-}
+  case "${__bs_cli_ssub}" in
+    ""|-h|--help|help) bs_cli_shebang_usage; return 0 ;;
+  esac
+  shift
+  # shellcheck disable=SC1090,SC1091
+  . "${BS_BOOTSTRAP_DIR}/shebang.sh" || bs_cli_die "shebang: bootstrap/shebang.sh not found"
+
+  __bs_cli_smode="auto"
+  __bs_cli_sprog="bs"
+  __bs_cli_sdry=0
+  bs_arr_clear bs_cli_spaths
+  while [ $# -gt 0 ]; do
+    __bs_cli_sarg=$1
+    shift
+    case "${__bs_cli_sarg}" in
+      --mode=*) __bs_cli_smode="${__bs_cli_sarg#--mode=}" ;;
+      --mode)   __bs_cli_smode="${1:?--mode needs a value}"; shift ;;
+      --prog=*) __bs_cli_sprog="${__bs_cli_sarg#--prog=}" ;;
+      --prog)   __bs_cli_sprog="${1:?--prog needs a value}"; shift ;;
+      --dry-run) __bs_cli_sdry=1 ;;
+      -h|--help) bs_cli_shebang_usage; return 0 ;;
+      -*) bs_cli_die "shebang: unknown option: ${__bs_cli_sarg}" ;;
+      *) bs_arr_push bs_cli_spaths "${__bs_cli_sarg}" ;;
+    esac
+  done
+
+  __bs_cli_src=0
+  eval "$(bs_arr_to_args bs_cli_spaths)"
+  for __bs_cli_sp2 in "$@"; do
+    [ -e "${__bs_cli_sp2}" ] || bs_cli_die "shebang: no such file or directory: ${__bs_cli_sp2}"
+  done
+  case "${__bs_cli_ssub}" in
+    info)
+      __bs_cli_se="$(bs_shebang_env_path || true)"
+      printf 'termux:    %s\n' "$(bs_shebang_is_termux && echo yes || echo no)"
+      printf 'env:       %s\n' "${__bs_cli_se:-not found}"
+      printf '/usr/bin/env: %s\n' "$(if [ -x /usr/bin/env ]; then echo present; else echo absent; fi)"
+      for __bs_cli_sm in portable env abs; do
+        __bs_cli_sl="$(bs_shebang_line "${__bs_cli_sm}" "${__bs_cli_sprog}" 2>/dev/null || echo '-')"
+        printf '%-9s  %s\n' "${__bs_cli_sm}" "${__bs_cli_sl}"
+      done
+      printf 'auto:      %s\n' "$(bs_shebang_line auto "${__bs_cli_sprog}" 2>/dev/null || echo '-')"
+      ;;
+    line)
+      bs_shebang_line "${__bs_cli_smode}" "${__bs_cli_sprog}" || return 1
+      ;;
+    check)
+      if [ "$(bs_arr_len bs_cli_spaths)" -eq 0 ]; then
+        bs_arr_new bs_cli_spaths "${BS_ROOT}/bs" "${BS_ROOT}/install.sh" "${BS_ROOT}/boot.sh"
+      fi
+      eval "$(bs_arr_to_args bs_cli_spaths)"
+      __bs_cli_sfiles=$(bs_cli_shebang_files "$@") || true
+      if [ -n "${__bs_cli_sfiles}" ]; then
+        while IFS= read -r __bs_cli_sf; do
+          __bs_cli_sl="$(bs_shebang_read "${__bs_cli_sf}")" || continue
+          if __bs_cli_why="$(bs_shebang_works "${__bs_cli_sl}")"; then
+            printf 'ok      %s  %s\n' "${__bs_cli_sf}" "${__bs_cli_sl}"
+          else
+            printf 'BROKEN  %s  %s  (%s)\n' "${__bs_cli_sf}" "${__bs_cli_sl}" "${__bs_cli_why}"
+            __bs_cli_src=1
+          fi
+        done <<SHEBANG_END
+${__bs_cli_sfiles}
+SHEBANG_END
+      fi
+      if [ "${__bs_cli_src}" -ne 0 ]; then
+        printf 'fix: bs shebang set --prog <program> <file>  (Termux: install termux-exec, or use --mode env)\n' >&2
+      fi
+      return "${__bs_cli_src}"
+      ;;
+    set)
+      [ "$(bs_arr_len bs_cli_spaths)" -gt 0 ] || bs_cli_die "shebang set: give at least one file or directory"
+      __bs_cli_sn=0
+      __bs_cli_snew="$(bs_shebang_line "${__bs_cli_smode}" "${__bs_cli_sprog}")" || return 1
+      eval "$(bs_arr_to_args bs_cli_spaths)"
+      __bs_cli_sfiles=$(bs_cli_shebang_files "$@") || true
+      if [ -n "${__bs_cli_sfiles}" ]; then
+        while IFS= read -r __bs_cli_sf; do
+          __bs_cli_sl="$(bs_shebang_read "${__bs_cli_sf}")" || continue
+          bs_shebang_is_for "${__bs_cli_sl}" "${__bs_cli_sprog}" || continue
+          [ "${__bs_cli_sl}" = "${__bs_cli_snew}" ] && continue
+          if [ "${__bs_cli_sdry}" -eq 1 ]; then
+            printf 'would change  %s\n  %s\n  -> %s\n' "${__bs_cli_sf}" "${__bs_cli_sl}" "${__bs_cli_snew}"
+          else
+            bs_shebang_rewrite "${__bs_cli_sf}" "${__bs_cli_snew}" || { printf 'failed        %s\n' "${__bs_cli_sf}" >&2; __bs_cli_src=1; continue; }
+            printf 'changed       %s\n  %s\n  -> %s\n' "${__bs_cli_sf}" "${__bs_cli_sl}" "${__bs_cli_snew}"
+          fi
+          __bs_cli_sn=$((__bs_cli_sn + 1))
+        done <<SHEBANG_END
+${__bs_cli_sfiles}
+SHEBANG_END
+      fi
+      printf '%d file(s) %s\n' "${__bs_cli_sn}" "$(if [ "${__bs_cli_sdry}" -eq 1 ]; then echo 'would change'; else echo changed; fi)"
+      return "${__bs_cli_src}"
+      ;;
+    *) bs_cli_die "shebang: unknown command: ${__bs_cli_ssub} (see: bs shebang --help)" ;;
+  esac
+}
+
+bs_cli_call_usage() {
+  printf 'Usage: bs call [--load MODULE]... FUNCTION [ARGS...]\n\n'
+  printf 'Call a function of the BS kernel or of a library module from ANY shell\n'
+  printf '(dash, ash, ksh, fish, nushell, ...): the function runs in the bash that bs\n'
+  printf 'starts; its stdout and stderr are yours, its exit code becomes the exit code.\n\n'
+  printf '  --load MODULE   load lib/... or core/... first (repeat for several), e.g. lib/io/streams\n'
+  printf '  FUNCTION        a function that exists after loading: utils::human_size, log::info, ...\n\n'
+  printf 'Examples:\n'
+  printf '  bs call utils::human_size 1536000\n'
+  printf '  bs call --load lib/system/info system::info::os\n'
+  printf '  fish: set size (bs call utils::human_size 1536000)\n\n'
+  printf 'Exit: 0..255 of the function; 2 bad usage or name; 127 no such function.\n'
+  printf 'Вызывает функцию ядра или модуля BS из ЛЮБОЙ оболочки: функция исполняется в\n'
+  printf 'bash, который запускает bs; её stdout/stderr и код выхода становятся вашими.\n'
+}
+
+# @private Мост для оболочек без bash-синтаксиса (fish, nu, dash, ash, ksh): вызов функции
+# ядра как команды. Имя проверяется по шаблону и по тому, что функция существует, —
+# произвольная команда через мост не исполняется.
+# @private Bridge for shells without bash syntax: call a kernel function as a command.
+# The name is checked against a pattern and for being a defined function — an
+# arbitrary command does not run through the bridge.
+bs_cli_call_cmd() {
+  bs_arr_clear bs_cli_cmods
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -h|--help) bs_cli_call_usage; return 0 ;;
+      --load)    [ $# -ge 2 ] || { printf 'bs call: --load needs a module\n' >&2; return 2; }
+                 bs_arr_push bs_cli_cmods "$2"; shift 2 ;;
+      --load=*)  bs_arr_push bs_cli_cmods "${1#--load=}"; shift ;;
+      --)        shift; break ;;
+      -*)        printf 'bs call: unknown option: %s\n' "$1" >&2; return 2 ;;
+      *)         break ;;
+    esac
+  done
+  [ $# -ge 1 ] || { bs_cli_call_usage >&2; return 2; }
+  __bs_cli_cfn=$1
+  shift
+  # аргументы функции — в массив: позиционные параметры понадобятся для обхода модулей
+  # the function arguments go into an array: the positional parameters are needed to walk the modules
+  bs_arr_new bs_cli_cargs "$@"
+  eval "$(bs_arr_to_args bs_cli_cmods)"
+  for __bs_cli_cm in "$@"; do
+    case "${__bs_cli_cm}" in
+      core/?*|lib/?*) ;;
+      *) printf 'bs call: bad module path: %s\n' "${__bs_cli_cm}" >&2; return 2 ;;
+    esac
+    case "${__bs_cli_cm#*/}" in
+      *[!A-Za-z0-9_/.-]*|*..*) printf 'bs call: bad module path: %s\n' "${__bs_cli_cm}" >&2; return 2 ;;
+    esac
+    bs_load "${__bs_cli_cm}" || return 1
+  done
+  case "${__bs_cli_cfn}" in
+    ''|[!A-Za-z_]*|*[!A-Za-z0-9_:]*) printf 'bs call: bad function name: %s\n' "${__bs_cli_cfn}" >&2; return 2 ;;
+  esac
+  # только функция: `command -V` на английском (LC_ALL=C), в ответе должно быть слово function
+  # only a function: `command -V` in English (LC_ALL=C), the answer must contain the word function
+  __bs_cli_ct=$(LC_ALL=C command -V "${__bs_cli_cfn}" 2>&1) || __bs_cli_ct=''
+  case "${__bs_cli_ct}" in
+    *function*) ;;
+    *)
+      printf 'bs call: no such function: %s (load its module: --load lib/...)\n' "${__bs_cli_cfn}" >&2
+      return 127 ;;
+  esac
+  eval "$(bs_arr_to_args bs_cli_cargs)"
+  "${__bs_cli_cfn}" "$@"
+}
+
 bs_shell_alias bs_cli_die bs::cli::die
 bs_shell_alias bs_cli_help bs::cli::help
 bs_shell_alias bs_cli_help_cmd bs::cli::help_cmd
@@ -302,3 +584,11 @@ bs_shell_alias bs_cli_bs_running_block bs::cli::bs_running_block
 bs_shell_alias bs_cli_version_cmd bs::cli::version_cmd
 bs_shell_alias bs_cli_env_cmd bs::cli::env_cmd
 bs_shell_alias bs_cli_list_cmd bs::cli::list_cmd
+bs_shell_alias bs_cli_init_shell_bin_dir bs::cli::init_shell_bin_dir
+bs_shell_alias bs_cli_init_shell_usage bs::cli::init_shell_usage
+bs_shell_alias bs_cli_init_shell_cmd bs::cli::init_shell_cmd
+bs_shell_alias bs_cli_shebang_usage bs::cli::shebang_usage
+bs_shell_alias bs_cli_shebang_files bs::cli::shebang_files
+bs_shell_alias bs_cli_shebang_cmd bs::cli::shebang_cmd
+bs_shell_alias bs_cli_call_usage bs::cli::call_usage
+bs_shell_alias bs_cli_call_cmd bs::cli::call_cmd

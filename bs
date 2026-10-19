@@ -236,8 +236,8 @@ case "${1:-help}" in
                     bs_cli_die "calc: core/calc.sh not found"
                   fi
                   bs_calc_main "$@" ;;
-  init-shell)     shift; bs_cli_delegate init-shell bs::cli::init_shell_cmd "$@" ;;
-  shebang)        shift; bs_cli_delegate shebang bs::cli::shebang_cmd "$@" ;;
-  call)           shift; bs_cli_delegate call bs::cli::call_cmd "$@" ;;
+  init-shell)     shift; bs_cli_init_shell_cmd "$@" ;;
+  shebang)        shift; bs_cli_shebang_cmd "$@" ;;
+  call)           shift; bs_cli_call_cmd "$@" ;;
   *)              bs_cli_die "unknown command: $1" ;;
 esac
