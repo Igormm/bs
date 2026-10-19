@@ -7,7 +7,7 @@
 
 ## 1. Why
 
-BS runs on **bash 4.2+** (all of `lib/`, plus the CLI `bootstrap/bs.sh`, the loader and the installer are written
+BS runs on **bash 4.2+** (all of `lib/`, plus the CLI `bootstrap/bs.sh` and the installer are written
 in it) and claims "ubiquity". The exception is 15 `@shell posix` kernel files that
 run in any shell; the other shells get BS through a re-run in bash and the `bs
 call` bridge (see

@@ -13,7 +13,7 @@
 ## Требования
 
 - **bash 4.2+ — обязательное требование.** На bash написаны вся библиотека `lib/`
-  (87 модулей), а также CLI `bootstrap/bs.sh`, загрузчик и установщик, поэтому без bash BS не работает.
+  (87 модулей), а также CLI `bootstrap/bs.sh`, установщик, поэтому без bash BS не работает.
   Версии 4.2 и 4.3 допускаются кодом, но CI проверяет с **4.4** (почти все
   платформы поставляют 4.4 и новее).
 - Исключение — 15 файлов ядра с меткой `@shell posix`: они не зависят от bash и
@@ -171,11 +171,12 @@ flowchart TB
     shell["shell.sh<br/>shell registry"]:::posix
     tramp["trampoline.sh<br/>re-run in bash"]:::posix
     sheb["shebang.sh<br/>#! management"]:::posix
+    loader["loader.sh<br/>load, @depends"]:::posix
+    kern["kernel.sh<br/>всё ядро"]:::posix
   end
   subgraph B["bootstrap/ · bash4"]
     bssh["bs.sh<br/>pre-kernel, bs::cli"]:::bash4
     init["init.sh"]:::bash4
-    loader["loader.sh<br/>load, @depends"]:::bash4
   end
   subgraph C["core/"]
     direction TB
@@ -208,7 +209,8 @@ flowchart TB
   shell -.-> tramp
   bs -.-> bssh
   bssh -.-> init
-  init -.-> loader
+  init -.-> kern
+  kern -.-> loader
   loader -.-> CP
   init -.-> L
   L -.-> CP

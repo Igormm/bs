@@ -55,7 +55,7 @@ The argument is the module name without the `__` / `_SOURCED` parts; it is upper
 internally (`foo` → `__FOO_SOURCED`).
 
 Note: modules loaded via `load` are already protected against double loading by the loader's
-`BS_LOADED_MODULES` registry; the guard is for files sourced outside the loader.
+registry (`bs_load_is_loaded`); the guard is for files sourced outside the loader.
 
 ### utils::has
 

@@ -2,8 +2,8 @@
 
 # Shell portability
 
-**BS requires bash 4.2+.** All of `lib/` (87 modules, none of them POSIX) and 1 of the 15 kernel
-files (plus the CLI `bootstrap/bs.sh`, the loader and the installer) are written in bash; only 15 `@shell posix` kernel files and the prologue of the entry
+**BS requires bash 4.2+.** All of `lib/` (87 modules, none of them POSIX), the CLI
+`bootstrap/bs.sh` and the installer are written in bash; only the 15 `@shell posix` kernel files, the loader and the prologue of the entry
 points do not depend on it. "Usable from most shells" means: `bs` and `install.sh` can be started
 from any shell (they re-run in bash), kernel functions are called from any shell with `bs call`,
 and the POSIX files are sourced directly. This page is the
@@ -246,7 +246,7 @@ Worth knowing: functions that change state and return a value (`bs_arr_pop`, `bs
 
 ## Heading for shell independence
 
-The goal is for `bootstrap/`, `core/`, `install/`, `boot.sh`, `bs` and `install.sh` to live in one namespace `bs_*` and be shell-independent. State: 15 of 15 `core/` files are done (`prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `config`, `lang`, `args`), plus the shell and shebang layer in `bootstrap/` and the prologue of the entry points. Next: `init.sh`, `loader.sh`, the `bs::cli::*` commands, `install/*`, and finally the entry points. Until then BS requires bash 4.2+ (see the top of this page).
+The goal is for `bootstrap/`, `core/`, `install/`, `boot.sh`, `bs` and `install.sh` to live in one namespace `bs_*` and be shell-independent. State: 15 of 15 `core/` files are done (`prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `config`, `lang`, `args`), the loader and `kernel.sh`, plus the shell and shebang layer in `bootstrap/` and the prologue of the entry points. Also done: the loader `bootstrap/loader.sh` and `bootstrap/kernel.sh`, which load all of `core/` in any shell. Next: what is left of `init.sh` (the bash 4 gate and the bridges), the `bs::cli::*` commands, `install/*`, and finally the entry points. Until then BS requires bash 4.2+ (see the top of this page).
 
 ## Not done yet
 

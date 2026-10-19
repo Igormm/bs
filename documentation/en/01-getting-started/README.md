@@ -12,7 +12,7 @@ code style and with zero external dependencies.
 ## Requirements
 
 - **bash 4.2+ is a hard requirement.** All of the `lib/` library (87 modules) and
-  1 of the 15 `core/` files, plus the CLI `bootstrap/bs.sh`, the loader and the installer are written in bash, so BS does not run without it.
+  the CLI `bootstrap/bs.sh` and the installer are written in bash, so BS does not run without it.
   Versions 4.2 and 4.3 are accepted by the code, but CI checks from **4.4**
   (nearly every platform ships 4.4 or newer).
 - The exception is the 15 kernel files labelled `@shell posix`: they do not depend
@@ -172,11 +172,12 @@ flowchart TB
     shell["shell.sh<br/>shell registry"]:::posix
     tramp["trampoline.sh<br/>re-run in bash"]:::posix
     sheb["shebang.sh<br/>#! management"]:::posix
+    loader["loader.sh<br/>load, @depends"]:::posix
+    kern["kernel.sh<br/>all of core/"]:::posix
   end
   subgraph B["bootstrap/ · bash4"]
     bssh["bs.sh<br/>pre-kernel, bs::cli"]:::bash4
     init["init.sh"]:::bash4
-    loader["loader.sh<br/>load, @depends"]:::bash4
   end
   subgraph C["core/"]
     direction TB
@@ -209,7 +210,8 @@ flowchart TB
   shell -.-> tramp
   bs -.-> bssh
   bssh -.-> init
-  init -.-> loader
+  init -.-> kern
+  kern -.-> loader
   loader -.-> CP
   init -.-> L
   L -.-> CP

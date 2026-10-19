@@ -104,46 +104,26 @@ bs::shell::ensure_version 4 || return 1
 # Add local bin to PATH
 bs::append_local_bin_to_path
 
-# @global BS_HOME — Env: BS_HOME, defaults to BS_ROOT (historical alias) (category: env)
-# @global BS_HOME — Env: BS_HOME, по умолчанию BS_ROOT (исторический алиас) (категория: env)
-: "${BS_HOME:=${BS_ROOT}}"
-export BS_HOME
-
-# Load loader
-if [[ -f "${BS_ROOT}/bootstrap/loader.sh" ]]; then
-  # shellcheck disable=SC1090
-  source "${BS_ROOT}/bootstrap/loader.sh"
-elif [[ -f "${BS_ROOT}/loader.sh" ]]; then
-  # shellcheck disable=SC1090
-  source "${BS_ROOT}/loader.sh"
+# Ядро (core/*) загружает bootstrap/kernel.sh — тот же POSIX-файл, что подключают
+# dash, ash, ksh, mksh и zsh; BS_HOME по умолчанию равен BS_ROOT, конфигурация читается там же
+# The kernel (core/*) is loaded by bootstrap/kernel.sh — the same POSIX file that dash, ash,
+# ksh, mksh and zsh source; BS_HOME defaults to BS_ROOT, the configuration is read there too
+if [[ -f "${BS_ROOT}/bootstrap/kernel.sh" ]]; then
+  # shellcheck disable=SC1091
+  source "${BS_ROOT}/bootstrap/kernel.sh" || return 1
 else
-  printf 'BS: error: loader.sh not found in %s/bootstrap/ or %s/\n' "${BS_ROOT}" "${BS_ROOT}" >&2
+  printf 'BS: error: kernel.sh not found in %s/bootstrap/\n' "${BS_ROOT}" >&2
   return 1
 fi
 
-# Load core modules via loader
-# core/prereq must come first: it provides bs::guard and bs::source_relative
-load "core/prereq"
-load "core/lang"
-load "core/const"
-load "core/logger"
-load "core/quiet"
-load "core/fmt"
-load "core/data"
-load "core/errorhandler"
-load "core/version"
-load "core/utils"
-load "core/config"
-load "core/deps"
-# мост совместимости: deps::missing_tools с массивом bash (вне ядра) / compatibility bridge: deps::missing_tools with a bash array (outside the kernel)
+# Мосты для bash вне ядра: настоящие массивы и прежние функции bash
+# Bridges for bash outside the kernel: real arrays and the old bash functions
+# мост совместимости: deps::missing_tools с массивом bash / compatibility bridge: deps::missing_tools with a bash array
 load "lib/compat/deps"
-# языковые примитивы bash: bs::func_name, str::*, arr::*, map::* (вне ядра) / bash language primitives (outside the kernel)
+# языковые примитивы bash: bs::func_name, str::*, arr::*, map::* / bash language primitives
 load "lib/compat/lang"
-# массивы bash ARGS_PARAMS/ARGS_FLAGS/ARGS_REST для args::parse (вне ядра) / bash arrays for args::parse (outside the kernel)
+# массивы bash ARGS_PARAMS/ARGS_FLAGS/ARGS_REST для args::parse / bash arrays for args::parse
 load "lib/compat/args"
-
-# Load configuration from files and env
-config::load
 
 # @global BS_INITIALIZED — Env: bootstrap initialized marker (category: env)
 # @global BS_INITIALIZED — Env: маркер выполненной инициализации (категория: env)

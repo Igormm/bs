@@ -97,7 +97,8 @@ done
 # One namespace: the real name = bs_ + the "::" name with "::" turned into "_"; the "::" aliases are
 # made by bs_shell_alias at the end of the file and must not be defined in the file itself.
 for f in "${files[@]}"; do
-  badnames="$(grep -vE '^[[:space:]]*#' "${f}" | grep -oE '^[A-Za-z_][A-Za-z0-9_:]*\(\)' | tr -d '()' | grep -vE '^(bs_|__bs_)' || true)"
+  # `load` — публичное имя DSL-функции (сотни скриптов: load "core/args"); исключение из правила bs_ / `load` is the public DSL name (hundreds of scripts use it); the one exception to the bs_ rule
+  badnames="$(grep -vE '^[[:space:]]*#' "${f}" | grep -oE '^[A-Za-z_][A-Za-z0-9_:]*\(\)' | tr -d '()' | grep -vE '^(bs_|__bs_|load$)' || true)"
   [[ -z "${badnames}" ]] || bad "names   ${f}: functions outside the bs_ namespace: $(printf '%s' "${badnames}" | head -n 4 | tr '\n' ' ')"
   colons="$(grep -vE '^[[:space:]]*#' "${f}" | grep -oE '^[A-Za-z_][A-Za-z0-9_:]*::[A-Za-z0-9_:]*\(\)' | head -n 2 | tr '\n' ' ' || true)"
   [[ -z "${colons}" ]] || bad "names   ${f}: a function defined with '::': ${colons}"

@@ -189,7 +189,7 @@ repl::__command() {
         log::warn "usage: :info <module> (e.g. :info lib/system/hw)"
       elif is::file "${BS_ROOT}/${mod}.sh"; then
         sed -n '1,8p' -- "${BS_ROOT}/${mod}.sh"
-        if [[ -n "${BS_LOADED_MODULES["${mod}"]:-}" ]]; then
+        if bs_load_is_loaded "${mod}"; then
           printf '[loaded]\n'
         else
           printf '[not loaded — use :load %s]\n' "${mod}"
