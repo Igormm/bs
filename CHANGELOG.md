@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- fix(tools): `tier_scan.sh` no longer reports the word `function` inside the operand of `${x:?words}`, `${x:-words}`, `${x:+words}`, `${x:=words}` as the `function` keyword (it flagged `core/errorhandler.sh` for `${2:?handler function required}`); regression fixtures in `unit/testshelltierunit.sh` — the old scanner fails the new fixture, the real `function f { :; }` is still reported
+
 ### Changed
 - refactor(core): second readability pass — the map functions of `core/data.sh` read, write and drop a key's variable through four helpers (`bs_data_var_is_set/read/write/drop`), `bs_utils_split` calls two helpers (`bs_utils_split_classify`, `bs_utils_split_skip_ws`) instead of three copies of one loop (byte-for-byte equal to the old version on 1500 random strings, checked by `diff_old_new.sh`), the header of `core/logger.sh` keeps each Russian/English note pair together
 ### Changed

@@ -96,7 +96,9 @@ scan_file() {
   # Text without comments; and the same without string literals (a construct
   # inside a message or a `bash -c` string is not a construct of this file)
   raw="$(grep -vE '^[[:space:]]*#' "${f}" 2>/dev/null || true)"
-  stripped="$(sed -E "s/\"[^\"]*\"//g; s/'[^']*'//g" <<< "${raw}")"
+  # и операнд-слова ${x:?слова}, ${x:-слова}, ${x:+слова}, ${x:=слова}: это текст, а не конструкции
+  # and the operand words of ${x:?words}, ${x:-words}, ${x:+words}, ${x:=words}: text, not constructs
+  stripped="$(sed -E "s/\"[^\"]*\"//g; s/'[^']*'//g; s/(\\$\\{[A-Za-z_0-9]+:?[?+=-])[^}]*\\}/\\1}/g" <<< "${raw}")"
   found="$(match_patterns "${raw}")"
   found_code="$(match_patterns "${stripped}")"
   [[ -z "${found}" ]] || computed="bash4"
