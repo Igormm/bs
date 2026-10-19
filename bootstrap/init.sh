@@ -9,15 +9,16 @@
 #
 # Режимы ядра / Kernel modes (BS_KERNEL_MODE)
 #   full  — bash 4.2+: 16 модулей core/ (prereq, lang, const, var, str, num, msg, logger, quiet, fmt,
-#           data, errorhandler, version, utils, config, deps) и мосты lib/compat/deps, lib/compat/lang;
-#           args и calc подключаются по запросу;
-#   posix — dash, ash, ksh, mksh, zsh: те же 16 модулей core/, без мостов; args и всё lib/ — только
-#           в режиме full (bash ниже 4.2 отклоняется).
+#           data, errorhandler, version, utils, config, deps) и мосты lib/compat/deps, lib/compat/lang,
+#           lib/compat/args; args и calc подключаются по запросу;
+#   posix — dash, ash, ksh, mksh, zsh: те же 16 модулей core/, без мостов; args и calc (оба POSIX)
+#           подключаются по запросу, всё lib/ — только в режиме full (bash ниже 4.2 отклоняется).
 #   full  — bash 4.2+: 16 core/ modules (prereq, lang, const, var, str, num, msg, logger, quiet, fmt,
 #           data, errorhandler, version, utils, config, deps) and the bridges lib/compat/deps,
-#           lib/compat/lang; args and calc are loaded on demand;
-#   posix — dash, ash, ksh, mksh and zsh: the same 16 core/ modules, no bridges; args and all of lib/
-#           are in the full mode only (a bash older than 4.2 is refused).
+#           lib/compat/lang, lib/compat/args; args and calc are loaded on demand;
+#   posix — dash, ash, ksh, mksh and zsh: the same 16 core/ modules, no bridges; args and calc (both
+#           POSIX) are loaded on demand, all of lib/ is in the full mode only (a bash older than 4.2
+#           is refused).
 #
 # Каталог bootstrap/ / The bootstrap/ directory
 #   bash берёт его из пути этого файла; остальные оболочки — из BS_BOOTSTRAP_DIR, BS_ENTRY_DIR
@@ -176,9 +177,10 @@ bs_load "core/utils"
 bs_load "core/config"
 bs_load "core/deps"
 if [ "$BS_KERNEL_MODE" = full ]; then
-  # мосты совместимости (вне ядра): deps::missing_tools с массивом bash; языковые примитивы bash: bs::func_name, str::*, arr::*, map::* / compatibility bridges (outside the kernel): deps::missing_tools with a bash array; bash language primitives: bs::func_name, str::*, arr::*, map::*
+  # мосты совместимости (вне ядра): deps::missing_tools с массивом bash; языковые примитивы bash: bs::func_name, str::*, arr::*, map::*; массивы bash ARGS_PARAMS/ARGS_FLAGS/ARGS_REST для args::parse / compatibility bridges (outside the kernel): deps::missing_tools with a bash array; bash language primitives: bs::func_name, str::*, arr::*, map::*; bash arrays ARGS_PARAMS/ARGS_FLAGS/ARGS_REST for args::parse
   bs_load "lib/compat/deps"
   bs_load "lib/compat/lang"
+  bs_load "lib/compat/args"
 fi
 # Load configuration from files and env / Загрузить конфигурацию из файлов и окружения
 bs_config_load

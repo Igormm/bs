@@ -12,10 +12,10 @@ code style and with zero external dependencies.
 ## Requirements
 
 - **bash 4.2+ is a hard requirement.** All of the `lib/` library (87 modules) and
-  1 of the 19 `core/` files are written in bash, so BS does not run without it.
+  the `bootstrap/bs.sh` commands that run it are written in bash, so BS does not run without it.
   Versions 4.2 and 4.3 are accepted by the code, but CI checks from **4.4**
   (nearly every platform ships 4.4 or newer).
-- The exception is the 18 kernel files labelled `@shell posix`: they do not depend
+- The exception is the 19 kernel files labelled `@shell posix` (all of `core/`): they do not depend
   on bash and can be sourced from dash, ash, ksh, mksh, zsh and bash (see "How the
   kernel works"). That is a small set of helpers (constants, the version,
   `bs_utils_has`, `bs_log_info`, `calc`, …), not the whole of BS.
@@ -34,7 +34,7 @@ tools only.
 
 **Heading for shell independence.** The goal is a kernel (`bootstrap/`, `core/`,
 `install/`, `boot.sh`, `bs`, `install.sh`) in one namespace `bs_*` that does not
-depend on the shell (dash, ash, ksh, mksh, zsh, bash). Already done: 18 of the 19
+depend on the shell (dash, ash, ksh, mksh, zsh, bash). Already done: all 19
 `core/` files (including the array and map layer `core/data.sh`) and the shell
 layer in `bootstrap/`; the rest moves by plan (see
 [shell-portability](../08-development/shell-portability.md#heading-for-shell-independence)).
@@ -190,18 +190,26 @@ flowchart TB
       const:::posix
       version:::posix
       quiet:::posix
+      fmt:::posix
+      logger:::posix
+      calc:::posix
+      data:::posix
+      utils:::posix
+      deps:::posix
+      errorhandler:::posix
+      config:::posix
+      lang:::posix
+      args:::posix
+      var:::posix
+      str:::posix
+      num:::posix
+      msg:::posix
     end
-    subgraph CB["@shell bash4"]
-      lang:::bash4
-      args:::bash4
-      errorhandler:::bash4
-      config:::bash4
-      logger:::bash4
-      utils:::bash4
-      deps:::bash4
-      calc:::bash4
-      repl:::bash4
-    end
+  end
+  subgraph L["lib/compat · bash4 (bridges, outside the kernel)"]
+    cdeps["deps.sh"]:::bash4
+    clang["lang.sh<br/>str::, arr::, map::"]:::bash4
+    cargs["args.sh<br/>ARGS_PARAMS, ARGS_FLAGS"]:::bash4
   end
   bs -.-> shell
   boot -.-> shell
@@ -211,8 +219,8 @@ flowchart TB
   bssh -.-> init
   init -.-> loader
   loader -.-> CP
-  loader -.-> CB
-  CB -.-> CP
+  init -.-> L
+  L -.-> CP
   inst -.-> sheb
 ```
 

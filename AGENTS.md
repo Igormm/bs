@@ -15,7 +15,7 @@ BS is a modular Bash 4.2+ framework and standard library. It provides:
 - `lib/` — standard library: `io/streams`, `io/files`, `io/process`, `system/*`, `integration/*`, `ui/*`, etc.
 - `tests/` — custom test framework, ShellCheck validation, syntax validation
 
-**BS requires bash 4.2+**: all of `lib/` (87 modules) and 1 of the 19 `core/` files are Bash 4.2+ scripts. Only the 18 `@shell posix` files of `core/`, `bootstrap/loader.sh`, `base.sh`, `init.sh` (its POSIX mode), `install/*` with `install.sh` (the installer runs without bash), `boot.sh` and the prologue of the entry points are shell-independent; `bs` itself runs `help`, `version`, `env`, `list`, `calc`, `doctor`, `uninstall`, `where`, `update`, `init-shell`, `shebang` and `call` without bash (`bootstrap/cli.sh`); its other commands, `bootstrap/bs.sh` and `lib/` still need bash. No external dependencies are required at runtime.
+**BS requires bash 4.2+**: all of `lib/` (87 modules) and the `bootstrap/bs.sh` commands that run it are Bash 4.2+ scripts. Only the 19 `@shell posix` files of `core/` (all of them), `bootstrap/loader.sh`, `base.sh`, `init.sh` (its POSIX mode), `install/*` with `install.sh` (the installer runs without bash), `boot.sh` and the prologue of the entry points are shell-independent; `bs` itself runs `help`, `version`, `env`, `list`, `calc`, `doctor`, `uninstall`, `where`, `update`, `init-shell`, `shebang` and `call` without bash (`bootstrap/cli.sh`); its other commands, `bootstrap/bs.sh` and `lib/` still need bash. No external dependencies are required at runtime.
 
 ## How AI should work with this framework
 
@@ -63,7 +63,7 @@ group::module::function() {
 - Use `bs::source_relative` for relative dependency sourcing.
 - Use `utils::has`, `utils::quiet`, `utils::quiet_err`, `utils::ignore` instead of raw redirects.
 - Strict mode (`set -euo pipefail`) is set only in entry points, never in library modules.
-- **Kernel code** (`bootstrap/`, `core/`, `install/`, entry points) is written in the one `bs_` namespace as `@shell posix` code (real names `bs_module_name`, `module::name` kept as bash/zsh aliases): the rules are chapter 12 of `code-style-guide.md`, the procedure is the skill `bs-kernel-code`. The `module::function` / `local` / `[[ ]]` conventions above are for `lib/` and the `bash4` kernel files (`lang`, `args`, `config`).
+- **Kernel code** (`bootstrap/`, `core/`, `install/`, entry points) is written in the one `bs_` namespace as `@shell posix` code (real names `bs_module_name`, `module::name` kept as bash/zsh aliases): the rules are chapter 12 of `code-style-guide.md`, the procedure is the skill `bs-kernel-code`. The `module::function` / `local` / `[[ ]]` conventions above are for `lib/`, `bootstrap/bs.sh` and the bridges `lib/compat/*`: no `core/` file is `bash4` any more.
 
 ## Testing
 

@@ -1645,3 +1645,10 @@ bs::eval() {
 is::function() {
   bs::is_function "${1:?function name required}"
 }
+
+# @description Predicate: command is available / Команда доступна.
+#   Calls utils::has by name (not bs_utils_has): code and tests that replace utils::has keep working.
+#   Replaces: command -v cmd >/dev/null 2>&1
+is::command() {
+  utils::has "${1:?command name required}"
+}

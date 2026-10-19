@@ -1,11 +1,11 @@
 # BS Framework
 
-**BS** — модульный фреймворк и стандартная библиотека на **Bash 4.2+** (вся `lib/` и 1 из 19 файлов ядра написаны на bash; 18 файлов ядра `@shell posix` работают в любой оболочке):
+**BS** — модульный фреймворк и стандартная библиотека на **Bash 4.2+** (вся `lib/` и команды `bootstrap/bs.sh`, которые запускают её, написаны на bash; все 19 файлов ядра `@shell posix` работают в любой оболочке):
 загрузчик модулей, логирование, обработка ошибок, декларативные параметры
 скриптов, абстракция потоков ввода/вывода и набор системных модулей —
 всё в едином code style и без единой внешней зависимости.
 
-**BS** is a modular framework and standard library written in **Bash 4.2+** (all of `lib/` and 1 of the 19 kernel files are bash; the 18 `@shell posix` kernel files run in any shell):
+**BS** is a modular framework and standard library written in **Bash 4.2+** (all of `lib/` and the `bootstrap/bs.sh` commands that run it are bash; all 19 `@shell posix` kernel files run in any shell):
 a module loader, logging, error handling, declarative script parameters,
 an I/O streams abstraction and a set of system modules — all in a
 consistent code style and with zero external dependencies.

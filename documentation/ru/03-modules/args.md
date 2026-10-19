@@ -177,6 +177,14 @@ args::define first middle last
 | `ARGS_HELP_REQUESTED` | `1`, если передан `-h`/`--help` |
 | `ARGS_VERSION` | версия модуля |
 
+## Имена и ярус
+
+`core/args.sh` — `@shell posix`: настоящие функции называются `bs_args_*` (`bs_args_parse`, `bs_args_get`, `bs_args_flag_get`, …) и работают в dash, ash, ksh, mksh, zsh и bash. Состояние (дерево, флаги, результат разбора) лежит в слое данных `core/data.sh`. В bash и zsh остаются прежние имена `args::*`. Сообщения и справка не изменились.
+
+Массивы bash `ARGS_PARAMS`, `ARGS_FLAGS` и `ARGS_REST` заполняет мост `lib/compat/args.sh` (его подключает `init.sh`): `args::parse`, `args::reset` и `args::require` вызывают ядро и копируют результат в эти массивы. Из других оболочек результат читают через `bs_args_get N`, `bs_args_flag_get NAME` и `bs_args_rest`.
+
+Валидатор флага — `number`, `enum:a,b` или имя функции (в POSIX-ядре это любое имя, которое находит `command -v`).
+
 ## Полный пример
 
 См. [examples/argsparseexample.sh](../../../examples/argsparseexample.sh):

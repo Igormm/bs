@@ -2,8 +2,8 @@
 
 # Shell portability
 
-**BS requires bash 4.2+.** All of `lib/` (87 modules, none of them POSIX) and 1 of the 19 kernel
-files are written in bash; only 18 small `@shell posix` kernel files and the prologue of the entry
+**BS requires bash 4.2+.** All of `lib/` (87 modules, none of them POSIX) and the `bootstrap/bs.sh`
+commands that run it are written in bash; only the 19 small `@shell posix` kernel files (all of `core/`) and the prologue of the entry
 points do not depend on it. "Usable from most shells" means: `bs` can be started from any shell
 (it re-runs in bash) and `install.sh` runs even with no bash at all (dash, ash, ksh, mksh, zsh; see
 "The installer and `init.sh` without bash" below), kernel functions are called from any shell with
@@ -248,7 +248,7 @@ Moved onto them (the portable tests of all five files give the same number of pa
 
 `bootstrap/base.sh` (`@shell posix`) is the POSIX half of the former `bootstrap/bs.sh`: `bs_strict`, `bs_append_local_bin_to_path`, `bs_shell_name/host/version/ok` and `bs_shell_ensure_version` (the old `bs::strict`, `bs::shell::*` stay as bash/zsh aliases). What reads the call stack, `BASH_REMATCH` and `BASH_SOURCE` stays in `bootstrap/bs.sh` (bash) together with the `bs::cli::*` commands. 83 checks in six shells (`unit/testbaseportableunit.sh`).
 
-`bootstrap/init.sh` (`@shell posix`) loads the kernel in two modes, `BS_KERNEL_MODE`: `full` in bash 4.2+ (the 16 modules and the bridges `lib/compat/deps` and `lib/compat/lang`; `args` and `calc` are loaded on demand) and `posix` in dash, ash, ksh, mksh and zsh (the same 16 modules, no bridges: `prereq`, `lang`, `const`, `var`, `str`, `num`, `msg`, `logger`, `quiet`, `fmt`, `data`, `errorhandler`, `version`, `utils`, `config`, `deps`); `bs_config_load` runs in both; an older bash is refused. Where `bs` finds its own directory: bash reads the path of the file, zsh `%x`, other shells take `BS_BOOTSTRAP_DIR`, `BS_ENTRY_DIR` (set by the prologue of the entry points) or `BS_ROOT`. Telling "sourced" from "executed" is possible only in bash, so only bash refuses a direct run. 75 checks in six shells (`unit/testinitportableunit.sh`).
+`bootstrap/init.sh` (`@shell posix`) loads the kernel in two modes, `BS_KERNEL_MODE`: `full` in bash 4.2+ (the 16 modules and the bridges `lib/compat/deps`, `lib/compat/lang` and `lib/compat/args`; `args` and `calc` are loaded on demand) and `posix` in dash, ash, ksh, mksh and zsh (the same 16 modules, no bridges: `prereq`, `lang`, `const`, `var`, `str`, `num`, `msg`, `logger`, `quiet`, `fmt`, `data`, `errorhandler`, `version`, `utils`, `config`, `deps`); `bs_config_load` runs in both; an older bash is refused. Where `bs` finds its own directory: bash reads the path of the file, zsh `%x`, other shells take `BS_BOOTSTRAP_DIR`, `BS_ENTRY_DIR` (set by the prologue of the entry points) or `BS_ROOT`. Telling "sourced" from "executed" is possible only in bash, so only bash refuses a direct run. 75 checks in six shells (`unit/testinitportableunit.sh`).
 
 `install.sh` and `install/*.sh` are `@shell posix` (`bs_install_*`, `bs_do_install`, `bs_do_uninstall`, `bs_auto_update_path`, …; the old names stay as aliases): arrays became data-layer arrays, `[[ =~ ]]` and `printf -v` became `case` and parameter expansion, `local` became `__bs_<file>_` temporaries, and the notice frame counts UTF-8 characters with `bs_str_width`/`bs_str_head` (a bare `${#s}` counts bytes in dash and mksh and would break the Cyrillic borders). The output of the notices and of the PATH helpers is byte-for-byte equal to the previous bash version on 19 scenarios (`diff_old_new.sh`), except the line number inside one shell error message about a read-only rc file. An entry point that can run without bash sets `BS_POSIX_ENTRY=1` before its prologue: the trampoline still re-runs it in a bash 4.2+ when there is one and otherwise returns and lets it continue in the current shell (an explicit but unfit `BS_HOST_BASH` stays an error). `unit/testinstallnobashunit.sh` hides every bash behind a mount namespace (`unshare -Urm`) and runs install → refused reinstall → uninstall in ash, dash, ksh, mksh and zsh. Two things this found: mksh has no built-in `printf` (it needs the binary), and an empty pattern `"$var"*` in `case` matches everything, so a helper must not trust a variable that a missing command left empty. Not verified: a real Alpine/musl machine (the test uses the busybox applets of a glibc host).
 
@@ -272,11 +272,11 @@ Worth knowing: functions that change state and return a value (`bs_arr_pop`, `bs
 
 ## `repl` outside the kernel
 
-`bs repl` is an interactive bash session with the kernel loaded, so by its nature it is not a kernel part. The module moved from `core/repl.sh` to `lib/ui/repl.sh` (loaded with `load "lib/ui/repl"`); the kernel keeps 15 files.
+`bs repl` is an interactive bash session with the kernel loaded, so by its nature it is not a kernel part. The module moved from `core/repl.sh` to `lib/ui/repl.sh` (loaded with `load "lib/ui/repl"`); the kernel keeps 19 files.
 
 ## Heading for shell independence
 
-The goal is for `bootstrap/`, `core/`, `install/`, `boot.sh`, `bs` and `install.sh` to live in one namespace `bs_*` and be shell-independent. State: 18 of the 19 `core/` files are done (`prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `config`, `lang`, `var`, `str`, `num`, `msg`), plus the shell and shebang layer, the loader, `base.sh`, `init.sh` and `cli.sh` in `bootstrap/`, `install/*`, and the entry points `install.sh`, `bs` and `boot.sh`. Still bash 4.2+: `args`, `bootstrap/bs.sh` (the call stack and `BASH_REMATCH`, with the 9 `bs::cli::*` commands that run `lib/`) and the 87 modules of `lib/`; so a full BS still wants bash 4.2+ (see the top of this page), and without it the POSIX part above runs.
+The goal is for `bootstrap/`, `core/`, `install/`, `boot.sh`, `bs` and `install.sh` to live in one namespace `bs_*` and be shell-independent. State: all 19 `core/` files are done (`prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `config`, `lang`, `args`, `var`, `str`, `num`, `msg`), plus the shell and shebang layer, the loader, `base.sh`, `init.sh` and `cli.sh` in `bootstrap/`, `install/*`, and the entry points `install.sh`, `bs` and `boot.sh`. Still bash 4.2+: `bootstrap/bs.sh` (the call stack and `BASH_REMATCH`, with the 9 `bs::cli::*` commands that run `lib/`) and the 87 modules of `lib/`; so a full BS still wants bash 4.2+ (see the top of this page), and without it the POSIX part above runs.
 
 ## Not done yet
 
