@@ -113,6 +113,17 @@ test_repeat_join_split() {
     done < <(testframework::posix_shells)
 }
 
+test_width_and_head() {
+    local sh_bin sh_name
+    while IFS= read -r sh_bin; do
+        sh_name="${sh_bin##*/}"
+        eq "0 3 6 2 2" "$(probe "${sh_bin}" 'printf "%s %s %s %s %s" "$(bs_str_width "")" "$(bs_str_width abc)" "$(bs_str_width "привет")" "$(bs_str_width "─╭")" "$(bs_str_width "😀a")"')" "${sh_name}: width counts UTF-8 characters, not bytes"
+        eq "[при] [ab😀] [] [abc] [привет]" "$(probe "${sh_bin}" 'printf "[%s] [%s] [%s] [%s] [%s]" "$(bs_str_head "привет мир" 3)" "$(bs_str_head "ab😀cd" 3)" "$(bs_str_head abc 0)" "$(bs_str_head abc 99)" "$(bs_str_head "привет" 6)"')" "${sh_name}: head takes N characters"
+        eq "rc=1 rc=1" "$(probe "${sh_bin}" 'bs_str_head abc x >/dev/null; printf "rc=%s " "$?"; bs_str_head abc -1 >/dev/null; printf "rc=%s" "$?"')" "${sh_name}: a bad count is 1"
+        eq "[a b]" "$(probe "${sh_bin}" 'printf "[%s]" "$(bs_str_head "a b c" 3)"')" "${sh_name}: head keeps a space inside"
+    done < <(testframework::posix_shells)
+}
+
 test_no_aliases() {
     # the names str::upper ... belong to core/lang.sh: loading core/str.sh must not replace them
     local out
@@ -128,6 +139,7 @@ main() {
     testframework::section "Replace / Замена"; test_replace
     testframework::section "Predicates / Предикаты"; test_predicates
     testframework::section "Repeat, join, before/after / Повтор, склейка, до/после"; test_repeat_join_split
+    testframework::section "Width and head / Ширина и начало"; test_width_and_head
     testframework::section "No aliases over lang.sh / Нет псевдонимов поверх lang.sh"; test_no_aliases
     rm -rf "${T:?}"
     testframework::summary

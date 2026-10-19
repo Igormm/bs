@@ -16,7 +16,7 @@
 #
 # ИМЕНА / NAMES
 #   bs_str_upper, lower, trim, ltrim, rtrim, replace, contains, starts_with, ends_with, repeat,
-#   join, before, after. Имена str::upper … str::repeat принадлежат core/lang.sh (bash, шаблон
+#   join, before, after, width, head. Имена str::upper … str::repeat принадлежат core/lang.sh (bash, шаблон
 #   замены — glob) и остаются как есть: псевдонимы здесь НЕ создаются, чтобы не подменить их.
 #   bs_str_* — POSIX-версии с теми же именами; отличия: bs_str_replace заменяет ДОСЛОВНУЮ
 #   подстроку, а не glob; trim срезает пробел, табуляцию, CR и LF.
@@ -25,11 +25,14 @@
 #   are POSIX versions with the same names; differences: bs_str_replace replaces a LITERAL
 #   substring, not a glob; trim cuts space, tab, CR and LF.
 #
-# ЧЕГО НЕТ / NOT HERE
-#   Длина и дополнение до ширины (pad): ${#s} считает байты в dash и mksh и символы в bash, zsh
-#   и ksh — результат зависит от оболочки (глава 12.7 code-style-guide).
-#   Length and padding to a width (pad): ${#s} counts bytes in dash and mksh and characters in
-#   bash, zsh and ksh — the result depends on the shell (chapter 12.7 of the code style guide).
+# ДЛИНА / LENGTH
+#   Длину считает bs_str_width — в символах UTF-8, одинаково во всех оболочках (байты минус байты
+#   продолжения 0x80–0xBF). Голое ${#s} зависит от оболочки и локали: dash и mksh считают байты,
+#   bash, zsh и ksh — символы по локали. Дополнение до ширины (pad) строится на bs_str_width.
+#   The length is counted by bs_str_width — in UTF-8 characters, the same in every shell (bytes minus
+#   the continuation bytes 0x80–0xBF). A bare ${#s} depends on the shell and the locale: dash and
+#   mksh count bytes, bash, zsh and ksh count characters by locale. Padding to a width builds on
+#   bs_str_width.
 
 # Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points
@@ -55,13 +58,22 @@ bs_str_lower() {
 # @stdout the string / строка
 bs_str_ltrim() {
   __bs_str_s=${1-}
-  # CR берём из printf: литерал возврата каретки в case не вставить переносимо / CR comes from printf: a literal carriage return cannot be put in a case portably
-  __bs_str_cr=$(printf '\r')
-  while :; do
+  # CR берём из printf: литерал возврата каретки в case не вставить переносимо. Если printf недоступен
+  # (в mksh он внешний), CR пуст — тогда он не учитывается: пустой шаблон "$cr"* совпал бы со всем.
+  # CR comes from printf: a literal carriage return cannot be put in a case portably. If printf is
+  # unavailable (it is external in mksh), CR is empty and is skipped: the empty pattern "$cr"* would match anything.
+  __bs_str_cr=$(printf '\r' 2>/dev/null) || __bs_str_cr=''
+  while [ -n "$__bs_str_s" ]; do
     case "$__bs_str_s" in
-      ' '*|'	'*|"$__bs_str_cr"*|'
+      ' '*|'	'*|'
 '*) __bs_str_s=${__bs_str_s#?} ;;
-      *) break ;;
+      *)
+        if [ -n "$__bs_str_cr" ]; then
+          case "$__bs_str_s" in
+            "$__bs_str_cr"*) __bs_str_s=${__bs_str_s#?}; continue ;;
+          esac
+        fi
+        break ;;
     esac
   done
   printf '%s\n' "$__bs_str_s"
@@ -72,12 +84,18 @@ bs_str_ltrim() {
 # @stdout the string / строка
 bs_str_rtrim() {
   __bs_str_s=${1-}
-  __bs_str_cr=$(printf '\r')
-  while :; do
+  __bs_str_cr=$(printf '\r' 2>/dev/null) || __bs_str_cr=''
+  while [ -n "$__bs_str_s" ]; do
     case "$__bs_str_s" in
-      *' '|*'	'|*"$__bs_str_cr"|*'
+      *' '|*'	'|*'
 ') __bs_str_s=${__bs_str_s%?} ;;
-      *) break ;;
+      *)
+        if [ -n "$__bs_str_cr" ]; then
+          case "$__bs_str_s" in
+            *"$__bs_str_cr") __bs_str_s=${__bs_str_s%?}; continue ;;
+          esac
+        fi
+        break ;;
     esac
   done
   printf '%s\n' "$__bs_str_s"
@@ -217,4 +235,52 @@ bs_str_after() {
     *"$2"*) printf '%s\n' "${__bs_str_s#*"${2}"}" ;;
     *) return 1 ;;
   esac
+}
+
+# @description Ширина строки в символах UTF-8: байты минус байты продолжения (0x80–0xBF); одинаково во всех оболочках / The width of a string in UTF-8 characters: bytes minus the continuation bytes (0x80–0xBF); the same in every shell
+# @param $1 string / строка
+# @stdout number of characters / число символов
+bs_str_width() {
+  __bs_str_wn=$(printf '%s' "${1-}" | LC_ALL=C tr -d '\200-\277' | wc -c)
+  printf '%s\n' "$((__bs_str_wn))"
+}
+
+# @description Первые N символов UTF-8 (вся строка, если она короче) / The first N UTF-8 characters (the whole string if it is shorter)
+# @param $1 string / строка
+# @param $2 count, an integer >= 0 / число символов, целое >= 0
+# @stdout the prefix / начало строки
+# @returns 0 ok / 1 count is not a non-negative integer
+bs_str_head() {
+  case "${2-}" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  # Подоболочка с LC_ALL=C: ${s#?} снимает один БАЙТ в любой оболочке / A subshell with LC_ALL=C: ${s#?} takes off one BYTE in every shell
+  (
+    LC_ALL=C
+    export LC_ALL
+    __bs_str_hs=${1-}
+    __bs_str_hn=$(($2))
+    __bs_str_ho=''
+    __bs_str_hc=0
+    while [ "$__bs_str_hc" -lt "$__bs_str_hn" ] && [ -n "$__bs_str_hs" ]; do
+      __bs_str_hb=${__bs_str_hs%"${__bs_str_hs#?}"}
+      __bs_str_hs=${__bs_str_hs#?}
+      __bs_str_ho="${__bs_str_ho}${__bs_str_hb}"
+      # байты продолжения тянутся за ведущим байтом; ASCII проверять форком незачем / continuation bytes follow the lead byte; an ASCII byte needs no fork
+      while [ -n "$__bs_str_hs" ]; do
+        __bs_str_hb=${__bs_str_hs%"${__bs_str_hs#?}"}
+        case "$__bs_str_hb" in
+          ' '|[\!-~]) break ;;
+        esac
+        if [ -z "$(printf '%s' "$__bs_str_hb" | tr -d '\200-\277')" ]; then
+          __bs_str_ho="${__bs_str_ho}${__bs_str_hb}"
+          __bs_str_hs=${__bs_str_hs#?}
+        else
+          break
+        fi
+      done
+      __bs_str_hc=$((__bs_str_hc + 1))
+    done
+    printf '%s\n' "$__bs_str_ho"
+  )
 }

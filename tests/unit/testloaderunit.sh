@@ -32,19 +32,19 @@ main() {
     
     # Тест 1: Ядро загружено bootstrap'ом
     testframework::section "Core Loaded / Ядро загружено"
-    testframework::assert_true "${BS_LOADED_MODULES[core/const]:-}" "core/const marked as loaded"
-    testframework::assert_true "${BS_LOADED_MODULES[core/logger]:-}" "core/logger marked as loaded"
-    testframework::assert_true "${BS_LOADED_MODULES[core/errorhandler]:-}" "core/errorhandler marked as loaded"
+    testframework::assert_true "$(bs_map_get bs_loaded_modules 'core/const' '')" "core/const marked as loaded"
+    testframework::assert_true "$(bs_map_get bs_loaded_modules 'core/logger' '')" "core/logger marked as loaded"
+    testframework::assert_true "$(bs_map_get bs_loaded_modules 'core/errorhandler' '')" "core/errorhandler marked as loaded"
     
     # Тест 2: Загрузка существующего модуля
     testframework::section "Load Existing Module / Загрузка существующего модуля"
     testframework::assert_command 'load "lib/system/platformcheck"' "Load lib/system/platformcheck"
-    testframework::assert_true "${BS_LOADED_MODULES[lib/system/platformcheck]:-}" "Module marked as loaded"
+    testframework::assert_true "$(bs_map_get bs_loaded_modules 'lib/system/platformcheck' '')" "Module marked as loaded"
     
     # Тест 3: Повторная загрузка не грузит дважды
     testframework::section "Duplicate Load / Повторная загрузка"
     testframework::assert_command 'load "lib/system/platformcheck"' "Repeated load returns success"
-    testframework::assert_equal "1" "${BS_LOADED_MODULES[lib/system/platformcheck]}" "Module still loaded once"
+    testframework::assert_equal "1" "$(bs_map_get bs_loaded_modules lib/system/platformcheck)" "Module still loaded once"
     
     # Тест 4: Загрузка несуществующего модуля
     testframework::section "Load Missing Module / Загрузка несуществующего модуля"
@@ -53,12 +53,12 @@ main() {
     utils::quiet_err load "lib/nonexistent/module" || rc=$?
     testframework::assert_true "$rc -ne 0" "Missing module load fails"
     
-    if [[ -z "${BS_LOADED_MODULES[lib/nonexistent/module]:-}" ]]; then
+    if [[ -z "$(bs_map_get bs_loaded_modules 'lib/nonexistent/module' '')" ]]; then
         testframework::assert_true "true" "Missing module not marked as loaded"
     else
         testframework::assert_true "false" "Missing module not marked as loaded"
     fi
-    testframework::assert_true "${#BS_LOAD_STACK[@]} -eq 0" "Load stack clean after failure"
+    testframework::assert_true "$(bs_arr_len bs_load_stack) -eq 0" "Load stack clean after failure"
     
     # Тест 5: Повторная попытка после ошибки — без ложного circular dependency
     testframework::section "Retry After Failure / Повтор после ошибки"
@@ -99,10 +99,10 @@ loader_test_space_mod::loaded() { :; }
 EOF
 
     testframework::assert_command 'load "lib/loader_test_space/space_dep"' "Load module with spaced @depends list"
-    testframework::assert_true "${BS_LOADED_MODULES[lib/loader_test_space/space_dep]:-}" "Spaced-depends module marked loaded"
+    testframework::assert_true "$(bs_map_get bs_loaded_modules 'lib/loader_test_space/space_dep' '')" "Spaced-depends module marked loaded"
 
     testframework::assert_command 'load "lib/loader test space/space_mod"' "Load module with space in path"
-    testframework::assert_true "${BS_LOADED_MODULES[lib/loader test space/space_mod]:-}" "Space-path module marked loaded"
+    testframework::assert_true "$(bs_map_get bs_loaded_modules 'lib/loader test space/space_mod' '')" "Space-path module marked loaded"
 
     rm -rf "${test_mod_dir}" "${space_mod_dir}"
 

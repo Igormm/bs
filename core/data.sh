@@ -230,14 +230,16 @@ bs_arr_index() {
   [ "${3:-0}" = 1 ] && [ "$__bs_dat_idx" -eq "$__bs_dat_n" ]
 }
 
-# @description Элемент по индексу / The element at an index
+# @description Элемент по индексу: в stdout или в переменную $3 (без подоболочки) / The element at an index: to stdout or into the variable $3 (no subshell)
 # @param $1 name / имя
 # @param $2 index / индекс
+# @param $3 variable for the result, otherwise stdout / переменная для результата, иначе stdout
 bs_arr_get() {
   bs_data_check "$1" || return 2
   bs_arr_index "$1" "$2" || return 1
   bs_data_get_at "$1" "$__bs_dat_idx"
-  printf '%s\n' "$__bs_dat_cur"
+  __bs_dat_out=$__bs_dat_cur
+  bs_data_ret "${3:-}"
 }
 
 # @description Записать элемент по индексу (индекс равный длине — добавление) / Set an element (an index equal to the length appends)
