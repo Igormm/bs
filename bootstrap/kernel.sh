@@ -28,6 +28,7 @@
 # Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points
 
+# shellcheck disable=SC2034  # BS_CURRENT_FILE читают подключаемые файлы / BS_CURRENT_FILE is read by the sourced files
 if [ -z "${BS_ROOT:-}" ] || [ ! -f "${BS_ROOT}/bootstrap/loader.sh" ]; then
   printf '%s\n' "BS: bootstrap/kernel.sh: задайте BS_ROOT — каталог с bootstrap/loader.sh" \
     "BS: bootstrap/kernel.sh: set BS_ROOT to the directory that holds bootstrap/loader.sh" >&2
@@ -40,7 +41,6 @@ fi
 : "${BS_HOME:=${BS_ROOT}}"
 export BS_HOME
 
-# shellcheck disable=SC2034  # BS_CURRENT_FILE читают подключаемые файлы / BS_CURRENT_FILE is read by the sourced files
 # Слой оболочек и загрузчик; BS_CURRENT_FILE нужен POSIX-файлам, чтобы найти свой каталог
 # The shell layer and the loader; POSIX files take their directory from BS_CURRENT_FILE
 if ! command -v bs_shell_alias >/dev/null 2>&1; then
