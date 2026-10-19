@@ -80,7 +80,7 @@ load "lib/system/info"
 ```
 
 Do not `source lib/...` paths by hand in user scripts — `load` tracks loaded
-modules in `BS_LOADED_MODULES` and skips duplicates.
+modules in `bs_loaded_modules` and skips duplicates.
 
 ### Docstring format
 

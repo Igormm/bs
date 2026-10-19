@@ -25,7 +25,7 @@ before that. So:
 | `boot.sh` | everything before `exec "${BS_ROOT}/bs"` |
 | `bs` | everything before `source "${BS_ROOT}/bootstrap/init.sh"` (the commands themselves live in `bootstrap/bs.sh` as `bs::cli::*`) |
 | `bootstrap/init.sh` | everything before `source .../loader.sh` |
-| `bootstrap/loader.sh` | everything before `source .../bs.sh` (the loader itself is load-time machinery and may probe `declare -f`) |
+| `bootstrap/loader.sh` | everything before `source .../bs.sh` (the loader itself is load-time machinery; it is `@shell posix` and, on its first call, sources the a-priori bottom layer `core/prereq`, `var`, `str`, `data` itself — the registry of loaded modules lives on the data layer) |
 
 ## Forbidden in pre-kernel scope
 

@@ -764,6 +764,10 @@ Allowed: `case`, `[ ]`/`test`, the expansions `${v#p}`, `${v%p}`, `${v:-d}`, `${
 | `cmd \| while read x; do … done` writing variables | `while read … done < file` or a heredoc | in bash, dash, ash, mksh the pipeline runs in a subshell and `n` stays 0, in zsh and ksh93 it does not (`n=2`): the behaviour differs |
 | An unquoted variable | `"$v"`, `"$@"` | globbing and splitting; the only exception is a deliberate `eval "$(…)"` |
 | a bare `\|` in a `${x%%a\|b}` pattern | escape it: `${x%%\|*}`, or use `case` | in ksh93 a bare `\|` in `${x%%\|*}` is an alternation, not a character (found by `testdepsportableunit.sh`) |
+| `while … done < <(cmd)`, `mapfile < <(cmd)` | `x=$(cmd)` and a `while read … done <<EOF` loop with `$x` in the heredoc | process substitution is not POSIX; a heredoc loop runs in the current shell, so variables survive |
+| `. file arg1 arg2`, `source file "$@"` | call a function from the file: `. file; bs_function "$@"` | dash does not pass arguments to a sourced file (the positional parameters stay the caller's) |
+| `case "$x" in "$prefix"*)` with a possibly empty `$prefix` | test `[ -n "$prefix" ]` before the `case` | an empty pattern `""*` matches anything: in `bs_str_ltrim` an empty CR (mksh has no built-in `printf`, the binary was missing) looped the parse forever |
+| relying on a built-in `printf` | assume it is an external command in mksh (R59) | mksh has no built-in `printf`: without the binary in `PATH` every call dies "not found" |
 | `exit` in a function | `return N`; `exit` only in `bs_exit`, entry points, `trampoline.sh` | `exit` in a subshell or in someone else's function kills the wrong thing |
 | `trap` when a file loads | `trap` inside a function (`bs_errorhandler_setup_trap`), cleanup through `bs_cleanup_add` | `trap` **replaces** the previous handler, it does not add to it |
 | `cd` in a function | `( cd -- "$d" && … )` or `$(cd -- "$d" && pwd -P)` | `cd` changes the caller's directory |

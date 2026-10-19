@@ -82,14 +82,14 @@ Read top to bottom. Three layers: the **POSIX prologue** (runs in any shell),
 ```
  source bootstrap/init.sh
    │
-   ├─ POSIX gate: not bash 4.2+ → bilingual explanation, return 1
-   ├─ source bootstrap/bs.sh  (pre-kernel); BS_BOOTSTRAP_DIR
+   ├─ BS_BOOTSTRAP_DIR (bash: path of the file; zsh: %x; others: BS_ENTRY_DIR / BS_ROOT)
+   ├─ source bootstrap/base.sh  (pre-kernel, POSIX); in bash also bootstrap/bs.sh
    ├─ BS_INITIALIZED set and bs::guard exists? → return 0   (idempotency)
    ├─ BS_ROOT (given, else the parent of bootstrap/ that holds the bs file)
-   ├─ bs::shell::ensure_version 4   (source mode: there is no prologue)
+   ├─ BS_KERNEL_MODE: full (bash 4.2+) or posix (dash, ash, ksh, mksh, zsh); an older bash is refused
    ├─ bs::append_local_bin_to_path   (~/.local/bin in the PATH of this process)
    ├─ BS_HOME (defaults to BS_ROOT)
-   ├─ source bootstrap/loader.sh      → load and bs::load appear
+   ├─ source bootstrap/loader.sh      → bs_load appears (load and bs::load in bash and zsh)
    ├─ load core/prereq      bs::guard, bs::source_relative (first!)
    ├─ load core/lang        str::, arr::, map::, bs::func_name
    ├─ load core/const       error codes, colours, flags
@@ -112,14 +112,14 @@ Read top to bottom. Three layers: the **POSIX prologue** (runs in any shell),
  load "lib/io/streams"
    │
    ├─ BS_ROOT set and a directory?            no  → error, return 1
-   ├─ already in BS_LOADED_MODULES?           yes → return 0
+   ├─ already in bs_loaded_modules?           yes → return 0
    ├─ --strict-shell: does the module's @shell tier fit BS_ORIGIN_SHELL?   no → refuse
-   ├─ module already in BS_LOAD_STACK?        yes → circular dependency, return 1
-   ├─ push onto BS_LOAD_STACK
+   ├─ module already in bs_load_stack?        yes → circular dependency, return 1
+   ├─ push onto bs_load_stack
    ├─ for each dependency in "# @depends" → load (recursive); failure → return 1
    ├─ BS_CURRENT_FILE=<file>; source ${BS_ROOT}/lib/io/streams.sh
-   ├─ pop from BS_LOAD_STACK (on error too)
-   └─ BS_LOADED_MODULES[path]=1
+   ├─ pop from bs_load_stack (on error too)
+   └─ bs_map_set bs_loaded_modules path 1
 ```
 
 ## The kernel by tiers: what every shell gets
@@ -251,13 +251,15 @@ Its steps:
    from the file's own location (the parent of `bootstrap/`), verified by the
    presence of the `bs` script. If that fails, initialization aborts with an
    error asking to set `BS_ROOT` manually.
-3. **Pre-kernel namespace.** Sources `bootstrap/bs.sh` and runs the shell
-   version gate `bs::shell::ensure_version 4` before any kernel code loads (in
-   source mode there is no prologue, so `init.sh` checks the version itself) —
-   runtime detection via `BASH_VERSION`/`ZSH_VERSION`, never `$SHELL` (the
-   login shell lies when sourcing from another shell).
+3. **Pre-kernel namespace and the kernel mode.** Sources `bootstrap/base.sh`
+   (POSIX: `bs_strict`, `bs_append_local_bin_to_path`, `bs_shell_*`) and, in
+   bash, `bootstrap/bs.sh`. Then it chooses `BS_KERNEL_MODE`: `full` in bash
+   4.2+, `posix` in every other shell (the 14 POSIX modules, no `lang`/`config`),
+   and refuses a bash older than 4.2 (`bs_shell_ensure_version`) — runtime
+   detection through the shell registry, never `$SHELL` (the login shell lies
+   when sourcing from another shell).
 4. **PATH tweak.** `~/.local/bin` is prepended to `PATH` once
-   (`bs::append_local_bin_to_path`), which covers local installs.
+   (`bs_append_local_bin_to_path`), which covers local installs.
 5. **BS_HOME.** Defaults to `BS_ROOT` if unset.
 6. **Loader.** Sources `bootstrap/loader.sh` (falling back to
    `${BS_ROOT}/loader.sh`). The loader also sources `bootstrap/bs.sh` for
@@ -319,10 +321,10 @@ load "lib/io/streams"   # sources ${BS_ROOT}/lib/io/streams.sh
 `sources` the corresponding file. Internals:
 
 - **Duplicate-load protection.** Loaded modules are recorded in the
-  associative array `BS_LOADED_MODULES`; a second `load` of the same module is
+  map `bs_loaded_modules` of the data layer (it was the bash array `BS_LOADED_MODULES`); a second `load` of the same module is
   a no-op returning `0`.
 - **Cycle detection.** The modules currently being loaded are kept in the
-  `BS_LOAD_STACK` array. If a module is requested while it is already on the
+  `bs_load_stack` array of the data layer (it was `BS_LOAD_STACK`). If a module is requested while it is already on the
   stack, loading fails with a `circular dependency detected` error naming the
   full chain. The stack entry is always popped afterwards, including on
   failure.
@@ -365,7 +367,7 @@ Step by step:
 3. `run_cmd` spawns a clean bash, unsets `BS_INITIALIZED`, sources
    `bootstrap/init.sh` (full core load) and then sources the script.
 4. The script pulls in additional modules with `load`. Already-loaded modules
-   cost nothing thanks to `BS_LOADED_MODULES`.
+   cost nothing thanks to `bs_loaded_modules`.
 5. During execution the script may register cleanup functions with
    `cleanup::add <fn>`.
 6. On exit — normal, via `bs::exit [code]`, or via `error::exit "msg" [code]` —

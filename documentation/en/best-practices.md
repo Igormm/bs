@@ -61,8 +61,8 @@ See the [Code Style Guide](code-style-guide.md) for details.
 ## Common patterns
 
 - **Module loader**: declare dependencies in a `# @depends core/const, core/logger`
-  comment; the loader detects cycles via `BS_LOAD_STACK` and deduplicates loads
-  via `BS_LOADED_MODULES`.
+  comment; the loader detects cycles via `bs_load_stack` and deduplicates loads
+  via `bs_loaded_modules`.
 - **Centralized shell checks**: validate Bash 4.2+ through a single helper
   (entry points rely on the POSIX prologue, `bs_shell_host_ok`; a script that
   sources `init.sh` uses `bootstrap/bs.sh::bs::shell::ensure_version`, available

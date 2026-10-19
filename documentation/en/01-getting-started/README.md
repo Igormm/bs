@@ -20,8 +20,12 @@ code style and with zero external dependencies.
   kernel works"). That is a small set of helpers (constants, the version,
   `bs_utils_has`, `bs_log_info`, `calc`, …), not the whole of BS.
 - You can start `bs` and `install.sh` **from any shell** (dash, ash, zsh, ksh,
-  fish, nushell): the prologue finds bash and re-runs itself in it, so bash must
-  be on the system but need not be your shell.
+  fish, nushell): the prologue finds bash and re-runs itself in it, so for `bs`
+  bash must be on the system but need not be your shell.
+- **`install.sh` does not need bash at all**: with no bash 4.2+ on the machine it
+  runs in dash, ash, ksh, mksh or zsh and installs BS (see
+  [install](../install.md#installing-without-bash)); only the installed `bs`
+  command and `lib/` then need bash.
 - Linux (primary platform; macOS is partially supported: the system bash there
   is 3.2, install bash 4.2+ from Homebrew)
 
