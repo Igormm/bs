@@ -13,10 +13,10 @@
 ## Требования
 
 - **bash 4.2+ — обязательное требование.** На bash написаны вся библиотека `lib/`
-  (87 модулей) и 1 из 15 файлов ядра, а также CLI `bootstrap/bs.sh`, загрузчик и установщик `core/`, поэтому без bash BS не работает.
+  (87 модулей), а также CLI `bootstrap/bs.sh`, загрузчик и установщик, поэтому без bash BS не работает.
   Версии 4.2 и 4.3 допускаются кодом, но CI проверяет с **4.4** (почти все
   платформы поставляют 4.4 и новее).
-- Исключение — 14 файлов ядра с меткой `@shell posix`: они не зависят от bash и
+- Исключение — 15 файлов ядра с меткой `@shell posix`: они не зависят от bash и
   подключаются из dash, ash, ksh, mksh, zsh и bash (см. раздел «Как устроено
   ядро»). Это небольшой набор помощников (константы, версия, `bs_utils_has`,
   `bs_log_info`, `calc` и др.), а не весь BS.
@@ -31,7 +31,7 @@
 
 **Курс на независимость от оболочки.** Цель — ядро (`bootstrap/`, `core/`, `install/`,
 `boot.sh`, `bs`, `install.sh`) в одном пространстве имён `bs_*`, не зависящее от
-оболочки (dash, ash, ksh, mksh, zsh, bash). Уже готово 14 из 15 файлов `core/`
+оболочки (dash, ash, ksh, mksh, zsh, bash). Уже готово 15 из 15 файлов `core/`
 (включая слой массивов и словарей `core/data.sh`) и слой оболочек в `bootstrap/`;
 остальное переводится по плану (см. [shell-portability](../08-development/shell-portability.md#курс-на-независимость-от-оболочки)).
 Вся библиотека `lib/` пока написана для bash 4.2+ (zsh разбирает 85 из 87 файлов,
@@ -185,18 +185,22 @@ flowchart TB
       const:::posix
       version:::posix
       quiet:::posix
+      fmt:::posix
+      logger:::posix
+      calc:::posix
+      data:::posix
+      utils:::posix
+      deps:::posix
+      errorhandler:::posix
+      config:::posix
+      lang:::posix
+      args:::posix
     end
-    subgraph CB["@shell bash4"]
-      lang:::bash4
-      args:::bash4
-      errorhandler:::bash4
-      config:::bash4
-      logger:::bash4
-      utils:::bash4
-      deps:::bash4
-      calc:::bash4
-      repl:::bash4
-    end
+  end
+  subgraph L["lib/compat · bash4 (мосты, вне ядра)"]
+    cdeps["deps.sh"]:::bash4
+    clang["lang.sh<br/>str::, arr::, map::"]:::bash4
+    cargs["args.sh<br/>ARGS_PARAMS, ARGS_FLAGS"]:::bash4
   end
   bs -.-> shell
   boot -.-> shell
@@ -206,8 +210,8 @@ flowchart TB
   bssh -.-> init
   init -.-> loader
   loader -.-> CP
-  loader -.-> CB
-  CB -.-> CP
+  init -.-> L
+  L -.-> CP
   inst -.-> sheb
 ```
 

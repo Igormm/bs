@@ -35,8 +35,8 @@
 #     bs_arr_each and bs_map_each may be called from their own callbacks (nesting is counted).
 #
 # ИМЕНА / NAMES: пространство bs_ (bs_arr_*, bs_map_*, bs_quote). Старые arr::* и map::* из
-#   core/lang.sh работают с настоящими массивами bash и остаются как есть.
-#   Namespace bs_ (bs_arr_*, bs_map_*, bs_quote). The old arr::* and map::* of core/lang.sh work
+#   lib/compat/lang.sh работают с настоящими массивами bash и остаются как есть.
+#   Namespace bs_ (bs_arr_*, bs_map_*, bs_quote). The old arr::* and map::* of lib/compat/lang.sh work
 #   on real bash arrays and stay as they are.
 
 # Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа

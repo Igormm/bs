@@ -18,9 +18,11 @@
 #   Real functions: bs_is_empty, bs_is_not_empty, bs_is_exists, bs_is_file, bs_is_dir,
 #   bs_is_symlink, bs_is_file_not_empty, bs_is_executable, bs_is_readable, bs_is_writable,
 #   bs_is_number, bs_is_command; in bash and zsh also is::* (the old names, aliases).
-#   is::function stays in lib/compat/lang.sh: only bash tells a function from a command.
+#   is::function and is::command stay in lib/compat/lang.sh: only bash tells a function from a command,
+#   and is::command keeps calling utils::has by name, so that tests can replace it.
 #   Настоящие функции — bs_is_*; в bash и zsh — ещё и is::* (прежние имена, псевдонимы).
-#   is::function остаётся в lib/compat/lang.sh: отличить функцию от команды умеет только bash.
+#   is::function и is::command остаются в lib/compat/lang.sh: функцию от команды отличает только bash,
+#   а is::command вызывает utils::has по имени, чтобы тесты могли его подменить.
 
 bs_guard LANG || return 0
 
@@ -100,4 +102,3 @@ bs_shell_alias bs_is_executable is::executable
 bs_shell_alias bs_is_readable is::readable
 bs_shell_alias bs_is_writable is::writable
 bs_shell_alias bs_is_number is::number
-bs_shell_alias bs_is_command is::command

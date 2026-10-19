@@ -139,6 +139,8 @@ load "core/deps"
 load "lib/compat/deps"
 # языковые примитивы bash: bs::func_name, str::*, arr::*, map::* (вне ядра) / bash language primitives (outside the kernel)
 load "lib/compat/lang"
+# массивы bash ARGS_PARAMS/ARGS_FLAGS/ARGS_REST для args::parse (вне ядра) / bash arrays for args::parse (outside the kernel)
+load "lib/compat/args"
 
 # Load configuration from files and env
 config::load

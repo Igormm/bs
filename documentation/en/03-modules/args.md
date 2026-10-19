@@ -179,6 +179,14 @@ args::define first middle last
 | `ARGS_HELP_REQUESTED` | `1` if `-h`/`--help` was passed |
 | `ARGS_VERSION` | module version |
 
+## Names and tier
+
+`core/args.sh` is `@shell posix`: the real functions are named `bs_args_*` (`bs_args_parse`, `bs_args_get`, `bs_args_flag_get`, …) and work in dash, ash, ksh, mksh, zsh and bash. The state (tree, flags, parse result) lives in the data layer `core/data.sh`. In bash and zsh the old `args::*` names stay. Messages and help are unchanged.
+
+The bash arrays `ARGS_PARAMS`, `ARGS_FLAGS` and `ARGS_REST` are filled by the bridge `lib/compat/args.sh` (loaded by `init.sh`): `args::parse`, `args::reset` and `args::require` call the kernel and copy the result into those arrays. From other shells read the result with `bs_args_get N`, `bs_args_flag_get NAME` and `bs_args_rest`.
+
+A flag validator is `number`, `enum:a,b` or a function name (in the POSIX kernel: any name `command -v` finds).
+
 ## Complete example
 
 See [examples/argsparseexample.sh](../../../examples/argsparseexample.sh):

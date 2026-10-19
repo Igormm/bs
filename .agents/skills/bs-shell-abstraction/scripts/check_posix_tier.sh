@@ -68,7 +68,14 @@ done
 # Конструкции, которых нет в POSIX sh / constructs that are not POSIX sh
 syntax='\[\[[^:]|\(\( |\$\(\(.*\)\)\)|=~|<\(|>\(|\$\{![A-Za-z_]|\$\{[A-Za-z_0-9]+(\^\^|,,)|\$\{[A-Za-z_0-9]+\[|^[[:space:]]*(declare|typeset|mapfile|readarray|shopt|local -[a-zA-Z]|source )|^[[:space:]]*function [A-Za-z_]|\$'"'"'|\bcoproc\b|\bselect [a-z]'
 for f in "${files[@]}"; do
-  body="$(grep -vE '^[[:space:]]*#' "${f}")"
+  # Тела heredoc — текст, который файл выдаёт (например, скрипт автодополнения для bash), а не его код
+  # Heredoc bodies are text the file prints (e.g. a bash completion script), not its code
+  body="$(grep -vE '^[[:space:]]*#' "${f}" | awk '
+    hd != "" { if ($0 == hd) hd = ""; next }
+    match($0, /<<-?[ ]*\\?["\x27]?[A-Za-z_]+["\x27]?/) {
+      t = substr($0, RSTART, RLENGTH); gsub(/<<-?[ ]*|\\|["\x27]/, "", t); hd = t
+    }
+    { print }')"
   hits="$(printf '%s\n' "${body}" | grep -nE -- "${syntax}" | grep -v 'shell-gate' || true)"
   # $(( )) арифметика — POSIX; отфильтровываем только её / $(( )) is POSIX; only it is filtered out
   hits="$(printf '%s\n' "${hits}" | grep -vE '\$\(\([^)]*\)\)' || true)"

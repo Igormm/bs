@@ -3,8 +3,8 @@
 # Architecture
 
 BS is a thin runtime layer **on top of bash 4.2+**: all of the `lib/` library (86
-modules) and 1 of the 15 kernel files, plus the CLI `bootstrap/bs.sh`, the loader and the installer (the `bash4` tier) are written in it. The
-exception is 14 `@shell posix` kernel files that run in any shell; the other
+modules), plus the CLI `bootstrap/bs.sh`, the loader and the installer (the `bash4` tier) are written in it. The
+exception is 15 `@shell posix` kernel files that run in any shell; the other
 shells reach BS through a re-run in bash or `bs call`. It consists of two entry scripts
 (`boot.sh`, `bs`) with a shared POSIX prologue, a shell registry
 (`bootstrap/shell.sh`), a bootstrapper (`bootstrap/init.sh`), a module loader
@@ -132,8 +132,7 @@ what was really run is in the priority table of
 
 | Tier | `core/` files | Runs directly in | How the other shells get it |
 |---|---|---|---|
-| `posix` (14) | `prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `config`, `lang` | bash, zsh, dash, busybox ash, ksh93, mksh (verified by running) | — (they source it themselves) |
-| `bash4` (1) | `args` (`repl` moved to `lib/ui/repl`, the rest of `lang` to `lib/compat/lang`) | bash 4.2+ only |
+| `posix` (15) | `prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `config`, `lang`, `args` | bash, zsh, dash, busybox ash, ksh93, mksh (verified by running) | — (they source it themselves) |
 | `bash4` (87) | **all of `lib/`**, every module | bash 4.2+ only (no `lib/` module is POSIX) | the entry point finds bash and re-runs itself in it (trampoline); kernel functions — the `bs call` command |
 
 What makes it "available to all":
@@ -147,13 +146,10 @@ What makes it "available to all":
    function from fish, nushell and other shells with another syntax; the
    function runs in bash, the output and the exit code go back to the caller.
 
-What the kernel does **not** promise: to run `args` and
-the other `bash4` files in dash, ash, ksh, mksh, fish or nushell. They need
-associative arrays, namerefs and `=~` with `BASH_REMATCH`, which are missing or
-behave differently there. Shells without a real run (nushell, oksh, osh) are
-not considered verified. Files move from `bash4` to `posix` one by one (done:
-`utils`, `deps`, `errorhandler`, `config`, `lang`, `calc`, `quiet`, `fmt`, `logger`, `data`; `args` waits for the data layer). The other bash language
-primitives (`str::*`, `arr::*`, `map::*`) moved out of `lang` into `lib/compat/lang`, `repl` into `lib/ui/repl`.
+What the kernel does **not** promise: to run what lies outside `core/` in dash, ash, ksh, mksh, fish or nushell — the CLI `bootstrap/bs.sh`, the
+loader, the installer and all of `lib/` (the `bash4` tier). All 15 `core/` files are `posix`. The bash features the kernel does not need were moved out
+of it into `lib/compat/`: `str::*`, `arr::*`, `map::*` (from `lang`), `deps::missing_tools` and the arrays `ARGS_PARAMS`, `ARGS_FLAGS`, `ARGS_REST` for
+`args::parse`; `repl` into `lib/ui/repl`. Shells without a real run (nushell, oksh, osh) are not considered verified.
 
 ## Stage 0: POSIX prologue and the `trampoline`
 
