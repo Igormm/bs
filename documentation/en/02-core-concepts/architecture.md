@@ -3,8 +3,8 @@
 # Architecture
 
 BS is a thin runtime layer **on top of bash 4.2+**: all of the `lib/` library (86
-modules) and 6 of the 15 kernel files (the `bash4` tier) are written in it. The
-exception is 9 small `@shell posix` kernel files that run in any shell; the other
+modules) and 2 of the 15 kernel files, plus the CLI `bootstrap/bs.sh`, the loader and the installer (the `bash4` tier) are written in it. The
+exception is 13 `@shell posix` kernel files that run in any shell; the other
 shells reach BS through a re-run in bash or `bs call`. It consists of two entry scripts
 (`boot.sh`, `bs`) with a shared POSIX prologue, a shell registry
 (`bootstrap/shell.sh`), a bootstrapper (`bootstrap/init.sh`), a module loader
@@ -132,8 +132,8 @@ what was really run is in the priority table of
 
 | Tier | `core/` files | Runs directly in | How the other shells get it |
 |---|---|---|---|
-| `posix` (9) | `prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data` | bash, zsh, dash, busybox ash, ksh93, mksh (verified by running) | — (they source it themselves) |
-| `bash4` (6) | `lang`, `args`, `errorhandler`, `config`, `utils`, `deps` (`repl` moved to `lib/ui/repl`) | bash 4.2+ only |
+| `posix` (13) | `prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `config` | bash, zsh, dash, busybox ash, ksh93, mksh (verified by running) | — (they source it themselves) |
+| `bash4` (2) | `lang`, `args` (`repl` moved to `lib/ui/repl`) | bash 4.2+ only |
 | `bash4` (87) | **all of `lib/`**, every module | bash 4.2+ only (no `lib/` module is POSIX) | the entry point finds bash and re-runs itself in it (trampoline); kernel functions — the `bs call` command |
 
 What makes it "available to all":

@@ -7,7 +7,7 @@ whenToUse: When writing or changing anything that touches the shell — an insta
 
 # Переносимость между оболочками / Shell portability
 
-Ядро BS делится на **два яруса**: `@shell posix` (9 файлов `core/` и слой `bootstrap/` —
+Ядро BS делится на **два яруса**: `@shell posix` (13 файлов `core/` и слой `bootstrap/` —
 работают в bash, zsh, dash, busybox ash, ksh93, mksh) и `@shell bash4` (остальное,
 требует bash 4.2+). Яруса bash4 не надо «лечить»: на ассоциативных массивах,
 namerefs и `[[ =~ ]]` стоят сотни функций; для ядра эти конструкции заменяются слоем `core/data.sh` и переводятся по плану (см. `bs-shell-abstraction`), а `lib/` остаётся bash.

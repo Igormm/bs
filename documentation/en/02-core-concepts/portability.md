@@ -7,8 +7,8 @@
 
 ## 1. Why
 
-BS runs on **bash 4.2+** (all of `lib/` and 6 of the 15 kernel files are written
-in it) and claims "ubiquity". The exception is 9 `@shell posix` kernel files that
+BS runs on **bash 4.2+** (all of `lib/` and 2 of the 15 kernel files, plus the CLI `bootstrap/bs.sh`, the loader and the installer are written
+in it) and claims "ubiquity". The exception is 13 `@shell posix` kernel files that
 run in any shell; the other shells get BS through a re-run in bash and the `bs
 call` bridge (see
 [shell-portability](../08-development/shell-portability.md)). But "everywhere"

@@ -449,6 +449,17 @@ bs_map_get() {
   return 1
 }
 
+# @description Положить значение по ключу в переменную (без вывода и подоболочки); нет ключа — статус 1 / Put the value by key into a variable (no output, no subshell); a missing key is status 1
+# @param $1 map / словарь
+# @param $2 key / ключ
+# @param $3 variable name / имя переменной
+bs_map_get_to() {
+  bs_data_check "$1" || return 2
+  bs_map_has "$1" "${2-}" || return 1
+  eval "__bs_dat_out=\${${__bs_dat_var}}"
+  bs_data_ret "${3-}"
+}
+
 # @description Удалить ключ / Remove a key
 # @param $1 map / словарь
 # @param $2 key / ключ
