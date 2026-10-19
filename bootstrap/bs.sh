@@ -186,209 +186,12 @@ bs::is_main() {
 # in other people's scripts.
 # ==========================================================================
 
-# 6. Утилитные функции
-bs::cli::die()  { error::exit "$*"; }
-
-bs::cli::help() {
-  cat <<HELP
-BS Framework $(bs::version::get) – command launcher & shebang interpreter
-Usage: bs [command] [args...]
-       bs help <command>   Show detailed help for a command
-
-Info / Информация:
-  help, -h, --help    Show this help / показать эту справку
-  help <command>      Show detailed help for a command / справка по команде
-  version [--full]    Print framework version (--full: build and install info) / версия (--full: сборка и установка)
-  env                 Show environment (BS_ROOT, PATH, install manifest) / окружение
-  doctor              Check framework integrity / проверка целостности
-
-Modules / Модули:
-  list                List available modules (core/, lib/) / список модулей
-  lang-doc            JSON index of function docs (LSP metadata) / индекс функций
-  lsp                 Run language server (JSON-RPC over stdin/stdout) / LSP
-
-Development / Разработка:
-  run <script> [args] Execute script inside BS environment / запуск скрипта
-  build <script>      Assemble a standalone self-extracting script / сборка
-  repl                Interactive REPL (BS shell) / интерактивная консоль
-  calc                RPN calculator / калькулятор ОПН
-  rfc [number]        RFC helpers (1925, 3986, 4122, 4180) / RFC
-  api <sub> [args]    OpenAPI 3.x client / OpenAPI-клиент
-  ts <command>        TypeScript toolchain / TS-тулчейн
-  audit [roots]       GNU-only tool audit / аудит GNU-зависимостей
-  chat [opts]         Interactive LLM chat / чат с LLM
-
-Maintenance / Обслуживание:
-  update [opts]       Update installed copies from a local repo or GitHub / обновление
-  uninstall [opts]    Remove installed BS copies / удаление
-  where [--deep]      Find every trace of BS on this machine / все следы BS на машине
-  init-shell [SHELL]  PATH snippet for your shell: bash zsh ash dash ksh fish nu / snippet для вашей оболочки
-  call FUNC [ARGS]    Call a kernel/library function from any shell (fish, nu, dash...) / вызвать функцию из любой оболочки
-  shebang <cmd>       Check and rewrite #! lines for this machine (Termux: no /usr/bin/env) / проверка и правка #! для этой машины
-  --strict-shell[=SHELL]  (before the command) refuse lib/ modules whose @shell tier does not fit the shell bs was started from, or the NAMED SHELL (--strict-shell=dash: will it work in dash) / отказывать модулям lib/, чей tier @shell не подходит оболочке запуска или УКАЗАННОЙ оболочке
-
-Shebang mode:
-  #!/usr/bin/env bs
-  (set BS_SHEBANG=1 internally)
-
-Examples:
-  bs doctor
-  bs help build
-  bs run ./examples/deploy.sh --prod
-  bs list | grep system
-HELP
-}
-
-# @description Show detailed help for a single command by calling its --help.
-# @description Показать подробную справку по одной команде через её --help.
-# @param $1 Command name / имя команды
-bs::cli::help_cmd() {
-  local cmd="${1:-}"
-  if is::empty "${cmd}"; then
-    bs::cli::help
-    return 0
-  fi
-  case "${cmd}" in
-    help|-h|--help) help ;;
-    version)        printf 'Usage: bs version [--full]\n\nPrint the framework version; --full adds the root, install kind, source and last update.\n' ;;
-    env)            printf 'Usage: bs env\n\nShow BS_ROOT, PATH and the install manifest.\n' ;;
-    list)           bs::cli::list_cmd --help ;;
-    lang-doc)       bs::cli::lang_doc_cmd --help ;;
-    lsp)            bs::cli::lsp_cmd --help ;;
-    chat)           bs::cli::chat_cmd --help ;;
-    api)            bs::cli::api_cmd --help ;;
-    ts)             bs::cli::ts_cmd --help ;;
-    audit)          bs::cli::audit_cmd --help ;;
-    doctor)         bs::cli::doctor_cmd --help ;;
-    run)            printf 'Usage: bs run <script> [args...]\n\nExecute a script inside the BS environment.\n' ;;
-    build)          bs::cli::build_cmd --help ;;
-    repl)           printf 'Usage: bs repl\n\nInteractive REPL (BS shell).\n' ;;
-    calc)           printf 'Usage: bs calc [expression]\n\nRPN calculator on dc.\n' ;;
-    update|sync)    bs::cli::update_cmd --help ;;
-    uninstall)      bs::cli::uninstall_cmd --help ;;
-    where)          bs::cli::where_cmd --help ;;
-    init-shell)     bs::cli::init_shell_usage ;;
-    shebang)        bs::cli::shebang_usage ;;
-    call)           bs::cli::call_usage ;;
-    rfc)            bs::cli::rfc_cmd --help ;;
-    *)              bs::cli::die "help: unknown command: ${cmd}" ;;
-  esac
-}
-
-# @private Первые 7 символов хеша коммита / First 7 characters of a commit hash
-bs::cli::short_sha() { printf '%s' "${1:0:7}"; }
-
-# @private Строки сведений о запущенной копии — ровно то, что `bs version --full`
-# печатает после строки версии: root, вид установки, источник, последнее
-# обновление. Читает манифест и git, чужой код не запускает. Те же строки идут
-# в начале и в каждой рамке `bs update` / `bs uninstall`.
-# @private The detail lines about the running copy — exactly what
-# `bs version --full` prints after the version line: root, install kind,
-# source, last update. Reads the manifest and git, runs no foreign code. The
-# same lines open every `bs update` / `bs uninstall` run and notice box.
-bs::cli::bs_full_info_lines() {
-  local key
-  local -A info=()
-  printf '  %-10s %s\n' "root:" "${BS_ROOT}"
-  if [[ -e "${BS_ROOT}/.install" ]] && ! bs::cli::update_manifest_valid "${BS_ROOT}/.install"; then
-    printf '  %-10s %s\n' "install:" \
-      "manifest unreadable or corrupt / манифест повреждён: ${BS_ROOT}/.install (bs update recreates it)"
-  elif [[ -f "${BS_ROOT}/.install" ]]; then
-    for key in mode installed_at installed_by source source_commit \
-               updated_at updated_from updated_commit; do
-      info["${key}"]="$(bs::cli::install_info_get "${BS_ROOT}" "${key}")"
-    done
-    printf '  %-10s %s, installed %s by %s\n' "install:" \
-      "${info[mode]:-?}" "${info[installed_at]:-?}" "${info[installed_by]:-?}"
-    printf '  %-10s %s @ %s\n' "source:" \
-      "${info[source]:-?}" "$(bs::cli::short_sha "${info[source_commit]:-}")"
-    if [[ -n "${info[updated_at]}" ]]; then
-      printf '  %-10s %s from %s @ %s\n' "updated:" "${info[updated_at]}" \
-        "${info[updated_from]:-?}" "$(bs::cli::short_sha "${info[updated_commit]:-}")"
-    fi
-  elif [[ -e "${BS_ROOT}/.git" ]] && utils::has git; then
-    printf '  %-10s source checkout, commit %s (%s)%s\n' "install:" \
-      "$(git -C "${BS_ROOT}" rev-parse --short=7 HEAD 2>/dev/null || printf '?')" \
-      "$(git -C "${BS_ROOT}" log -1 --format=%cd --date=short 2>/dev/null || printf '?')" \
-      "$([[ -n "$(git -C "${BS_ROOT}" status --porcelain 2>/dev/null)" ]] && printf ', with uncommitted changes' || true)"
-  elif [[ -e "${BS_ROOT}/.git" || -d "${BS_ROOT}/tests" ]]; then
-    printf '  %-10s source checkout (git not available, commit unknown / git недоступен)\n' "install:"
-  else
-    printf '  %-10s %s\n' "install:" \
-      "no manifest (installed by an older installer)"
-  fi
-}
-
-# @private Сведения о запущенной копии одним блоком: заголовок с версией и
-# строки bs::cli::bs_full_info_lines. Первая строка «Запущен / Running: bs ВЕРСИЯ».
-# @private The running copy as one block: a heading with the version and the
-# bs::cli::bs_full_info_lines rows. The first line is "Запущен / Running: bs VERSION".
-bs::cli::bs_running_block() {
-  printf 'Запущен / Running: bs %s\n' "$(bs::version::get)"
-  bs::cli::bs_full_info_lines
-}
-
-# bs version [--full]: номер версии; с --full — откуда взята эта копия BS
-# bs version [--full]: the version number; --full adds where this BS copy is from
-bs::cli::version_cmd() {
-  case "${1:-}" in
-    "")          bs::version::print; return 0 ;;
-    -f|--full)   bs::version::print ;;
-    *)           bs::cli::die "version: unknown argument: $1 (try: bs version --full)" ;;
-  esac
-
-  bs::cli::bs_full_info_lines
-  printf '  codename:  %s\n' "$(bs::version::codename)"
-}
-
-# @private Значение ключа из манифеста установки (<lib>/.install, key=value).
-# @private Value of a key from the install manifest (<lib>/.install, key=value).
-# @param $1 Install directory / Каталог установки
-# @param $2 Key / Ключ
-bs::cli::install_info_get() {
-  local -r file="$1/.install" key="$2"
-  local line
-  [[ -f "${file}" ]] || return 0
-  while IFS= read -r line; do
-    if [[ "${line}" == "${key}="* ]]; then
-      printf '%s\n' "${line#*=}"
-      return 0
-    fi
-  done < "${file}"
-  return 0
-}
-
-bs::cli::env_cmd() {
-  printf 'BS_ROOT=%s\nPATH=%s\n' "$BS_ROOT" "$PATH"
-  # Как установлена эта копия (манифест пишет install.sh)
-  # How this copy was installed (the manifest is written by install.sh)
-  if [[ -e "${BS_ROOT}/.install" ]] && ! bs::cli::update_manifest_valid "${BS_ROOT}/.install"; then
-    printf '\nInstall manifest unreadable or corrupt / манифест повреждён: %s (bs update recreates it)\n' "${BS_ROOT}/.install"
-  elif [[ -f "${BS_ROOT}/.install" ]]; then
-    printf '\nInstall manifest (%s):\n' "${BS_ROOT}/.install"
-    local line
-    while IFS= read -r line; do
-      [[ -z "${line}" || "${line}" == '#'* ]] || printf '  %s\n' "${line}"
-    done < "${BS_ROOT}/.install"
-  elif is::dir "${BS_ROOT}/tests"; then
-    printf '\nInstall: source checkout (not installed) / исходный репозиторий\n'
-  else
-    printf '\nInstall: no manifest (installed by an older installer) / манифеста нет\n'
-  fi
-}
-
-bs::cli::list_cmd() {
-  echo 'Available modules:'
-  local file
-  local count=0
-  while IFS= read -r file; do
-    if is::file "${file}"; then
-      printf '  %s\n' "${file#"${BS_ROOT}"/}"
-      count=$(( count + 1 ))
-    fi
-  done < <(find "${BS_ROOT}/core" "${BS_ROOT}/lib" -type f -name '*.sh' 2>/dev/null | sort)
-  printf '%d modules\n' "${count}"
-}
+# POSIX-часть команд (die, help, version, env, list, …) — bootstrap/cli.sh; здесь остальные, на bash
+# The POSIX part of the commands (die, help, version, env, list, …) is bootstrap/cli.sh; the rest, in bash, is here
+if [[ -f "${BS_BOOTSTRAP_DIR}/cli.sh" ]]; then
+  # shellcheck source=bootstrap/cli.sh
+  source "${BS_BOOTSTRAP_DIR}/cli.sh"
+fi
 
 bs::cli::lang_doc_cmd() {
   local file=""
@@ -816,6 +619,10 @@ bs::cli::build_cmd() {
   chmod 0755 "${out_tmp}"
   mv -f -- "${out_tmp}" "${out_file}"
   rm -rf "${tmp_dir}"
+  # RETURN-ловушка живёт и после возврата из функции: без сброса она сработала бы ещё раз у вызывающего,
+  # где tmp_dir уже нет (под set -u это ошибка) / a RETURN trap outlives the function: without the reset it would fire
+  # again in the caller, where tmp_dir is gone (an error under set -u)
+  trap - RETURN
 
   printf 'Built: %s\n' "${out_file}"
   printf 'Framework bundle: %s bytes (payload hash %s)\n' "$(( ${#payload} ))" "${hash}"
@@ -1472,22 +1279,6 @@ bs::cli::update_source_missing() {
     printf '%s\n' "core/version.sh: версия не читается / no readable version"
   fi
   return 0
-}
-
-# @private Манифест читаем и выглядит как key=value с mode=.
-# @private The manifest is readable key=value text with a mode= line.
-bs::cli::update_manifest_valid() {
-  local line has=0
-  [[ -f "$1" && -r "$1" ]] || return 1
-  while IFS= read -r line || [[ -n "${line}" ]]; do
-    case "${line}" in
-      ''|'#'*) ;;
-      mode=*) has=1 ;;
-      [a-z_]*=*) ;;
-      *) return 1 ;;
-    esac
-  done < "$1"
-  (( has == 1 ))
 }
 
 # @private Обёртка установки: из манифеста, иначе из пути .../lib/bs.

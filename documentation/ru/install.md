@@ -17,7 +17,7 @@ BS устанавливается модульным установщиком в
 
 `install.sh` работает в **dash, busybox ash, ksh, mksh, zsh и bash**. POSIX-пролог сначала ищет bash 4.2+ и перезапускает установщик в нём, если он есть; если нет — установщик продолжает в текущей оболочке, а ядро загружает свою POSIX-часть (`BS_KERNEL_MODE=posix`: 14 из 19 файлов `core/`; `lang`, `config`, `args` и `lib/` требуют bash). Поэтому машина только с busybox (Alpine без `apk add bash`) может установить, переустановить и удалить BS: файлы копируются транзакционно, wrapper записывается, строка PATH идёт в rc-файл вашей оболочки (`~/.profile` для ash, dash, ksh и mksh). `unit/testinstallnobashunit.sh` прячет каждый bash в пространстве монтирования и гоняет весь жизненный цикл в каждой из пяти оболочек.
 
-Что без bash **пока не работает**: сама установленная команда `bs` (её тело и `bootstrap/bs.sh` пока на bash), bash-completion (устанавливается, но не используется) и всё из `lib/`. На такой машине поставьте bash (`apk add bash`), чтобы запускать `bs`.
+Что работает без bash после установки: `bs help`, `bs version [--full]`, `bs env`, `bs list` и `bs calc` (`unit/testbsnobashunit.sh` гоняет их в ash, dash, ksh, mksh и zsh). Любая другая команда `bs` (`doctor`, `update`, `uninstall`, `where`, `run`, …) отвечает «команда пока требует bash 4.2+» и завершается с кодом 1; bash-completion устанавливается, но не используется, а всё из `lib/` — bash. Для этого на такой машине поставьте bash (`apk add bash`).
 
 ## Режимы
 
