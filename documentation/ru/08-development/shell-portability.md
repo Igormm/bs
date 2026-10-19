@@ -2,8 +2,8 @@
 
 # Переносимость между оболочками
 
-**BS требует bash 4.2+.** На bash написаны вся `lib/` (87 модулей, ни один не POSIX) и 3 из
-19 файлов ядра; от bash не зависят только 16 небольших файлов ядра `@shell posix` и пролог точек
+**BS требует bash 4.2+.** На bash написаны вся `lib/` (87 модулей, ни один не POSIX) и 2 из
+19 файлов ядра; от bash не зависят только 17 небольших файлов ядра `@shell posix` и пролог точек
 входа. «Работает из большинства оболочек» значит: `bs` можно запустить из любой оболочки (он
 перезапускается в bash), а `install.sh` работает даже без bash вообще (dash, ash, ksh, mksh, zsh; см.
 «Установщик и `init.sh` без bash» ниже); функции ядра вызываются из любой оболочки через `bs call`, а
@@ -271,7 +271,7 @@ busybox ash, ksh93 и mksh (`unit/testquietportableunit.sh`).
 
 ## Курс на независимость от оболочки
 
-Цель — чтобы `bootstrap/`, `core/`, `install/`, `boot.sh`, `bs` и `install.sh` жили в одном пространстве имён `bs_*` и не зависели от оболочки. Состояние: готово 16 из 19 файлов `core/` (`prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `var`, `str`, `num`, `msg`), слой оболочек и шебанга, загрузчик, `base.sh`, `init.sh` и `cli.sh` в `bootstrap/`, `install/*` и точки входа `install.sh`, `bs` и `boot.sh`. Пока на bash 4.2+: `config` (`BS_CONFIG` на `bs_map_*`), `lang`, `args`, `bootstrap/bs.sh` (стек вызовов и `BASH_REMATCH`, с 9 командами `bs::cli::*`, которые запускают `lib/`) и 87 модулей `lib/`; поэтому полному BS по-прежнему нужен bash 4.2+ (см. начало страницы), а без него работает POSIX-часть выше.
+Цель — чтобы `bootstrap/`, `core/`, `install/`, `boot.sh`, `bs` и `install.sh` жили в одном пространстве имён `bs_*` и не зависели от оболочки. Состояние: готово 17 из 19 файлов `core/` (`prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `config`, `var`, `str`, `num`, `msg`), слой оболочек и шебанга, загрузчик, `base.sh`, `init.sh` и `cli.sh` в `bootstrap/`, `install/*` и точки входа `install.sh`, `bs` и `boot.sh`. Пока на bash 4.2+: `lang`, `args`, `bootstrap/bs.sh` (стек вызовов и `BASH_REMATCH`, с 9 командами `bs::cli::*`, которые запускают `lib/`) и 87 модулей `lib/`; поэтому полному BS по-прежнему нужен bash 4.2+ (см. начало страницы), а без него работает POSIX-часть выше.
 
 ## Не сделано
 

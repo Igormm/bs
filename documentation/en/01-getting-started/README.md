@@ -12,10 +12,10 @@ code style and with zero external dependencies.
 ## Requirements
 
 - **bash 4.2+ is a hard requirement.** All of the `lib/` library (87 modules) and
-  3 of the 19 `core/` files are written in bash, so BS does not run without it.
+  2 of the 19 `core/` files are written in bash, so BS does not run without it.
   Versions 4.2 and 4.3 are accepted by the code, but CI checks from **4.4**
   (nearly every platform ships 4.4 or newer).
-- The exception is the 16 kernel files labelled `@shell posix`: they do not depend
+- The exception is the 17 kernel files labelled `@shell posix`: they do not depend
   on bash and can be sourced from dash, ash, ksh, mksh, zsh and bash (see "How the
   kernel works"). That is a small set of helpers (constants, the version,
   `bs_utils_has`, `bs_log_info`, `calc`, …), not the whole of BS.
@@ -34,7 +34,7 @@ tools only.
 
 **Heading for shell independence.** The goal is a kernel (`bootstrap/`, `core/`,
 `install/`, `boot.sh`, `bs`, `install.sh`) in one namespace `bs_*` that does not
-depend on the shell (dash, ash, ksh, mksh, zsh, bash). Already done: 16 of the 19
+depend on the shell (dash, ash, ksh, mksh, zsh, bash). Already done: 17 of the 19
 `core/` files (including the array and map layer `core/data.sh`) and the shell
 layer in `bootstrap/`; the rest moves by plan (see
 [shell-portability](../08-development/shell-portability.md#heading-for-shell-independence)).

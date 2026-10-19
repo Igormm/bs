@@ -111,6 +111,11 @@ test_maps() {
         eq "multi
 line" "$(probe "${sh_bin}" 'bs_map_set m k "multi
 line"; bs_map_get m k')" "${sh_name}: a value with a newline"
+        eq "[v 1]rc=0" "$(probe "${sh_bin}" 'bs_map_set m k "v 1"; bs_map_get_to m k out; printf "[%s]rc=%s" "$out" "$?"')" "${sh_name}: get_to puts the value into a variable"
+        eq "rc=1" "$(probe "${sh_bin}" 'bs_map_get_to m nope out; echo rc=$?')" "${sh_name}: get_to of a missing key is 1"
+        eq "multi
+line" "$(probe "${sh_bin}" 'bs_map_set m k "multi
+line"; bs_map_get_to m k out; printf "%s" "$out"')" "${sh_name}: get_to keeps a trailing-free newline value exactly"
     done < <(testframework::posix_shells)
 }
 

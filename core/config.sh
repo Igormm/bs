@@ -1,5 +1,7 @@
-#!/usr/bin/env bash
-# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], array, local/declare flags, indirect expansion ${!x} / needs bash constructs: double-bracket [[ ]], array, local/declare flags, indirect expansion ${!x}
+#!/bin/sh
+# shellcheck shell=sh
+# @shell posix — валидный POSIX sh: case, подстановки параметров, eval с проверкой имён; словарь — из core/data.sh / valid POSIX sh: case, parameter expansion, eval with name checks; the map comes from core/data.sh
+# @tier core — builtins and sort; works everywhere
 #
 # core/config.sh — Unified configuration loader for BS
 # core/config.sh — единый загрузчик конфигурации BS
@@ -13,31 +15,40 @@
 #   config::get "BS_LOG_LEVEL" "info"
 #   config::set "BS_LOG_LEVEL" "debug"
 #
-# @depends core/const, core/logger, core/utils
+# ИМЕНА / NAMES
+#   Real functions: bs_config_load, bs_config_get, bs_config_set, bs_config_list,
+#   bs_config_user_file, bs_config_local_file and the private bs_config_set_defaults,
+#   bs_config_load_file, bs_config_export_to_env; in bash and zsh also config::* (the old names).
+#   The loaded configuration is the data-layer map bs_config (it was the associative array BS_CONFIG).
+#   Настоящие функции — bs_config_*; в bash и zsh — ещё и config::*. Загруженная конфигурация —
+#   словарь слоя данных bs_config (был ассоциативным массивом BS_CONFIG).
+#
+# @depends core/const, core/logger, core/utils, core/data
 
-bs::guard "CORE_CONFIG" || return 0
+# shellcheck disable=SC2154  # значения присваиваются через eval / values are assigned through eval
+bs_guard "CORE_CONFIG" || return 0
 
 # Зависимости / Dependencies
-bs::source_relative "const.sh" "logger.sh" "utils.sh"
+bs_source_relative "const.sh" "logger.sh" "utils.sh" "data.sh"
 
 # @global CORE_CONFIG_VERSION — Module version (category: module-flag)
 # @global CORE_CONFIG_VERSION — Версия модуля (категория: module-flag)
-declare -g CORE_CONFIG_VERSION="1.0.0"
-
-# @global BS_CONFIG — Config: loaded configuration map (category: env)
-# @global BS_CONFIG — Config: карта загруженной конфигурации (категория: env)
-declare -gA BS_CONFIG
+# shellcheck disable=SC2034  # читают другие модули и тесты / read by other modules and tests
+CORE_CONFIG_VERSION="1.0.0"
 
 # @global BS_CONFIG_USER_DIR — Env: user config dir ~/.config/bs (category: env)
 # @global BS_CONFIG_USER_DIR — Env: каталог конфигурации пользователя ~/.config/bs (категория: env)
 # Без HOME (cron, systemd, env -i) пользовательского конфига нет: путь пуст / Without HOME (cron, systemd, env -i) there is no user config: the path is empty
-readonly BS_CONFIG_USER_DIR="${HOME:+${HOME}/.config/bs}"
+bs_shell_readonly BS_CONFIG_USER_DIR="${HOME:+${HOME}/.config/bs}"
 # @global BS_CONFIG_USER_FILE — Env: user config file (category: env)
 # @global BS_CONFIG_USER_FILE — Env: файл конфигурации пользователя (категория: env)
-readonly BS_CONFIG_USER_FILE="${BS_CONFIG_USER_DIR:+${BS_CONFIG_USER_DIR}/config.sh}"
+bs_shell_readonly BS_CONFIG_USER_FILE="${BS_CONFIG_USER_DIR:+${BS_CONFIG_USER_DIR}/config.sh}"
 # @global BS_CONFIG_LOCAL_FILE — Env: local (cwd) config file name (category: env)
 # @global BS_CONFIG_LOCAL_FILE — Env: имя локального (cwd) конфиг-файла (категория: env)
-readonly BS_CONFIG_LOCAL_FILE=".bsrc"
+bs_shell_readonly BS_CONFIG_LOCAL_FILE=".bsrc"
+# @global BS_CONFIG_LOCAL_KEYS — Config: keys a project-local ./.bsrc may set (category: constant)
+# @global BS_CONFIG_LOCAL_KEYS — Config: ключи, которые может задать локальный ./.bsrc (категория: constant)
+bs_shell_readonly BS_CONFIG_LOCAL_KEYS=" BS_LOG_LEVEL BS_SILENT BS_FRAMEWORK_DRY_RUN BS_FRAMEWORK_DEBUG BS_FILES_ATOMIC BS_FILES_BACKUP_SUFFIX BS_FILES_ATOMIC_FALLBACK BS_LLM_PROVIDER BS_LLM_MODEL "
 
 # ==========================================
 # Private helpers / Приватные вспомогательные функции
@@ -46,87 +57,86 @@ readonly BS_CONFIG_LOCAL_FILE=".bsrc"
 # @private
 # @description Set default values for built-in configuration keys.
 # @description Установить значения по умолчанию для встроенных ключей конфигурации.
-__config::set_defaults() {
-  BS_CONFIG["BS_LOG_LEVEL"]="info"
-  BS_CONFIG["BS_SILENT"]="0"
-  BS_CONFIG["BS_FRAMEWORK_DRY_RUN"]="false"
-  BS_CONFIG["BS_FRAMEWORK_DEBUG"]="false"
-  BS_CONFIG["BS_RESULT_FILE"]=""
-  BS_CONFIG["BS_FILES_ATOMIC"]="false"
-  BS_CONFIG["BS_FILES_BACKUP_SUFFIX"]=""
-  BS_CONFIG["BS_FILES_ATOMIC_FALLBACK"]="true"
-  BS_CONFIG["BS_LLM_PROVIDER"]=""
-  BS_CONFIG["BS_LLM_MODEL"]=""
-  BS_CONFIG["BS_LLM_BASE_URL"]=""
-  BS_CONFIG["BS_LLM_API_KEY"]=""
+bs_config_set_defaults() {
+  bs_map_set bs_config BS_LOG_LEVEL "info"
+  bs_map_set bs_config BS_SILENT "0"
+  bs_map_set bs_config BS_FRAMEWORK_DRY_RUN "false"
+  bs_map_set bs_config BS_FRAMEWORK_DEBUG "false"
+  bs_map_set bs_config BS_RESULT_FILE ""
+  bs_map_set bs_config BS_FILES_ATOMIC "false"
+  bs_map_set bs_config BS_FILES_BACKUP_SUFFIX ""
+  bs_map_set bs_config BS_FILES_ATOMIC_FALLBACK "true"
+  bs_map_set bs_config BS_LLM_PROVIDER ""
+  bs_map_set bs_config BS_LLM_MODEL ""
+  bs_map_set bs_config BS_LLM_BASE_URL ""
+  bs_map_set bs_config BS_LLM_API_KEY ""
 }
 
-# @global BS_CONFIG_LOCAL_KEYS — Config: keys a project-local ./.bsrc may set (category: constant)
-# @global BS_CONFIG_LOCAL_KEYS — Config: ключи, которые может задать локальный ./.bsrc (категория: constant)
-# ./.bsrc лежит в текущем каталоге и может прийти из чужого репозитория, а
-# загруженные ключи экспортируются в окружение: произвольный ключ (LD_PRELOAD,
-# PATH, BS_UPDATE_REPO, BS_LLM_BASE_URL) был бы выполнением чужого кода.
-# ./.bsrc lives in the current directory and may come from a foreign
-# repository, while loaded keys are exported to the environment: an arbitrary
-# key (LD_PRELOAD, PATH, BS_UPDATE_REPO, BS_LLM_BASE_URL) would be foreign
-# code execution.
-readonly BS_CONFIG_LOCAL_KEYS=" BS_LOG_LEVEL BS_SILENT BS_FRAMEWORK_DRY_RUN BS_FRAMEWORK_DEBUG BS_FILES_ATOMIC BS_FILES_BACKUP_SUFFIX BS_FILES_ATOMIC_FALLBACK BS_LLM_PROVIDER BS_LLM_MODEL "
-
 # @private
-# @description Load a configuration file if it exists.
-# @description Загрузить файл конфигурации, если он существует.
-# @param $1 File path / Путь к файлу
-# @param $2 [optional] "local": accept only BS_CONFIG_LOCAL_KEYS (untrusted file)
-#   / "local": принимать только BS_CONFIG_LOCAL_KEYS (недоверенный файл)
-# @return 0 if file loaded or does not exist, 1 on load error
-__config::load_file() {
-  local file="${1:-}"
-  local -r trust="${2:-user}"
-  is::not_empty "${file}" && is::file "${file}" || return 0
-
-  log::debug "Loading config file: ${file}"
-
-  local key
-  local value
-  local line
-
-  while IFS= read -r line || is::not_empty "${line}"; do
-    # Skip comments and empty lines / Пропускаем комментарии и пустые строки
-    is::empty "${line}" || [[ "${line}" =~ ^[[:space:]]*# ]] && continue
-
-    # Parse KEY="value" or KEY=value / Разбираем KEY="value" или KEY=value
-    if [[ "${line}" =~ ^([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*=[[:space:]]*(.*)$ ]]; then
-      key="$(bs::regex::group 1)"
-      value="$(bs::regex::group 2)"
-
-      if [[ "${trust}" == "local" && "${BS_CONFIG_LOCAL_KEYS}" != *" ${key} "* ]]; then
-        log::warn "config: ${file}: key ${key} is not allowed in a project-local file, ignored"
-        continue
-      fi
-
-      # Remove surrounding quotes / Убираем окружающие кавычки
-      if [[ "${value}" =~ ^\"(.*)\"$ ]]; then
-        value="$(bs::regex::group 1)"
-      elif [[ "${value}" =~ ^\'(.*)\'$ ]]; then
-        value="$(bs::regex::group 1)"
-      fi
-
-      BS_CONFIG["${key}"]="${value}"
-    fi
-  done < "${file}"
-
+# @description Is this a valid variable name? / Допустимо ли это имя переменной?
+# @param $1 name / имя
+bs_config_valid_key() {
+  case "${1-}" in
+    ''|[!A-Za-z_]*|*[!A-Za-z0-9_]*) return 1 ;;
+  esac
   return 0
 }
 
 # @private
-# @description Export configuration values to environment variables.
-# @description Экспортировать значения конфигурации в переменные окружения.
-__config::export_to_env() {
-  local key
-  for key in "${!BS_CONFIG[@]}"; do
-    if is::not_empty "${BS_CONFIG[${key}]:-}"; then
-      printf -v "${key}" '%s' "${BS_CONFIG[${key}]}"
-      export "${key}"
+# @description Parse a config file line by line (KEY=value) into the map.
+# @description Разобрать файл конфигурации построчно (KEY=значение) в словарь.
+# @param $1 File path / Путь к файлу
+# @param $2 [optional] "local": accept only BS_CONFIG_LOCAL_KEYS (untrusted file)
+#   / "local": принимать только BS_CONFIG_LOCAL_KEYS (недоверенный файл)
+bs_config_load_file() {
+  __bs_cf_file=${1:-}
+  __bs_cf_trust=${2:-user}
+  [ -n "$__bs_cf_file" ] && [ -f "$__bs_cf_file" ] || return 0
+  bs_log_debug "Loading config file: ${__bs_cf_file}"
+  while IFS= read -r __bs_cf_line || [ -n "$__bs_cf_line" ]; do
+    [ -n "$__bs_cf_line" ] || continue
+    # комментарий: пробелы, затем # / a comment: spaces, then #
+    __bs_cf_trim=${__bs_cf_line#"${__bs_cf_line%%[![:space:]]*}"}
+    case "$__bs_cf_trim" in '#'*) continue ;; esac
+    case "$__bs_cf_line" in *=*) ;; *) continue ;; esac
+    # ключ — идентификатор в начале строки, за ним необязательные пробелы и «=» / the key is an identifier at the start of the line, then optional spaces and "="
+    __bs_cf_key=${__bs_cf_line%%=*}
+    __bs_cf_key=${__bs_cf_key%"${__bs_cf_key##*[![:space:]]}"}
+    bs_config_valid_key "$__bs_cf_key" || continue
+    __bs_cf_val=${__bs_cf_line#*=}
+    __bs_cf_val=${__bs_cf_val#"${__bs_cf_val%%[![:space:]]*}"}
+    if [ "$__bs_cf_trust" = "local" ]; then
+      case "$BS_CONFIG_LOCAL_KEYS" in
+        *" ${__bs_cf_key} "*) ;;
+        *)
+          bs_log_warn "config: ${__bs_cf_file}: key ${__bs_cf_key} is not allowed in a project-local file, ignored"
+          continue ;;
+      esac
+    fi
+    # значение в двойных или одинарных кавычках — снять их / a value in double or single quotes loses them
+    case "$__bs_cf_val" in
+      \"*\")
+        if [ "${#__bs_cf_val}" -ge 2 ]; then __bs_cf_val=${__bs_cf_val#\"}; __bs_cf_val=${__bs_cf_val%\"}; fi ;;
+      \'*\')
+        if [ "${#__bs_cf_val}" -ge 2 ]; then __bs_cf_val=${__bs_cf_val#\'}; __bs_cf_val=${__bs_cf_val%\'}; fi ;;
+    esac
+    bs_map_set bs_config "$__bs_cf_key" "$__bs_cf_val"
+  done < "$__bs_cf_file"
+  return 0
+}
+
+# @private
+# shellcheck disable=SC2120  # заменяет позиционные параметры списком ключей / replaces the positional parameters with the key list
+# @description Export non-empty configuration values to the environment.
+# @description Экспортировать непустые значения конфигурации в окружение.
+bs_config_export_to_env() {
+  bs_map_keys_to bs_config bscfgkeys
+  eval "$(bs_arr_to_args bscfgkeys)"
+  for __bs_cf_key in "$@"; do
+    bs_map_get_to bs_config "$__bs_cf_key" __bs_cf_val || continue
+    if [ -n "$__bs_cf_val" ]; then
+      eval "${__bs_cf_key}=\${__bs_cf_val}"
+      export "${__bs_cf_key?}"
     fi
   done
 }
@@ -135,117 +145,117 @@ __config::export_to_env() {
 # Public API / Публичный API
 # ==========================================
 
-# @description Load configuration from all sources.
-# @description Загрузить конфигурацию из всех источников.
-#   Priority (low → high): defaults, user config, project config, env vars.
+# @description Load configuration: defaults, user file, project-local file, environment.
+#   Priority (low → high): defaults, user config, local config, environment variables.
+# @description Загрузить конфигурацию: умолчания, файл пользователя, локальный файл проекта, окружение.
 #   Приоритет (низкий → высокий): дефолты, пользовательский config, локальный config, env.
 # @return 0
 # @example
 #   config::load
-config::load() {
-  __config::set_defaults
+bs_config_load() {
+  bs_config_set_defaults
 
   # Ensure user config directory exists / Создаём директорию пользовательского конфига
-  if [[ -n "${BS_CONFIG_USER_DIR}" ]] && ! is::dir "${BS_CONFIG_USER_DIR}"; then
-    utils::ignore mkdir -p "${BS_CONFIG_USER_DIR}"
+  if [ -n "$BS_CONFIG_USER_DIR" ] && [ ! -d "$BS_CONFIG_USER_DIR" ]; then
+    bs_utils_ignore mkdir -p "$BS_CONFIG_USER_DIR"
   fi
 
   # Load user config / Пользовательский конфиг
-  if [[ -n "${BS_CONFIG_USER_FILE}" ]]; then
-    __config::load_file "${BS_CONFIG_USER_FILE}"
+  if [ -n "$BS_CONFIG_USER_FILE" ]; then
+    bs_config_load_file "$BS_CONFIG_USER_FILE"
   fi
 
   # Load project-local config / Локальный конфиг проекта
-  if is::file "${BS_CONFIG_LOCAL_FILE}"; then
-    __config::load_file "${BS_CONFIG_LOCAL_FILE}" local
+  if [ -f "$BS_CONFIG_LOCAL_FILE" ]; then
+    bs_config_load_file "$BS_CONFIG_LOCAL_FILE" local
   fi
 
   # Environment variables override / Переменные окружения имеют приоритет
-  local key
-  for key in "${!BS_CONFIG[@]}"; do
-    if is::not_empty "${!key:-}"; then
-      BS_CONFIG["${key}"]="${!key}"
+  bs_map_keys_to bs_config bscfgkeys
+  eval "$(bs_arr_to_args bscfgkeys)"
+  for __bs_cf_key in "$@"; do
+    eval "__bs_cf_env=\${${__bs_cf_key}:-}"
+    if [ -n "$__bs_cf_env" ]; then
+      bs_map_set bs_config "$__bs_cf_key" "$__bs_cf_env"
     fi
   done
 
-  __config::export_to_env
-
+  bs_config_export_to_env
   return "${E_SUCCESS}"
 }
 
-# @description Get a configuration value.
-# @description Получить значение конфигурации.
+# @description Get a configuration value (or a default).
+# @description Получить значение конфигурации (или значение по умолчанию).
 # @param $1 Key / Ключ
-# @param $2 [optional] Default value / Значение по умолчанию
-# @stdout Configuration value / Значение конфигурации
-# @return 0 if key exists or default provided, E_INVALID otherwise
-# @example
-#   config::get "BS_LOG_LEVEL" "info"
-config::get() {
-  local key="${1:-}"
-  local default_value="${2:-}"
-
-  if is::empty "${key}"; then
-    log::warn "config::get: key required"
+# @param $2 Default value (optional) / Значение по умолчанию (необязательно)
+# @stdout Value / Значение
+# @return 0 if found or defaulted, E_INVALID otherwise / 0 если найдено или есть умолчание, иначе E_INVALID
+bs_config_get() {
+  if [ -z "${1:-}" ]; then
+    bs_log_warn "config::get: key required"
     return "${E_INVALID}"
   fi
-
-  if [[ -v "BS_CONFIG[${key}]" ]]; then
-    printf '%s' "${BS_CONFIG[${key}]}"
-  elif is::not_empty "${default_value}"; then
-    printf '%s' "${default_value}"
+  if bs_map_get_to bs_config "$1" __bs_cf_val; then
+    printf '%s' "$__bs_cf_val"
+  elif [ -n "${2:-}" ]; then
+    printf '%s' "$2"
   else
     return "${E_INVALID}"
   fi
-
   return "${E_SUCCESS}"
 }
 
-# @description Set a configuration value at runtime.
-# @description Установить значение конфигурации в runtime.
+# @description Set a configuration value, in the map and in the environment.
+# @description Установить значение конфигурации — в словаре и в окружении.
 # @param $1 Key / Ключ
 # @param $2 Value / Значение
-# @return 0 on success, E_INVALID on missing key
-# @example
-#   config::set "BS_LOG_LEVEL" "debug"
-config::set() {
-  local key="${1:-}"
-  local value="${2:-}"
-
-  if is::empty "${key}"; then
-    log::warn "config::set: key required"
+# @return 0 on success, E_INVALID if the key is empty or not a variable name / 0 при успехе, E_INVALID если ключ пуст или не имя переменной
+bs_config_set() {
+  if [ -z "${1:-}" ]; then
+    bs_log_warn "config::set: key required"
     return "${E_INVALID}"
   fi
-
-  BS_CONFIG["${key}"]="${value}"
-  printf -v "${key}" '%s' "${value}"
-  export "${key}"
-
+  if ! bs_config_valid_key "$1"; then
+    bs_log_warn "config::set: not a valid variable name: $1"
+    return "${E_INVALID}"
+  fi
+  __bs_cf_key=$1
+  __bs_cf_val=${2:-}
+  bs_map_set bs_config "$__bs_cf_key" "$__bs_cf_val"
+  eval "${__bs_cf_key}=\${__bs_cf_val}"
+  export "${__bs_cf_key?}"
   return "${E_SUCCESS}"
 }
 
-# @description List all configured keys and values.
-# @description Вывести все настроенные ключи и значения.
-# @stdout key=value pairs, one per line
-# @example
-#   config::list
-config::list() {
-  local key
-  printf '%s\n' "${!BS_CONFIG[@]}" | sort | while IFS= read -r key; do
-    printf '%s=%s\n' "${key}" "${BS_CONFIG[${key}]}"
+# @description Print all configuration as KEY=VALUE, sorted.
+# @description Вывести всю конфигурацию как KEY=VALUE, по алфавиту.
+bs_config_list() {
+  bs_map_keys bs_config | sort | while IFS= read -r __bs_cf_key; do
+    bs_map_get_to bs_config "$__bs_cf_key" __bs_cf_val
+    printf '%s=%s\n' "$__bs_cf_key" "$__bs_cf_val"
   done
 }
 
 # @description Return path to user config file.
 # @description Вернуть путь к пользовательскому файлу конфигурации.
 # @stdout Path / Путь
-config::user_file() {
-  printf '%s' "${BS_CONFIG_USER_FILE}"
+bs_config_user_file() {
+  printf '%s' "$BS_CONFIG_USER_FILE"
 }
 
-# @description Return path to project-local config file.
-# @description Вернуть путь к локальному файлу конфигурации проекта.
-# @stdout Path / Путь
-config::local_file() {
-  printf '%s' "${BS_CONFIG_LOCAL_FILE}"
+# @description Return the name of the project-local config file.
+# @description Вернуть имя локального файла конфигурации проекта.
+# @stdout Name / Имя
+bs_config_local_file() {
+  printf '%s' "$BS_CONFIG_LOCAL_FILE"
 }
+
+bs_shell_alias bs_config_set_defaults __config::set_defaults
+bs_shell_alias bs_config_load_file __config::load_file
+bs_shell_alias bs_config_export_to_env __config::export_to_env
+bs_shell_alias bs_config_load config::load
+bs_shell_alias bs_config_get config::get
+bs_shell_alias bs_config_set config::set
+bs_shell_alias bs_config_list config::list
+bs_shell_alias bs_config_user_file config::user_file
+bs_shell_alias bs_config_local_file config::local_file

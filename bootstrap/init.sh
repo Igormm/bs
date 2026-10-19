@@ -8,13 +8,13 @@
 # Назначение: определить корень проекта, экспортировать BS_ROOT и загрузить ядро через loader.
 #
 # Режимы ядра / Kernel modes (BS_KERNEL_MODE)
-#   full  — bash 4.2+: все 19 файлов core/ (включая lang и config) и мост lib/compat/deps;
+#   full  — bash 4.2+: все 19 файлов core/ (включая lang) и мост lib/compat/deps;
 #   posix — dash, ash, ksh, mksh, zsh и bash ниже 4.2 не нужен: только POSIX-часть core/
 #           (prereq, const, var, str, num, msg, logger, quiet, fmt, data, errorhandler, version,
-#           utils, deps); lang, config, args и всё lib/ — только в режиме full.
-#   full  — bash 4.2+: all 19 core/ files (lang and config included) and the bridge lib/compat/deps;
+#           utils, config, deps); lang, args и всё lib/ — только в режиме full.
+#   full  — bash 4.2+: all 19 core/ files (lang included) and the bridge lib/compat/deps;
 #   posix — dash, ash, ksh, mksh and zsh: only the POSIX part of core/ (prereq, const, var, str, num,
-#           msg, logger, quiet, fmt, data, errorhandler, version, utils, deps); lang, config, args and
+#           msg, logger, quiet, fmt, data, errorhandler, version, utils, config, deps); lang, args and
 #           all of lib/ are in the full mode only. A bash older than 4.2 is refused.
 #
 # Каталог bootstrap/ / The bootstrap/ directory
@@ -171,14 +171,14 @@ bs_load "core/data"
 bs_load "core/errorhandler"
 bs_load "core/version"
 bs_load "core/utils"
-if [ "$BS_KERNEL_MODE" = full ]; then bs_load "core/config"; fi
+bs_load "core/config"
 bs_load "core/deps"
 if [ "$BS_KERNEL_MODE" = full ]; then
   # мост совместимости: deps::missing_tools с массивом bash (вне ядра) / compatibility bridge: deps::missing_tools with a bash array (outside the kernel)
   bs_load "lib/compat/deps"
-  # Load configuration from files and env
-  config::load
 fi
+# Load configuration from files and env / Загрузить конфигурацию из файлов и окружения
+bs_config_load
 
 # @global BS_INITIALIZED — Env: bootstrap initialized marker (category: env)
 # @global BS_INITIALIZED — Env: маркер выполненной инициализации (категория: env)

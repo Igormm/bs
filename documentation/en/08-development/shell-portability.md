@@ -2,8 +2,8 @@
 
 # Shell portability
 
-**BS requires bash 4.2+.** All of `lib/` (87 modules, none of them POSIX) and 3 of the 19 kernel
-files are written in bash; only 16 small `@shell posix` kernel files and the prologue of the entry
+**BS requires bash 4.2+.** All of `lib/` (87 modules, none of them POSIX) and 2 of the 19 kernel
+files are written in bash; only 17 small `@shell posix` kernel files and the prologue of the entry
 points do not depend on it. "Usable from most shells" means: `bs` can be started from any shell
 (it re-runs in bash) and `install.sh` runs even with no bash at all (dash, ash, ksh, mksh, zsh; see
 "The installer and `init.sh` without bash" below), kernel functions are called from any shell with
@@ -272,7 +272,7 @@ Worth knowing: functions that change state and return a value (`bs_arr_pop`, `bs
 
 ## Heading for shell independence
 
-The goal is for `bootstrap/`, `core/`, `install/`, `boot.sh`, `bs` and `install.sh` to live in one namespace `bs_*` and be shell-independent. State: 16 of the 19 `core/` files are done (`prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `var`, `str`, `num`, `msg`), plus the shell and shebang layer, the loader, `base.sh`, `init.sh` and `cli.sh` in `bootstrap/`, `install/*`, and the entry points `install.sh`, `bs` and `boot.sh`. Still bash 4.2+: `config` (`BS_CONFIG` on `bs_map_*`), `lang`, `args`, `bootstrap/bs.sh` (the call stack and `BASH_REMATCH`, with the 9 `bs::cli::*` commands that run `lib/`) and the 87 modules of `lib/`; so a full BS still wants bash 4.2+ (see the top of this page), and without it the POSIX part above runs.
+The goal is for `bootstrap/`, `core/`, `install/`, `boot.sh`, `bs` and `install.sh` to live in one namespace `bs_*` and be shell-independent. State: 17 of the 19 `core/` files are done (`prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `config`, `var`, `str`, `num`, `msg`), plus the shell and shebang layer, the loader, `base.sh`, `init.sh` and `cli.sh` in `bootstrap/`, `install/*`, and the entry points `install.sh`, `bs` and `boot.sh`. Still bash 4.2+: `lang`, `args`, `bootstrap/bs.sh` (the call stack and `BASH_REMATCH`, with the 9 `bs::cli::*` commands that run `lib/`) and the 87 modules of `lib/`; so a full BS still wants bash 4.2+ (see the top of this page), and without it the POSIX part above runs.
 
 ## Not done yet
 

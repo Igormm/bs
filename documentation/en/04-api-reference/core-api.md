@@ -396,7 +396,9 @@ Note: internally this checks `command -v timeout >/dev/null 2>&1`; in your own c
 
 ## Configuration — `core/config.sh`
 
-`config::load` fills `BS_CONFIG` from four sources, from the lowest priority to the highest:
+`core/config.sh` is a module of the `@shell posix` tier: the real functions are named `bs_config_load`, `bs_config_get`, `bs_config_set`, `bs_config_list`, `bs_config_user_file`, `bs_config_local_file` (they can be sourced and called from dash, ash, ksh, mksh), and `config::load` and the other `config::*` are their aliases in bash and zsh; all existing code works unchanged. The settings live in the data-layer map `bs_config` (it was the associative array `BS_CONFIG`).
+
+`config::load` fills the map `bs_config` from four sources, from the lowest priority to the highest:
 
 1. built-in defaults;
 2. `~/.config/bs/config.sh` — your own file, trusted: any key is accepted;
@@ -414,7 +416,7 @@ The keys a project-local `./.bsrc` may set are listed in `BS_CONFIG_LOCAL_KEYS`:
 - Prints the value, or the default; returns `E_INVALID` if there is neither.
 
 #### `config::set <key> <value>`
-- Sets the value in `BS_CONFIG` and exports the variable.
+- Sets the value in the map `bs_config` and exports the variable; returns `E_INVALID` if the key is empty or is not a variable name.
 
 #### `config::list`, `config::user_file`, `config::local_file`
 - `list` prints `KEY=value` pairs sorted by key; the other two print the path of the user file and the name of the local file.
