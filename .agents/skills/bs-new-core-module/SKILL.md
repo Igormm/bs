@@ -11,16 +11,21 @@ Create or modify core module `$module_name`. Core modules differ from lib module
 
 ## Differences from lib modules
 
-- Shebang is `#!/usr/bin/env bash` (NOT `#!/usr/bin/env bs`, no `shellcheck shell=bash` line needed).
-- NO `bs::source_relative` — core modules do not carry their own dependencies. The whole core is loaded by `bootstrap/init.sh` in a fixed order: `prereq → const → logger → errorhandler → version → utils → config → deps`.
-- Guard is still `bs::guard "NAME" || return 0` (defined in `core/prereq.sh`, which is autoloaded first).
-- `core/prereq.sh` is the ONLY module allowed a manual self-guard, because `bs::guard` is defined there. Never copy that pattern elsewhere.
+- **Two tiers.** A core file is `# @shell posix` (default for NEW core code; valid POSIX sh, runs in dash, ash, ksh, mksh, zsh, bash) or `# @shell bash4` (only if it really needs associative arrays, namerefs, `=~`: today `lang`, `args`, `config`). The tier is the single source of truth about the shell dependency.
+- **`posix` files** live in the one `bs_` namespace (`bs_module_name`; the `module::name` alias is made by `bs_shell_alias` at the end of the file), have `#!/bin/sh`, no `local`/`[[ ]]`/arrays, and a portable test. Write them with the skill **`bs-kernel-code`** (skeleton, rules in chapter 12 of the code style guide) — this skill only covers registration.
+- `bash4` files keep `#!/usr/bin/env bash`, `bs::guard`, `module::function` names.
+- No manual dependency sourcing between modules unless the file is loaded alone: the whole core is loaded by `bootstrap/init.sh` in a fixed order: `prereq → lang → const → logger → quiet → fmt → data → errorhandler → version → utils → config → deps` (then the bridge `lib/compat/deps`). A module may call only what is loaded before it; `bs_source_relative` for explicit dependencies, `command -v` for optional ones.
+- `core/prereq.sh` is the ONLY module allowed a manual self-guard, because `bs_guard` is defined there. Never copy that pattern elsewhere.
 - Strict mode is never set in core modules.
 
 ## Skeleton
 
+`posix`: instantiate `.agents/skills/bs-kernel-code/references/module.sh.tmpl` (see `bs-kernel-code`, step 4). `bash4`:
+
 ```bash
 #!/usr/bin/env bash
+# shellcheck shell=bash
+# @shell bash4 — <what holds the file> / <что держит файл>
 # core/mymodule.sh — one-line description
 
 # Source Guard
@@ -33,16 +38,18 @@ declare -g MYMODULE_VERSION="1.0.0"
 
 ## Registration checklist (all required for a NEW core module)
 
-1. Add the module to the load list in `bootstrap/init.sh` (~lines 87-94), in the correct dependency position.
-2. Add it to the required-files check (`req` list) in the `doctor_cmd` of the `bs` script (~line 122).
-3. Add a unit test `tests/unit/test<module>unit.sh` (see `bs-write-test` skill).
-4. Run the full validation cycle (see `bs-validate` skill):
+1. Add the module to the load list in `bootstrap/init.sh` (`load "core/…"` lines), in the correct dependency position (after everything it calls).
+2. Add it to the required-files list (`req=(…)`) in `bs::cli::doctor_cmd` in `bootstrap/bs.sh`.
+3. Add a unit test `tests/unit/test<module>unit.sh` (see `bs-write-test`) and, for a `posix` file, `tests/unit/test<module>portableunit.sh` (`bs-kernel-code`, step 6); `testposixtierunit.sh` requires it.
+4. Run the full validation cycle (see `bs-validate`):
    ```bash
    bash tests/validatesyntax.sh
    bash tests/validateshellcheck.sh
+   bash tests/validatedocscode.sh
+   bash .agents/skills/bs-shell-abstraction/scripts/check_posix_tier.sh
    bash tests/runalltests.sh
    ```
-5. If conventions or module inventory changed, update `AGENTS.md` and both documentation languages (`documentation/en/` + `documentation/ru/`).
+5. If the module inventory or a tier changed, update `AGENTS.md`, both documentation languages (`documentation/en/` + `documentation/ru/`), the tier lists of the skills `bs-shell-abstraction` / `bs-shell-portability` and `CHANGELOG.md`; `tests/unit/testdoctierscountunit.sh` fails when the counts in the docs disagree with the `@shell` labels.
 
 ## Extra caution
 

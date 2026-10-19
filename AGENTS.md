@@ -54,7 +54,7 @@ group::module::function() {
 
 ## Key conventions
 
-- Shebang: `#!/usr/bin/env bs` for library/example scripts; `#!/usr/bin/env bash` for `core/` and entry points.
+- Shebang: `#!/usr/bin/env bs` for library/example scripts; `#!/usr/bin/env bash` for entry points and `bash4` `core/` files; `#!/bin/sh` for the `@shell posix` kernel files.
 - Add `# shellcheck shell=bash` on line 2 for `#!/usr/bin/env bs` files.
 - Public functions use `module::function` or `module::sub::function` namespaces.
 - Constants are `SCREAMING_SNAKE_CASE` and `readonly`.
@@ -63,6 +63,7 @@ group::module::function() {
 - Use `bs::source_relative` for relative dependency sourcing.
 - Use `utils::has`, `utils::quiet`, `utils::quiet_err`, `utils::ignore` instead of raw redirects.
 - Strict mode (`set -euo pipefail`) is set only in entry points, never in library modules.
+- **Kernel code** (`bootstrap/`, `core/`, `install/`, entry points) is written in the one `bs_` namespace as `@shell posix` code (real names `bs_module_name`, `module::name` kept as bash/zsh aliases): the rules are chapter 12 of `code-style-guide.md`, the procedure is the skill `bs-kernel-code`. The `module::function` / `local` / `[[ ]]` conventions above are for `lib/` and the `bash4` kernel files (`lang`, `args`, `config`).
 
 ## Testing
 
@@ -125,12 +126,6 @@ Reusable workflow skills live in `.agents/skills/` (Kimi Code / agents-compatibl
 - `bash-defensive-patterns` — defensive Bash patterns (strict mode, quoting, traps, temp files, idempotency); [wshobson/agents](https://github.com/wshobson/agents), MIT, verbatim + `UPSTREAM.md` with BS notes (BS rules win: strict mode only in entry points).
 - `doc-coauthoring` — three-stage doc workflow (context gathering, section-by-section refinement, reader testing); [anthropics/skills](https://github.com/anthropics/skills), verbatim + `UPSTREAM.md` (license: see there).
 - `bs-code-review-security` — security-first review (injection, quoting, paths, temp files, privilege, `@shell` tier, tests, P0–P3 report); adapted from [DataDog/rshell](https://github.com/DataDog/rshell) `code-review`, Apache-2.0; report-only.
-
-### Imported shell-safety skills (external)
-
-- `bash-defensive-patterns` — defensive Bash patterns (strict mode, quoting, traps, temp files, idempotency); [wshobson/agents](https://github.com/wshobson/agents), MIT, verbatim + `UPSTREAM.md` with BS notes (BS rules win: strict mode only in entry points).
-- `doc-coauthoring` — three-stage doc workflow (context gathering, section-by-section refinement, reader testing); [anthropics/skills](https://github.com/anthropics/skills), verbatim + `UPSTREAM.md` (license: see there).
-- `bs-code-review-security` — security-first review (injection, quoting, paths, temp files, privilege, tests, P0–P3 report); adapted from [DataDog/rshell](https://github.com/DataDog/rshell) `code-review`, Apache-2.0; report-only.
 
 ### Imported methodology skills (external, verbatim)
 

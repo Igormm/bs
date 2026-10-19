@@ -13,48 +13,50 @@ Implement or modify `core/` modules so they remain small, stable, backward-compa
 
 ## Core design principles
 
-1. **Core is loaded as a unit**: `bootstrap/init.sh` loads `core/prereq`, `core/lang`, then `core/const`, `core/logger`, `core/errorhandler`, `core/version`, `core/utils`, `core/config`, `core/deps`. `core/args` is loaded on demand.
-2. **Do not source `core/prereq.sh` from core modules**: `bs::guard`, `bs::guard_loaded`, and `bs::source_relative` are available a priori.
-3. **`core/lang.sh` is the language kernel**: introspection (`bs::func_name`, `bs::type_of`), strings (`str::*`), collections (`arr::*`, `map::*`), predicates (`is::*`). New language-level primitives belong there — not scattered across modules.
-4. **Minimize core dependencies**: `core/prereq.sh` has no dependencies. Other core modules should depend only on already-loaded core pieces.
-5. **Keep public surface small**: core functions are used by the entire framework; breaking changes require updating all callers.
+1. **Core is loaded as a unit**: `bootstrap/init.sh` loads `core/prereq`, `core/lang`, then `core/const`, `core/logger`, `core/quiet`, `core/fmt`, `core/data`, `core/errorhandler`, `core/version`, `core/utils`, `core/config`, `core/deps` (and the bridge `lib/compat/deps`). `core/args` is loaded on demand. A module may call only what is loaded **before** it.
+2. **Two tiers, one namespace.** Each `core/` file carries `# @shell posix` (valid POSIX sh, runs in dash, ash, ksh, mksh, zsh, bash — `prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`) or `# @shell bash4` (`lang`, `args`, `config`). **New core code is `posix` unless it genuinely needs bash** (associative arrays, namerefs, `=~`); `posix` code is written in the one `bs_` namespace — real names `bs_module_name`, the old `module::name` are bash/zsh aliases made by `bs_shell_alias`. The rules are chapter 12 of `documentation/{ru,en}/code-style-guide.md`; the procedure is the skill `bs-kernel-code`.
+3. **`core/prereq.sh` is available a priori**: `bs_guard`, `bs_guard_loaded`, `bs_source_relative` (also `bs::guard`, … in bash and zsh). Do not source it from core modules.
+4. **`core/lang.sh` is the bash language kernel**: introspection (`bs::func_name`, `bs::type_of`), strings (`str::*`), collections (`arr::*`, `map::*` on real bash arrays), predicates (`is::*`). `posix` code does not depend on it: arrays and maps come from `core/data.sh` (`bs_arr_*`, `bs_map_*`).
+5. **Minimize core dependencies** and **keep the public surface small**: core functions are used by the entire framework; never rename existing functions or variables.
 
 ## Always follow these rules
 
-1. Read `documentation/{ru,en}/code-style-guide.md` and the target module before editing.
-2. Use shebang `#!/usr/bin/env bash` for core files.
-3. Start the module with:
-   ```bash
-   bs::guard "MODULE_NAME" || return 0
-   ```
-4. Use `bs::source_relative` for intra-core dependencies when needed (rare).
-5. Run validators after changes:
+1. Read chapter 12 of `documentation/{ru,en}/code-style-guide.md`, the skills `bs-kernel-code` and `bs-shell-abstraction`, and the target module before editing.
+2. A `posix` file starts with `#!/bin/sh`, `# shellcheck shell=sh`, `# @shell posix — <reason> / <reason>`, `# @tier core — …`; a `bash4` file with `#!/usr/bin/env bash` and an honest `# @shell bash4 — <reason>`.
+3. Guard: `bs_guard MODULE || return 0` (a `bash4` file may write `bs::guard`).
+4. Dependencies: `bs_source_relative "const.sh" …` (or an optional `command -v` check where the module loads before them).
+5. Run the validators after changes:
    ```bash
    bash tests/validatesyntax.sh
    bash tests/validateshellcheck.sh
+   bash tests/validatedocscode.sh
+   bash .agents/skills/bs-shell-abstraction/scripts/check_posix_tier.sh
    bash tests/runalltests.sh
    ```
-6. Update or add unit tests in `tests/unit/test<core>unit.sh`.
-7. Update API reference docs in `documentation/{ru,en}/04-api-reference/core-api.md` if public API changes.
+6. Tests: `tests/unit/test<core>unit.sh` and, for every `posix` file, `tests/unit/test<core>portableunit.sh` (six shells).
+7. Update `documentation/{ru,en}/04-api-reference/core-api.md` if the public API changes, and the tier counts/lists if a file changes tier (`tests/unit/testdoctierscountunit.sh` checks the counts).
 
 ## Module skeleton
 
+`posix` — instantiate `.agents/skills/bs-kernel-code/references/module.sh.tmpl`. A `bash4` file:
+
 ```bash
 #!/usr/bin/env bash
+# shellcheck shell=bash
+# @shell bash4 — <what holds the file> / <что держит файл>
 #
 # core/module.sh — description
 # core/module.sh — English description
 #
 # @depends core/const, core/logger
 
-# Source Guard / Защита от повторной загрузки
 bs::guard "MODULE" || return 0
 
 # Dependencies / Зависимости
 bs::source_relative "const.sh" "logger.sh"
 
 # Public API
-core::module::do_thing() {
+module::do_thing() {
     local -r arg="${1:?argument required}"
     ...
 }
@@ -75,7 +77,7 @@ core::module::do_thing() {
 ## Before finishing
 
 - Confirm all validators pass.
-- Confirm no core module sources `core/prereq.sh`.
+- Confirm no core module sources `core/prereq.sh`, and that a `posix` file passes `check_posix_tier.sh` (it must not use `local`, `[[ ]]`, arrays, `printf -v`, `$'..'`).
 - Provide a concise summary of changes and any breaking implications.
 
 ## Portability / Вектор возможностей

@@ -20,9 +20,9 @@ documentation and protection against errors.
   This is the rule for `lib/` and `bash4` code; kernel code in the `bs_` namespace (`@shell posix`)
   follows the opposite one, see [12](#12-code-in-the-bs_-namespace-the-kernel-tier-shell-posix).
 - Quote variable expansions: `"${var}"`, not `$var`.
+- Strict mode (`set -euo pipefail` and a safe `IFS`, see
+  [1.1](#11-strict-mode)) is enabled by entry points, not by modules.
 - Module files must include:
-  - strict mode (`set -euo pipefail` and a safe `IFS`, see
-    [1.1](#11-strict-mode));
   - a Source Guard against double sourcing (see [1.2](#12-module-file-structure-and-source-guard));
   - dependencies loaded via `load`, not via a direct `source lib/...` call.
 
