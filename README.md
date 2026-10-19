@@ -1,12 +1,18 @@
 # BS Framework
 
-**BS** — модульный фреймворк и стандартная библиотека на **Bash 4.2+**: загрузчик модулей, логирование, обработка ошибок, декларативные параметры скриптов, абстракция потоков ввода/вывода и набор системных модулей. Единый code style, ни одной внешней зависимости.
+**BS** — модульный фреймворк. Его ядро `core/` запускается в любой оболочке из реестра: bash, zsh, dash, busybox ash, ksh, mksh; из fish и nushell — через `bs call`. Реестр оболочек — `bootstrap/shell.sh` (таблица в [shell-portability](documentation/ru/08-development/shell-portability.md)).
 
-**BS требует bash 4.2+.** Вся `lib/` написана на bash. Ядро `core/` переводится на POSIX: 13 из 15 файлов уже работают в любой оболочке, на bash остаются `lang` и `args`, а также CLI, загрузчик и установщик.
+- **Установить для своей оболочки:** `./install.sh --local --update-path --shell fish` (PATH и подсказки ставятся под эту оболочку).
+- **Запустить для определённой оболочки:** `bs --strict-shell=dash КОМАНДА` проверяет, подойдёт ли команда этой оболочке; из fish и nushell функции ядра вызываются так: `bs call ФУНКЦИЯ`.
 
-**BS** is a modular framework and standard library for **Bash 4.2+**: a module loader, logging, error handling, declarative script parameters, an I/O streams abstraction and a set of system modules. One code style, zero external dependencies.
+**Основная библиотека `lib/` пока только для bash 4.2+.** Поэтому BS в целом требует bash 4.2+, а ядро постепенно становится независимым от оболочки: 13 из 15 файлов `core/` уже на POSIX.
 
-**BS requires bash 4.2+.** All of `lib/` is written in bash. The `core/` kernel is moving to POSIX: 13 of 15 files already run in any shell; `lang` and `args` stay on bash, as do the CLI, the loader and the installer.
+**BS** is a modular framework. Its `core/` runs in any shell of the registry: bash, zsh, dash, busybox ash, ksh, mksh; from fish and nushell through `bs call`. The shell registry is `bootstrap/shell.sh` (a table is in [shell-portability](documentation/en/08-development/shell-portability.md)).
+
+- **Install for your shell:** `./install.sh --local --update-path --shell fish` (PATH and hints are set for that shell).
+- **Run for a specific shell:** `bs --strict-shell=dash COMMAND` checks whether the command fits that shell; from fish and nushell, kernel functions are called with `bs call FUNCTION`.
+
+**The main library `lib/` is bash 4.2+ only for now.** So BS as a whole requires bash 4.2+, while the kernel is becoming shell-independent step by step: 13 of 15 `core/` files are already POSIX.
 
 ## Возможности / Features
 

@@ -1,8 +1,11 @@
 # BS Documentation
 
-**BS** is a modular framework and standard library for **Bash 4.2+**: a module loader, logging, error handling, declarative script parameters, an I/O streams abstraction and a set of system modules. One code style, zero external dependencies.
+**BS** is a modular framework. Its `core/` runs in any shell of the registry: bash, zsh, dash, busybox ash, ksh, mksh; from fish and nushell through `bs call`. The shell registry is `bootstrap/shell.sh` (a table is in [shell-portability](08-development/shell-portability.md)).
 
-**BS requires bash 4.2+.** All of `lib/` is written in bash. The `core/` kernel is moving to POSIX: 13 of 15 files already run in any shell; `lang` and `args` stay on bash, as do the CLI, the loader and the installer.
+- **Install for your shell:** `./install.sh --local --update-path --shell fish` (PATH and hints are set for that shell).
+- **Run for a specific shell:** `bs --strict-shell=dash COMMAND` checks whether the command fits that shell; from fish and nushell, kernel functions are called with `bs call FUNCTION`.
+
+**The main library `lib/` is bash 4.2+ only for now.** So BS as a whole requires bash 4.2+, while the kernel is becoming shell-independent step by step: 13 of 15 `core/` files are already POSIX.
 
 Русская версия: [documentation/ru/](../ru/README.md)
 
