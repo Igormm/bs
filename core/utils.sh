@@ -17,16 +17,8 @@
 
 bs_guard UTILS || return 0
 
-# @private
-# @description Сообщение об ошибке через логгер, если он загружен / An error message through the logger if it is loaded
-# @param $1 text / текст
-bs_utils_error() {
-  if command -v bs_log_error >/dev/null 2>&1; then
-    bs_log_error "$1"
-  else
-    printf '%s\n' "$1" >&2
-  fi
-}
+# Dependencies / Зависимости
+bs_source_relative "msg.sh"
 
 # Устанавливает строгий режим (pipefail — там, где он есть; IFS — перевод строки и табуляция).
 # @description Enable strict mode (pipefail where it exists; IFS is newline and tab).
@@ -80,7 +72,7 @@ bs_utils_tempfile() {
   fi
   if ! bs_utils_tmp_registry_trusted; then
     rm -rf -- "$__bs_ut_path"
-    bs_utils_error "utils::tempfile: temp registry is not ours, refusing: ${UTILS_TMP_REGISTRY}"
+    bs_msg_error "utils::tempfile: temp registry is not ours, refusing: ${UTILS_TMP_REGISTRY}"
     return 1
   fi
   printf '%s\n' "$__bs_ut_path" >> "$UTILS_TMP_REGISTRY"
@@ -192,19 +184,19 @@ bs_utils_split() {
 bs_utils_ensure_source() {
   __bs_ut_file=${1:?File path is required}
   __bs_ut_func=${2:?Function name is required}
-  [ -n "$__bs_ut_file" ] || { bs_utils_error "file argument is empty"; return "${E_INVALID:-2}"; }
-  [ -n "$__bs_ut_func" ] || { bs_utils_error "function argument is empty"; return "${E_INVALID:-2}"; }
+  [ -n "$__bs_ut_file" ] || { bs_msg_error "file argument is empty"; return "${E_INVALID:-2}"; }
+  [ -n "$__bs_ut_func" ] || { bs_msg_error "function argument is empty"; return "${E_INVALID:-2}"; }
   if [ ! -f "$__bs_ut_file" ]; then
-    bs_utils_error "file not found: ${__bs_ut_file}"
+    bs_msg_error "file not found: ${__bs_ut_file}"
     return "${E_ERROR:-1}"
   fi
   # shellcheck disable=SC1090  # путь известен только во время выполнения / the path is known only at run time
   if ! . "$__bs_ut_file"; then
-    bs_utils_error "failed to source file: ${__bs_ut_file}"
+    bs_msg_error "failed to source file: ${__bs_ut_file}"
     return "${E_ERROR:-1}"
   fi
   if ! command -v "$__bs_ut_func" >/dev/null 2>&1; then
-    bs_utils_error "required function ${__bs_ut_func} not defined"
+    bs_msg_error "required function ${__bs_ut_func} not defined"
     return "${E_ERROR:-1}"
   fi
   return 0

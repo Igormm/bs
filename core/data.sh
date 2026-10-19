@@ -45,6 +45,9 @@
 # shellcheck disable=SC2154  # __bs_dat_out/__bs_dat_cur присваиваются через eval, ShellCheck их не видит / assigned through eval, which ShellCheck cannot follow
 bs_guard DATA || return 0
 
+# Dependencies / Зависимости
+bs_source_relative "var.sh"
+
 __bs_dat_depth=0
 
 # ==========================================
@@ -61,6 +64,51 @@ bs_data_check() {
       return 2 ;;
   esac
   return 0
+}
+
+# Слоты массива NAME — переменные __bs_dat_a_NAME__<индекс>, счётчик — слот «n». Только эти пять
+# помощников знают такую запись и зовут eval с именем; имя к ним приходит уже проверенным.
+# The slots of an array NAME are the variables __bs_dat_a_NAME__<index>, the counter is the slot "n".
+# Only these five helpers know that spelling and call eval with a name; the name reaches them checked.
+
+# @private
+# @description Длина массива → __bs_dat_n (0, если массива нет) / The length of an array → __bs_dat_n (0 if there is none)
+# @param $1 name / имя
+bs_data_len_of() {
+  eval "__bs_dat_n=\${__bs_dat_a_${1}__n:-0}"
+}
+
+# @private
+# @description Записать длину массива / Set the length of an array
+# @param $1 name / имя
+# @param $2 length / длина
+bs_data_set_len() {
+  eval "__bs_dat_a_${1}__n=${2}"
+}
+
+# @private
+# @description Элемент по номеру слота → __bs_dat_cur / The element in a slot → __bs_dat_cur
+# @param $1 name / имя
+# @param $2 slot index (0..n-1) / номер слота
+bs_data_get_at() {
+  eval "__bs_dat_cur=\${__bs_dat_a_${1}__${2}}"
+}
+
+# @private
+# @description Записать значение в слот / Put a value into a slot
+# @param $1 name / имя
+# @param $2 slot index / номер слота
+# @param $3 value / значение
+bs_data_put_at() {
+  eval "__bs_dat_a_${1}__${2}=\${3}"
+}
+
+# @private
+# @description Удалить слот (слот «n» — счётчик) / Remove a slot (the slot "n" is the counter)
+# @param $1 name / имя
+# @param $2 slot index or n / номер слота или n
+bs_data_drop_at() {
+  eval "unset __bs_dat_a_${1}__${2}"
 }
 
 # @description Взять строку в одинарные кавычки так, чтобы eval вернул её как есть / Single-quote a string so eval gives it back unchanged
@@ -118,7 +166,7 @@ bs_data_enc() {
 # @param $1 name / имя
 bs_arr_len() {
   bs_data_check "$1" || return 2
-  eval "__bs_dat_n=\${__bs_dat_a_${1}__n:-0}"
+  bs_data_len_of "$1"
   printf '%s\n' "$__bs_dat_n"
 }
 
@@ -129,12 +177,12 @@ bs_arr_push() {
   bs_data_check "$1" || return 2
   __bs_dat_nm=$1
   shift
-  eval "__bs_dat_n=\${__bs_dat_a_${__bs_dat_nm}__n:-0}"
+  bs_data_len_of "$__bs_dat_nm"
   for __bs_dat_v in "$@"; do
-    eval "__bs_dat_a_${__bs_dat_nm}__${__bs_dat_n}=\${__bs_dat_v}"
+    bs_data_put_at "$__bs_dat_nm" "$__bs_dat_n" "$__bs_dat_v"
     __bs_dat_n=$((__bs_dat_n + 1))
   done
-  eval "__bs_dat_a_${__bs_dat_nm}__n=\${__bs_dat_n}"
+  bs_data_set_len "$__bs_dat_nm" "$__bs_dat_n"
 }
 
 # @description Очистить массив (имя остаётся допустимым) / Clear an array
@@ -142,13 +190,13 @@ bs_arr_push() {
 bs_arr_clear() {
   bs_data_check "$1" || return 2
   __bs_dat_nm=$1
-  eval "__bs_dat_n=\${__bs_dat_a_${__bs_dat_nm}__n:-0}"
+  bs_data_len_of "$__bs_dat_nm"
   __bs_dat_i=0
   while [ "$__bs_dat_i" -lt "$__bs_dat_n" ]; do
-    eval "unset __bs_dat_a_${__bs_dat_nm}__${__bs_dat_i}"
+    bs_data_drop_at "$__bs_dat_nm" "$__bs_dat_i"
     __bs_dat_i=$((__bs_dat_i + 1))
   done
-  eval "unset __bs_dat_a_${__bs_dat_nm}__n"
+  bs_data_drop_at "$__bs_dat_nm" n   # слот «n» — счётчик / the slot "n" is the counter
   return 0
 }
 
@@ -169,7 +217,7 @@ bs_arr_new() {
 # @param $2 index (negative counts from the end) / индекс
 # @param $3 allow n (append position): 1 / разрешить позицию n (вставка в конец)
 bs_arr_index() {
-  eval "__bs_dat_n=\${__bs_dat_a_${1}__n:-0}"
+  bs_data_len_of "$1"
   case "${2:-}" in
     ''|-|*[!0-9-]*|?*-*) return 1 ;;
   esac
@@ -188,8 +236,8 @@ bs_arr_index() {
 bs_arr_get() {
   bs_data_check "$1" || return 2
   bs_arr_index "$1" "$2" || return 1
-  eval "__bs_dat_out=\${__bs_dat_a_${1}__${__bs_dat_idx}}"
-  printf '%s\n' "$__bs_dat_out"
+  bs_data_get_at "$1" "$__bs_dat_idx"
+  printf '%s\n' "$__bs_dat_cur"
 }
 
 # @description Записать элемент по индексу (индекс равный длине — добавление) / Set an element (an index equal to the length appends)
@@ -201,9 +249,9 @@ bs_arr_set() {
   __bs_dat_nm=$1
   __bs_dat_sv=${3-}
   bs_arr_index "$__bs_dat_nm" "$2" 1 || return 1
-  eval "__bs_dat_a_${__bs_dat_nm}__${__bs_dat_idx}=\${__bs_dat_sv}"
+  bs_data_put_at "$__bs_dat_nm" "$__bs_dat_idx" "$__bs_dat_sv"
   if [ "$__bs_dat_idx" -eq "$__bs_dat_n" ]; then
-    eval "__bs_dat_a_${__bs_dat_nm}__n=$((__bs_dat_n + 1))"
+    bs_data_set_len "$__bs_dat_nm" $((__bs_dat_n + 1))
   fi
 }
 
@@ -212,12 +260,7 @@ bs_arr_set() {
 # @param $1 variable name or empty / имя переменной или пусто
 bs_data_ret() {
   if [ -n "${1:-}" ]; then
-    case "$1" in
-      [!A-Za-z_]*|*[!A-Za-z0-9_]*)
-        printf 'bs_data: invalid variable name: %s\n' "$1" >&2
-        return 2 ;;
-    esac
-    eval "$1=\${__bs_dat_out}"
+    bs_var_set "$1" "$__bs_dat_out"
   else
     printf '%s\n' "$__bs_dat_out"
   fi
@@ -230,12 +273,13 @@ bs_arr_pop() {
   bs_data_check "$1" || return 2
   __bs_dat_nm=$1
   __bs_dat_rv=${2:-}
-  eval "__bs_dat_n=\${__bs_dat_a_${__bs_dat_nm}__n:-0}"
+  bs_data_len_of "$__bs_dat_nm"
   [ "$__bs_dat_n" -gt 0 ] || return 1
   __bs_dat_n=$((__bs_dat_n - 1))
-  eval "__bs_dat_out=\${__bs_dat_a_${__bs_dat_nm}__${__bs_dat_n}}"
-  eval "unset __bs_dat_a_${__bs_dat_nm}__${__bs_dat_n}"
-  eval "__bs_dat_a_${__bs_dat_nm}__n=${__bs_dat_n}"
+  bs_data_get_at "$__bs_dat_nm" "$__bs_dat_n"
+  __bs_dat_out=$__bs_dat_cur
+  bs_data_drop_at "$__bs_dat_nm" "$__bs_dat_n"
+  bs_data_set_len "$__bs_dat_nm" "$__bs_dat_n"
   bs_data_ret "$__bs_dat_rv"
 }
 
@@ -246,17 +290,19 @@ bs_arr_shift() {
   bs_data_check "$1" || return 2
   __bs_dat_nm=$1
   __bs_dat_rv=${2:-}
-  eval "__bs_dat_n=\${__bs_dat_a_${__bs_dat_nm}__n:-0}"
+  bs_data_len_of "$__bs_dat_nm"
   [ "$__bs_dat_n" -gt 0 ] || return 1
-  eval "__bs_dat_out=\${__bs_dat_a_${__bs_dat_nm}__0}"
+  bs_data_get_at "$__bs_dat_nm" 0
+  __bs_dat_out=$__bs_dat_cur
   __bs_dat_i=1
   while [ "$__bs_dat_i" -lt "$__bs_dat_n" ]; do
-    eval "__bs_dat_a_${__bs_dat_nm}__$((__bs_dat_i - 1))=\${__bs_dat_a_${__bs_dat_nm}__${__bs_dat_i}}"
+    bs_data_get_at "$__bs_dat_nm" "$__bs_dat_i"
+    bs_data_put_at "$__bs_dat_nm" $((__bs_dat_i - 1)) "$__bs_dat_cur"
     __bs_dat_i=$((__bs_dat_i + 1))
   done
   __bs_dat_n=$((__bs_dat_n - 1))
-  eval "unset __bs_dat_a_${__bs_dat_nm}__${__bs_dat_n}"
-  eval "__bs_dat_a_${__bs_dat_nm}__n=${__bs_dat_n}"
+  bs_data_drop_at "$__bs_dat_nm" "$__bs_dat_n"
+  bs_data_set_len "$__bs_dat_nm" "$__bs_dat_n"
   bs_data_ret "$__bs_dat_rv"
 }
 
@@ -270,12 +316,13 @@ bs_arr_remove_at() {
   __bs_dat_i=$__bs_dat_idx
   __bs_dat_cnt=$__bs_dat_n
   while [ $((__bs_dat_i + 1)) -lt "$__bs_dat_cnt" ]; do
-    eval "__bs_dat_a_${__bs_dat_nm}__${__bs_dat_i}=\${__bs_dat_a_${__bs_dat_nm}__$((__bs_dat_i + 1))}"
+    bs_data_get_at "$__bs_dat_nm" $((__bs_dat_i + 1))
+    bs_data_put_at "$__bs_dat_nm" "$__bs_dat_i" "$__bs_dat_cur"
     __bs_dat_i=$((__bs_dat_i + 1))
   done
   __bs_dat_cnt=$((__bs_dat_cnt - 1))
-  eval "unset __bs_dat_a_${__bs_dat_nm}__${__bs_dat_cnt}"
-  eval "__bs_dat_a_${__bs_dat_nm}__n=${__bs_dat_cnt}"
+  bs_data_drop_at "$__bs_dat_nm" "$__bs_dat_cnt"
+  bs_data_set_len "$__bs_dat_nm" "$__bs_dat_cnt"
 }
 
 # @description Индекс первого элемента, равного значению (1 — нет) / Index of the first element equal to a value (1 — none)
@@ -285,10 +332,10 @@ bs_arr_index_of() {
   bs_data_check "$1" || return 2
   __bs_dat_nm=$1
   __bs_dat_want=${2-}
-  eval "__bs_dat_n=\${__bs_dat_a_${__bs_dat_nm}__n:-0}"
+  bs_data_len_of "$__bs_dat_nm"
   __bs_dat_i=0
   while [ "$__bs_dat_i" -lt "$__bs_dat_n" ]; do
-    eval "__bs_dat_cur=\${__bs_dat_a_${__bs_dat_nm}__${__bs_dat_i}}"
+    bs_data_get_at "$__bs_dat_nm" "$__bs_dat_i"
     if [ "$__bs_dat_cur" = "$__bs_dat_want" ]; then
       printf '%s\n' "$__bs_dat_i"
       return 0
@@ -312,11 +359,11 @@ bs_arr_join() {
   bs_data_check "$1" || return 2
   __bs_dat_nm=$1
   __bs_dat_sep=${2- }
-  eval "__bs_dat_n=\${__bs_dat_a_${__bs_dat_nm}__n:-0}"
+  bs_data_len_of "$__bs_dat_nm"
   __bs_dat_acc=''
   __bs_dat_i=0
   while [ "$__bs_dat_i" -lt "$__bs_dat_n" ]; do
-    eval "__bs_dat_cur=\${__bs_dat_a_${__bs_dat_nm}__${__bs_dat_i}}"
+    bs_data_get_at "$__bs_dat_nm" "$__bs_dat_i"
     if [ "$__bs_dat_i" -eq 0 ]; then
       __bs_dat_acc=$__bs_dat_cur
     else
@@ -332,11 +379,11 @@ bs_arr_join() {
 bs_arr_to_args() {
   bs_data_check "$1" || return 2
   __bs_dat_nm=$1
-  eval "__bs_dat_n=\${__bs_dat_a_${__bs_dat_nm}__n:-0}"
+  bs_data_len_of "$__bs_dat_nm"
   __bs_dat_acc='set --'
   __bs_dat_i=0
   while [ "$__bs_dat_i" -lt "$__bs_dat_n" ]; do
-    eval "__bs_dat_cur=\${__bs_dat_a_${__bs_dat_nm}__${__bs_dat_i}}"
+    bs_data_get_at "$__bs_dat_nm" "$__bs_dat_i"
     __bs_dat_acc="${__bs_dat_acc} $(bs_quote "$__bs_dat_cur")"
     __bs_dat_i=$((__bs_dat_i + 1))
   done
@@ -483,10 +530,10 @@ bs_map_keys_to() {
 bs_map_keys() {
   bs_data_check "$1" || return 2
   __bs_dat_mn=$1
-  eval "__bs_dat_n=\${__bs_dat_a_mk_${__bs_dat_mn}__n:-0}"
+  bs_data_len_of "mk_${__bs_dat_mn}"
   __bs_dat_i=0
   while [ "$__bs_dat_i" -lt "$__bs_dat_n" ]; do
-    eval "__bs_dat_cur=\${__bs_dat_a_mk_${__bs_dat_mn}__${__bs_dat_i}}"
+    bs_data_get_at "mk_${__bs_dat_mn}" "$__bs_dat_i"
     printf '%s\n' "$__bs_dat_cur"
     __bs_dat_i=$((__bs_dat_i + 1))
   done

@@ -8,13 +8,15 @@
 #
 # ЗАЧЕМ / WHY
 #   Каждый модуль, который может работать без логгера, писал собственную обёртку «если есть
-#   bs_log_error — через неё, иначе printf в stderr»: bs_utils_error (core/utils.sh), bs_calc_log
-#   (core/calc.sh), ветки в core/errorhandler.sh, core/data.sh, core/guard.sh. Здесь она одна;
-#   модуль звать можно в любой момент загрузки, в том числе раньше логгера.
+#   bs_log_error — через неё, иначе printf в stderr»: bs_utils_error (core/utils.sh) и bs_calc_log
+#   (core/calc.sh) заменены вызовами этого модуля; ветки в core/errorhandler.sh, core/data.sh,
+#   core/guard.sh пока свои. Здесь она одна; модуль звать можно в любой момент загрузки, в том
+#   числе раньше логгера.
 #   Every module that may run without the logger wrote its own wrapper "through bs_log_error if
-#   there is one, else printf to stderr": bs_utils_error (core/utils.sh), bs_calc_log
-#   (core/calc.sh), branches in core/errorhandler.sh, core/data.sh, core/guard.sh. Here there is
-#   one; the module may be called at any moment of loading, even before the logger.
+#   there is one, else printf to stderr": bs_utils_error (core/utils.sh) and bs_calc_log
+#   (core/calc.sh) are replaced by calls to this module; the branches in core/errorhandler.sh,
+#   core/data.sh, core/guard.sh are still their own. Here there is one; the module may be called
+#   at any moment of loading, even before the logger.
 #
 # ФОРМАТ БЕЗ ЛОГГЕРА / FORMAT WITHOUT THE LOGGER
 #   «УРОВЕНЬ: текст», слова склеены пробелом независимо от IFS; error и warn — в stderr,

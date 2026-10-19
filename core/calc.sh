@@ -27,6 +27,9 @@
 # Source Guard / Защита от повторной загрузки
 bs_guard CORE_CALC || return 0
 
+# Dependencies / Зависимости
+bs_source_relative "msg.sh"
+
 # @description Показать справку / Show help
 bs_calc_help() {
   cat <<HELP
@@ -52,19 +55,6 @@ re-evaluated each time). :q / Ctrl-D — exit.
 Интерактивный режим: стек живёт между строками (сессия пересчитывается
 каждый раз). :q / Ctrl-D — выход.
 HELP
-}
-
-# @private
-# @description Message through the BS logger when it is loaded, else plain stderr
-# @description Сообщение через логгер BS, если он загружен, иначе просто в stderr
-# @param $1 level (warn, error) / уровень
-# @param $2 text / текст
-bs_calc_log() {
-  if command -v "log::$1" >/dev/null 2>&1; then
-    "log::$1" "$2"
-  else
-    printf '%s\n' "$2" >&2
-  fi
 }
 
 # @private
@@ -118,7 +108,7 @@ bs_calc_interactive() {
     __bs_calc_session="${__bs_calc_session}${__bs_calc_line}
 "
     if ! printf '%s\n' "$(bs_calc_autop "$__bs_calc_session")" | dc; then
-      bs_calc_log warn "calc: dc failed (see error above)"
+      bs_msg_warn "calc: dc failed (see error above)"
     fi
   done
 }
@@ -132,7 +122,7 @@ bs_calc_main() {
   esac
 
   if ! command -v dc >/dev/null 2>&1; then
-    bs_calc_log error "calc: dc not found — install bc/dc (part of every Linux distribution)"
+    bs_msg_error "calc: dc not found — install bc/dc (part of every Linux distribution)"
     return 1
   fi
 

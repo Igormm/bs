@@ -18,10 +18,12 @@ source "${TEST_SCRIPT_DIR}/../testframework.sh"
 
 T=""
 
-# probe <shell> <path> <snippet> — shell.sh, prereq.sh и calc.sh подключены, затем snippet; stdin — от вызывающего
+# probe <shell> <path> <snippet> — shell.sh, prereq.sh и calc.sh подключены (BS_CURRENT_FILE ставится, как это делает загрузчик:
+# calc.sh сам подключает msg.sh), затем snippet; stdin — от вызывающего
 probe() {
     local -r sh_bin="$1" path="$2" snippet="$3"
-    printf '. "%s"\n. "%s"\n. "%s"\n%s\n' "${SHELL_SH}" "${PREREQ_SH}" "${CALC_SH}" "${snippet}" > "${T}/probe.sh"
+    printf 'BS_CURRENT_FILE="%s"\n. "%s"\nBS_CURRENT_FILE="%s"\n. "%s"\nBS_CURRENT_FILE="%s"\n. "%s"\n%s\n' \
+        "${SHELL_SH}" "${SHELL_SH}" "${PREREQ_SH}" "${PREREQ_SH}" "${CALC_SH}" "${CALC_SH}" "${snippet}" > "${T}/probe.sh"
     env -i HOME="${T}/h" PATH="${path}" "${sh_bin}" "${T}/probe.sh" 2>&1
 }
 
