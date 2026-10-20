@@ -55,6 +55,7 @@ test_autop_no_p_for_comments() {
 # calc::eval computes simple RPN expressions
 test_eval_simple_rpn() {
     local out
+    utils::has dc || { printf '  skip: dc is not installed / dc не установлен\n'; return 0; }
     out="$(calc::eval '2 3 4 * +')"
     testframework::assert_equal "14" "${out}" "calc::eval computes 2 3 4 * +"
 
@@ -65,6 +66,7 @@ test_eval_simple_rpn() {
 # calc::eval honors explicit print commands
 test_eval_honors_explicit_print() {
     local out
+    utils::has dc || { printf '  skip: dc is not installed / dc не установлен\n'; return 0; }
     out="$(calc::eval '2 3 + p')"
     testframework::assert_equal "5" "${out}" "calc::eval honors explicit p"
 
