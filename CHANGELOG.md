@@ -14,6 +14,7 @@
 - fix(install): a lib directory that `ls` cannot read is "foreign", not "empty" — the installer no longer tries to replace it
 
 ### Changed
+- docs(style): chapter 12 of the code style guide (en, ru) and the skill `bs-kernel-code` got the pitfalls found while moving `bs update`, `bs where`, `bs uninstall` and `boot.sh`: an unmatched glob in zsh, an assignment before a function call, a command with arguments in a variable, `$(( … $(cmd) … ))`, `set --` inside a function, the check method for CLI commands that write to disk; the `${#s}` row now points to `bs_str_width`/`bs_str_head`
 - refactor(bootstrap): `bootstrap/loader.sh` is `@shell posix` — `bs_load` (`load` and `bs::load` stay as bash/zsh aliases) with private `bs_load_*` helpers; the registry `BS_LOADED_MODULES` became the data-layer map `bs_loaded_modules`, `BS_LOAD_STACK` the array `bs_load_stack` (`lib/ui/repl.sh` and `unit/testloaderunit.sh` read them through `bs_map_*`/`bs_arr_*`); the loader sources the bottom layer (`prereq`, `var`, `str`, `data`) itself on the first call; `@depends` is parsed without `[[ =~ ]]`; `bs_arr_get NAME INDEX [VAR]` got an optional output variable. 133 checks in six shells (`unit/testloaderportableunit.sh`), byte-for-byte equal to the previous loader on six scenarios; the circular-dependency chain is now joined with a space (it was `IFS`, a newline in BS scripts)
 
 ### Fixed
