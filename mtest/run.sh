@@ -18,7 +18,7 @@ for entry in "bash:bash" "zsh:zsh" "ash:busybox ash" "dash:dash"; do
   done
 done
 if command -v nu >/dev/null 2>&1 && [ -f "${root}/mtest/t_nu.nu" ] && [[ "${glob}" == t_* ]]; then
-  out="$(cd "${root}" && env -i HOME="$(mktemp -d)" PATH=/usr/bin:/bin MT_ROOT="${root}" nu "${root}/mtest/t_nu.nu" 2>&1)"; rc=$?
+  out="$(cd "${root}" && env -i HOME="$(mktemp -d)" PATH=/usr/bin:/bin MT_ROOT="${root}" BS_LOG_TIMESTAMP=false BS_LOG_COLOR=never nu "${root}/mtest/t_nu.nu" 2>&1)"; rc=$?
   total=$((total + 1)); [ "${rc}" -ne 0 ] && fail=$((fail + 1))
   if [ "${rc}" -ne 0 ] || [ "${verbose}" = 1 ]; then printf '%s\n' "${out}"; fi
 else

@@ -20,6 +20,8 @@ let cases = [
   [S1 "config default" [bs_config_get BS_FILES_ATOMIC] "false" 0]
   [S1 "deps has" [bs_deps_has ls] "" 0]
   [S1 "error try ok" [bs_error_try "true"] "" 0]
+  [S1 "log info" [bs_log_info hi] "[INFO ] hi" 0]
+  [S1 "log error" [bs_log_error e] "[ERROR] e" 0]
   # S2 alternative scenarios / альтернативные
   [S2 "contains no" [bs_str_contains hello xyz] "" 1]
   [S2 "div by zero" [bs_num_div 1 0] "" 2]
@@ -40,6 +42,8 @@ let cases = [
   [S3 "join empty item" [bs_str_join "," a "" c] "a,,c" 0]
   [S3 "version numeric not lexical" [bs_version_compare "1.10" "1.9"] "" 1]
   [S3 "calc rpn" [--load core/calc bs_calc_main 3 4 +] "7" 0]
+  [S3 "log percent literal" [bs_log_info "100%s"] "[INFO ] 100%s" 0]
+  [S3 "log words joined" [bs_log_info a b] "[INFO ] a b" 0]
   # S4 half-scenarios / полусценарии
   [S4 "repeat without count" [bs_str_repeat ab] "" 1]
   [S4 "add one arg" [bs_num_add 1] "" 1]
@@ -53,7 +57,8 @@ mut pass = 0
 mut fail = 0
 for c in $cases {
   let r = (do { ^$bs call ...$c.2 } | complete)
-  let out = ($r.stdout | str trim --right --char "\n")
+  let o1 = ($r.stdout | str trim --right --char "\n")
+  let out = (if ($o1 == "" and ($c.3 | str starts-with "[")) { $r.stderr | str trim --right --char "\n" } else { $o1 })
   if $out == $c.3 and $r.exit_code == $c.4 {
     $pass += 1
   } else {
