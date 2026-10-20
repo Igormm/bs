@@ -26,25 +26,29 @@ main() {
 
     testframework::section "list_interfaces / список интерфейсов"
     local s
-    s="$(system::network::list_interfaces)"
-    testframework::assert_true "-n '${s}'" "string output non-empty"
-    # no "iface:" prefix in the default string view
-    testframework::assert_command "! printf '%s' '${s}' | grep -q 'iface:'" "string is bare names"
+    if utils::has ip || utils::has ifconfig; then
+        s="$(system::network::list_interfaces)"
+        testframework::assert_true "-n '${s}'" "string output non-empty"
+        # no "iface:" prefix in the default string view
+        testframework::assert_command "! printf '%s' '${s}' | grep -q 'iface:'" "string is bare names"
 
-    local j
-    j="$(BS_OUTPUT_FORMAT=json system::network::list_interfaces)"
-    if command -v jq >/dev/null 2>&1; then
-        testframework::assert_command "printf '%s' '${j}' | jq -e . >/dev/null" "json valid"
-    else
-        testframework::assert_true "'${j}' == '['* || '${j}' == '{'*" "json looks like array/object"
-    fi
+        local j
+        j="$(BS_OUTPUT_FORMAT=json system::network::list_interfaces)"
+        if command -v jq >/dev/null 2>&1; then
+            testframework::assert_command "printf '%s' '${j}' | jq -e . >/dev/null" "json valid"
+        else
+            testframework::assert_true "'${j}' == '['* || '${j}' == '{'*" "json looks like array/object"
+        fi
 
-    local x
-    x="$(BS_OUTPUT_FORMAT=xml system::network::list_interfaces)"
-    if command -v xmllint >/dev/null 2>&1; then
-        testframework::assert_command "printf '%s' '${x}' | xmllint --noout - 2>/dev/null" "xml valid"
+        local x
+        x="$(BS_OUTPUT_FORMAT=xml system::network::list_interfaces)"
+        if command -v xmllint >/dev/null 2>&1; then
+            testframework::assert_command "printf '%s' '${x}' | xmllint --noout - 2>/dev/null" "xml valid"
+        else
+            testframework::assert_true "'${x}' == '<records>'*" "xml has records root"
+        fi
     else
-        testframework::assert_true "'${x}' == '<records>'*" "xml has records root"
+        testframework::skip "list_interfaces" "neither ip nor ifconfig is installed / нет ни ip, ни ifconfig"
     fi
 
     testframework::section "status / статус (blob getter)"
@@ -57,7 +61,7 @@ main() {
             testframework::assert_command "printf '%s' '${stj}' | jq -e . >/dev/null" "status json valid"
         fi
     else
-        testframework::assert_true "true" "status empty (no ip in env) — skipped"
+        testframework::skip "status" "empty output (no ip in env) / пустой вывод (нет ip)"
     fi
 
     testframework::section "ip getter / геттер ip"

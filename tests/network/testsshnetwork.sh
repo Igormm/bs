@@ -216,6 +216,7 @@ test_ssh_key_generation() {
 # Test 4: Get local network
 test_get_local_network() {
     log::info "Testing get local network..."
+    utils::has ip || { testframework::skip "test_get_local_network" "ip (iproute2) is not installed / ip не установлен"; return 0; }
     
     local network
     network=$(sshnetwork::get_local_network)
@@ -423,6 +424,7 @@ test_get_remote_info() {
 # Test 16: Get topology
 test_get_topology() {
     log::info "Testing get topology..."
+    utils::has ip || { testframework::skip "test_get_topology" "ip (iproute2) is not installed / ip не установлен"; return 0; }
     
     local result
     result=$(sshnetwork::get_topology)

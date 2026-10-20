@@ -25,8 +25,10 @@ main() {
     testframework::init
 
     testframework::section "show / routes"
-    local s
-    s="$(system::routing::show)"
+    local s=""
+    if utils::has ip; then
+        s="$(system::routing::show)"
+    fi
     if is::not_empty "${s}"; then
         testframework::assert_true "true" "show string non-empty"
         testframework::assert_command "! printf '%s' '${s}' | grep -q 'route:'" "string is bare route lines"
@@ -35,12 +37,15 @@ main() {
                 "BS_OUTPUT_FORMAT=json system::routing::show | jq -e . >/dev/null" "show json valid"
         fi
     else
-        testframework::assert_true "true" "show empty (no ip in env) — skipped"
+        testframework::skip "show" "empty output (no ip in env) / пустой вывод (нет ip)"
     fi
 
     testframework::section "rules / policy rules"
-    local r
-    r="$(system::routing::rules)"
+    # без ip rules честно возвращает ошибку — не вызываем / without ip, rules fails on purpose — not called
+    local r=""
+    if utils::has ip; then
+        r="$(system::routing::rules)"
+    fi
     if is::not_empty "${r}"; then
         testframework::assert_true "true" "rules string non-empty"
         if command -v jq >/dev/null 2>&1; then
@@ -48,7 +53,7 @@ main() {
                 "BS_OUTPUT_FORMAT=json system::routing::rules | jq -e . >/dev/null" "rules json valid"
         fi
     else
-        testframework::assert_true "true" "rules empty (no ip in env) — skipped"
+        testframework::skip "rules" "empty output (no ip in env) / пустой вывод (нет ip)"
     fi
 
     testframework::section "mutators with a fake ip / изменяющие команды с подставным ip"

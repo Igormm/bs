@@ -38,6 +38,10 @@ run_installer() {
 }
 
 test_uninstall_failure_keeps_wrapper() {
+    if testframework::is_root; then
+        testframework::skip "uninstall that cannot remove the lib" "running as root (chmod 555 does not stop root)"
+        return 0
+    fi
     sandbox
     run_installer --local
     local lib="${T}/home/.local/lib/bs" wrapper="${T}/home/.local/bin/bs"

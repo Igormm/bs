@@ -40,7 +40,7 @@ test_parses_and_lints() {
 
 test_behaviour() {
     local sh_bin sh_name out
-    utils::has dc || { printf '  skip: dc is not installed / dc не установлен\n'; return 0; }
+    utils::has dc || { testframework::skip "calc behaviour in every shell" "dc is not installed / dc не установлен"; return 0; }
     while IFS= read -r sh_bin; do
         sh_name="${sh_bin##*/}"
         eq "14" "$(probe "${sh_bin}" /usr/bin:/bin 'bs_calc_eval "2 3 4 * +"')" "${sh_name}: RPN arithmetic"
@@ -73,6 +73,7 @@ test_no_dc() {
 
 test_aliases() {
     local sh_name sh_bin
+    utils::has dc || { testframework::skip "calc::eval aliases" "dc is not installed / dc не установлен"; return 0; }
     for sh_name in bash zsh; do
         sh_bin="$(command -v "${sh_name}" || true)"
         [[ -n "${sh_bin}" ]] || continue

@@ -72,7 +72,9 @@ test_waiting_and_progress() {
     testframework::assert_equal "0" "${rc}" "a slow server does not break the run"
     testframework::assert_command "grep -q 'waiting for the server' '${tmp}/run.log'" "a long wait prints a heartbeat message"
     testframework::assert_command "grep -q 'фрагмент 1/2' '${tmp}/run.log'" "the heartbeat names the chunk"
-    testframework::assert_command "grep -q 'progress: 50%' '${tmp}/run.log'" "progress after the first chunk is 50%"
+    # ffmpeg режет по границе аудиокадра: первый фрагмент 3.000–3.072 с из 6 → 50–51%
+    # ffmpeg cuts on an audio frame boundary: the first chunk is 3.000–3.072 s of 6 → 50–51%
+    testframework::assert_command "grep -qE 'progress: 5[01]%' '${tmp}/run.log'" "progress after the first chunk is 50%"
     testframework::assert_command "grep -q 'осталось ≈ 00:00:0' '${tmp}/run.log'" "the remaining time is estimated"
     testframework::assert_command "grep -q 'x от реального времени' '${tmp}/run.log'" "the speed is printed"
     testframework::assert_command "grep -q 'progress: 100%' '${tmp}/run.log'" "progress reaches 100%"

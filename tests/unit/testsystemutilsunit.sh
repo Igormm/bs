@@ -29,6 +29,10 @@ test_get_ip_address() {
 # Test get_ip_address_for_interface on a real interface
 test_interface_ip() {
     local iface ip
+    if ! utils::has ip; then
+        testframework::skip "get_ip_address_for_interface" "ip (iproute2) is not installed / ip не установлен"
+        return 0
+    fi
     iface="$(ip -4 route show default 2>/dev/null | awk '{print $5; exit}')"
     if is::empty "${iface}"; then
         iface="$(ip -4 -o addr show 2>/dev/null | awk '$2 != "lo" {print $2; exit}')"

@@ -53,6 +53,10 @@ run_uninstall() {
 }
 
 test_failed_removal_keeps_wrapper() {
+    if testframework::is_root; then
+        testframework::skip "failed removal keeps the wrapper" "running as root (chmod 555 does not stop root)"
+        return 0
+    fi
     sandbox
     local lib="${T}/pfx/lib/bs" wrapper="${T}/pfx/bin/bs"
     make_install "${lib}"

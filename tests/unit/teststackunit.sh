@@ -55,7 +55,11 @@ main() {
   ts::stack::down
   st="$(ts::stack::status)"
   testframework::assert_true "'${st}' =~ api.alive=no" "api dead after down"
-  testframework::assert_false "kill -0 ${pid}" "pid gone"
+  # Убитый процесс без «жнеца» остаётся зомби: в контейнере PID 1 часто не вызывает wait
+  # A killed process nobody reaps stays a zombie: in a container PID 1 often never waits
+  testframework::assert_command \
+    "! kill -0 ${pid} 2>/dev/null || [[ \"\$(ps -o stat= -p ${pid} 2>/dev/null)\" == Z* ]]" \
+    "pid gone (or a zombie awaiting reaping)"
 
   local down_rc=0
   ts::stack::down || down_rc=$?

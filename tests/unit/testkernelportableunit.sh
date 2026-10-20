@@ -54,7 +54,7 @@ number
 ver=X" "${sh_name}: the loaded kernel works (log, args, data layer, predicates, version)"
         eq "$(probe "${sh_bin}" 'bs_config_get BS_LOG_LEVEL >/dev/null; echo "cfg=$?"; echo "home=${BS_HOME##*/}"' | tail -n 2 | tr '\n' ' ')" "cfg=0 home=$(basename "${BS_PROJECT_ROOT}") " "${sh_name}: configuration is loaded and BS_HOME defaults to BS_ROOT"
         eq "$(probe "${sh_bin}" '. "'"${KERNEL_SH}"'"; echo "again=$? depth=$(bs_load_stack_size)"' | tail -n 1)" "again=0 depth=0" "${sh_name}: sourcing kernel.sh twice is harmless"
-        eq "$(env -i HOME="${T}/h" PATH="/usr/bin:/bin" "${sh_bin}" -c '. "'"${KERNEL_SH}"'"; echo "rc=$?"' 2>&1 | head -n 1 | cut -c1-40)" "BS: bootstrap/kernel.sh: задайте BS_ROOT" "${sh_name}: no BS_ROOT gives a clear message"
+        eq "$(env -i HOME="${T}/h" PATH="/usr/bin:/bin" "${sh_bin}" -c '. "'"${KERNEL_SH}"'"; echo "rc=$?"' 2>&1 | head -n 1 | grep -o '^BS: bootstrap/kernel.sh: задайте BS_ROOT')" "BS: bootstrap/kernel.sh: задайте BS_ROOT" "${sh_name}: no BS_ROOT gives a clear message"
     done < <(testframework::posix_shells)
     # shellcheck disable=SC2034
     m=""
