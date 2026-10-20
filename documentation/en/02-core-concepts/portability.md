@@ -88,6 +88,7 @@ Compatibility tiers (for the version and `bs doctor`):
 - `gnu-linux` — GNU userland (`grep -P`, `sed -z`, `sha256sum`);
 - `posix` — POSIX-only tools (fallback mode);
 - `bsd` — macOS/FreeBSD compatibility layers.
+
 **The shell is part of the capability vector** (facts `shell`, `shell_ok`,
 `bash_version`): bash 4.2+ — the whole kernel (both tiers); the other shells
 (zsh, dash, busybox ash, ksh, mksh) — `@shell posix` modules directly and
@@ -95,6 +96,11 @@ everything else through a re-run in bash; fish and nushell — only through the
 `bs` command and the `bs call` bridge. The tiers below assume `shell_ok=1`,
 checked via `platform::get shell_ok`. What was really run is in the priority
 table of [shell-portability](../08-development/shell-portability.md).
+`platform::get shell_tier` says how BS works for the user's shell: `native`
+(bash 4.2+, `source` works too), `hosted` (another shell, BS runs as the `bs`
+command) or `unsupported` (no bash 4.2+ on the machine); the per-file `@shell`
+tier and strict mode are in
+[01-getting-started](../01-getting-started/README.md#running-from-any-shell).
 
 A script checks the required tier at startup and fails with a clear
 message if the capability is missing (instead of a cryptic crash from

@@ -285,7 +285,7 @@ sudo ./install.sh
 # Собрать самодостаточный исполняемый файл (фреймворк внутри, ~230 КБ)
 ./bs build examples/sysdiag.sh                 # → examples/sysdiag.standalone.sh
 
-# Запуск на любой машине с bash 4+ (дистрибутив не важен)
+# Запуск на любой машине, где есть bash 4.2+ (дистрибутив и оболочка не важны)
 ./examples/sysdiag.standalone.sh quick
 ```
 

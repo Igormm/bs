@@ -246,7 +246,7 @@ sudo ./install.sh uninstall        # system
 bs uninstall --local               # CLI: remove installed copies (no rc-file edits)
 ```
 
-`uninstall` (alias: `remove`) deletes `TARGET_BIN` and `TARGET_LIB`. In local mode it additionally removes `BIN_DIR`/`LIB_DIR` only if they are empty (`rmdir`), so other files in `~/.local` are never touched. The installer-added PATH line is also removed from `~/.bashrc` and `~/.zshrc` (exact match only; user edits are left untouched).
+`uninstall` (alias: `remove`) deletes `TARGET_BIN` and `TARGET_LIB`. In local mode it additionally removes `BIN_DIR`/`LIB_DIR` only if they are empty (`rmdir`), so other files in `~/.local` are never touched. The installer-added PATH line is also removed from the rc files of every known shell (bash, zsh, `~/.profile`, osh, fish, nu; exact match only; user edits are left untouched).
 
 `bs uninstall` explains itself the same way: `--local` with only a system install says "no local install → `bs uninstall --system`" (exit 1); nothing installed gives "NOTHING TO UNINSTALL" (exit 1); a foreign directory, a source checkout or a file given to `--lib` is refused; with no write access and no terminal it says `try: sudo bs uninstall --system` and removes nothing (it never calls `sudo` itself); a wrapper that belongs to another install stays in place while the lib is removed; removing the copy `bs` runs from is announced as normal. The "Running" line comes first here too.
 
@@ -256,22 +256,25 @@ bs uninstall --local               # CLI: remove installed copies (no rc-file ed
 
 ## PATH management (local mode)
 
-When the installer is started from a terminal and `~/.local/bin` was not yet in the `PATH` of that shell, it ends by starting a fresh `zsh`/`bash` (which reads the rc file) and prints `PATH APPLIED`, so `bs` works at once; `exit` returns to the previous shell, where `bs` appears only in a new terminal. Without a terminal it prints the `source ~/.bashrc` hint instead.
+When the installer is started from a terminal and `~/.local/bin` was not yet in the `PATH` of that shell, it ends by starting a fresh copy of your shell (when it is your login shell; it reads the rc file) and prints `PATH APPLIED`, so `bs` works at once; `exit` returns to the previous shell, where `bs` appears only in a new terminal. Without a terminal it prints the reload command for your shell instead (`source ~/.bashrc`, `. ~/.profile`, `exec nu`, …).
 
 After a local install, `auto_update_path` runs automatically. Both PATH flags are valid only together with `--local`:
 
 ```bash
 ./install.sh --local --path         # print a snippet for manual setup
-./install.sh --local --update-path  # add the line to ~/.bashrc and/or ~/.zshrc
+./install.sh --local --update-path  # add the line to the rc file of your shell
+./install.sh --local --update-path --shell fish   # for a given shell
 ```
 
-`--update-path` appends the following line (idempotently — existing identical lines are detected with `grep -Fqx` and not duplicated):
+`--update-path` appends the PATH line in the syntax of your shell (idempotently — existing identical lines are detected with `grep -Fqx` and not duplicated):
 
 ```bash
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.local/bin:$PATH"     # bash, zsh, dash/ash/sh/ksh (~/.profile), osh
 ```
 
-Rules: `~/.bashrc` is updated if it exists, or if there is no `~/.zshrc`; `~/.zshrc` is updated only if it already exists. Reload the shell afterwards (`source ~/.bashrc`) or open a new session.
+fish (`conf.d/bs.fish`) and nushell (`env.nu`) get a line in their own syntax; `bs init-shell --list` shows the rc file and reload command of every shell.
+
+Rules: the rc file of your shell is always updated (your shell is detected from the parent process, then the login shell; `--shell NAME` or `BS_USER_SHELL=NAME` sets it); existing `~/.bashrc` and `~/.zshrc` are updated as well. nushell: when `env.nu` does not exist the installer does not create it and prints the exact line to add. Reload the shell afterwards or open a new session.
 
 ## Termux and the shebang: `bs shebang`
 
