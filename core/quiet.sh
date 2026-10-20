@@ -30,7 +30,7 @@ bs_guard QUIET || return 0
 #   if bs_utils_has dnf; then ...; fi        # bash/zsh: utils::has dnf
 bs_utils_has() {
   # статус нормализуем: dash и ash при «не найдено» отдают 127, а не 1 / normalise the status: dash and ash return 127, not 1, for "not found"
-  command -v "${1}" >/dev/null 2>&1 || return 1
+  command -v "${1-}" >/dev/null 2>&1 || return 1
 }
 
 # Выполняет команду, полностью подавляя вывод. Код возврата сохраняется.
