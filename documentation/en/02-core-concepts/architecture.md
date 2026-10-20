@@ -88,22 +88,12 @@ Read top to bottom. Three layers: the **POSIX prologue** (runs in any shell),
    ├─ BS_ROOT (given, else the parent of bootstrap/ that holds the bs file)
    ├─ BS_KERNEL_MODE: full (bash 4.2+) or posix (dash, ash, ksh, mksh, zsh); an older bash is refused
    ├─ bs::append_local_bin_to_path   (~/.local/bin in the PATH of this process)
-   ├─ BS_HOME (defaults to BS_ROOT)
-   ├─ source bootstrap/loader.sh      → bs_load appears (load and bs::load in bash and zsh)
-   ├─ load core/prereq      bs::guard, bs::source_relative (first!)
-   ├─ load core/lang        bs_is_* (is::* in bash and zsh)            (posix)
-   ├─ load core/const       error codes, colours, flags
-   ├─ load core/logger      log::*
-   ├─ load core/errorhandler  errorhandler::*, cleanup::add
-   ├─ load core/version     BS_VERSION, bs::version::*
-   ├─ load core/quiet       bs_utils_has, bs_utils_quiet, ...  (posix)
-   ├─ load core/fmt         bs_utils_human_size, bs_utils_stamp, ...   (posix)
-   ├─ load core/data        bs_arr_*, bs_map_*  (arrays and maps)      (posix)
-   ├─ load core/utils       the rest of utils::*
-   ├─ load core/config      config::*
-   ├─ load core/deps        # @depends parsing
-   ├─ load lib/compat/deps, lib/compat/lang   (full mode only) deps::missing_tools, str::*, arr::*, map::*, bs::func_name
-   ├─ config::load          configuration from files and the environment
+   ├─ source bootstrap/kernel.sh      (posix: the same file dash, ash, ksh, mksh, zsh source)
+   │    ├─ BS_HOME (defaults to BS_ROOT); the loader appears → bs_load (load and bs::load in bash and zsh)
+   │    ├─ load core/prereq first (bs_guard, bs_source_relative), then lang, const, var, str, num, msg,
+   │    │  logger, quiet, fmt, data, errorhandler, version, utils, config, deps, args   (17 modules)
+   │    └─ bs_config_load      configuration from files and the environment
+   ├─ load lib/compat/deps, lib/compat/lang, lib/compat/args   (full mode only) deps::missing_tools, str::*, arr::*, map::*, ARGS_*
    └─ BS_INITIALIZED=1
 ```
 
@@ -113,14 +103,14 @@ Read top to bottom. Three layers: the **POSIX prologue** (runs in any shell),
  load "lib/io/streams"
    │
    ├─ BS_ROOT set and a directory?            no  → error, return 1
-   ├─ already in bs_loaded_modules?           yes → return 0
+   ├─ already loaded (bs_load_is_loaded)?           yes → return 0
    ├─ --strict-shell: does the module's @shell tier fit BS_ORIGIN_SHELL?   no → refuse
-   ├─ module already in bs_load_stack?        yes → circular dependency, return 1
-   ├─ push onto bs_load_stack
+   ├─ module already on the load stack?        yes → circular dependency, return 1
+   ├─ push onto the load stack
    ├─ for each dependency in "# @depends" → load (recursive); failure → return 1
    ├─ BS_CURRENT_FILE=<file>; source ${BS_ROOT}/lib/io/streams.sh
-   ├─ pop from bs_load_stack (on error too)
-   └─ bs_map_set bs_loaded_modules path 1
+   ├─ pop from the load stack (on error too)
+   └─ add path to the registry of loaded modules
 ```
 
 ## The kernel by tiers: what every shell gets
@@ -324,10 +314,10 @@ load "lib/io/streams"   # sources ${BS_ROOT}/lib/io/streams.sh
 `sources` the corresponding file. Internals:
 
 - **Duplicate-load protection.** Loaded modules are recorded in the
-  map `bs_loaded_modules` of the data layer (it was the bash array `BS_LOADED_MODULES`); a second `load` of the same module is
+  string `__bs_ld_loaded` (one module per line; it was the bash array `BS_LOADED_MODULES` — the loader runs before `core/data.sh`, so it uses no data layer; ask with `bs_load_is_loaded`); a second `load` of the same module is
   a no-op returning `0`.
 - **Cycle detection.** The modules currently being loaded are kept in the
-  `bs_load_stack` array of the data layer (it was `BS_LOAD_STACK`). If a module is requested while it is already on the
+  string `__bs_ld_stack` (it was `BS_LOAD_STACK`; `bs_load_stack_size` gives its depth). If a module is requested while it is already on the
   stack, loading fails with a `circular dependency detected` error naming the
   full chain. The stack entry is always popped afterwards, including on
   failure.
@@ -370,7 +360,7 @@ Step by step:
 3. `run_cmd` spawns a clean bash, unsets `BS_INITIALIZED`, sources
    `bootstrap/init.sh` (full core load) and then sources the script.
 4. The script pulls in additional modules with `load`. Already-loaded modules
-   cost nothing thanks to `bs_loaded_modules`.
+   cost nothing thanks to the registry of loaded modules.
 5. During execution the script may register cleanup functions with
    `cleanup::add <fn>`.
 6. On exit — normal, via `bs::exit [code]`, or via `error::exit "msg" [code]` —

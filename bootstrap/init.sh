@@ -8,17 +8,16 @@
 # Назначение: определить корень проекта, экспортировать BS_ROOT и загрузить ядро через loader.
 #
 # Режимы ядра / Kernel modes (BS_KERNEL_MODE)
-#   full  — bash 4.2+: 16 модулей core/ (prereq, lang, const, var, str, num, msg, logger, quiet, fmt,
-#           data, errorhandler, version, utils, config, deps) и мосты lib/compat/deps, lib/compat/lang,
-#           lib/compat/args; args и calc подключаются по запросу;
-#   posix — dash, ash, ksh, mksh, zsh: те же 16 модулей core/, без мостов; args и calc (оба POSIX)
-#           подключаются по запросу, всё lib/ — только в режиме full (bash ниже 4.2 отклоняется).
-#   full  — bash 4.2+: 16 core/ modules (prereq, lang, const, var, str, num, msg, logger, quiet, fmt,
-#           data, errorhandler, version, utils, config, deps) and the bridges lib/compat/deps,
-#           lib/compat/lang, lib/compat/args; args and calc are loaded on demand;
-#   posix — dash, ash, ksh, mksh and zsh: the same 16 core/ modules, no bridges; args and calc (both
-#           POSIX) are loaded on demand, all of lib/ is in the full mode only (a bash older than 4.2
-#           is refused).
+#   full  — bash 4.2+: 17 модулей core/ (prereq, lang, const, var, str, num, msg, logger, quiet, fmt,
+#           data, errorhandler, version, utils, config, deps, args; их грузит bootstrap/kernel.sh) и
+#           мосты lib/compat/deps, lib/compat/lang, lib/compat/args; calc — по запросу;
+#   posix — dash, ash, ksh, mksh, zsh: те же 17 модулей core/, без мостов; calc — по запросу,
+#           всё lib/ — только в режиме full (bash ниже 4.2 отклоняется).
+#   full  — bash 4.2+: 17 core/ modules (prereq, lang, const, var, str, num, msg, logger, quiet, fmt,
+#           data, errorhandler, version, utils, config, deps, args; bootstrap/kernel.sh loads them) and
+#           the bridges lib/compat/deps, lib/compat/lang, lib/compat/args; calc is loaded on demand;
+#   posix — dash, ash, ksh, mksh and zsh: the same 17 core/ modules, no bridges; calc is loaded on
+#           demand, all of lib/ is in the full mode only (a bash older than 4.2 is refused).
 #
 # Каталог bootstrap/ / The bootstrap/ directory
 #   bash берёт его из пути этого файла; остальные оболочки — из BS_BOOTSTRAP_DIR, BS_ENTRY_DIR
@@ -141,49 +140,22 @@ export BS_KERNEL_MODE
 # Add local bin to PATH
 bs_append_local_bin_to_path
 
-# @global BS_HOME — Env: BS_HOME, defaults to BS_ROOT (historical alias) (category: env)
-# @global BS_HOME — Env: BS_HOME, по умолчанию BS_ROOT (исторический алиас) (категория: env)
-: "${BS_HOME:=${BS_ROOT}}"
-export BS_HOME
-
-# Load loader
-if [ -f "${BS_ROOT}/bootstrap/loader.sh" ]; then
-  # shellcheck disable=SC1090,SC1091
-  . "${BS_ROOT}/bootstrap/loader.sh"
-elif [ -f "${BS_ROOT}/loader.sh" ]; then
-  # shellcheck disable=SC1090,SC1091
-  . "${BS_ROOT}/loader.sh"
-else
-  printf 'BS: error: loader.sh not found in %s/bootstrap/ or %s/\n' "${BS_ROOT}" "${BS_ROOT}" >&2
+# Ядро (core/*) загружает bootstrap/kernel.sh: загрузчик, 17 модулей и конфигурацию; BS_HOME по
+# умолчанию равен BS_ROOT. Тот же POSIX-файл подключают dash, ash, ksh, mksh и zsh напрямую.
+# The kernel (core/*) is loaded by bootstrap/kernel.sh: the loader, 17 modules and the configuration;
+# BS_HOME defaults to BS_ROOT. The same POSIX file is sourced directly by dash, ash, ksh, mksh and zsh.
+if [ ! -f "${BS_ROOT}/bootstrap/kernel.sh" ]; then
+  printf 'BS: error: kernel.sh not found in %s/bootstrap/\n' "${BS_ROOT}" >&2
   return 1
 fi
-
-# Load core modules via loader
-# core/prereq must come first: it provides bs_guard and bs_source_relative
-bs_load "core/prereq"
-bs_load "core/lang"
-bs_load "core/const"
-bs_load "core/var"
-bs_load "core/str"
-bs_load "core/num"
-bs_load "core/msg"
-bs_load "core/logger"
-bs_load "core/quiet"
-bs_load "core/fmt"
-bs_load "core/data"
-bs_load "core/errorhandler"
-bs_load "core/version"
-bs_load "core/utils"
-bs_load "core/config"
-bs_load "core/deps"
+# shellcheck disable=SC1091
+. "${BS_ROOT}/bootstrap/kernel.sh" || return 1
 if [ "$BS_KERNEL_MODE" = full ]; then
   # мосты совместимости (вне ядра): deps::missing_tools с массивом bash; языковые примитивы bash: bs::func_name, str::*, arr::*, map::*; массивы bash ARGS_PARAMS/ARGS_FLAGS/ARGS_REST для args::parse / compatibility bridges (outside the kernel): deps::missing_tools with a bash array; bash language primitives: bs::func_name, str::*, arr::*, map::*; bash arrays ARGS_PARAMS/ARGS_FLAGS/ARGS_REST for args::parse
   bs_load "lib/compat/deps"
   bs_load "lib/compat/lang"
   bs_load "lib/compat/args"
 fi
-# Load configuration from files and env / Загрузить конфигурацию из файлов и окружения
-bs_config_load
 
 # @global BS_INITIALIZED — Env: bootstrap initialized marker (category: env)
 # @global BS_INITIALIZED — Env: маркер выполненной инициализации (категория: env)

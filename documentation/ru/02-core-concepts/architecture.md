@@ -88,22 +88,12 @@ BS — тонкий слой времени выполнения **поверх 
    ├─ BS_ROOT (задан, иначе родитель bootstrap/ с файлом bs)
    ├─ BS_KERNEL_MODE: full (bash 4.2+) или posix (dash, ash, ksh, mksh, zsh); bash старше 4.2 отклоняется
    ├─ bs::append_local_bin_to_path   (~/.local/bin в PATH этого процесса)
-   ├─ BS_HOME (по умолчанию BS_ROOT)
-   ├─ source bootstrap/loader.sh      → появляется bs_load (в bash и zsh — ещё load и bs::load)
-   ├─ load core/prereq      bs::guard, bs::source_relative (первым!)
-   ├─ load core/lang        bs_is_* (is::* в bash и zsh)               (posix)
-   ├─ load core/const       коды ошибок, цвета, флаги
-   ├─ load core/logger      log::*
-   ├─ load core/errorhandler  errorhandler::*, cleanup::add
-   ├─ load core/version     BS_VERSION, bs::version::*
-   ├─ load core/quiet       bs_utils_has, bs_utils_quiet, ...  (posix)
-   ├─ load core/fmt         bs_utils_human_size, bs_utils_stamp, ...   (posix)
-   ├─ load core/data        bs_arr_*, bs_map_*  (arrays and maps)      (posix)
-   ├─ load core/utils       остальное utils::*
-   ├─ load core/config      config::*
-   ├─ load core/deps        разбор # @depends
-   ├─ load lib/compat/deps, lib/compat/lang   (только full) deps::missing_tools, str::*, arr::*, map::*, bs::func_name
-   ├─ config::load          конфигурация из файлов и окружения
+   ├─ source bootstrap/kernel.sh      (posix: тот же файл подключают dash, ash, ksh, mksh, zsh)
+   │    ├─ BS_HOME (по умолчанию BS_ROOT); появляется загрузчик → bs_load (load и bs::load в bash и zsh)
+   │    ├─ load core/prereq первым (bs_guard, bs_source_relative), затем lang, const, var, str, num, msg,
+   │    │  logger, quiet, fmt, data, errorhandler, version, utils, config, deps, args   (17 модулей)
+   │    └─ bs_config_load      конфигурация из файлов и окружения
+   ├─ load lib/compat/deps, lib/compat/lang, lib/compat/args   (только режим full) deps::missing_tools, str::*, arr::*, map::*, ARGS_*
    └─ BS_INITIALIZED=1
 ```
 
@@ -113,14 +103,14 @@ BS — тонкий слой времени выполнения **поверх 
  load "lib/io/streams"
    │
    ├─ BS_ROOT задан и это каталог?            нет → ошибка, return 1
-   ├─ уже в bs_loaded_modules?                да  → return 0
+   ├─ уже загружен (bs_load_is_loaded)?                да  → return 0
    ├─ --strict-shell: @shell-tier модуля подходит BS_ORIGIN_SHELL?   нет → отказ
-   ├─ модуль уже в bs_load_stack?             да  → circular dependency, return 1
-   ├─ push в bs_load_stack
+   ├─ модуль уже в стеке загрузки?             да  → circular dependency, return 1
+   ├─ push в стек загрузки
    ├─ для каждой зависимости из «# @depends» → load (рекурсивно); сбой → return 1
    ├─ BS_CURRENT_FILE=<файл>; source ${BS_ROOT}/lib/io/streams.sh
-   ├─ pop из bs_load_stack (и при ошибке тоже)
-   └─ bs_map_set bs_loaded_modules путь 1
+   ├─ pop из стека загрузки (и при ошибке тоже)
+   └─ путь — в реестр загруженных модулей
 ```
 
 ## Ядро по ярусам: что доступно всем оболочкам
@@ -327,10 +317,10 @@ load "lib/io/streams"   # подключает ${BS_ROOT}/lib/io/streams.sh
 `source` соответствующего файла. Внутренние механизмы:
 
 - **Защита от повторной загрузки.** Загруженные модули фиксируются в
-  словаре `bs_loaded_modules` слоя данных (был массивом bash `BS_LOADED_MODULES`); повторный `load` того же модуля —
+  строке `__bs_ld_loaded` (по модулю на строку; был массивом bash `BS_LOADED_MODULES` — загрузчик работает до `core/data.sh` и слоем данных не пользуется; спрашивать через `bs_load_is_loaded`); повторный `load` того же модуля —
   холостая операция, возвращающая `0`.
 - **Обнаружение циклов.** Модули, находящиеся в процессе загрузки, хранятся в
-  массиве `bs_load_stack` слоя данных (был `BS_LOAD_STACK`). Если модуль запрашивается, пока он уже есть в
+  строке `__bs_ld_stack` (был `BS_LOAD_STACK`; глубину даёт `bs_load_stack_size`). Если модуль запрашивается, пока он уже есть в
   стеке, загрузка завершается ошибкой `circular dependency detected` с полной
   цепочкой. Элемент стека удаляется в любом случае, включая ошибку.
 - **Директива `# @depends`.** Перед подключением модуля загрузчик ищет в его
@@ -374,7 +364,7 @@ load "lib/io/streams"
 3. `run_cmd` порождает чистый bash, сбрасывает `BS_INITIALIZED`, подключает
    `bootstrap/init.sh` (полная загрузка ядра) и затем подключает скрипт.
 4. Скрипт подтягивает дополнительные модули через `load`. Уже загруженные
-   модули ничего не стоят благодаря `bs_loaded_modules`.
+   модули ничего не стоят благодаря реестру загруженных модулей.
 5. Во время работы скрипт может регистрировать функции очистки через
    `cleanup::add <fn>`.
 6. При выходе — обычном, через `bs::exit [code]` или через
