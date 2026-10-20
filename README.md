@@ -1,14 +1,32 @@
 # BS Framework
 
-**BS** — модульный фреймворк и стандартная библиотека на **Bash 4.2+** (вся `lib/` и команды `bootstrap/bs.sh`, которые запускают её, написаны на bash; все 19 файлов ядра `@shell posix` работают в любой оболочке):
-загрузчик модулей, логирование, обработка ошибок, декларативные параметры
-скриптов, абстракция потоков ввода/вывода и набор системных модулей —
-всё в едином code style и без единой внешней зависимости.
+**BS** — модульный фреймворк и стандартная библиотека для shell-скриптов.
+Пишешь скрипт, подключаешь нужные модули через `load`, остальное берёт на
+себя фреймворк.
 
-**BS** is a modular framework and standard library written in **Bash 4.2+** (all of `lib/` and the `bootstrap/bs.sh` commands that run it are bash; all 19 `@shell posix` kernel files run in any shell):
-a module loader, logging, error handling, declarative script parameters,
-an I/O streams abstraction and a set of system modules — all in a
-consistent code style and with zero external dependencies.
+- 📦 **Загрузчик модулей** с разрешением зависимостей
+- 📝 **Логирование** и 🛡️ **обработка ошибок** из коробки
+- ⚙️ **Декларативные параметры** скриптов
+- 🔀 **Абстракция потоков** ввода/вывода
+- 🖥️ **Системные модули**: процессы, файлы, железо, интеграции
+
+🐚 Ядро написано на POSIX sh и работает в любой оболочке, стандартная
+библиотека написана на Bash.
+🎯 Единый code style, ни одной внешней зависимости.
+
+**BS** is a modular framework and standard library for shell scripts.
+Write your script, `load` the modules you need, and the framework does
+the rest.
+
+- 📦 **Module loader** with dependency resolution
+- 📝 **Logging** and 🛡️ **error handling** out of the box
+- ⚙️ **Declarative script parameters**
+- 🔀 **I/O streams abstraction**
+- 🖥️ **System modules**: processes, files, hardware, integrations
+
+🐚 The kernel is POSIX sh and runs in any shell; the standard library is
+written in Bash.
+🎯 One code style, zero external dependencies.
 
 ## Возможности / Features
 
@@ -62,7 +80,7 @@ consistent code style and with zero external dependencies.
 
 ## Требования / Requirements
 
-- **Bash 4.2+ — обязательно / required**: на нём написаны вся `lib/` (87 модулей) и ядро; CI проверяет с 4.4, версии 4.2–4.3 допускаются кодом, но не проверяются / all of `lib/` (87 modules) and the kernel are bash; CI checks from 4.4, 4.2–4.3 are accepted by the code but not verified
+- **Bash 4.2+ — обязательно / required**: на нём написана вся `lib/` (87 модулей), ядро — POSIX sh; CI проверяет с 4.4, версии 4.2–4.3 допускаются кодом, но не проверяются / all of `lib/` (87 modules) is bash, the kernel is POSIX sh; CI checks from 4.4, 4.2–4.3 are accepted by the code but not verified
 - Запускать `bs` и `install.sh` можно из любой оболочки: пролог находит bash и перезапускается в нём / `bs` and `install.sh` can be started from any shell: the prologue finds bash and re-runs itself in it
 - Linux (основная платформа; macOS — частично)
 
