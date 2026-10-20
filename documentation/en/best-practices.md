@@ -96,8 +96,10 @@ See the [Code Style Guide](code-style-guide.md) for details.
 
 ## Tools & dependencies
 
-- **Shell**: Bash 4.2+ is required for associative arrays and the loader.
-  zsh may invoke the CLI, but execution always happens in Bash.
+- **Shell**: the user may run BS from any shell (bash, zsh, dash, ash, sh,
+  ksh, fish, nushell); the code always runs in a host bash 4.2+ found on the
+  machine. Mark a module `# @shell posix` only if it really is POSIX sh
+  (see 01-getting-started, "Running from any shell").
 - **Core tools** (module-dependent): `jq`, `curl`, `openssl`, `coreutils`
   (`base64`).
 - **Install wrappers**:

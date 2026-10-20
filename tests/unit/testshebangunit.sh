@@ -122,7 +122,9 @@ test_cli() {
     testframework::assert_false "'${bs_bin}' shebang check '${T}/b.sh' >/dev/null 2>&1" "check: broken shebang -> exit 1" || true
     "${bs_bin}" shebang set --mode portable "${T}/b.sh" >/dev/null 2>&1
     eq "$(head -n1 "${T}/b.sh")" '#!/usr/bin/env bs' "set repairs it"
-    testframework::assert_command "'${bs_bin}' shebang check '${T}/b.sh' >/dev/null 2>&1" "check: repaired -> exit 0" || true
+    # #!/usr/bin/env bs works only where bs is in PATH: put this copy there (CI has no installed bs)
+    # #!/usr/bin/env bs работает, только если bs в PATH: кладём туда эту копию (в CI bs не установлен)
+    testframework::assert_command "PATH='${BS_PROJECT_ROOT}':\"\${PATH}\" '${bs_bin}' shebang check '${T}/b.sh' >/dev/null 2>&1" "check: repaired -> exit 0" || true
     "${bs_bin}" shebang set --mode portable "${T}/o.sh" >/dev/null 2>&1
     eq "$(head -n1 "${T}/o.sh")" '#!/usr/bin/env bash' "other programs are not touched"
 }

@@ -94,10 +94,11 @@ dash, busybox ash, ksh, mksh) — модули `@shell posix` напрямую �
 `bs call`. Тиры ниже предполагают `shell_ok=1`, проверяется через
 `platform::get shell_ok`. Что реально запускалось — таблица приоритетов в
 [shell-portability](../08-development/shell-portability.md).
-**The shell is part of the capability vector** (facts `shell`, `shell_ok`,
-`bash_version`): bash 4.2+ — full kernel; zsh — init-level only
-(`bootstrap/init.sh`); dash/sh/fish — unsupported. The tiers below assume
-`shell_ok=1`, checked via `platform::get shell_ok`.
+`platform::get shell_tier` говорит, как BS работает для оболочки пользователя:
+`native` (bash 4.2+, работает и `source`), `hosted` (другая оболочка, BS
+работает командой `bs`) или `unsupported` (bash 4.2+ на машине нет); tier файла
+`@shell` и строгий режим — в
+[01-getting-started](../01-getting-started/README.md#работа-из-любой-оболочки).
 
 Скрипт при старте проверяет нужный тир и падает с понятной ошибкой,
 если возможности нет (вместо криптопада из-за `sed -z`).
