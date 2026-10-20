@@ -18,6 +18,8 @@ let cases = [
   [S1 "error description" [bs_const_error_description 2] "Invalid arguments / Неверные аргументы" 0]
   [S1 "is_number" [bs_is_number 42] "" 0]
   [S1 "config default" [bs_config_get BS_FILES_ATOMIC] "false" 0]
+  [S1 "deps has" [bs_deps_has ls] "" 0]
+  [S1 "error try ok" [bs_error_try "true"] "" 0]
   # S2 alternative scenarios / альтернативные
   [S2 "contains no" [bs_str_contains hello xyz] "" 1]
   [S2 "div by zero" [bs_num_div 1 0] "" 2]
@@ -26,6 +28,9 @@ let cases = [
   [S2 "compare less" [bs_version_compare "1.2.3" "1.10.0"] "" 2]
   [S2 "config unknown key" [bs_config_get NEVER_DEFINED_KEY] "" 2]
   [S2 "unknown function" [bs_no_such_fn] "" 127]
+  [S2 "deps has missing" [bs_deps_has no_such_cmd_zz] "" 1]
+  [S2 "error try keeps status" [bs_error_try sh -c "exit 7"] "" 7]
+  [S2 "timeout fires" [bs_error_with_timeout 1 sleep 3] "" 124]
   # S3 parameter variants / варианты параметров
   [S3 "replace glob literal" [bs_str_replace "a*b" "*" "."] "a.b" 0]
   [S3 "width cyrillic" [bs_str_width "привет"] "6" 0]
@@ -34,6 +39,7 @@ let cases = [
   [S3 "human 3 GiB" [bs_utils_human_size 3221225472] "3.0 GiB" 0]
   [S3 "join empty item" [bs_str_join "," a "" c] "a,,c" 0]
   [S3 "version numeric not lexical" [bs_version_compare "1.10" "1.9"] "" 1]
+  [S3 "calc rpn" [--load core/calc bs_calc_main 3 4 +] "7" 0]
   # S4 half-scenarios / полусценарии
   [S4 "repeat without count" [bs_str_repeat ab] "" 1]
   [S4 "add one arg" [bs_num_add 1] "" 1]
