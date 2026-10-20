@@ -15,7 +15,7 @@ happens between a script's shebang and its exit.
 ## Loading flow at a glance
 
 Read top to bottom. Three layers: the **POSIX prologue** (runs in any shell),
-**stages 1–2** (`boot.sh`, `bs` — bash 4.2+) and the **kernel**
+**stages 1–2** (`boot.sh`, `bs` — POSIX: all commands in bash 4.2+, the POSIX part elsewhere) and the **kernel**
 (`bootstrap/init.sh` → `bootstrap/loader.sh` → `core/*`).
 
 ```
@@ -40,8 +40,8 @@ Read top to bottom. Three layers: the **POSIX prologue** (runs in any shell),
               ┌───────────────────────────┴───────────────────────────┐
               ▼                                                       ▼
    stage-1: boot.sh                                          stage-2: bs
-    · source bootstrap/bs.sh (pre-kernel)                      (boot.sh execs into it)
-    · bs::strict (prologue checked the version)                      │
+    · . bootstrap/base.sh (pre-kernel, POSIX)                 (boot.sh execs into it)
+    · bs_strict                                                      │
     · BS_ROOT: env → next to boot.sh →                               ▼
       ~/.local/lib/bs → /usr/local/lib/bs        · BS_CALLER_PATH = the caller's PATH
       (not found → exit 2)                       · source bootstrap/bs.sh:
@@ -179,11 +179,11 @@ on `@shell posix|bash4` tiers and shells: [shell-portability](../08-development/
 [boot.sh](../../../boot.sh) is a minimal pre-loader whose only job is to verify
 the environment and hand control to `bs` as fast as possible:
 
-1. **Pre-kernel namespace.** It sources `bootstrap/bs.sh` — a dependency-free,
-   bash-3.2-compatible file — and enables strict mode
-   (`bs::strict`). The POSIX prologue (`bs_shell_host_ok`) has already checked
-   the bash version: it replaces an unsuitable bash with a re-run (trampoline)
-   or exits with code `1`.
+1. **Pre-kernel namespace.** It sources `bootstrap/base.sh` — a dependency-free
+   POSIX file — and enables strict mode (`bs_strict`). The POSIX prologue
+   (`bs_shell_host_ok`) has already looked at the shell: it re-runs in a bash
+   4.2+ when there is one and otherwise lets `boot.sh` carry on in the current
+   shell (`BS_POSIX_ENTRY=1`); `bs` then decides what it can run there.
 2. **BS_ROOT lookup**, in priority order:
    - already exported `BS_ROOT`;
    - the directory containing `boot.sh` itself, if `bs` and
@@ -195,8 +195,8 @@ the environment and hand control to `bs` as fast as possible:
 3. **Handover.** `exec "${BS_ROOT}/bs" "$@"` replaces the process, so all
    arguments and standard streams reach stage 2 unchanged.
 
-Exit codes: `0` — `bs` ran successfully; `1` — bash too old; `2` — framework
-not found.
+Exit codes: `0` — `bs` ran successfully; `1` — `bootstrap/base.sh` not found;
+`2` — framework not found.
 
 ## Stage 2: `bs` — CLI and shebang interpreter
 

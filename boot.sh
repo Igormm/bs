@@ -1,17 +1,24 @@
-#!/usr/bin/env bash
-# @shell bash4 — bash 4.2+ file behind a POSIX prologue: sh/dash/zsh/bash 3.2 re-run it in bash (bootstrap/trampoline.sh)
-# @shell bash4 — файл bash 4.2+ за POSIX-прологом: sh/dash/zsh/bash 3.2 перезапускают его в bash (bootstrap/trampoline.sh)
-# 
+#!/bin/sh
+# shellcheck shell=sh
+# @shell posix — валидный POSIX sh: находит BS_ROOT и передаёт управление bs; работает в любой оболочке, bash не нужен / valid POSIX sh: finds BS_ROOT and hands over to bs; works in any shell, no bash needed
+# @tier core — builtins and readlink; works everywhere
+#
 #  BS Framework – STAGE-1 BOOT-LOADER
 #  Назначение / Purpose:
-#    - проверить среду (bash≥4);
+#    - проверить среду (оболочка-хозяин);
 #    - максимально быстро найти BS_ROOT;
 #    - передать управление скрипту bs (stage-2).
 #  Exit-codes:
 #    0 – успешный запуск bs;
-#    1 – bash слишком старый;
+#    1 – не найден bootstrap/base.sh;
 #    2 – не найден BS_ROOT или отсутствует bs.
-# 
+#
+
+# Точка входа умеет работать без bash: трамплин перезапускает её в bash 4.2+, если он есть,
+# иначе она остаётся в текущей оболочке — bs сам решит, что ему можно выполнить.
+# The entry point can run without bash: the trampoline re-runs it in a bash 4.2+ when there is
+# one and otherwise it stays in the current shell — bs itself decides what it can run there.
+BS_POSIX_ENTRY=1
 
 # --- POSIX-пролог (валиден в sh/dash/ash/zsh/bash) / POSIX prologue ---------
 # Если запущены не bash 4+ (sh install.sh, zsh ./bs, bash 3.2, bash как sh),
@@ -38,20 +45,21 @@ if ! bs_shell_host_ok; then
 fi
 unset __BS_TRAMPOLINE __bs_p __bs_r __bs_s
 # --- конец пролога / end of the prologue ------------------------------------
+unset BS_POSIX_ENTRY
 
 # 1. Определяем каталог, где лежит boot.sh
 BOOT_DIR="${BS_ENTRY_DIR}"
 
-# 2. Pre-kernel root namespace: shell version gate (bash 3.2-compatible)
-#    Строгий режим — через pre-kernel хелпер bs::strict (bootstrap/bs.sh).
-#    Strict mode comes from the pre-kernel helper bs::strict (bootstrap/bs.sh).
-if [[ -f "${BOOT_DIR}/bootstrap/bs.sh" ]]; then
-  source "${BOOT_DIR}/bootstrap/bs.sh"
-  bs::strict
-  # Версию bash уже проверил POSIX-пролог (bs_shell_host_ok) — повторять нечего
-  # The POSIX prologue (bs_shell_host_ok) has already checked the bash version
+# 2. Pre-kernel: POSIX-часть (bootstrap/base.sh) работает в любой оболочке.
+#    Строгий режим включается именованной pre-kernel функцией bs_strict.
+#    Pre-kernel: the POSIX part (bootstrap/base.sh) works in any shell.
+#    Strict mode is enabled via the named pre-kernel helper bs_strict.
+if [ -f "${BOOT_DIR}/bootstrap/base.sh" ]; then
+  # shellcheck disable=SC1090,SC1091
+  . "${BOOT_DIR}/bootstrap/base.sh"
+  bs_strict
 else
-  printf 'ERROR: bootstrap/bs.sh not found in %s\n' "$BOOT_DIR" >&2
+  printf 'ERROR: bootstrap/base.sh not found in %s\n' "$BOOT_DIR" >&2
   exit 1
 fi
 
@@ -59,12 +67,12 @@ fi
 #  1) Уже экспортирован внешним скриптом
 #  2) Рядом лежит файл «bs» и bootstrap/init.sh
 #  3) Системные/пользовательские префиксы
-if [[ -z "${BS_ROOT:-}" ]]; then
-  if [[ -f "${BOOT_DIR}/bs" && -f "${BOOT_DIR}/bootstrap/init.sh" ]]; then
+if [ -z "${BS_ROOT:-}" ]; then
+  if [ -f "${BOOT_DIR}/bs" ] && [ -f "${BOOT_DIR}/bootstrap/init.sh" ]; then
     BS_ROOT=$BOOT_DIR
   else
     for prefix in "${HOME}/.local/lib/bs" "/usr/local/lib/bs"; do
-      if [[ -f "${prefix}/bs" && -f "${prefix}/bootstrap/init.sh" ]]; then
+      if [ -f "${prefix}/bs" ] && [ -f "${prefix}/bootstrap/init.sh" ]; then
         BS_ROOT=$prefix
         break
       fi
@@ -73,12 +81,12 @@ if [[ -z "${BS_ROOT:-}" ]]; then
 fi
 
 # 4. Валидация
-if [[ -z "${BS_ROOT:-}" ]]; then
+if [ -z "${BS_ROOT:-}" ]; then
   printf 'ERROR: BS framework not found (searched: repo, ~/.local/lib/bs, /usr/local/lib/bs)\n' >&2
   exit 2
 fi
 
-if [[ ! -x "${BS_ROOT}/bs" ]]; then
+if [ ! -x "${BS_ROOT}/bs" ]; then
   printf 'ERROR: bs script not found or not executable in BS_ROOT=%s\n' "$BS_ROOT" >&2
   exit 2
 fi
