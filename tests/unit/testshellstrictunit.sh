@@ -115,6 +115,31 @@ test_cli() {
     fi
 }
 
+# --strict-shell=ОБОЛОЧКА: проверка против УКАЗАННОЙ оболочки, где бы ни запустили
+# --strict-shell=SHELL: a check against the NAMED shell, wherever bs is started
+test_named_shell() {
+    printf '#!/usr/bin/env bs\nload "lib/io/streams"\nio::streams::print "ran"\n' > "${T}/n.sh"
+    local sh_name
+    for sh_name in dash zsh ash ksh mksh fish; do
+        run -- "${TEST_BASH}" ./bs "--strict-shell=${sh_name}" run "${T}/n.sh"
+        eq "1" "${RC}" "--strict-shell=${sh_name} (started from bash): a bash4 module is refused"
+        has "'${sh_name}'" "--strict-shell=${sh_name}: names the declared shell"
+    done
+    run -- "${TEST_BASH}" ./bs --strict-shell=bash run "${T}/n.sh"
+    eq "ran" "${OUT}" "--strict-shell=bash: bash 4.2+ is allowed"
+    run -- "${TEST_BASH}" ./bs --strict-shell dash run "${T}/n.sh"
+    eq "1" "${RC}" "--strict-shell dash (a separate word): the same as the = form"
+    run -- "${TEST_BASH}" ./bs --strict-shell run "${T}/n.sh"
+    eq "ran" "${OUT}" "--strict-shell with no name: run is a command, not a shell name"
+    run -- "${TEST_BASH}" ./bs --strict-shell=nosuch run "${T}/n.sh"
+    eq "1" "${RC}" "--strict-shell=nosuch: an unknown shell is an error"
+    has "unknown shell" "--strict-shell=nosuch: says so"
+    run -- "${TEST_BASH}" ./bs --strict-shell= run "${T}/n.sh"
+    eq "1" "${RC}" "--strict-shell= with an empty name is an error"
+    run -- "${TEST_BASH}" ./bs --strict-shell=dash version
+    has "BS Framework version:" "--strict-shell=dash: core/ and the commands are always allowed"
+}
+
 main() {
     print_header "Strict Shell Unit Tests / Тесты --strict-shell"
 
@@ -130,6 +155,9 @@ main() {
     test_file_tier
     testframework::section "bs --strict-shell"
     test_cli
+
+    testframework::section "Named shell / Указанная оболочка"
+    test_named_shell
 
     rm -rf "${T:?}"
     testframework::summary

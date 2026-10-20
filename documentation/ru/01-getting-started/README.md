@@ -4,7 +4,7 @@
 
 ## Что такое BS
 
-**BS** — модульный фреймворк и стандартная библиотека на Bash. В его
+**BS** — модульный фреймворк и стандартная библиотека на **Bash 4.2+**. В его
 состав входят загрузчик модулей, логирование, обработка ошибок,
 декларативные параметры скриптов, абстракция потоков ввода/вывода и набор
 системных модулей — всё в едином стиле кода и без единой внешней
@@ -17,14 +17,17 @@ dash, ash/busybox, sh, ksh, fish, nushell. Какой bash исполнит ко
 
 ## Требования
 
-- **bash 4.2+** где-то в `PATH`: на нём исполняется ядро (ярус `bash4`). Версии
-  4.2 и 4.3 допускаются кодом, но CI проверяет с **4.4** (почти все платформы
-  поставляют 4.4 и новее).
+- **bash 4.2+ — обязательное требование.** На bash написаны вся библиотека `lib/`
+  (87 модулей), а также CLI `bootstrap/bs.sh`, установщик, поэтому без bash BS не работает.
+  Версии 4.2 и 4.3 допускаются кодом, но CI проверяет с **4.4** (почти все
+  платформы поставляют 4.4 и новее).
+- Исключение — 15 файлов ядра с меткой `@shell posix`: они не зависят от bash и
+  подключаются из dash, ash, ksh, mksh, zsh и bash (см. раздел «Как устроено
+  ядро»). Это небольшой набор помощников (константы, версия, `bs_utils_has`,
+  `bs_log_info`, `calc` и др.), а не весь BS.
 - Запускать `bs` и `install.sh` можно **из любой оболочки** (dash, ash, zsh, ksh,
-  fish, nushell): пролог найдёт bash и перезапустится в нём. Модули `@shell
-  posix` подключаются из bash, zsh, dash, ash, ksh, mksh напрямую (см. раздел
-  «Как устроено ядро»); fish и nushell вызывают функции ядра через `bs call`.
-  Подробнее — [«Работа из любой оболочки»](#работа-из-любой-оболочки).
+  fish, nushell): пролог найдёт bash и перезапустится в нём, так что bash должен
+  быть в системе, но не обязан быть вашей оболочкой.
 - Linux (основная платформа; macOS поддерживается частично: системный bash там
   3.2, нужен bash 4.2+ из Homebrew)
 - Termux (Android): первую строку скриптов подгоняет
@@ -32,6 +35,14 @@ dash, ash/busybox, sh, ksh, fish, nushell. Какой bash исполнит ко
 
 Ничего больше не требуется: BS использует только встроенные команды
 оболочки и стандартные системные утилиты.
+
+**Курс на независимость от оболочки.** Цель — ядро (`bootstrap/`, `core/`, `install/`,
+`boot.sh`, `bs`, `install.sh`) в одном пространстве имён `bs_*`, не зависящее от
+оболочки (dash, ash, ksh, mksh, zsh, bash). Уже готово 15 из 15 файлов `core/`
+(включая слой массивов и словарей `core/data.sh`) и слой оболочек в `bootstrap/`;
+остальное переводится по плану (см. [shell-portability](../08-development/shell-portability.md#курс-на-независимость-от-оболочки)).
+Вся библиотека `lib/` пока написана для bash 4.2+ (zsh разбирает 85 из 87 файлов,
+но работа `lib/` в zsh не проверялась).
 
 ## Установка
 
@@ -335,11 +346,12 @@ flowchart TB
     shell["shell.sh<br/>shell registry"]:::posix
     tramp["trampoline.sh<br/>re-run in bash"]:::posix
     sheb["shebang.sh<br/>#! management"]:::posix
+    loader["loader.sh<br/>load, @depends"]:::posix
+    kern["kernel.sh<br/>всё ядро"]:::posix
   end
   subgraph B["bootstrap/ · bash4"]
     bssh["bs.sh<br/>pre-kernel, bs::cli"]:::bash4
     init["init.sh"]:::bash4
-    loader["loader.sh<br/>load, @depends"]:::bash4
   end
   subgraph C["core/"]
     direction TB
@@ -349,18 +361,22 @@ flowchart TB
       const:::posix
       version:::posix
       quiet:::posix
+      fmt:::posix
+      logger:::posix
+      calc:::posix
+      data:::posix
+      utils:::posix
+      deps:::posix
+      errorhandler:::posix
+      config:::posix
+      lang:::posix
+      args:::posix
     end
-    subgraph CB["@shell bash4"]
-      lang:::bash4
-      args:::bash4
-      errorhandler:::bash4
-      config:::bash4
-      logger:::bash4
-      utils:::bash4
-      deps:::bash4
-      calc:::bash4
-      repl:::bash4
-    end
+  end
+  subgraph L["lib/compat · bash4 (мосты, вне ядра)"]
+    cdeps["deps.sh"]:::bash4
+    clang["lang.sh<br/>str::, arr::, map::"]:::bash4
+    cargs["args.sh<br/>ARGS_PARAMS, ARGS_FLAGS"]:::bash4
   end
   bs -.-> shell
   boot -.-> shell
@@ -368,10 +384,11 @@ flowchart TB
   shell -.-> tramp
   bs -.-> bssh
   bssh -.-> init
-  init -.-> loader
+  init -.-> kern
+  kern -.-> loader
   loader -.-> CP
-  loader -.-> CB
-  CB -.-> CP
+  init -.-> L
+  L -.-> CP
   inst -.-> sheb
 ```
 
@@ -491,7 +508,7 @@ sequenceDiagram
   D->>sh: . bootstrap/shell.sh
   D->>pre: . core/prereq.sh
   D->>q: . core/quiet.sh
-  D->>q: utils_has ls
+  D->>q: bs_utils_has ls
   q-->>D: код 0 или 1; bash не запускался
 ```
 

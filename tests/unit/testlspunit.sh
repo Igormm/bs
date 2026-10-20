@@ -80,7 +80,7 @@ test_lsp_session() {
     # hover / наведение
     testframework::assert_equal "2" "$(jq -r '.id' "${tmp_dir}/resp1.json")" "lsp hover echoes id"
     testframework::assert_command "jq -e '.result.contents.value | contains(\"arr::slice\")' '${tmp_dir}/resp1.json'" "lsp hover finds arr::slice"
-    testframework::assert_command "jq -e '.result.contents.value | contains(\"core/lang.sh\")' '${tmp_dir}/resp1.json'" "lsp hover shows source file"
+    testframework::assert_command "jq -e '.result.contents.value | contains(\"compat/lang.sh\")' '${tmp_dir}/resp1.json'" "lsp hover shows source file"
 
     # completion / автодополнение
     testframework::assert_equal "3" "$(jq -r '.id' "${tmp_dir}/resp2.json")" "lsp completion echoes id"

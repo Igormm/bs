@@ -80,7 +80,7 @@ load "lib/system/info"
 ```
 
 Do not `source lib/...` paths by hand in user scripts — `load` tracks loaded
-modules in `BS_LOADED_MODULES` and skips duplicates.
+modules in its registry (`bs_load_is_loaded`) and skips duplicates.
 
 ### Docstring format
 
@@ -239,7 +239,7 @@ Build-in commands: `:help` `:load <module>` `:list` `:doc <func>`
 is saved to `$XDG_CONFIG_HOME/bs/repl_history` (`BS_REPL_HISTORY_FILE`
 overrides it). Prompts: `BS_REPL_PROMPT1` / `BS_REPL_PROMPT2`.
 Line continuation with a trailing backslash. Implementation:
-`core/repl.sh` ([repl.sh](../../../core/repl.sh)), tests:
+`lib/ui/repl.sh` ([repl.sh](../../../lib/ui/repl.sh)), tests:
 `tests/integration/testrepl.sh`.
 
 ## bs calc — RPN calculator

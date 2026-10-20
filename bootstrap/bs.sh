@@ -159,13 +159,6 @@ bs::regex::captures() {
   __bs_rx_out=("${BASH_REMATCH[@]}")
 }
 
-# @description Is the code running in a subshell (( ), $( ), pipeline)?
-# @description Исполняется ли код в подоболочке (( ), $( ), конвейер)?
-# @return 0 in a subshell, 1 in the main shell / 0 в подоболочке, 1 в основной оболочке
-bs::shell::in_subshell() {
-  (( BASH_SUBSHELL > 0 ))
-}
-
 # @description Send `set -x` traces to the open file descriptor FD.
 # @description Направить трассировку `set -x` в открытый дескриптор FD.
 # @param $1 fd / дескриптор
@@ -326,7 +319,7 @@ Maintenance / Обслуживание:
   init-shell [SHELL]  PATH snippet for your shell: bash zsh ash dash ksh fish nu / snippet для вашей оболочки
   call FUNC [ARGS]    Call a kernel/library function from any shell (fish, nu, dash...) / вызвать функцию из любой оболочки
   shebang <cmd>       Check and rewrite #! lines for this machine (Termux: no /usr/bin/env) / проверка и правка #! для этой машины
-  --strict-shell      (before the command) refuse lib/ modules whose @shell tier does not fit the shell bs was started from / отказывать модулям lib/, чей tier @shell не подходит оболочке запуска
+  --strict-shell[=SHELL]  (before the command) refuse lib/ modules whose @shell tier does not fit the shell bs was started from, or the NAMED SHELL (--strict-shell=dash: will it work in dash) / отказывать модулям lib/, чей tier @shell не подходит оболочке запуска или УКАЗАННОЙ оболочке
 
 Shebang mode:
   #!/usr/bin/env bs
@@ -678,7 +671,7 @@ bs::cli::doctor_cmd() {
   # повторная проверка не нужна.
 
   # Required core files / Обязательные файлы ядра
-  local req=(bootstrap/init.sh bootstrap/loader.sh bootstrap/bs.sh bootstrap/shell.sh bootstrap/trampoline.sh core/prereq.sh core/lang.sh core/const.sh core/logger.sh core/errorhandler.sh core/version.sh core/quiet.sh core/utils.sh core/config.sh core/deps.sh core/repl.sh core/calc.sh)
+  local req=(bootstrap/init.sh bootstrap/loader.sh bootstrap/bs.sh bootstrap/shell.sh bootstrap/trampoline.sh core/prereq.sh core/lang.sh core/const.sh core/logger.sh core/errorhandler.sh core/version.sh core/quiet.sh core/fmt.sh core/data.sh core/utils.sh core/config.sh core/deps.sh core/calc.sh)
   local f
   for f in "${req[@]}"; do
     if is::file "${BS_ROOT}/${f}"; then

@@ -38,6 +38,8 @@ Central place for everything AI-facing in the repo (replaces the old `ai/` direc
 | `bash-defensive-patterns` | defensive Bash patterns (imported from wshobson/agents, MIT): strict mode, quoting, traps, temp files, idempotency |
 | `bs-code-review-security` | security-first review: injection, quoting, paths, temp files, privilege, `@shell` tier, tests, P0–P3 report (adapted from DataDog/rshell, Apache-2.0) |
 | `bs-shell-portability` | shell-independence of BS: host/user/script shell, `@shell` tiers, trampoline, `tier_scan.sh`, `probe_shells.sh` |
+| `bs-shell-abstraction` | the shell dependency is set by the `@shell` tier; `find_leaks.sh`, `check_posix_tier.sh` (bash does not take part in `posix`) |
+| `bs-docs-shell-claims` | fix documentation that says the whole kernel needs bash 4 when only the `bash4` tier does |
 | `bs-check-artifacts` | AI-generation traces + request-text leakage scan |
 | `bs-cli-markdown-style` | markdown-simplicity principle for CLI/output/docs (RU) |
 | `bs-device-module` | Linux device/hardware modules (evdev/sysfs) |

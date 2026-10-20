@@ -8,6 +8,7 @@
 #   2. syntax  — no bash-only construct on a non-comment line: [[ ]], (( )), arrays,
 #                local -x, declare, ${!x}, <( ), =~, mapfile, shopt, source, function keyword,
 #                $'..', ${x,,} ${x^^}; no BASH_*/ZSH_* variables outside the layer files;
+#   2b. names  — every function is in the one namespace bs_* (real name = bs_ + the "::" name with "::" -> "_"), none is defined with "::";
 #   3. run     — the whole tier is sourced and used by dash in a sandbox whose PATH has
 #                NO bash at all (proof that bash does not take part, not only that it parses).
 # Для каждого файла с «# @shell posix» в bootstrap/ и core/: (1) разбор в каждой
@@ -38,7 +39,7 @@ done
 declare -a tier=()
 while IFS= read -r f; do
   head -n 14 "${f}" | grep -q '^# @shell posix' && tier+=("${f}")
-done < <(git ls-files 'bootstrap/*.sh' 'core/*.sh')
+done < <(git ls-files --cached --others --exclude-standard 'bootstrap/*.sh' 'core/*.sh')
 (( ${#files[@]} > 0 )) || files=("${tier[@]}")
 if (( list_only == 1 )); then printf '%s\n' "${files[@]}"; exit 0; fi
 
@@ -67,7 +68,14 @@ done
 # Конструкции, которых нет в POSIX sh / constructs that are not POSIX sh
 syntax='\[\[[^:]|\(\( |\$\(\(.*\)\)\)|=~|<\(|>\(|\$\{![A-Za-z_]|\$\{[A-Za-z_0-9]+(\^\^|,,)|\$\{[A-Za-z_0-9]+\[|^[[:space:]]*(declare|typeset|mapfile|readarray|shopt|local -[a-zA-Z]|source )|^[[:space:]]*function [A-Za-z_]|\$'"'"'|\bcoproc\b|\bselect [a-z]'
 for f in "${files[@]}"; do
-  body="$(grep -vE '^[[:space:]]*#' "${f}")"
+  # Тела heredoc — текст, который файл выдаёт (например, скрипт автодополнения для bash), а не его код
+  # Heredoc bodies are text the file prints (e.g. a bash completion script), not its code
+  body="$(grep -vE '^[[:space:]]*#' "${f}" | awk '
+    hd != "" { if ($0 == hd) hd = ""; next }
+    match($0, /<<-?[ ]*\\?["\x27]?[A-Za-z_]+["\x27]?/) {
+      t = substr($0, RSTART, RLENGTH); gsub(/<<-?[ ]*|\\|["\x27]/, "", t); hd = t
+    }
+    { print }')"
   hits="$(printf '%s\n' "${body}" | grep -nE -- "${syntax}" | grep -v 'shell-gate' || true)"
   # $(( )) арифметика — POSIX; отфильтровываем только её / $(( )) is POSIX; only it is filtered out
   hits="$(printf '%s\n' "${hits}" | grep -vE '\$\(\([^)]*\)\)' || true)"
@@ -81,6 +89,19 @@ for f in "${files[@]}"; do
     vars="$(printf '%s\n' "${body}" | grep -nE '\b(BASH|BASH_[A-Z]+|ZSH_[A-Z]+|FUNCNAME)\b' | grep -v 'shell-gate' || true)"
     [[ -z "${vars}" ]] || bad "vars    ${f}: shell variables outside the layer: $(printf '%s' "${vars}" | head -n 2 | tr '\n' ' ' | cut -c1-160)"
   fi
+done
+
+# --- 2b. namespace: every function of the tier is bs_* (one namespace), none has "::" ---
+# Одно пространство имён: настоящее имя = bs_ + имя через «::», где «::» заменено на «_»;
+# псевдонимы с «::» создаёт bs_shell_alias в конце файла, определять их в самом файле нельзя.
+# One namespace: the real name = bs_ + the "::" name with "::" turned into "_"; the "::" aliases are
+# made by bs_shell_alias at the end of the file and must not be defined in the file itself.
+for f in "${files[@]}"; do
+  # `load` — публичное имя DSL-функции (сотни скриптов: load "core/args"); исключение из правила bs_ / `load` is the public DSL name (hundreds of scripts use it); the one exception to the bs_ rule
+  badnames="$(grep -vE '^[[:space:]]*#' "${f}" | grep -oE '^[A-Za-z_][A-Za-z0-9_:]*\(\)' | tr -d '()' | grep -vE '^(bs_|__bs_|load$)' || true)"
+  [[ -z "${badnames}" ]] || bad "names   ${f}: functions outside the bs_ namespace: $(printf '%s' "${badnames}" | head -n 4 | tr '\n' ' ')"
+  colons="$(grep -vE '^[[:space:]]*#' "${f}" | grep -oE '^[A-Za-z_][A-Za-z0-9_:]*::[A-Za-z0-9_:]*\(\)' | head -n 2 | tr '\n' ' ' || true)"
+  [[ -z "${colons}" ]] || bad "names   ${f}: a function defined with '::': ${colons}"
 done
 
 # --- 3. run in a sandbox with NO bash ---
@@ -108,9 +129,9 @@ elif command -v dash >/dev/null 2>&1; then
   probe="${src}
 bs_shell_family >/dev/null || exit 11
 case \$(bs_version_get) in [0-9]*) : ;; *) exit 12 ;; esac
-utils_has ls || exit 13
-utils_has no-such-command-xyz && exit 14
-utils_ignore false || exit 15
+bs_utils_has ls || exit 13
+bs_utils_has no-such-command-xyz && exit 14
+bs_utils_ignore false || exit 15
 exit 0"
   out="$(env -i HOME="${sandbox}/home" PATH="${sandbox}/bin" BS_ROOT="${root}" BS_BOOTSTRAP_DIR="${root}/bootstrap" "${sandbox}/bin/dash" -c "${probe}" 2>&1)"; rc=$?
   (( rc == 0 )) || bad "run     dash without bash: the tier does not work (exit ${rc}): $(printf '%s' "${out}" | head -n 2 | tr '\n' ' ' | cut -c1-160)"

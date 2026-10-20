@@ -586,6 +586,25 @@ bs_shell_tier_desc() {
   esac
 }
 
+# @description Is the code running in a subshell (( ), $( ), pipeline)? A branch per shell:
+#   bash BASH_SUBSHELL, zsh ZSH_SUBSHELL; in the other shells traps are reset in a subshell, so
+#   there is nothing to guard and the answer is "not a subshell".
+# @description Исполняется ли код в подоболочке (( ), $( ), конвейер)? Ветка на оболочку: bash —
+#   BASH_SUBSHELL, zsh — ZSH_SUBSHELL; в остальных оболочках trap'ы в подоболочке сбрасываются,
+#   охранять нечего, и ответ «не подоболочка».
+# @return 0 in a subshell, 1 in the main shell / 0 в подоболочке, 1 в основной оболочке
+bs_shell_in_subshell() {
+  if [ -n "${BASH_VERSION:-}" ]; then
+    # shellcheck disable=SC3028  # ветка выполняется только в bash / the branch runs only in bash
+    [ "${BASH_SUBSHELL:-0}" -gt 0 ]
+  elif [ -n "${ZSH_VERSION:-}" ]; then
+    # shellcheck disable=SC3028  # ветка выполняется только в zsh / the branch runs only in zsh
+    [ "${ZSH_SUBSHELL:-0}" -gt 0 ]
+  else
+    return 1
+  fi
+}
+
 # ==========================================
 # Read-only variables / Переменные только для чтения
 # ==========================================
@@ -647,7 +666,7 @@ bs_shell__ns_ok() {
 if bs_shell__ns_ok; then
   for __bs_fn in of_name family login parent user rc_file rc_scan all_rc_files \
       path_line reload_hint fresh_flags known host_ok host_find tier tier_desc \
-      login_path can_source rc_create_ok default_login_path version_string version_major version_minor strict self_path file_tier tier_word tier_allows; do
+      login_path can_source rc_create_ok default_login_path version_string version_major version_minor strict self_path file_tier tier_word tier_allows in_subshell; do
     eval "bs::shell::${__bs_fn}() { bs_shell_${__bs_fn} \"\$@\"; }"
   done
 fi

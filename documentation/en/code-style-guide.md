@@ -616,10 +616,17 @@ part in it**. That is why it has its own rules; the rest of the code style (bili
 bs_guard MODULE || return 0
 ```
 
-**Names.** The real function is an identifier without `::`: `module_function` (`bs_guard`, `utils_has`,
-`const_version`, `bs_version_get`). The old `::` name is created as an alias by `bs_shell_alias real module::function`
-at the very end of the file: it works in bash and zsh, so old calls such as `utils::has` do not change. New `bash4`
-code still writes `module::function`; POSIX code calls the real name.
+**Names — one namespace `bs_`.** The real function is an identifier without `::`, and **all** kernel code (`bootstrap/`, `core/`, `install/`, the entry points) lives in one namespace: `bs_` + the `::` name with `::` turned into `_`. The rule is unambiguous and reversible:
+
+| Old name | Real name |
+|---|---|
+| `utils::has` | `bs_utils_has` |
+| `log::info` | `bs_log_info` |
+| `calc::eval` | `bs_calc_eval` |
+| `bs::version::get` | `bs_version_get` |
+| `log::__timestamp` (private) | `bs_log_timestamp` (no leading `__`) |
+
+The old `::` name is created as an alias by `bs_shell_alias real module::function` at the very end of the file: it works in bash and zsh, so old calls such as `utils::has` do not change. New `bash4` code may still write `module::function`; POSIX code calls the real name. **Defining** a function with `::` or without the `bs_`/`__bs_` prefix inside the file is forbidden: `check_posix_tier.sh` checks it (the "names" section).
 
 **Variables.** No `local` (POSIX has none) and no `local -r`: temporaries are global, so they carry a
 `__bs_<function abbreviation>_` prefix (for example `__bs_sb_` in `shebang.sh`, `__bs_vo_` in `version.sh`) to avoid

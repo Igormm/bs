@@ -1,7 +1,7 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
-# tests/unit/testreplunit.sh — Unit tests for core/repl module
-# tests/unit/testreplunit.sh — Модульные тесты для модуля core/repl
+# tests/unit/testreplunit.sh — Unit tests for lib/ui/repl module
+# tests/unit/testreplunit.sh — Модульные тесты для модуля lib/ui/repl
 
 set -euo pipefail
 
@@ -12,7 +12,7 @@ source "${TEST_SCRIPT_DIR}/../testframework.sh"
 export BS_SILENT=1
 source "${BS_PROJECT_ROOT}/bootstrap/init.sh"
 export BS_HOME="${BS_PROJECT_ROOT}"
-load "core/repl"
+load "lib/ui/repl"
 
 # Isolated temporary directory for REPL history file tests.
 readonly REPL_TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/bs_repl_unit.XXXXXX")"
@@ -134,7 +134,7 @@ test_repl_eval() {
 }
 
 main() {
-    print_header "Core REPL Unit Tests / Модульные тесты core/repl"
+    print_header "REPL Unit Tests / Модульные тесты lib/ui/repl"
 
     testframework::init
 

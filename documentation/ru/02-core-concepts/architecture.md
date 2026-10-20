@@ -2,9 +2,10 @@
 
 # Архитектура
 
-BS — тонкий слой времени выполнения: ядро делится на POSIX-ярус (любая
-оболочка) и ярус `bash4` (bash 4.2+, остальные оболочки попадают в него через
-перезапуск или `bs call`). Он состоит из двух
+BS — тонкий слой времени выполнения **поверх bash 4.2+**: на нём написаны вся
+библиотека `lib/` (87 модулей), а также CLI `bootstrap/bs.sh`, установщик (ярус `bash4`). Исключение —
+15 файлов ядра `@shell posix`, которые работают в любой оболочке;
+остальные оболочки попадают в BS через перезапуск в bash или `bs call`. Он состоит из двух
 входных скриптов (`boot.sh`, `bs`) с общим POSIX-прологом, реестра оболочек
 (`bootstrap/shell.sh`), инициализатора (`bootstrap/init.sh`),
 загрузчика модулей (`bootstrap/loader.sh`), всегда загружаемых модулей `core/`
@@ -87,18 +88,14 @@ BS — тонкий слой времени выполнения: ядро де�
    ├─ BS_ROOT (задан, иначе родитель bootstrap/ с файлом bs)
    ├─ bs::shell::ensure_version 4   (source-режим: пролога нет)
    ├─ bs::append_local_bin_to_path   (~/.local/bin в PATH этого процесса)
-   ├─ BS_HOME (по умолчанию BS_ROOT)
-   ├─ source bootstrap/loader.sh      → появляются load, bs::load
-   ├─ load core/prereq      bs::guard, bs::source_relative (первым!)
-   ├─ load core/lang        str::, arr::, map::, bs::func_name
-   ├─ load core/const       коды ошибок, цвета, флаги
-   ├─ load core/logger      log::*
-   ├─ load core/errorhandler  errorhandler::*, cleanup::add
-   ├─ load core/version     BS_VERSION, bs::version::*
-   ├─ load core/utils       utils::has, utils::quiet, ...
-   ├─ load core/config      config::*
-   ├─ load core/deps        разбор # @depends
-   ├─ config::load          конфигурация из файлов и окружения
+   ├─ source bootstrap/kernel.sh      (posix: тот же файл подключают dash, ash, ksh, mksh, zsh)
+   │    ├─ BS_HOME (по умолчанию BS_ROOT)
+   │    ├─ source bootstrap/loader.sh   → появляются load, bs_load, bs::load
+   │    ├─ load core/prereq   bs_guard, bs_source_relative (первым!)
+   │    ├─ load core/lang, const, logger, quiet, fmt, data, errorhandler,
+   │    │        version, utils, config, deps, args          (все posix)
+   │    └─ bs_config_load     конфигурация из файлов и окружения
+   ├─ load lib/compat/{deps,lang,args}   мосты для bash: массивы и прежние функции
    └─ BS_INITIALIZED=1
 ```
 
@@ -108,14 +105,14 @@ BS — тонкий слой времени выполнения: ядро де�
  load "lib/io/streams"
    │
    ├─ BS_ROOT задан и это каталог?            нет → ошибка, return 1
-   ├─ уже в BS_LOADED_MODULES?                да  → return 0
+   ├─ уже в реестре загрузчика?                да  → return 0
    ├─ --strict-shell: @shell-tier модуля подходит BS_ORIGIN_SHELL?   нет → отказ
-   ├─ модуль уже в BS_LOAD_STACK?             да  → circular dependency, return 1
-   ├─ push в BS_LOAD_STACK
+   ├─ модуль уже в стеке загрузки?            да  → circular dependency, return 1
+   ├─ push в стек загрузки
    ├─ для каждой зависимости из «# @depends» → load (рекурсивно); сбой → return 1
    ├─ BS_CURRENT_FILE=<файл>; source ${BS_ROOT}/lib/io/streams.sh
-   ├─ pop из BS_LOAD_STACK (и при ошибке тоже)
-   └─ BS_LOADED_MODULES[путь]=1
+   ├─ pop из стека загрузки (и при ошибке тоже)
+   └─ путь добавляется в реестр
 ```
 
 ## Ядро по ярусам: что доступно всем оболочкам
@@ -128,27 +125,27 @@ BS — тонкий слой времени выполнения: ядро де�
 
 | Ярус | Файлы `core/` | Где работает напрямую | Как попадают остальные оболочки |
 |---|---|---|---|
-| `posix` (5) | `prereq`, `guard`, `const`, `version`, `quiet` | bash, zsh, dash, busybox ash, ksh93, mksh (проверено запуском) | — (подключаются сами) |
-| `bash4` (9) | `lang`, `args`, `errorhandler`, `config`, `logger`, `utils`, `deps`, `calc`, `repl` | только bash 4.2+ | точка входа находит bash и перезапускается в нём (трамплин); функции ядра — командой `bs call` |
+| `posix` (15) | `prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `config`, `lang`, `args` | bash, zsh, dash, busybox ash, ksh93, mksh (проверено запуском) | — (подключаются сами) |
+| `bash4` (87) | **вся `lib/`**, все модули | только bash 4.2+ (ни один модуль `lib/` не POSIX) | точка входа находит bash и перезапускается в нём (трамплин); функции ядра — командой `bs call` |
 
 Что делает «доступным всем»:
 
 1. **Любая оболочка запускает `bs` и скрипты с `#!/usr/bin/env bs`**: пролог точки
    входа написан на POSIX, при необходимости перезапускает файл в bash 4.2+.
 2. **POSIX-ярус подключается напрямую** из bash, zsh, dash, ash, ksh, mksh:
-   константы, версия, `utils_has`/`utils_quiet` и др., реестр оболочек
+   константы, версия, `bs_utils_has`/`bs_utils_quiet` и др., реестр оболочек
    (`bootstrap/shell.sh`), управление шебангом (`bootstrap/shebang.sh`).
+   **Всё ядро одной строкой:** `BS_ROOT=/путь/к/bs . /путь/к/bs/bootstrap/kernel.sh`
+   подключает загрузчик, все 15 модулей `core/` и конфигурацию (проверено в
+   dash, ash, ksh, mksh, zsh и bash тестом `unit/testkernelportableunit.sh`).
 3. **Мост `bs call [--load МОДУЛЬ] ФУНКЦИЯ [АРГУМЕНТЫ]`** вызывает любую функцию
    ядра из fish, nushell и прочих оболочек с другим синтаксисом; функция
    исполняется в bash, вывод и код выхода возвращаются вызывающему.
 
-Чего ядро **не** обещает: исполнять `lang`, `args`, `errorhandler` и другие файлы
-яруса `bash4` в dash, ash, ksh, mksh, fish или nushell. В них нужны
-ассоциативные массивы, nameref и `=~` с `BASH_REMATCH`, которых нет или которые
-ведут себя иначе. Оболочки без настоящего запуска (nushell, oksh, osh) не
-считаются проверенными. Перевод файлов `bash4` на `posix` идёт по одному
-(порядок: `calc`, `utils`, `config`, `logger`, `deps`); `lang`, `args` и `repl`
-останутся ярусом `bash4`.
+Чего ядро **не** обещает: исполнять в dash, ash, ksh, mksh, fish или nushell то, что
+лежит вне `core/` — CLI `bootstrap/bs.sh`, установщик и всю `lib/` (ярус `bash4`). Все 15 файлов `core/` — `posix`.
+Башевские возможности, которые ядру не нужны, вынесены из него в `lib/compat/`: `str::*`, `arr::*`, `map::*` (из `lang`), `deps::missing_tools` и
+массивы `ARGS_PARAMS`, `ARGS_FLAGS`, `ARGS_REST` для `args::parse`; `repl` — в `lib/ui/repl`. Оболочки без настоящего запуска (nushell, oksh, osh) не считаются проверенными.
 
 ## Стадия 0: POSIX-пролог и `trampoline`
 
@@ -161,6 +158,7 @@ BS — тонкий слой времени выполнения: ядро де�
 |---|---|---|
 | `BS_ENTRY_DIR` | пролог | каталог точки входа со снятыми символическими ссылками; от него считаются `BS_ROOT`, `bootstrap/` |
 | `bootstrap/shell.sh` | реестр оболочек | POSIX-ответы: какая это оболочка, годится ли в хозяева (`bs_shell_host_ok`), где искать bash 4.2+ (`bs_shell_host_find`), tier |
+| `bootstrap/loader.sh`, `bootstrap/kernel.sh` | загрузчик и ядро | `load`/`bs_load` с `@depends`, обнаружением циклов и `--strict-shell`; `kernel.sh` загружает весь `core/` в фиксированном порядке |
 | `bootstrap/trampoline.sh` | перезапуск | `exec` в найденный bash с теми же файлом и аргументами; иначе сообщение, что установить |
 | `BS_HOST_BASH` | окружение | принудительно указать bash для перезапуска |
 | `BS_ORIGIN_SHELL` | окружение | оболочка, из которой запустили; нужна `--strict-shell` |
@@ -254,10 +252,10 @@ source**, а не запускаться (при прямом запуске о�
 4. **Твик PATH.** `~/.local/bin` добавляется в начало `PATH` один раз
    (`bs::append_local_bin_to_path`), что покрывает локальные установки.
 5. **BS_HOME.** По умолчанию равен `BS_ROOT`, если не задан.
-6. **Loader.** Подключает `bootstrap/loader.sh` (с фолбэком на
-   `${BS_ROOT}/loader.sh`). Loader тоже подключает `bootstrap/bs.sh` для
-   прямых пользователей, так что `bs::shell::*` и другие хелперы доступны
-   всегда.
+6. **Ядро и загрузчик.** Подключает `bootstrap/kernel.sh` (`@shell posix`): он
+   подключает загрузчик `bootstrap/loader.sh`, загружает 15 модулей `core/` в
+   фиксированном порядке и читает конфигурацию. Тот же файл подключают из
+   dash, ash, ksh, mksh и zsh с заданным `BS_ROOT`.
 7. **Модули ядра**, загружаемые через `load` в фиксированном порядке:
    - `core/prereq` — первым: базовые примитивы `bs::guard`,
       `bs::guard_loaded` и `bs::source_relative`, доступные априори всем
@@ -271,17 +269,25 @@ source**, а не запускаться (при прямом запуске о�
      цветовые константы, флаги фреймворка (`FRAMEWORK_DEBUG`,
      `FRAMEWORK_DRY_RUN`);
    - `core/logger` — семейство `log::` (`log::info`, `log::warn`,
-     `log::error`, …);
+     `log::error`, …); `@shell posix`: настоящие функции `bs_log_info`, `bs_log_warn`, …,
+     `log::*` — их псевдонимы в bash и zsh;
    - `core/errorhandler` — `errorhandler::throw`, `errorhandler::setup_trap`,
      стек очистки (`cleanup::add`) и помощники выхода (`bs::exit`,
      `error::exit`);
    - `core/version` — экспорт `BS_VERSION` / `BS_NAME` и помощники
      `bs::version::*`;
-   - `core/utils` — помощники среды, включая идиомы тишины `utils::has`,
+   - `core/quiet` (`@shell posix`) — идиомы тишины `utils::has`,
      `utils::quiet`, `utils::quiet_err`, `utils::ignore`, `utils::attempt`
      (замены для `command -v … >/dev/null 2>&1`, `>/dev/null 2>&1`,
      `2>/dev/null`, `>/dev/null 2>&1 || true` и `2>/dev/null || true`
-     соответственно);
+     соответственно); настоящие имена `bs_utils_has`, `bs_utils_quiet`, …;
+   - `core/fmt` (`@shell posix`) — размеры и метки времени: `utils::human_size`,
+     `utils::head_bytes`, `utils::now_s`, `utils::now_ms`, `utils::now_float`,
+     `utils::stamp`, `utils::log_stamp` (настоящие имена `fmt_*`);
+   - `core/data` (`@shell posix`) — массивы и словари для оболочек, где их нет:
+     `bs_arr_*`, `bs_map_*`, `bs_quote` (на переменных и `eval`, ключ любого вида);
+   - `core/utils` — остальные помощники среды (`utils::tempfile`, `utils::split`,
+     `utils::ensure_source`, …);
    - `core/config` — единый загрузчик конфигурации (`config::load`,
      `config::get`, `config::set`);
    - `core/deps` — разбор зависимостей модулей (`# @depends`).
@@ -308,10 +314,10 @@ load "lib/io/streams"   # подключает ${BS_ROOT}/lib/io/streams.sh
 `source` соответствующего файла. Внутренние механизмы:
 
 - **Защита от повторной загрузки.** Загруженные модули фиксируются в
-  ассоциативном массиве `BS_LOADED_MODULES`; повторный `load` того же модуля —
+  строке-реестре (спросить: `bs_load_is_loaded МОДУЛЬ`); повторный `load` того же модуля —
   холостая операция, возвращающая `0`.
 - **Обнаружение циклов.** Модули, находящиеся в процессе загрузки, хранятся в
-  массиве `BS_LOAD_STACK`. Если модуль запрашивается, пока он уже есть в
+  стеке загрузки (строка; глубину даёт `bs_load_stack_size`). Если модуль запрашивается, пока он уже есть в
   стеке, загрузка завершается ошибкой `circular dependency detected` с полной
   цепочкой. Элемент стека удаляется в любом случае, включая ошибку.
 - **Директива `# @depends`.** Перед подключением модуля загрузчик ищет в его
@@ -355,7 +361,7 @@ load "lib/io/streams"
 3. `run_cmd` порождает чистый bash, сбрасывает `BS_INITIALIZED`, подключает
    `bootstrap/init.sh` (полная загрузка ядра) и затем подключает скрипт.
 4. Скрипт подтягивает дополнительные модули через `load`. Уже загруженные
-   модули ничего не стоят благодаря `BS_LOADED_MODULES`.
+   модули ничего не стоят благодаря реестру загрузчика.
 5. Во время работы скрипт может регистрировать функции очистки через
    `cleanup::add <fn>`.
 6. При выходе — обычном, через `bs::exit [code]` или через

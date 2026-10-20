@@ -4,7 +4,7 @@
 
 ## What is BS
 
-**BS** is a modular framework and standard library written in Bash. It provides
+**BS** is a modular framework and standard library written in **Bash 4.2+**. It provides
 a module loader, logging, error handling, declarative script arguments, an
 I/O streams abstraction, and a set of system modules — all in one consistent
 code style and with zero external dependencies.
@@ -16,14 +16,17 @@ your shell is allowed to load is decided by the tier mechanism; see
 
 ## Requirements
 
-- **bash 4.2+** somewhere in `PATH`: the kernel (the `bash4` tier) runs on it.
+- **bash 4.2+ is a hard requirement.** All of the `lib/` library (87 modules) and
+  the CLI `bootstrap/bs.sh` and the installer are written in bash, so BS does not run without it.
   Versions 4.2 and 4.3 are accepted by the code, but CI checks from **4.4**
   (nearly every platform ships 4.4 or newer).
+- The exception is the 15 kernel files labelled `@shell posix`: they do not depend
+  on bash and can be sourced from dash, ash, ksh, mksh, zsh and bash (see "How the
+  kernel works"). That is a small set of helpers (constants, the version,
+  `bs_utils_has`, `bs_log_info`, `calc`, …), not the whole of BS.
 - You can start `bs` and `install.sh` **from any shell** (dash, ash, zsh, ksh,
-  fish, nushell): the prologue finds bash and re-runs itself in it. `@shell
-  posix` modules are sourced directly from bash, zsh, dash, ash, ksh, mksh (see
-  "How the kernel works"); fish and nushell call kernel functions through
-  `bs call`. More in [Running from any shell](#running-from-any-shell).
+  fish, nushell): the prologue finds bash and re-runs itself in it, so bash must
+  be on the system but need not be your shell.
 - Linux (primary platform; macOS is partially supported: the system bash there
   is 3.2, install bash 4.2+ from Homebrew)
 - Termux (Android): [`bs shebang`](#a-shebang-for-this-machine) fits the first
@@ -31,6 +34,15 @@ your shell is allowed to load is decided by the tier mechanism; see
 
 Nothing else is required: BS relies on shell built-ins and standard system
 tools only.
+
+**Heading for shell independence.** The goal is a kernel (`bootstrap/`, `core/`,
+`install/`, `boot.sh`, `bs`, `install.sh`) in one namespace `bs_*` that does not
+depend on the shell (dash, ash, ksh, mksh, zsh, bash). Already done: 15 of 15
+`core/` files (including the array and map layer `core/data.sh`) and the shell
+layer in `bootstrap/`; the rest moves by plan (see
+[shell-portability](../08-development/shell-portability.md#heading-for-shell-independence)).
+All of the `lib/` library is for now written for bash 4.2+ (zsh parses 85 of the
+87 files, but `lib/` was not run in zsh).
 
 ## Installation
 
@@ -332,11 +344,12 @@ flowchart TB
     shell["shell.sh<br/>shell registry"]:::posix
     tramp["trampoline.sh<br/>re-run in bash"]:::posix
     sheb["shebang.sh<br/>#! management"]:::posix
+    loader["loader.sh<br/>load, @depends"]:::posix
+    kern["kernel.sh<br/>all of core/"]:::posix
   end
   subgraph B["bootstrap/ · bash4"]
     bssh["bs.sh<br/>pre-kernel, bs::cli"]:::bash4
     init["init.sh"]:::bash4
-    loader["loader.sh<br/>load, @depends"]:::bash4
   end
   subgraph C["core/"]
     direction TB
@@ -346,18 +359,22 @@ flowchart TB
       const:::posix
       version:::posix
       quiet:::posix
+      fmt:::posix
+      logger:::posix
+      calc:::posix
+      data:::posix
+      utils:::posix
+      deps:::posix
+      errorhandler:::posix
+      config:::posix
+      lang:::posix
+      args:::posix
     end
-    subgraph CB["@shell bash4"]
-      lang:::bash4
-      args:::bash4
-      errorhandler:::bash4
-      config:::bash4
-      logger:::bash4
-      utils:::bash4
-      deps:::bash4
-      calc:::bash4
-      repl:::bash4
-    end
+  end
+  subgraph L["lib/compat · bash4 (bridges, outside the kernel)"]
+    cdeps["deps.sh"]:::bash4
+    clang["lang.sh<br/>str::, arr::, map::"]:::bash4
+    cargs["args.sh<br/>ARGS_PARAMS, ARGS_FLAGS"]:::bash4
   end
   bs -.-> shell
   boot -.-> shell
@@ -365,10 +382,11 @@ flowchart TB
   shell -.-> tramp
   bs -.-> bssh
   bssh -.-> init
-  init -.-> loader
+  init -.-> kern
+  kern -.-> loader
   loader -.-> CP
-  loader -.-> CB
-  CB -.-> CP
+  init -.-> L
+  L -.-> CP
   inst -.-> sheb
 ```
 
@@ -488,7 +506,7 @@ sequenceDiagram
   D->>sh: . bootstrap/shell.sh
   D->>pre: . core/prereq.sh
   D->>q: . core/quiet.sh
-  D->>q: utils_has ls
+  D->>q: bs_utils_has ls
   q-->>D: code 0 or 1; bash was not started
 ```
 

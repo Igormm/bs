@@ -7,10 +7,10 @@ whenToUse: When writing or changing anything that touches the shell — an insta
 
 # Переносимость между оболочками / Shell portability
 
-Ядро BS делится на **два яруса**: `@shell posix` (5 файлов `core/` и слой `bootstrap/` —
+Ядро BS делится на **два яруса**: `@shell posix` (все 15 файлов `core/` и слой `bootstrap/` —
 работают в bash, zsh, dash, busybox ash, ksh93, mksh) и `@shell bash4` (остальное,
 требует bash 4.2+). Яруса bash4 не надо «лечить»: на ассоциативных массивах,
-namerefs и `[[ =~ ]]` стоят сотни функций (`lang`, `args`, `repl` в POSIX не перейдут).
+namerefs и `[[ =~ ]]` стоят сотни функций; для ядра эти конструкции заменяются слоем `core/data.sh` и переводятся по плану (см. `bs-shell-abstraction`), а `lib/` остаётся bash.
 BS доступен из большинства оболочек разделением ролей, а не переписыванием всего.
 Полное описание и таблица оболочек —
 `documentation/{en,ru}/08-development/shell-portability.md`.
@@ -45,7 +45,7 @@ ksh, mksh.
 
 * `@shell posix` — файл валиден как POSIX sh: его подключат dash, ash/busybox,
   bash, zsh, ksh, mksh. Сейчас: `bootstrap/shell.sh`, `trampoline.sh`, `shebang.sh`;
-  `core/prereq`, `guard`, `const`, `version`, `quiet`. **bash в этом ярусе не
+  `core/prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`. **bash в этом ярусе не
   участвует** — это проверяет `.agents/skills/bs-shell-abstraction/scripts/check_posix_tier.sh`
   (разбор в не-bash оболочках, запрет bash-конструкций, запуск в dash без bash в PATH).
   Стиль кода яруса — `documentation/*/code-style-guide.md`, раздел 12.
@@ -92,11 +92,11 @@ bash; PATH/rc/подсказки — под его оболочку), **unsuppor
 
 Не «портируйте» ради галочки. Если модуль держится на ассоциативных массивах,
 namerefs, `mapfile`, `${!x}`, `BASH_REMATCH` — это `@shell bash4` с описанием
-причины (так остаются `lang`, `args`, `repl`). Для пользователя другой оболочки такой
+причины (в `core/` таких файлов больше нет; остаются CLI, установщик и `lib/`). Для пользователя другой оболочки такой
 модуль доступен через `bs` (hosted) и `bs call`. В POSIX переводят то, что (а) должно
 работать ДО bash — пролог, трамплин, реестр, шебанг; или (б) нужно скриптам на других
 оболочках и не держится на bash-конструкциях — `quiet`, `version`, `const`, `guard`,
-`prereq`; очередь: `calc`, `utils` (остаток), `config`, `logger`, `deps`. Перевод — отдельный
+`prereq`; `core/` переведён целиком; очередь: остаток `init.sh`, `bs::cli::*`, `install/*`, точки входа. Перевод — отдельный
 коммит: код, тест в шести оболочках, `check_posix_tier.sh`, строка в документации.
 
 ## 5. Порядок работы / Workflow
@@ -134,5 +134,5 @@ bash tests/validatesyntax.sh && bash tests/validateshellcheck.sh && bash tests/r
 
 ## Strict mode / Строгий режим
 
-`bs --strict-shell` (or `BS_SHELL_STRICT=1`) makes the `@shell` tier binding at `load`: a `lib/` module runs only if its tier fits the origin shell (`BS_ORIGIN_SHELL`). Rules: `posix` — any, `bash4` — bash 4.2+, other word (`zsh`, `nu`, …) — the shell of that name, a list `a,b` — any. `core/` is always allowed. Write a new module's tier honestly: it is what strict mode enforces.
+`bs --strict-shell[=SHELL]` (or `BS_SHELL_STRICT=1`) makes the `@shell` tier binding at `load`: a `lib/` module runs only if its tier fits the origin shell (`BS_ORIGIN_SHELL`) — or, with a name (`--strict-shell=dash`), the NAMED shell, wherever bs is started ("will this work in dash"). `install.sh --strict-shell=SHELL` is the shell the install is for (like `--shell`, refused for tier unsupported). Rules: `posix` — any, `bash4` — bash 4.2+, other word (`zsh`, `nu`, …) — the shell of that name, a list `a,b` — any. `core/` is always allowed. Write a new module's tier honestly: it is what strict mode enforces.
 `bs --strict-shell` (или `BS_SHELL_STRICT=1`) делает tier `@shell` обязательным при `load`; правила выше. Tier нового модуля пишите честно — именно его проверяет строгий режим.

@@ -99,7 +99,7 @@ main() {
 
     # Дубликаты не задваиваются / Duplicates are not duplicated
     args::level 1 start
-    testframework::assert_equal "start stop status" "${__ARGS_TREE[1]}" "No duplicates in tree"
+    testframework::assert_equal "start stop status" "$(bs_map_get bs_args_tree 1)" "No duplicates in tree"
 
     # Тест 7: Help
     testframework::section "Help Generation / Генерация help"

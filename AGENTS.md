@@ -7,15 +7,16 @@
 BS is a modular Bash 4.2+ framework and standard library. It provides:
 
 - `bs` — shebang interpreter and CLI (`#!/usr/bin/env bs`)
-- `bootstrap/loader.sh` — module loader with dependency resolution (`load "lib/io/streams"`)
+- `bootstrap/loader.sh` — module loader with dependency resolution (`load "lib/io/streams"`), `@shell posix`
+- `bootstrap/kernel.sh` — loads all of `core/` in any shell (`BS_ROOT=… . bootstrap/kernel.sh`), `@shell posix`
 - `bootstrap/bs.sh` — pre-kernel root namespace: dependency-free helpers available
   before the loader (shell detection `bs::shell::*`, `bs::script_dir`, PATH tweak);
   sourced by entry points, `bootstrap/init.sh` and the loader itself
-- `core/` — framework kernel: `args`, `logger`, `errorhandler`, `const`, `utils`, `version`, `config`, `deps`, `prereq`, `lang`
+- `core/` — framework kernel: `args`, `logger`, `errorhandler`, `const`, `utils`, `version`, `config`, `deps`, `prereq`, `lang` (predicates `is::*`; the other bash primitives are in `lib/compat/lang`)
 - `lib/` — standard library: `io/streams`, `io/files`, `io/process`, `system/*`, `integration/*`, `ui/*`, etc.
 - `tests/` — custom test framework, ShellCheck validation, syntax validation
 
-All modules are Bash 4.2+ scripts. No external dependencies are required at runtime.
+**BS requires bash 4.2+**: all of `lib/` (87 modules), plus the CLI `bootstrap/bs.sh` and the installer are Bash 4.2+ scripts. Only the 15 `@shell posix` files of `core/` (and the prologue of the entry points) are shell-independent. No external dependencies are required at runtime.
 
 ## How AI should work with this framework
 
@@ -116,7 +117,8 @@ Reusable workflow skills live in `.agents/skills/` (Kimi Code / agents-compatibl
 - `bs-device-module` — write Linux device/hardware modules (evdev/sysfs, binary decoding, test hooks, graceful degradation).
 - `bs-ai-toolchain` — operate BS as an AI toolbox (discovery ladder, verification loops, generation contracts).
 - `bs-shell-portability` — shell-independence of BS: host/user/script shell, `@shell posix|bash4` tiers, POSIX layer (`bootstrap/shell.sh`, trampoline), `tier_scan.sh` and `probe_shells.sh`.
-- `bs-shell-abstraction` — eradicate shell dependency: no `BASH_SOURCE`/`ZSH_*`/`$SHELL` checks outside the abstraction layer (`bs::is_main`, `bs::script_dir`, `bs::shell::*`), commands as `bs::cli::*`, `@shell` tiers, priority bash/zsh/ash/nushell; `scripts/find_leaks.sh`.
+- `bs-shell-abstraction` — the shell dependency is set once, by the `@shell posix|bash4` tier of a file: no `BASH_SOURCE`/`ZSH_*`/`$SHELL` checks outside the abstraction layer (`bs::is_main`, `bs::script_dir`, `bs::shell::*`), commands as `bs::cli::*`, no bash version checks in modules; `scripts/find_leaks.sh`, `scripts/check_posix_tier.sh` (bash does not take part in the `posix` tier).
+- `bs-docs-shell-claims` — find and fix documentation that says the whole kernel needs bash 4 when only the `bash4` tier does; every shell/version/tier claim must match the code and a real run.
 
 ### Imported shell-safety skills (external)
 

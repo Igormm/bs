@@ -1,506 +1,455 @@
-#!/usr/bin/env bash
-# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags
+#!/bin/sh
+# shellcheck shell=sh
+# @shell posix — валидный POSIX sh: case, eval с проверкой имён, trap; стек и обработчики — на слое core/data.sh / valid POSIX sh: case, eval with name checks, trap; the stack and the handlers are on the core/data.sh layer
+# @tier core — builtins, tr and sleep; works everywhere
 #
-# errorhandler.sh — единый EXIT-хендлер и cleanup-хуки / unified EXIT handler and cleanup
-# hooks
+# errorhandler.sh — единый EXIT-хендлер и cleanup-хуки / unified EXIT handler and cleanup hooks
 #
-# @depends core/const, core/logger, core/lang
+# @depends core/const, core/logger, core/data
 #
 # Идея / Idea:
 # - любой модуль/скрипт может добавить очистку / any module/script can add cleanup:
 #     cleanup::add my_cleanup_function
 # - при завершении скрипта (даже при ошибке) cleanup выполнится / on script exit (even on
-# error) cleanup will execute
+#   error) cleanup will execute
 #
+# ИМЕНА / NAMES
+#   Real functions: bs_cleanup_add, bs_cleanup_run_all, bs_on_exit, bs_errorhandler_setup_trap,
+#   bs_errorhandler_throw, bs_error_*, bs_signal_*, bs_exit, bs_function_exists; in bash and zsh also
+#   the old names cleanup::add, error::exit, bs::exit, signal::on, function_exists, … (aliases).
+#   Настоящие функции — bs_*; в bash и zsh — ещё и прежние имена (псевдонимы).
+#
+# ДАННЫЕ / DATA
+#   The cleanup stack is the data-layer array bs_cleanup_stack (it was the bash array
+#   BS_CLEANUP_STACK); the error handlers are the data-layer map bs_error_handlers (it was
+#   the associative array __ERROR_HANDLERS).
+#   Стек очистки — массив слоя данных bs_cleanup_stack (был массивом bash BS_CLEANUP_STACK);
+#   обработчики ошибок — словарь слоя данных bs_error_handlers (был __ERROR_HANDLERS).
 
 # Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points
 
-bs::guard "ERRORHANDLER" || return 0
+# shellcheck disable=SC2154  # __bs_eh_fn присваивает bs_arr_pop через eval / __bs_eh_fn is assigned by bs_arr_pop through eval
+bs_guard "ERRORHANDLER" || return 0
 
 # Зависимости / Dependencies
-bs::source_relative "const.sh" "logger.sh"
+bs_source_relative "const.sh" "logger.sh" "data.sh"
 
-# @global BS_CLEANUP_STACK — Errorhandler: cleanup action stack (LIFO) (category: env)
-# @global BS_CLEANUP_STACK — Errorhandler: стек действий очистки (LIFO) (категория: env)
-declare -ga BS_CLEANUP_STACK=()
-
-# @global __ERROR_HANDLERS — Errorhandler: registered code → handler function map (category: state)
-# @global __ERROR_HANDLERS — Errorhandler: карта зарегистрированных code → функция-обработчик (категория: state)
-declare -gA __ERROR_HANDLERS=()
+# ==========================================
+# Очистка / Cleanup
+# ==========================================
 
 # @description Add cleanup function to stack / Добавить функцию очистки в стек
 # @param $1 Function name to add to cleanup / Имя функции для добавления в очистку
 # @example
 #   cleanup::add my_cleanup_function
-cleanup::add() {
-	local fn="${1-}"
-	if is::empty "${fn}"; then
-		log::warn "cleanup::add: не указана функция"
-		return "${E_INVALID:-2}"
-	fi
-	BS_CLEANUP_STACK+=("${fn}")
+bs_cleanup_add() {
+  if [ -z "${1-}" ]; then
+    bs_log_warn "cleanup::add: не указана функция"
+    return "${E_INVALID:-2}"
+  fi
+  bs_arr_push bs_cleanup_stack "$1"
 }
 
-# @description Run all cleanup functions / Выполнить все функции очистки
-# @example
-#   cleanup::__run_all
-cleanup::__run_all() {
-	local i
-	for ((i = ${#BS_CLEANUP_STACK[@]} - 1; i >= 0; i--)); do
-		"${BS_CLEANUP_STACK[$i]}" || true
-	done
-	# Очищаем стек после прогона: повторный вызов (ручной + trap EXIT) безопасен
-	# Clear stack after run: repeated call (manual + EXIT trap) is safe
-	BS_CLEANUP_STACK=()
+# @private
+# @description Run the cleanup functions, last added first, and empty the stack / Выполнить функции очистки, последняя добавленная — первой, и очистить стек
+bs_cleanup_run_all() {
+  while bs_arr_pop bs_cleanup_stack __bs_eh_fn; do
+    "$__bs_eh_fn" || true
+  done
+  return 0
 }
 
-BS::__on_exit() {
-	cleanup::__run_all
+# @private
+# @description The EXIT trap: runs the cleanup / Ловушка EXIT: выполняет очистку
+bs_on_exit() {
+  bs_cleanup_run_all
 }
 
-# @description Install EXIT trap running the cleanup stack (entry points only)
-# / Установить EXIT-trap, выполняющий стек очистки (только для точек входа)
-# @example
-#   errorhandler::setup_trap
-errorhandler::setup_trap() {
-	trap 'BS::__on_exit' EXIT
+# @description Set the EXIT trap that runs the cleanup stack / Поставить ловушку EXIT, выполняющую стек очистки
+bs_errorhandler_setup_trap() {
+  trap 'bs_on_exit' EXIT
 }
 
-# @description Log an error and return its code without exiting
-# / Записать ошибку в лог и вернуть её код, не завершая скрипт
-# @param $1 Function name where the error occurred / Имя функции, где произошла ошибка
-# @param $2 Error message / Сообщение об ошибке
-# @param $3 [optional] Error code (default: E_ERROR) / Код ошибки (по умолчанию E_ERROR)
-# @return Error code / Код ошибки
-# @example
-#   errorhandler::throw "my::func" "Something failed" "${LIB_ERROR_FILE_NOT_FOUND}"
-errorhandler::throw() {
-	local -r func_name="${1:-unknown}"
-	local -r message="${2:-}"
-	local -r code="${3:-${E_ERROR:-1}}"
+# ==========================================
+# Ошибки / Errors
+# ==========================================
 
-	# Логируем через log::error, если logger загружен, иначе — в stderr
-	# Log via log::error if logger is loaded, otherwise to stderr
-	if declare -F log::error >/dev/null 2>&1; then
-		log::error "[${func_name}] ${message}"
-	else
-		printf 'ERROR [%s] %s\n' "${func_name}" "${message}" >&2
-	fi
-
-	return "${code}"
+# @description Report an error from a function and return its code / Сообщить об ошибке из функции и вернуть её код
+# @param $1 function name / имя функции
+# @param $2 message / сообщение
+# @param $3 code, default E_ERROR / код, по умолчанию E_ERROR
+bs_errorhandler_throw() {
+  __bs_eh_func=${1:-unknown}
+  __bs_eh_msg=${2:-}
+  __bs_eh_code=${3:-${E_ERROR:-1}}
+  if command -v bs_log_error >/dev/null 2>&1; then
+    bs_log_error "[${__bs_eh_func}] ${__bs_eh_msg}"
+  else
+    printf 'ERROR [%s] %s\n' "$__bs_eh_func" "$__bs_eh_msg" >&2
+  fi
+  return "$__bs_eh_code"
 }
 
-# @description Throw with the caller's name auto-detected via FUNCNAME.
-# / То же, что errorhandler::throw, но имя функции определяется само.
-#   Replaces the boilerplate pair / Заменяет пару бойлерплейта:
-#     local func_name="my::func"
-#     errorhandler::throw "${func_name}" "message" "${CODE}"
-# @param $1 Error message / Сообщение об ошибке
-# @param $2 [optional] Error code (default: E_ERROR) / Код ошибки
-# @return Error code / Код ошибки
-# @example
-#   error::throw "Something failed" "${LIB_ERROR_FILE_NOT_FOUND}"
-error::throw() {
-	errorhandler::throw "$(bs::func_name 2)" "${@}"
+# @description Report an error naming the caller (where the shell can tell) / Сообщить об ошибке с именем вызывающего (там, где оболочка умеет)
+# @param $@ message and code, as for errorhandler::throw / сообщение и код, как у errorhandler::throw
+bs_error_throw() {
+  __bs_eh_who=unknown
+  if command -v bs::func_name >/dev/null 2>&1; then
+    __bs_eh_who=$(bs::func_name 2)
+    # через псевдоним добавляется ещё один кадр / one more frame comes through the alias
+    if [ "$__bs_eh_who" = "error::throw" ]; then __bs_eh_who=$(bs::func_name 3); fi
+  fi
+  bs_errorhandler_throw "$__bs_eh_who" "$@"
 }
 
-# @description Subscribe a function to a signal / Подписать функцию на сигнал
-#   Linguistic wrapper over `trap "handler" SIG`; accepts INT or SIGINT.
-#   «Лингвистическая» обёртка над trap; принимает INT или SIGINT.
-# @param $1 Signal name (with or without SIG) / Имя сигнала
-# @param $2 Handler function / Функция-обработчик
-# @return 0 on success, E_INVALID on unknown signal, E_ERROR on bad handler
-# @example
-#   signal::on SIGINT my::cleanup
-signal::on() {
-	local -r signal="${1:?signal name required}"
-	local -r handler="${2:?handler function required}"
+# ==========================================
+# Сигналы / Signals
+# ==========================================
 
-	if ! declare -F -- "${handler}" >/dev/null 2>&1; then
-		log::error "signal::on: handler function not found: ${handler}"
-		return "${E_ERROR:-1}"
-	fi
-
-	if ! trap "${handler}" "${signal}" 2>/dev/null; then
-		log::error "signal::on: unknown signal: ${signal}"
-		return "${E_INVALID:-2}"
-	fi
+# @description Install a handler function for a signal / Установить функцию-обработчик сигнала
+# @param $1 signal / сигнал
+# @param $2 handler function / функция-обработчик
+bs_signal_on() {
+  __bs_eh_sig=${1:?signal name required}
+  __bs_eh_hnd=${2:?handler function required}
+  if ! command -v "$__bs_eh_hnd" >/dev/null 2>&1; then
+    bs_log_error "signal::on: handler function not found: ${__bs_eh_hnd}"
+    return "${E_ERROR:-1}"
+  fi
+  # shellcheck disable=SC2064  # имя функции нужно раскрыть сейчас, как и раньше / the function name must expand now, as before
+  if ! trap "$__bs_eh_hnd" "$__bs_eh_sig" 2>/dev/null; then
+    bs_log_error "signal::on: unknown signal: ${__bs_eh_sig}"
+    return "${E_INVALID:-2}"
+  fi
 }
 
-# @description Ignore a signal / Игнорировать сигнал (trap '' SIG)
-# @param $1 Signal name / Имя сигнала
-# @example
-#   signal::ignore SIGHUP
-signal::ignore() {
-	trap '' "${1:?signal name required}" 2>/dev/null || {
-		log::error "signal::ignore: unknown signal: ${1}"
-		return "${E_INVALID:-2}"
-	}
+# @description Ignore a signal / Игнорировать сигнал
+# @param $1 signal / сигнал
+bs_signal_ignore() {
+  __bs_eh_sig=${1:?signal name required}
+  trap '' "$__bs_eh_sig" 2>/dev/null || {
+    bs_log_error "signal::ignore: unknown signal: ${__bs_eh_sig}"
+    return "${E_INVALID:-2}"
+  }
 }
 
-# @description Reset a signal to its default disposition / Сбросить перехват сигнала
-#   (trap - SIG)
-# @param $1 Signal name / Имя сигнала
-# @example
-#   signal::reset SIGINT
-signal::reset() {
-	trap - "${1:?signal name required}" 2>/dev/null || {
-		log::error "signal::reset: unknown signal: ${1}"
-		return "${E_INVALID:-2}"
-	}
+# @description Reset a signal to its default / Вернуть сигналу поведение по умолчанию
+# @param $1 signal / сигнал
+bs_signal_reset() {
+  __bs_eh_sig=${1:?signal name required}
+  trap - "$__bs_eh_sig" 2>/dev/null || {
+    bs_log_error "signal::reset: unknown signal: ${__bs_eh_sig}"
+    return "${E_INVALID:-2}"
+  }
 }
 
-# @description Exit BS application with cleanup / Выход из приложения BS с очисткой
-#   Accepts a number or a code name / Принимает число или имя кода:
-#     bs::exit 0            — numeric code / числовой код
-#     bs::exit success      — E_SUCCESS
-#     bs::exit invalid      — E_INVALID
-#     bs::exit file_not_found — LIB_ERROR_FILE_NOT_FOUND
-# @param $1 [optional] Exit code or name (default: 0) / Код или имя (по умолчанию 0)
-# @example
-#   bs::exit
-#   bs::exit invalid
-bs::exit() {
-    local code="${1:-0}"
+# ==========================================
+# Выход / Exit
+# ==========================================
 
-    # Именованные коды: E_<NAME>, затем LIB_ERROR_<NAME>
-    # Named codes: E_<NAME>, then LIB_ERROR_<NAME>
-    if ! is::number "${code}"; then
-        local var="E_${code^^}"
-        [[ -z "${!var:-}" ]] && var="LIB_ERROR_${code^^}"
-        code="${!var:-}"
-        if is::empty "${code}"; then
-            log::error "bs::exit: unknown exit code name: ${1}"
-            code="${E_ERROR:-1}"
-        fi
-    fi
-
-    # Run all cleanup functions / Запустить все функции очистки
-    cleanup::__run_all
-    exit "${code}"
+# @description Run the cleanup and exit; the code is a number or a name (E_<NAME> / LIB_ERROR_<NAME>) / Выполнить очистку и выйти; код — число или имя
+# @param $1 code or name, default 0 / код или имя, по умолчанию 0
+bs_exit() {
+  __bs_eh_ecode=${1:-0}
+  case "$__bs_eh_ecode" in
+    ''|*[!0-9]*)
+      # имя кода: имя проверяется, прежде чем попасть в eval / a code name: the name is checked before it reaches eval
+      __bs_eh_up=$(printf '%s' "$__bs_eh_ecode" | tr '[:lower:]' '[:upper:]')
+      __bs_eh_val=''
+      case "$__bs_eh_up" in
+        ''|*[!A-Z0-9_]*) : ;;
+        *)
+          eval "__bs_eh_val=\${E_${__bs_eh_up}:-}"
+          if [ -z "$__bs_eh_val" ]; then
+            eval "__bs_eh_val=\${LIB_ERROR_${__bs_eh_up}:-}"
+          fi ;;
+      esac
+      if [ -z "$__bs_eh_val" ]; then
+        bs_log_error "bs::exit: unknown exit code name: ${1:-}"
+        __bs_eh_val=${E_ERROR:-1}
+      fi
+      __bs_eh_ecode=$__bs_eh_val ;;
+  esac
+  bs_cleanup_run_all
+  exit "$__bs_eh_ecode"
 }
 
-# @description Exit with error message and cleanup / Выход с сообщением об ошибке и
-# очисткой
-# @param $1 Error message / Сообщение об ошибке
-# @param $2 Exit code (default: 1) / Код выхода (по умолчанию 1)
-# @example
-#   error::exit "Something went wrong" 2
-error::exit() {
-    local -r message="${1}"
-    local -r exit_code="${2:-${E_ERROR:-1}}"
-    
-    log::error "${message}"
-    bs::exit "${exit_code}"
+# @description Log the message and exit with a code / Записать сообщение в лог и выйти с кодом
+# @param $1 message / сообщение
+# @param $2 code, default E_ERROR / код, по умолчанию E_ERROR
+bs_error_exit() {
+  __bs_eh_emsg=${1-}
+  __bs_eh_ecd=${2:-${E_ERROR:-1}}
+  bs_log_error "$__bs_eh_emsg"
+  bs_exit "$__bs_eh_ecd"
 }
 
-# @description Exit with error message and backtrace / Выход с сообщением об ошибке и
-# трассировкой
-# @param $1 Error message / Сообщение об ошибке
-# @param $2 Exit code (default: 1) / Код выхода (по умолчанию 1)
-# @example
-#   error::exit_with_backtrace "Critical error occurred" 3
-error::exit_with_backtrace() {
-    local -r message="${1}"
-    local -r exit_code="${2:-${E_ERROR:-1}}"
-    
-    log::error "${message}"
-    log::error "Backtrace:"
-    
-    # Print backtrace excluding this function
-    local frame
-    local -i depth
-    depth="$(bs::stack_depth)"
-    for ((frame=1; frame<depth-1; frame++)); do
-        log::error "  $(bs::stack_file $((frame+1))):$(bs::stack_line $((frame+1))) $(bs::stack_func $((frame+1)))(...)"
+# @description Log the message and a backtrace (where the shell has one) and exit / Записать сообщение и трассировку (где она есть) и выйти
+# @param $1 message / сообщение
+# @param $2 code, default E_ERROR / код, по умолчанию E_ERROR
+bs_error_exit_with_backtrace() {
+  __bs_eh_emsg=${1-}
+  __bs_eh_ecd=${2:-${E_ERROR:-1}}
+  bs_log_error "$__bs_eh_emsg"
+  bs_log_error "Backtrace:"
+  if command -v bs::stack_depth >/dev/null 2>&1; then
+    __bs_eh_depth=$(bs::stack_depth)
+    __bs_eh_frame=1
+    while [ "$__bs_eh_frame" -lt $((__bs_eh_depth - 1)) ]; do
+      bs_log_error "  $(bs::stack_file $((__bs_eh_frame + 1))):$(bs::stack_line $((__bs_eh_frame + 1))) $(bs::stack_func $((__bs_eh_frame + 1)))(...)"
+      __bs_eh_frame=$((__bs_eh_frame + 1))
     done
-    
-    bs::exit "${exit_code}"
+  else
+    bs_log_error "  (no call stack in this shell / в этой оболочке нет стека вызовов)"
+  fi
+  bs_exit "$__bs_eh_ecd"
 }
 
-# @description Handle error with custom handler / Обработка ошибки с пользовательским
-# обработчиком
-# @param $1 Error code / Код ошибки
-# @param $2 Error message / Сообщение об ошибке
-# @example
-#   error::handle 127 "Command not found"
-error::handle() {
-    local -r error_code="${1}"
-    local -r message="${2}"
+# ==========================================
+# Обработчики по коду / Handlers by code
+# ==========================================
 
-    log::error "Error ${error_code}: ${message}"
-
-    # Execute custom error handler if registered
-    local handler="${__ERROR_HANDLERS["${error_code}"]:-}"
-    if is::not_empty "${handler}"; then
-        "${handler}" "${message}"
-    else
-        # Default error handling
-        error::exit "${message}" "${error_code}"
-    fi
+# @description Does a function with this name exist? / Существует ли функция с таким именем?
+# @param $1 name / имя
+bs_function_exists() {
+  # статус нормализуем: dash и ash при «не найдено» отдают 127, а не 1 / normalise the status: dash and ash return 127, not 1, for "not found"
+  command -v "${1-}" >/dev/null 2>&1 || return 1
 }
 
-# @description Check if function exists / Проверить, существует ли функция
-# @param $1 Function name / Имя функции
-# @return 0 if function exists, 1 otherwise / 0 если функция существует, 1 в противном
-# случае
-function_exists() {
-    local -r fn="${1}"
-    declare -F -- "${fn}" >/dev/null 2>&1
+# @description Handle an error: a registered handler, or log and exit / Обработать ошибку: зарегистрированный обработчик, иначе лог и выход
+# @param $1 error code / код ошибки
+# @param $2 message / сообщение
+bs_error_handle() {
+  __bs_eh_hcode=${1-}
+  __bs_eh_hmsg=${2-}
+  bs_log_error "Error ${__bs_eh_hcode}: ${__bs_eh_hmsg}"
+  __bs_eh_handler=$(bs_map_get bs_error_handlers "$__bs_eh_hcode" 2>/dev/null || true)
+  if [ -n "$__bs_eh_handler" ]; then
+    "$__bs_eh_handler" "$__bs_eh_hmsg"
+  else
+    bs_error_exit "$__bs_eh_hmsg" "$__bs_eh_hcode"
+  fi
 }
 
-# @description Set custom error handler for specific error code / Установить
-# пользовательский обработчик для конкретного кода ошибки
-# @param $1 Error code / Код ошибки
-# @param $2 Handler function name / Имя функции-обработчика
-# @example
-#   error::set_handler 127 my_not_found_handler
-error::set_handler() {
-    local -r error_code="${1}"
-    local -r handler="${2}"
-
-    if is::empty "${error_code}"; then
-        log::warn "error::set_handler: error code is required"
-        return "${E_INVALID:-2}"
-    fi
-
-    if ! function_exists "${handler}"; then
-        log::warn "Handler function does not exist: ${handler}"
-        return "${E_ERROR:-1}"
-    fi
-
-    __ERROR_HANDLERS["${error_code}"]="${handler}"
-    log::debug "Set custom handler for error ${error_code}: ${handler}"
+# @description Register a handler function for an error code / Зарегистрировать функцию-обработчик для кода ошибки
+# @param $1 error code / код ошибки
+# @param $2 handler function / функция-обработчик
+bs_error_set_handler() {
+  if [ -z "${1-}" ]; then
+    bs_log_warn "error::set_handler: error code is required"
+    return "${E_INVALID:-2}"
+  fi
+  if ! bs_function_exists "${2-}"; then
+    bs_log_warn "Handler function does not exist: ${2-}"
+    return "${E_ERROR:-1}"
+  fi
+  bs_map_set bs_error_handlers "$1" "$2"
+  bs_log_debug "Set custom handler for error $1: $2"
 }
 
-# @description Reset error handler for specific error code / Сбросить обработчик для
-# конкретного кода ошибки
-# @param $1 Error code / Код ошибки
-# @example
-#   error::reset_handler 127
-error::reset_handler() {
-    local -r error_code="${1}"
-
-    unset '__ERROR_HANDLERS["${error_code}"]'
-    log::debug "Reset handler for error ${error_code}"
+# @description Remove the handler of an error code / Убрать обработчик кода ошибки
+# @param $1 error code / код ошибки
+bs_error_reset_handler() {
+  bs_map_remove bs_error_handlers "${1-}" >/dev/null 2>&1 || true
+  bs_log_debug "Reset handler for error ${1-}"
 }
 
-# @description Try-catch-like error handling / Обработка ошибок в стиле try-catch
-# @param $@ Command to execute / Команда для выполнения
-# @example
-#   error::try command_that_might_fail
-error::try() {
-    local -i result=0
-    "$@" || result=$?
+# ==========================================
+# Выполнение с обработкой / Running with handling
+# ==========================================
 
-    if [[ ${result} -ne 0 ]]; then
-        log::error "Command failed: $*"
-        return "${result}"
-    fi
+# @description Run a command; log and return its code on failure / Выполнить команду; при сбое залогировать и вернуть её код
+# @param $@ command / команда
+bs_error_try() {
+  __bs_eh_res=0
+  "$@" || __bs_eh_res=$?
+  if [ "$__bs_eh_res" -ne 0 ]; then
+    bs_log_error "Command failed: $*"
+    return "$__bs_eh_res"
+  fi
+  return 0
+}
 
+# @description Run a primary function, and a fallback one if it fails / Выполнить основную функцию, а при сбое — запасную
+# @param $1 primary function / основная функция
+# @param $2 fallback function / запасная функция
+# @param $@ arguments / аргументы
+bs_error_try_with_fallback() {
+  __bs_eh_prim=${1-}
+  __bs_eh_fall=${2-}
+  if [ -z "$__bs_eh_prim" ] || [ -z "$__bs_eh_fall" ]; then
+    bs_log_warn "error::try_with_fallback: primary and fallback function names are required"
+    return "${E_INVALID:-2}"
+  fi
+  if ! bs_function_exists "$__bs_eh_prim"; then
+    bs_log_warn "error::try_with_fallback: primary function not found: ${__bs_eh_prim}"
+    return "${E_ERROR:-1}"
+  fi
+  if ! bs_function_exists "$__bs_eh_fall"; then
+    bs_log_warn "error::try_with_fallback: fallback function not found: ${__bs_eh_fall}"
+    return "${E_ERROR:-1}"
+  fi
+  shift 2
+  if "$__bs_eh_prim" "$@"; then
     return 0
+  fi
+  bs_log_warn "Primary function '${__bs_eh_prim}' failed, trying fallback: ${__bs_eh_fall}"
+  "$__bs_eh_fall" "$@"
 }
 
-# @description Execute primary function with fallback on failure / Выполнить основную
-# функцию с запасным вариантом при ошибке
-# @param $1 Primary function name / Имя основной функции
-# @param $2 Fallback function name / Имя запасной функции
-# @param $@ Arguments passed to both functions / Аргументы, передаваемые обеим функциям
-# @example
-#   error::try_with_fallback primary_func fallback_func "arg1" "arg2"
-error::try_with_fallback() {
-    local primary_fn="${1}"
-    local fallback_fn="${2}"
-    shift 2
-
-    if is::empty "${primary_fn}" || is::empty "${fallback_fn}"; then
-        log::warn "error::try_with_fallback: primary and fallback function names are required"
-        return "${E_INVALID:-2}"
+# @description Run a command up to N times, a second apart / Выполнить команду до N раз с паузой в секунду
+# @param $1 attempts (an integer >= 1) / число попыток (целое >= 1)
+# @param $@ command / команда
+bs_error_retry() {
+  __bs_eh_max=${1-}
+  shift
+  case "$__bs_eh_max" in
+    ''|*[!0-9]*)
+      bs_log_error "error::retry: attempts must be an integer >= 1, got: '${__bs_eh_max}'"
+      return "${E_INVALID:-2}" ;;
+  esac
+  # 10# в bash снимал восьмеричность; здесь отбрасываем ведущие нули сами / 10# in bash dropped octal; here the leading zeros are cut by hand
+  while :; do
+    case "$__bs_eh_max" in 0?*) __bs_eh_max=${__bs_eh_max#0} ;; *) break ;; esac
+  done
+  if [ "$__bs_eh_max" -lt 1 ]; then
+    bs_log_error "error::retry: attempts must be an integer >= 1, got: '${__bs_eh_max}'"
+    return "${E_INVALID:-2}"
+  fi
+  __bs_eh_att=1
+  __bs_eh_res=0
+  while [ "$__bs_eh_att" -le "$__bs_eh_max" ]; do
+    bs_log_debug "Attempt ${__bs_eh_att}/${__bs_eh_max}: $*"
+    "$@" && return 0
+    __bs_eh_res=$?
+    if [ "$__bs_eh_att" -lt "$__bs_eh_max" ]; then
+      bs_log_debug "Command failed, retrying in 1 second..."
+      sleep 1
     fi
-
-    if ! function_exists "${primary_fn}"; then
-        log::warn "error::try_with_fallback: primary function not found: ${primary_fn}"
-        return "${E_ERROR:-1}"
-    fi
-
-    if ! function_exists "${fallback_fn}"; then
-        log::warn "error::try_with_fallback: fallback function not found: ${fallback_fn}"
-        return "${E_ERROR:-1}"
-    fi
-
-    if "${primary_fn}" "$@"; then
-        return 0
-    fi
-
-    log::warn "Primary function '${primary_fn}' failed, trying fallback: ${fallback_fn}"
-    "${fallback_fn}" "$@"
+    __bs_eh_att=$((__bs_eh_att + 1))
+  done
+  bs_log_error "Command failed after ${__bs_eh_max} attempts: $*"
+  return "$__bs_eh_res"
 }
 
-# @description Execute command with retry logic / Выполнить команду с логикой повтора
-# @param $1 Max retries / Максимум повторов
-# @param $@ Command to execute / Команда для выполнения
-# @example
-#   error::retry 3 command_that_might_fail
-error::retry() {
-    local -r max_retries="${1}"
-    shift
-    # Число попыток — целое >= 1: иначе команда не запустится ни разу, а
-    # функция вернула бы 0 («успех» без выполнения).
-    # The attempt count is an integer >= 1: otherwise the command would never
-    # run while the function returned 0 (a "success" without running).
-    if ! [[ "${max_retries}" =~ ^[0-9]+$ ]] || (( 10#${max_retries} < 1 )); then
-        log::error "error::retry: attempts must be an integer >= 1, got: '${max_retries}'"
-        return "${E_INVALID:-2}"
-    fi
-    local cmd=("$@")
-    local -i attempt=1
-    local -i result=0
-    
-    while [[ ${attempt} -le ${max_retries} ]]; do
-        log::debug "Attempt ${attempt}/${max_retries}: ${cmd[*]}"
-        "${cmd[@]}" && return 0
-        result=$?
-        
-        if [[ ${attempt} -lt ${max_retries} ]]; then
-            log::debug "Command failed, retrying in 1 second..."
-            sleep 1
-        fi
-        
-        ((attempt++))
-    done
-    
-    log::error "Command failed after ${max_retries} attempts: ${cmd[*]}"
-    return ${result}
+# @description Run a command and hide its stderr; the status is always 0 / Выполнить команду, скрыв stderr; статус всегда 0
+# @param $@ command / команда
+bs_error_ignore() {
+  "$@" 2>/dev/null || true
 }
 
-# @description Ignore specific errors / Игнорировать конкретные ошибки
-# @param $@ Commands to execute with error ignored / Команды для выполнения с
-# игнорированием ошибок
-# @example
-#   error::ignore command_that_might_fail
-error::ignore() {
-    "$@" 2>/dev/null || true
+# @description Run a command with a time limit (without one if timeout is missing) / Выполнить команду с ограничением времени (без него, если нет timeout)
+# @param $1 timeout / время
+# @param $@ command / команда
+bs_error_with_timeout() {
+  __bs_eh_to=${1-}
+  shift
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$__bs_eh_to" "$@"
+  else
+    bs_log_warn "timeout command not available, running without timeout: $*"
+    "$@"
+  fi
 }
 
-# @description Error handling with timeout / Обработка ошибок с таймаутом
-# @param $1 Timeout in seconds / Таймаут в секундах
-# @param $@ Command to execute / Команда для выполнения
-# @example
-#   error::with_timeout 10 long_running_command
-error::with_timeout() {
-    local timeout="${1}"
-    shift
-    local cmd=("$@")
-    
-    if command -v timeout >/dev/null 2>&1; then
-        timeout "${timeout}" "${cmd[@]}"
-    else
-        log::warn "timeout command not available, running without timeout: ${cmd[*]}"
-        "${cmd[@]}"
-    fi
+# @description Log a fatal message, run the cleanup and exit at once / Записать фатальное сообщение, выполнить очистку и сразу выйти
+# @param $1 message / сообщение
+bs_error_panic() {
+  bs_log_error "PANIC: ${1-}"
+  bs_log_error "System is in an inconsistent state. Terminating immediately."
+  bs_cleanup_run_all
+  exit "${E_ERROR:-1}"
 }
 
-# @description Panic handler for critical errors / Обработчик паники для критических
-# ошибок
-# @param $1 Critical error message / Сообщение о критической ошибке
-# @example
-#   error::panic "Critical system failure"
-error::panic() {
-    local -r message="${1}"
-
-    log::error "PANIC: ${message}"
-    log::error "System is in an inconsistent state. Terminating immediately."
-
-    # Run cleanup functions
-    cleanup::__run_all
-
-    # Exit immediately with error code
-    exit "${E_ERROR:-1}"
+# @description Log an error message / Записать сообщение об ошибке
+# @param $1 message / сообщение
+bs_error_log() {
+  bs_log_error "${1-}"
 }
 
-# @description Log error without exiting / Записать ошибку без выхода
-# @param $1 Error message / Сообщение об ошибке
-# @example
-#   error::log "Non-fatal error occurred"
-error::log() {
-    local -r message="${1}"
-    log::error "${message}"
+# @description Exit with a message if a predicate function succeeds / Выйти с сообщением, если функция-предикат успешна
+# @param $1 predicate function / функция-предикат
+# @param $2 message / сообщение
+# @param $3 code, default E_ERROR / код, по умолчанию E_ERROR
+bs_error_conditional() {
+  __bs_eh_pred=${1-}
+  __bs_eh_cmsg=${2-}
+  __bs_eh_ccode=${3:-${E_ERROR:-1}}
+  if [ -z "$__bs_eh_pred" ]; then
+    bs_log_warn "error::conditional: predicate function name is required"
+    return "${E_INVALID:-2}"
+  fi
+  if ! bs_function_exists "$__bs_eh_pred"; then
+    bs_log_warn "error::conditional: predicate function not found: ${__bs_eh_pred}"
+    return "${E_ERROR:-1}"
+  fi
+  if "$__bs_eh_pred"; then
+    bs_error_exit "$__bs_eh_cmsg" "$__bs_eh_ccode"
+  fi
 }
 
-# @description Handle error conditionally / Условная обработка ошибки
-# @param $1 Predicate function name / Имя функции-предиката
-# @param $2 Error message / Сообщение об ошибке
-# @param $3 Exit code (default: 1) / Код выхода (по умолчанию 1)
-# @example
-#   error::conditional command_exists "Command not found" 127
-error::conditional() {
-    local predicate="${1}"
-    local -r message="${2}"
-    local -r exit_code="${3:-${E_ERROR:-1}}"
-
-    if is::empty "${predicate}"; then
-        log::warn "error::conditional: predicate function name is required"
-        return "${E_INVALID:-2}"
-    fi
-
-    if ! function_exists "${predicate}"; then
-        log::warn "error::conditional: predicate function not found: ${predicate}"
-        return "${E_ERROR:-1}"
-    fi
-
-    if "${predicate}"; then
-        error::exit "${message}" "${exit_code}"
-    fi
+# @description Warn with a message if a predicate function succeeds / Предупредить, если функция-предикат успешна
+# @param $1 predicate function / функция-предикат
+# @param $2 message / сообщение
+bs_error_conditional_warning() {
+  __bs_eh_pred=${1-}
+  __bs_eh_cmsg=${2-}
+  if [ -z "$__bs_eh_pred" ]; then
+    bs_log_warn "error::conditional_warning: predicate function name is required"
+    return "${E_INVALID:-2}"
+  fi
+  if ! bs_function_exists "$__bs_eh_pred"; then
+    bs_log_warn "error::conditional_warning: predicate function not found: ${__bs_eh_pred}"
+    return "${E_ERROR:-1}"
+  fi
+  if "$__bs_eh_pred"; then
+    bs_log_warn "$__bs_eh_cmsg"
+  fi
 }
 
-# @description Handle warning conditionally / Условная обработка предупреждения
-# @param $1 Predicate function name / Имя функции-предиката
-# @param $2 Warning message / Сообщение предупреждения
-# @example
-#   error::conditional_warning check_deprecated_feature "Feature is deprecated"
-error::conditional_warning() {
-    local predicate="${1}"
-    local -r message="${2}"
-
-    if is::empty "${predicate}"; then
-        log::warn "error::conditional_warning: predicate function name is required"
-        return "${E_INVALID:-2}"
+# @description Handler for a missing command: hints a package and exits with 127 / Обработчик отсутствующей команды: подсказывает пакет и выходит с кодом 127
+# @param $1 command / команда
+bs_error_handler_command_not_found() {
+  __bs_eh_cmd=${1-}
+  bs_log_error "Command not found: ${__bs_eh_cmd}"
+  if command -v apt >/dev/null 2>&1; then
+    __bs_eh_pkg=$(apt-cache search "$__bs_eh_cmd" | head -n 1 | awk '{print $1}')
+    if [ -n "$__bs_eh_pkg" ]; then
+      bs_log_info "You might need to install package: ${__bs_eh_pkg}"
     fi
-
-    if ! function_exists "${predicate}"; then
-        log::warn "error::conditional_warning: predicate function not found: ${predicate}"
-        return "${E_ERROR:-1}"
+  elif command -v dnf >/dev/null 2>&1; then
+    __bs_eh_pkg=$(dnf search "$__bs_eh_cmd" 2>/dev/null | grep -E '^\w' | head -n 1 | awk '{print $1}')
+    if [ -n "$__bs_eh_pkg" ]; then
+      bs_log_info "You might need to install package: ${__bs_eh_pkg}"
     fi
-
-    if "${predicate}"; then
-        log::warn "${message}"
-    fi
+  fi
+  bs_error_exit "Command '${__bs_eh_cmd}' not found" 127
 }
 
-# @description Error handler for missing commands / Обработчик ошибок для отсутствующих
-# команд
-# @param $1 Command that was not found / Команда, которая не была найдена
-# @example
-#   error::handler::command_not_found "mycommand"
-error::handler::command_not_found() {
-    local -r cmd="${1}"
-    log::error "Command not found: ${cmd}"
-
-    # Check if the command exists in any package
-    if command -v apt >/dev/null 2>&1; then
-        local package
-        package=$(apt-cache search "${cmd}" | head -n 1 | awk '{print $1}')
-        if is::not_empty "${package}"; then
-            log::info "You might need to install package: ${package}"
-        fi
-    elif command -v dnf >/dev/null 2>&1; then
-        local package
-        package=$(dnf search "${cmd}" 2>/dev/null | grep -E '^\w' | head -n 1 | awk '{print $1}')
-        if is::not_empty "${package}"; then
-            log::info "You might need to install package: ${package}"
-        fi
-    fi
-
-    error::exit "Command '${cmd}' not found" 127
-}
+bs_shell_alias bs_cleanup_add cleanup::add
+bs_shell_alias bs_cleanup_run_all cleanup::__run_all
+bs_shell_alias bs_on_exit 'BS::__on_exit'
+bs_shell_alias bs_errorhandler_setup_trap errorhandler::setup_trap
+bs_shell_alias bs_errorhandler_throw errorhandler::throw
+bs_shell_alias bs_error_throw error::throw
+bs_shell_alias bs_signal_on signal::on
+bs_shell_alias bs_signal_ignore signal::ignore
+bs_shell_alias bs_signal_reset signal::reset
+bs_shell_alias bs_exit bs::exit
+bs_shell_alias bs_error_exit error::exit
+bs_shell_alias bs_error_exit_with_backtrace error::exit_with_backtrace
+bs_shell_alias bs_function_exists function_exists
+bs_shell_alias bs_error_handle error::handle
+bs_shell_alias bs_error_set_handler error::set_handler
+bs_shell_alias bs_error_reset_handler error::reset_handler
+bs_shell_alias bs_error_try error::try
+bs_shell_alias bs_error_try_with_fallback error::try_with_fallback
+bs_shell_alias bs_error_retry error::retry
+bs_shell_alias bs_error_ignore error::ignore
+bs_shell_alias bs_error_with_timeout error::with_timeout
+bs_shell_alias bs_error_panic error::panic
+bs_shell_alias bs_error_log error::log
+bs_shell_alias bs_error_conditional error::conditional
+bs_shell_alias bs_error_conditional_warning error::conditional_warning
+bs_shell_alias bs_error_handler_command_not_found error::handler::command_not_found

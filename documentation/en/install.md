@@ -38,13 +38,15 @@ A source checkout is recognised by `.git` or `tests/` in its root: an installed 
 - `TARGET_LIB=$LIB_DIR/bs` — the framework files: `bootstrap/`, `core/`, `lib/`, and the `bs` launcher, copied from the repository.
 - `TARGET_BIN=$BIN_DIR/bs` — a small wrapper script:
 
-```bash
-#!/usr/bin/env bash
+```sh
+#!/bin/sh
 export BS_ROOT="${TARGET_LIB}"
 exec "${BS_ROOT}/bs" "$@"
 ```
 
-The wrapper exports `BS_ROOT` and delegates to the real `bs` entry point, so `#!/usr/bin/env bs` works in user scripts once `BIN_DIR` is on `PATH`.
+The wrapper is POSIX `sh` (it only hands over), exports `BS_ROOT` and delegates to the real `bs` entry point, so `#!/usr/bin/env bs` works in user scripts once `BIN_DIR` is on `PATH`. If the machine has no `/bin/sh` or `/usr/bin/env` (Termux), the installer and `bs update` adapt the first line of the wrapper and of the `bs` copy to the machine (`bs shebang`, the "Termux and the shebang" section below).
+
+The bash completion goes to `~/.local/share/bash-completion/completions/bs` (`--local`), to `/usr/share/bash-completion/completions/bs` (a system install with the default prefix) or to `$PREFIX/share/bash-completion/completions/bs` (a custom `PREFIX`, for example Termux). A failure to install it is a note, not an error: `bs` works without it.
 
 ## Install manifest
 
@@ -317,7 +319,7 @@ The animated diagrams show what happens during `./install.sh` and `bs update`. T
   - `system` (default): `/usr/local/lib/bs`;
   - `local` (`--local`): `~/.local/lib/bs`;
   - custom: values of `PREFIX`, `BIN_DIR`, `LIB_DIR`.
-- bash 4.2+ is required to start the kernel (the `bash4` tier); the installer can
+- **bash 4.2+ is required** (the kernel and all of `lib/` are written in it); the installer can
   be started from any shell — the entry point finds bash itself (trampoline). The POSIX prologue of `install.sh` checks the
   version (`bs_shell_host_ok`, based on the real interpreter, not `$SHELL`)
   before anything else; `init.sh` checks it once more when sourced.

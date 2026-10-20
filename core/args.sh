@@ -1,5 +1,8 @@
-#!/usr/bin/env bash
-# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags
+#!/bin/sh
+# shellcheck shell=sh
+# @shell posix — валидный POSIX sh: case, test, eval с проверенными именами, слой данных core/data.sh / valid POSIX sh: case, test, eval with checked names, the data layer core/data.sh
+# @tier core — builtins only; works everywhere
+# @tier core — только builtin'ы; работает везде
 #
 # core/args.sh — модуль объявления и валидации параметров скриптов BS
 # core/args.sh — script parameter declaration and validation module for BS
@@ -36,928 +39,809 @@
 #   - more parameters than tree levels → error + help, E_INVALID
 #   - -h/--help → help to stdout, code 0, ARGS_HELP_REQUESTED=1
 #
+# ИМЕНА / NAMES
+#   Real functions: bs_args_define, bs_args_level, bs_args_required, bs_args_describe,
+#   bs_args_flag, bs_args_flag_describe, bs_args_flag_get, bs_args_flag_is_set, bs_args_has,
+#   bs_args_rest, bs_args_help, bs_args_parse, bs_args_reset, bs_args_require, bs_args_get,
+#   bs_args_completion; in bash and zsh also args::* (the old names, aliases). args::parse,
+#   args::reset and args::require come from lib/compat/args.sh: they also fill the bash arrays
+#   ARGS_PARAMS, ARGS_FLAGS and ARGS_REST that scripts read after parsing.
+#   Настоящие функции — bs_args_*; в bash и zsh — ещё и args::* (прежние имена, псевдонимы).
+#   args::parse, args::reset и args::require приходят из lib/compat/args.sh: они ещё заполняют
+#   массивы bash ARGS_PARAMS, ARGS_FLAGS и ARGS_REST, которые скрипты читают после разбора.
+#
+# ДАННЫЕ / DATA
+#   The tree, descriptions, flags and the parse result live in the data layer (core/data.sh):
+#   maps bs_args_tree (level → names), bs_args_desc, bs_args_flags (name → bool|value),
+#   bs_args_flag_desc, bs_args_flag_def, bs_args_flag_val, bs_args_parsed (the parsed flags);
+#   arrays bs_args_params and bs_args_rest.
+#   Дерево, описания, флаги и результат разбора живут в слое данных (core/data.sh).
+#
 # Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points
 
-bs::guard "ARGS" || return 0
+# shellcheck disable=SC2154,SC2119,SC2120,SC2034  # ARGS_LOADED читают снаружи; переменные присваивает eval (bs_args_mget); bs_args_help и bs_args_max_level без аргументов / variables are assigned by eval (bs_args_mget); bs_args_help and bs_args_max_level take no arguments
+bs_guard "ARGS" || return 0
 
 # Зависимости / Dependencies
-bs::source_relative "const.sh" "logger.sh"
+bs_source_relative "const.sh" "logger.sh" "utils.sh" "data.sh" "lang.sh"
 
 # @global ARGS_VERSION — Module version (category: module-flag)
 # @global ARGS_VERSION — Версия модуля (категория: module-flag)
-declare -g ARGS_VERSION="1.0.0"
-
-# ==========================================
-# Состояние модуля / Module state
-# ==========================================
-
-# @global __ARGS_TREE — Args: internal flag tree (category: private)
-# @global __ARGS_TREE — Args: внутреннее дерево флагов (категория: private)
-declare -g -A __ARGS_TREE=()
-
-# @global __ARGS_DESCRIPTIONS — Args: internal flag descriptions (category: private)
-# @global __ARGS_DESCRIPTIONS — Args: внутренние описания флагов (категория: private)
-declare -g -A __ARGS_DESCRIPTIONS=()
-
-# @global ARGS_PARAMS — Args: parsed positional parameters (category: constant)
-# @global ARGS_PARAMS — Args: разобранные позиционные параметры (категория: constant)
-declare -g -a ARGS_PARAMS=()
+bs_shell_readonly ARGS_VERSION="1.0.0"
 
 # @global ARGS_HELP_REQUESTED — Args: help was requested (0/1) (category: constant)
 # @global ARGS_HELP_REQUESTED — Args: запрошена справка (0/1) (категория: constant)
-declare -g ARGS_HELP_REQUESTED=0
+ARGS_HELP_REQUESTED=0
 
-# @global __ARGS_FLAGS — Args: internal flags map (category: private)
-# @global __ARGS_FLAGS — Args: внутренняя карта флагов (категория: private)
-declare -g -A __ARGS_FLAGS=()
+# @global __bs_args_required — Args: internal required-positionals counter (category: private)
+# @global __bs_args_required — Args: внутренний счётчик обязательных параметров (категория: private)
+__bs_args_required=0
 
-# @global __ARGS_FLAG_DESCRIPTIONS — Args: internal flag descriptions map (category: private)
-# @global __ARGS_FLAG_DESCRIPTIONS — Args: внутренняя карта описаний флагов (категория: private)
-declare -g -A __ARGS_FLAG_DESCRIPTIONS=()
-
-# @global ARGS_FLAGS — Args: parsed flags map (category: constant)
-# @global ARGS_FLAGS — Args: карта разобранных флагов (категория: constant)
-declare -g -A ARGS_FLAGS=()
-
-# @global __ARGS_FLAG_DEFAULTS — Args: internal flag defaults map (category: private)
-# @global __ARGS_FLAG_DEFAULTS — Args: внутренняя карта значений по умолчанию (категория: private)
-declare -g -A __ARGS_FLAG_DEFAULTS=()
-
-# @global __ARGS_FLAG_VALIDATORS — Args: internal flag validators map (category: private)
-# @global __ARGS_FLAG_VALIDATORS — Args: внутренняя карта валидаторов флагов (категория: private)
-declare -g -A __ARGS_FLAG_VALIDATORS=()
-
-# @global __ARGS_REQUIRED — Args: internal required-flags counter (category: private)
-# @global __ARGS_REQUIRED — Args: внутренний счётчик обязательных флагов (категория: private)
-declare -g -i __ARGS_REQUIRED=0
-
-# @global __ARGS_VARIADIC_LEVEL — Args: internal variadic nesting level (category: private)
-# @global __ARGS_VARIADIC_LEVEL — Args: внутренний уровень вложенности вариадиков (категория: private)
-declare -g -i __ARGS_VARIADIC_LEVEL=0
-
-# @global ARGS_REST — Args: remaining arguments after parsing (category: constant)
-# @global ARGS_REST — Args: остаток аргументов после разбора (категория: constant)
-declare -g -a ARGS_REST=()
+# @global __bs_args_variadic — Args: internal variadic level, 0 = none (category: private)
+# @global __bs_args_variadic — Args: внутренний повторяемый уровень, 0 = нет (категория: private)
+__bs_args_variadic=0
 
 # ==========================================
 # Приватные вспомогательные функции / Private helper functions
 # ==========================================
 
 # @private
+# @description Значение ключа словаря в переменную; нет ключа — пустая строка
+# @description Map value into a variable; a missing key gives an empty string
+# @param $1 map  $2 key  $3 variable name (a constant of this file)
+bs_args_mget() {
+  eval "$3=''"
+  bs_map_get_to "$1" "$2" "$3" || :
+}
+
+# @private
+# @description Наибольший номер уровня в дереве (0, если дерево пусто) / The highest level of the tree (0 if empty)
+# @stdout number / число
+bs_args_max_level() {
+  bs_map_keys_to bs_args_tree bs_args_lk
+  eval "$(bs_arr_to_args bs_args_lk)"
+  __bs_args_ml=0
+  for __bs_args_mk in "$@"; do
+    if [ "$__bs_args_mk" -gt "$__bs_args_ml" ]; then __bs_args_ml=$__bs_args_mk; fi
+  done
+  printf '%s\n' "$__bs_args_ml"
+}
+
+# @private
 # @description Найти уровень параметра в дереве
 # @description Find the level of a parameter in the tree
 # @param $1 Parameter name / Имя параметра
 # @return Prints level number or empty string / Выводит номер уровня или пустую строку
-args::__level_of() {
-    local name="${1}"
-    local level
-
-    for level in "${!__ARGS_TREE[@]}"; do
-        local item
-        # Список разбираем по пробелам независимо от IFS вызывающего;
-        # read -ra, а не for по подстановке: word-splitting без глоббинга
-        # Split the list on spaces regardless of the caller's IFS;
-        # read -ra, not for-in-expansion: word splitting without globbing
-        local IFS=' '
-        local -a items=()
-        read -ra items <<< "${__ARGS_TREE["${level}"]}"
-        for item in "${items[@]}"; do
-            if [[ "${item}" == "${name}" ]]; then
-                printf '%s\n' "${level}"
-                return "${E_SUCCESS:-0}"
-            fi
-        done
-    done
-    printf '\n'
+bs_args_level_of() {
+  __bs_args_lo_name=$1
+  bs_map_keys_to bs_args_tree bs_args_lk
+  eval "$(bs_arr_to_args bs_args_lk)"
+  for __bs_args_lo_k in "$@"; do
+    bs_args_mget bs_args_tree "$__bs_args_lo_k" __bs_args_lo_l
+    case " $__bs_args_lo_l " in
+      *" $__bs_args_lo_name "*)
+        printf '%s\n' "$__bs_args_lo_k"
+        return "${E_SUCCESS:-0}"
+        ;;
+    esac
+  done
+  printf '\n'
 }
 
 # @private
-# @description Проверить, допустимо ли имя на данном уровне
-# @description Check if a name is allowed at the given level
-# @param $1 Level number / Номер уровня
-# @param $2 Parameter name / Имя параметра
-# @return 0 if allowed, 1 otherwise / 0 если допустимо, иначе 1
-args::__is_allowed_at() {
-    local level="${1}"
-    local name="${2}"
-
-    is::empty "${__ARGS_TREE["${level}"]:-}" && return "${E_ERROR:-1}"
-
-    local item
-    local IFS=' '
-    local -a items=()
-    read -ra items <<< "${__ARGS_TREE["${level}"]}"
-    for item in "${items[@]}"; do
-        [[ "${item}" == "${name}" ]] && return "${E_SUCCESS:-0}"
-    done
-    return "${E_ERROR:-1}"
+# @description Допустим ли параметр на уровне / Is the parameter allowed at the level
+# @param $1 level  $2 name
+bs_args_is_allowed_at() {
+  bs_args_mget bs_args_tree "$1" __bs_args_aa_l
+  if [ -z "$__bs_args_aa_l" ]; then return "${E_ERROR:-1}"; fi
+  case " $__bs_args_aa_l " in
+    *" $2 "*) return "${E_SUCCESS:-0}" ;;
+  esac
+  return "${E_ERROR:-1}"
 }
 
-# @description Проверить значение value-флага по объявленному валидатору.
-# @description Validate a value-flag value against the declared validator.
-#   Validators: "number", "enum:a,b,c", or a callback function name.
-#   Валидаторы: "number", "enum:a,b,c" или имя функции-колбэка.
-# @param $1 Flag name (without --) / Имя флага (без --)
-# @param $2 Value to check / Проверяемое значение
-# @return 0 valid, 1 invalid or unknown validator
-args::__validate_flag_value() {
-    local -r flag="${1:-}" value="${2-}"
-    local -r validator="${__ARGS_FLAG_VALIDATORS["${flag}"]:-}"
-    is::empty "${validator}" && return "${E_SUCCESS:-0}"
-    case "${validator}" in
-        number)
-            is::number "${value}" || return "${E_ERROR:-1}"
-            ;;
-        enum:*)
-            local list="${validator#enum:}"
-            local item ok=0
-            local IFS=','
-            local -a items=()
-            read -ra items <<< "${list}"
-            for item in "${items[@]}"; do
-                [[ "${item}" == "${value}" ]] && ok=1
-            done
-            (( ok == 1 )) || return "${E_ERROR:-1}"
-            ;;
-        *)
-            if is::function "${validator}"; then
-                "${validator}" "${value}" || return "${E_ERROR:-1}"
-            else
-                return "${E_ERROR:-1}"
-            fi
-            ;;
-    esac
-    return "${E_SUCCESS:-0}"
+# @private
+# @description Проверить значение флага его валидатором (number, enum:a,b или имя функции)
+# @description Check a flag value with its validator (number, enum:a,b or a function name)
+# @param $1 flag name  $2 value
+bs_args_validate_flag_value() {
+  __bs_args_vf_flag=${1:-}
+  __bs_args_vf_value=${2-}
+  bs_args_mget bs_args_flag_val "$__bs_args_vf_flag" __bs_args_vf_v
+  if [ -z "$__bs_args_vf_v" ]; then return "${E_SUCCESS:-0}"; fi
+  case "$__bs_args_vf_v" in
+    number)
+      bs_is_number "$__bs_args_vf_value" || return "${E_ERROR:-1}"
+      ;;
+    enum:*)
+      bs_utils_split bs_args_wa "${__bs_args_vf_v#enum:}" ','
+      eval "$(bs_arr_to_args bs_args_wa)"
+      __bs_args_vf_ok=0
+      for __bs_args_vf_i in "$@"; do
+        if [ "$__bs_args_vf_i" = "$__bs_args_vf_value" ]; then __bs_args_vf_ok=1; fi
+      done
+      [ "$__bs_args_vf_ok" -eq 1 ] || return "${E_ERROR:-1}"
+      ;;
+    *)
+      if bs_function_exists "$__bs_args_vf_v"; then
+        "$__bs_args_vf_v" "$__bs_args_vf_value" || return "${E_ERROR:-1}"
+      else
+        return "${E_ERROR:-1}"
+      fi
+      ;;
+  esac
+  return "${E_SUCCESS:-0}"
 }
 
-# @description Человекочитаемая подсказка валидатора для сообщений и help.
-# @description Human-readable validator hint for messages and help.
-# @param $1 Flag name (without --) / Имя флага (без --)
-# @stdout hint / подсказка
-args::__flag_value_hint() {
-    local -r flag="${1:-}"
-    local -r validator="${__ARGS_FLAG_VALIDATORS["${flag}"]:-}"
-    case "${validator}" in
-        number) printf 'a number\n' ;;
-        enum:*) printf 'one of: %s\n' "${validator#enum:}" ;;
-        *)      printf '%s\n' "${validator}" ;;
-    esac
+# @private
+# @description Подсказка по значению флага для сообщения об ошибке / Value hint for an error message
+# @param $1 flag name
+bs_args_flag_value_hint() {
+  bs_args_mget bs_args_flag_val "${1:-}" __bs_args_fh_v
+  case "$__bs_args_fh_v" in
+    number) printf 'a number\n' ;;
+    enum:*) printf 'one of: %s\n' "${__bs_args_fh_v#enum:}" ;;
+    *)      printf '%s\n' "$__bs_args_fh_v" ;;
+  esac
 }
 
 # ==========================================
 # Объявление дерева / Tree declaration
 # ==========================================
 
-# @description Сбросить дерево параметров и описания (для повторного объявления)
-# @description Reset the parameter tree and descriptions (for re-declaration)
-# @example
-#   args::reset
-args::reset() {
-    __ARGS_TREE=()
-    __ARGS_DESCRIPTIONS=()
-    __ARGS_FLAGS=()
-    __ARGS_FLAG_DESCRIPTIONS=()
-    __ARGS_FLAG_DEFAULTS=()
-    __ARGS_FLAG_VALIDATORS=()
-    ARGS_PARAMS=()
-    ARGS_FLAGS=()
-    ARGS_REST=()
-    __ARGS_REQUIRED=0
-    __ARGS_VARIADIC_LEVEL=0
-    ARGS_HELP_REQUESTED=0
+# @description Сбросить объявления и результаты разбора / Reset declarations and parse results
+bs_args_reset() {
+  bs_map_clear bs_args_tree
+  bs_map_clear bs_args_desc
+  bs_map_clear bs_args_flags
+  bs_map_clear bs_args_flag_desc
+  bs_map_clear bs_args_flag_def
+  bs_map_clear bs_args_flag_val
+  bs_map_clear bs_args_parsed
+  bs_arr_clear bs_args_params
+  bs_arr_clear bs_args_rest
+  __bs_args_required=0
+  __bs_args_variadic=0
+  ARGS_HELP_REQUESTED=0
 }
 
-# @description Объявить линейную цепочку параметров:
-#   первое имя — уровень 1, второе — уровень 2 и т.д.
-#   Аналог parameters("first", "middle", "last")
-# @description Declare a linear parameter chain:
-#   first name — level 1, second — level 2, etc.
-#   Equivalent of parameters("first", "middle", "last")
-# @param $@ Parameter names in order / Имена параметров по порядку
-# @example
-#   args::define first middle last
-args::define() {
-    if [[ $# -eq 0 ]]; then
-        log::warn "args::define: at least one parameter name is required"
-        return "${E_ERROR:-1}"
-    fi
-
-    local level=1
-    local name
-    for name in "$@"; do
-        args::level "${level}" "${name}" || return "${E_ERROR:-1}"
-        ((++level))
-    done
+# @description Объявить линейную цепочку параметров: define a b c = level 1 a, level 2 b, level 3 c
+# @description Declare a linear chain of parameters: define a b c = level 1 a, level 2 b, level 3 c
+# @param $@ names / имена
+bs_args_define() {
+  if [ $# -eq 0 ]; then
+    bs_log_warn "args::define: at least one parameter name is required"
+    return "${E_ERROR:-1}"
+  fi
+  __bs_args_df_level=1
+  for __bs_args_df_name in "$@"; do
+    bs_args_level "$__bs_args_df_level" "$__bs_args_df_name" || return "${E_ERROR:-1}"
+    __bs_args_df_level=$((__bs_args_df_level + 1))
+  done
 }
 
-# @description Объявить допустимые значения уровня (ветвление дерева):
-#   на одном уровне может быть несколько альтернатив. Имя с суффиксом
-#   "..." делает уровень повторяемым: допустимые имена повторяются
-#   без ограничений (аналог nargs='*' в argparse).
-# @description Declare allowed values for a level (tree branching):
-#   one level may hold several alternatives. A name with a "..." suffix
-#   makes the level variadic: its allowed names may repeat unboundedly
-#   (the argparse nargs='*' analog).
-# @param $1 Level number (1-based) / Номер уровня (с 1)
-# @param $@ Parameter names allowed at this level / Имена, допустимые на уровне
-# @example
-#   args::level 1 start stop status
-#   args::level 3 file...            # повторяемый уровень / variadic level
-args::level() {
-    local level="${1:-}"
-    shift $(( $# > 0 ? 1 : 0 ))
-
-    if is::empty "${level}" || ! [[ "${level}" =~ ^[0-9]+$ ]] || [[ "${level}" -eq 0 ]]; then
-        log::warn "args::level: level must be a positive integer, got: ${level}"
-        return "${E_ERROR:-1}"
+# @description Объявить допустимые параметры уровня; имя с суффиксом ... — повторяемый уровень
+# @description Declare the allowed parameters of a level; a name with the ... suffix makes the level variadic
+# @param $1 level (positive integer) / номер уровня
+# @param $@ names / имена
+bs_args_level() {
+  __bs_args_lv_level=${1:-}
+  if [ $# -gt 0 ]; then shift; fi
+  if [ -z "$__bs_args_lv_level" ] || ! bs_is_number "$__bs_args_lv_level" || [ "$__bs_args_lv_level" -eq 0 ]; then
+    bs_log_warn "args::level: level must be a positive integer, got: ${__bs_args_lv_level}"
+    return "${E_ERROR:-1}"
+  fi
+  if [ $# -eq 0 ]; then
+    bs_log_warn "args::level: at least one parameter name is required"
+    return "${E_ERROR:-1}"
+  fi
+  for __bs_args_lv_name in "$@"; do
+    case "$__bs_args_lv_name" in
+      *...)
+        # Повторяемый уровень / Variadic level
+        __bs_args_variadic=$__bs_args_lv_level
+        __bs_args_lv_name=${__bs_args_lv_name%...}
+        ;;
+    esac
+    if [ -z "$__bs_args_lv_name" ]; then
+      bs_log_warn "args::level: empty parameter name at level ${__bs_args_lv_level}"
+      return "${E_ERROR:-1}"
     fi
-    if [[ $# -eq 0 ]]; then
-        log::warn "args::level: at least one parameter name is required"
-        return "${E_ERROR:-1}"
+    if bs_args_is_allowed_at "$__bs_args_lv_level" "$__bs_args_lv_name"; then
+      continue  # Уже объявлен / Already declared
     fi
-
-    local name
-    for name in "$@"; do
-        if [[ "${name}" == *"..." ]]; then
-            # Повторяемый уровень / Variadic level
-            __ARGS_VARIADIC_LEVEL="${level}"
-            name="${name%...}"
-        fi
-        if is::empty "${name}"; then
-            log::warn "args::level: empty parameter name at level ${level}"
-            return "${E_ERROR:-1}"
-        fi
-        if args::__is_allowed_at "${level}" "${name}"; then
-            continue  # Уже объявлен / Already declared
-        fi
-        if is::not_empty "${__ARGS_TREE["${level}"]:-}"; then
-            __ARGS_TREE["${level}"]+=" ${name}"
-        else
-            __ARGS_TREE["${level}"]="${name}"
-        fi
-    done
+    bs_args_mget bs_args_tree "$__bs_args_lv_level" __bs_args_lv_cur
+    if [ -n "$__bs_args_lv_cur" ]; then
+      bs_map_set bs_args_tree "$__bs_args_lv_level" "${__bs_args_lv_cur} ${__bs_args_lv_name}"
+    else
+      bs_map_set bs_args_tree "$__bs_args_lv_level" "$__bs_args_lv_name"
+    fi
+  done
 }
 
-# @description Объявить минимальное количество позиционных параметров.
-# @description Declare the minimum number of positional parameters.
-#   args::parse fails with E_INVALID if fewer are given.
-# @param $1 Minimum count, non-negative integer / Минимум, целое число >= 0
-# @return 0 ok, 1 invalid count
-# @example
-#   args::required 2
-args::required() {
-    local -r count="${1:-}"
-    if is::empty "${count}" || ! [[ "${count}" =~ ^[0-9]+$ ]]; then
-        log::warn "args::required: count must be a non-negative integer, got: ${count}"
-        return "${E_ERROR:-1}"
-    fi
-    __ARGS_REQUIRED="${count}"
-    return "${E_SUCCESS:-0}"
+# @description Минимальное число позиционных параметров / Minimum number of positional parameters
+# @param $1 count / число
+bs_args_required() {
+  __bs_args_rq_count=${1:-}
+  if [ -z "$__bs_args_rq_count" ] || ! bs_is_number "$__bs_args_rq_count"; then
+    bs_log_warn "args::required: count must be a non-negative integer, got: ${__bs_args_rq_count}"
+    return "${E_ERROR:-1}"
+  fi
+  __bs_args_required=$__bs_args_rq_count
+  return "${E_SUCCESS:-0}"
 }
 
-# @description Задать описание параметра для help-сообщения
-# @description Set a parameter description for the help message
-# @param $1 Parameter name / Имя параметра
-# @param $2 Description text / Текст описания
-# @example
-#   args::describe start "Start the service immediately"
-args::describe() {
-    # Параметры могут быть не переданы: значения по умолчанию для set -u
-    # Parameters may be omitted: defaults for set -u
-    local name="${1:-}"
-    local text="${2:-}"
-
-    if is::empty "${name}"; then
-        log::warn "args::describe: parameter name not specified"
-        return "${E_ERROR:-1}"
-    fi
-    __ARGS_DESCRIPTIONS["${name}"]="${text}"
+# @description Описать параметр для help / Describe a parameter for help
+# @param $1 name  $2 text
+bs_args_describe() {
+  # Параметры могут быть не переданы: значения по умолчанию для set -u
+  # Parameters may be omitted: defaults for set -u
+  __bs_args_ds_name=${1:-}
+  if [ -z "$__bs_args_ds_name" ]; then
+    bs_log_warn "args::describe: parameter name not specified"
+    return "${E_ERROR:-1}"
+  fi
+  bs_map_set bs_args_desc "$__bs_args_ds_name" "${2:-}"
 }
 
 # ==========================================
 # Флаги (--key value) / Flags (--key value)
 # ==========================================
 
-# @description Объявить флаг командной строки
-#   bool-флаг не требует значения (--verbose), value-флаг требует (--output file)
-#   Флаги не занимают позиционные уровни дерева
-# @description Declare a command line flag
-#   A bool flag takes no value (--verbose), a value flag requires one (--output file)
-#   Flags do not occupy positional tree levels
-# @param $1 Flag name (with or without --) / Имя флага (с -- или без)
-# @param $2 [optional] Type: "bool" (default) or "value" / [опционально] Тип: "bool" (по умолчанию) или "value"
-# @param $3 [optional] Default value (value flags; also for --help display)
-#        [опционально] Значение по умолчанию (для value-флагов; попадает в help)
-# @param $4 [optional] Value validator: "number", "enum:a,b,c", or a callback
-#        function name returning 0 for valid values
-#        [опционально] Валидатор значения: "number", "enum:a,b,c" или имя
-#        функции-колбэка, возвращающей 0 для допустимых значений
-# @example
-#   args::flag verbose
-#   args::flag output value
-#   args::flag env value staging "enum:staging,prod"
-#   args::flag port value "" number
-#   args::flag token value "" "is::not_empty"
-args::flag() {
-    local name="${1:-}"
-    local type="${2:-bool}"
-    local default="${3-}"
-    local validator="${4-}"
-
-    # Убираем префикс --, если передан / Strip the -- prefix if given
-    name="${name#--}"
-
-    if is::empty "${name}"; then
-        log::warn "args::flag: flag name not specified"
-        return "${E_ERROR:-1}"
-    fi
-    if [[ "${type}" != "bool" ]] && [[ "${type}" != "value" ]]; then
-        log::warn "args::flag: type must be 'bool' or 'value', got: ${type}"
-        return "${E_ERROR:-1}"
-    fi
-
-    __ARGS_FLAGS["${name}"]="${type}"
-    # Пустая строка дефолта означает "дефолта нет" / Empty default = no default
-    if (( $# >= 3 )) && is::not_empty "${default}"; then
-        __ARGS_FLAG_DEFAULTS["${name}"]="${default}"
-    fi
-    if (( $# >= 4 )); then
-        __ARGS_FLAG_VALIDATORS["${name}"]="${validator}"
-    fi
+# @description Объявить флаг: bool (по умолчанию) или value; дефолт и валидатор необязательны
+# @description Declare a flag: bool (default) or value; the default and the validator are optional
+# @param $1 name (with or without --)  $2 type  $3 default  $4 validator (number, enum:a,b, function)
+bs_args_flag() {
+  __bs_args_fl_name=${1:-}
+  __bs_args_fl_type=${2:-bool}
+  # Убираем префикс --, если передан / Strip the -- prefix if given
+  __bs_args_fl_name=${__bs_args_fl_name#--}
+  if [ -z "$__bs_args_fl_name" ]; then
+    bs_log_warn "args::flag: flag name not specified"
+    return "${E_ERROR:-1}"
+  fi
+  if [ "$__bs_args_fl_type" != "bool" ] && [ "$__bs_args_fl_type" != "value" ]; then
+    bs_log_warn "args::flag: type must be 'bool' or 'value', got: ${__bs_args_fl_type}"
+    return "${E_ERROR:-1}"
+  fi
+  bs_map_set bs_args_flags "$__bs_args_fl_name" "$__bs_args_fl_type"
+  # Пустая строка дефолта означает "дефолта нет" / Empty default = no default
+  if [ $# -ge 3 ] && [ -n "${3-}" ]; then
+    bs_map_set bs_args_flag_def "$__bs_args_fl_name" "$3"
+  fi
+  if [ $# -ge 4 ]; then
+    bs_map_set bs_args_flag_val "$__bs_args_fl_name" "$4"
+  fi
 }
 
-# @description Задать описание флага для help-сообщения
-# @description Set a flag description for the help message
-# @param $1 Flag name (with or without --) / Имя флага (с -- или без)
-# @param $2 Description text / Текст описания
-# @example
-#   args::flag_describe output "Write the report to this file"
-args::flag_describe() {
-    local name="${1:-}"
-    local text="${2:-}"
-
-    name="${name#--}"
-
-    if is::empty "${name}"; then
-        log::warn "args::flag_describe: flag name not specified"
-        return "${E_ERROR:-1}"
-    fi
-    __ARGS_FLAG_DESCRIPTIONS["${name}"]="${text}"
+# @description Описать флаг для help / Describe a flag for help
+# @param $1 name  $2 text
+bs_args_flag_describe() {
+  __bs_args_fd_name=${1:-}
+  __bs_args_fd_name=${__bs_args_fd_name#--}
+  if [ -z "$__bs_args_fd_name" ]; then
+    bs_log_warn "args::flag_describe: flag name not specified"
+    return "${E_ERROR:-1}"
+  fi
+  bs_map_set bs_args_flag_desc "$__bs_args_fd_name" "${2:-}"
 }
 
-# @description Получить значение флага после args::parse
-#   Если флаг не задан на командной строке, возвращается объявленный
-#   дефолт (args::flag NAME value DEFAULT); без дефолта — ошибка.
-# @description Get a flag value after args::parse
-#   If the flag was not set on the command line, the declared default is
-#   returned (args::flag NAME value DEFAULT); without a default — error.
-# @param $1 Flag name (with or without --) / Имя флага (с -- или без)
-# @return Prints the value; 1 if flag not set and no default declared
-#   Выводит значение; 1 если флаг не задан и дефолт не объявлен
-# @example
-#   report_file="$(args::flag_get output)"
-args::flag_get() {
-    local name="${1:-}"
-
-    name="${name#--}"
-
-    local value="${ARGS_FLAGS["${name}"]:-}"
-    if is::empty "${value}"; then
-        # Объявленный дефолт / Declared default
-        if [[ -v __ARGS_FLAG_DEFAULTS["${name}"] ]]; then
-            printf '%s\n' "${__ARGS_FLAG_DEFAULTS["${name}"]}"
-            return "${E_SUCCESS:-0}"
-        fi
-        return "${E_ERROR:-1}"
+# @description Значение флага после разбора или его дефолт; 1, если нет ни того, ни другого
+# @description The flag value after parsing, or its default; 1 if neither exists
+# @param $1 name
+bs_args_flag_get() {
+  __bs_args_fg_name=${1:-}
+  __bs_args_fg_name=${__bs_args_fg_name#--}
+  bs_args_mget bs_args_parsed "$__bs_args_fg_name" __bs_args_fg_v
+  if [ -z "$__bs_args_fg_v" ]; then
+    # Объявленный дефолт / Declared default
+    if bs_map_has bs_args_flag_def "$__bs_args_fg_name"; then
+      bs_map_get bs_args_flag_def "$__bs_args_fg_name"
+      return "${E_SUCCESS:-0}"
     fi
-    printf '%s\n' "${value}"
+    return "${E_ERROR:-1}"
+  fi
+  printf '%s\n' "$__bs_args_fg_v"
 }
 
-# @description Предикат: флаг был задан на командной строке.
-# @description Predicate: the flag was set on the command line.
-#   False when only the default was declared — use args::flag_get for that.
-#   Ложь, если задан только дефолт — для дефолта используйте args::flag_get.
-# @param $1 Flag name (with or without --) / Имя флага (с -- или без)
-# @return 0 set on the command line, 1 not set
-# @example
-#   if args::flag_is_set dry-run; then ...
-args::flag_is_set() {
-    local name="${1:-}"
-    name="${name#--}"
-    [[ -v ARGS_FLAGS["${name}"] ]]
+# @description Передан ли флаг в разборе (даже с пустым значением) / Was the flag given in the parse (even with an empty value)
+# @param $1 name
+bs_args_flag_is_set() {
+  __bs_args_fs_name=${1:-}
+  __bs_args_fs_name=${__bs_args_fs_name#--}
+  bs_map_has bs_args_parsed "$__bs_args_fs_name"
 }
 
-# @description Предикат: позиционный параметр задан (Python: len check).
-# @description Predicate: the positional parameter is set.
-# @param $1 Position (1-based) / Позиция (с 1)
-# @return 0 set, 1 not set or invalid position
-# @example
-#   if args::has 2; then ...
-args::has() {
-    local -r position="${1:-}"
-    if is::empty "${position}" || ! [[ "${position}" =~ ^[0-9]+$ ]] || [[ "${position}" -eq 0 ]]; then
-        return "${E_ERROR:-1}"
-    fi
-    [[ -n "${ARGS_PARAMS[$((position - 1))]:-}" ]]
+# @description Есть ли непустой позиционный параметр на позиции / Is there a non-empty positional parameter at the position
+# @param $1 position (from 1) / позиция
+bs_args_has() {
+  __bs_args_hs_pos=${1:-}
+  if [ -z "$__bs_args_hs_pos" ] || ! bs_is_number "$__bs_args_hs_pos" || [ "$__bs_args_hs_pos" -eq 0 ]; then
+    return "${E_ERROR:-1}"
+  fi
+  __bs_args_hs_v=$(bs_arr_get bs_args_params $((__bs_args_hs_pos - 1))) || return 1
+  [ -n "$__bs_args_hs_v" ]
 }
 
-# @description Сырые аргументы после "--", построчно.
-# @description Raw arguments after "--", one per line.
-#   The full array is also exposed as ARGS_REST.
-# @stdout rest arguments / сырые аргументы
-# @example
-#   while IFS= read -r raw; do printf '%s\n' "${raw}"; done < <(args::rest)
-args::rest() {
-    if (( ${#ARGS_REST[@]} > 0 )); then
-        printf '%s\n' "${ARGS_REST[@]}"
-    fi
+# @description Аргументы после "--", по одному в строке / Arguments after "--", one per line
+bs_args_rest() {
+  if [ "$(bs_arr_len bs_args_rest)" -gt 0 ]; then
+    eval "$(bs_arr_to_args bs_args_rest)"
+    printf '%s\n' "$@"
+  fi
 }
 
 # ==========================================
 # Help / Справка
 # ==========================================
 
-# @description Вывести help, сгенерированный из дерева параметров
+# @description Напечатать справку по объявленному дереву
+# @description Print help for the declared tree
 #   Help никогда не расходится с валидацией — это тот же источник данных
-# @description Print help generated from the parameter tree
 #   Help never diverges from validation — it is the same data source
-# @param $1 [optional] Program name (default: $0 basename) / [опционально] Имя программы
+# @param $1 [optional] program name / имя программы
 # @example
 #   args::help "deploy.sh"
-args::help() {
-    local prog="${1:-${0##*/}}"
+bs_args_help() {
+  __bs_args_hp_prog=${1:-${0##*/}}
 
-    if [[ ${#__ARGS_TREE[@]} -eq 0 ]] && [[ ${#__ARGS_FLAGS[@]} -eq 0 ]]; then
-        printf 'Usage: %s\n' "${prog}"
-        printf '(no parameters declared / параметры не объявлены)\n'
-        return "${E_SUCCESS:-0}"
+  if [ "$(bs_map_count bs_args_tree)" -eq 0 ] && [ "$(bs_map_count bs_args_flags)" -eq 0 ]; then
+    printf 'Usage: %s\n' "$__bs_args_hp_prog"
+    printf '(no parameters declared / параметры не объявлены)\n'
+    return "${E_SUCCESS:-0}"
+  fi
+
+  # Собираем usage-строку по уровням / Build the usage line by levels
+  __bs_args_hp_usage="Usage: ${__bs_args_hp_prog}"
+
+  # Флаги в usage-строке / Flags in the usage line
+  if [ "$(bs_map_count bs_args_flags)" -gt 0 ]; then
+    __bs_args_hp_usage="${__bs_args_hp_usage} [flags]"
+  fi
+
+  __bs_args_hp_max=$(bs_args_max_level)
+
+  __bs_args_hp_level=1
+  while [ "$__bs_args_hp_level" -le "$__bs_args_hp_max" ]; do
+    bs_args_mget bs_args_tree "$__bs_args_hp_level" __bs_args_hp_list
+    if [ -n "$__bs_args_hp_list" ]; then
+      bs_utils_split bs_args_wa "$__bs_args_hp_list" ' '
+      __bs_args_hp_choices=$(bs_arr_join bs_args_wa '|')
+      # Повторяемый уровень: суффикс ... / Variadic level: ... suffix
+      if [ "$__bs_args_variadic" -eq "$__bs_args_hp_level" ]; then
+        __bs_args_hp_choices="${__bs_args_hp_choices}..."
+      fi
+      __bs_args_hp_usage="${__bs_args_hp_usage} [${__bs_args_hp_choices}]"
     fi
+    __bs_args_hp_level=$((__bs_args_hp_level + 1))
+  done
+  printf '%s\n' "$__bs_args_hp_usage"
 
-    # Собираем usage-строку по уровням / Build the usage line by levels
-    local usage="Usage: ${prog}"
+  if [ "$(bs_map_count bs_args_tree)" -gt 0 ]; then
+    printf '\nParameters / Параметры:\n'
 
-    # Флаги в usage-строке / Flags in the usage line
-    if [[ ${#__ARGS_FLAGS[@]} -gt 0 ]]; then
-        usage+=" [flags]"
-    fi
-
-    local level
-    local max_level=0
-    for level in "${!__ARGS_TREE[@]}"; do
-        [[ "${level}" -gt "${max_level}" ]] && max_level="${level}"
-    done
-
-    local item
-    for ((level = 1; level <= max_level; level++)); do
-        if is::not_empty "${__ARGS_TREE["${level}"]:-}"; then
-            local IFS=' '
-            local choices=""
-            local -a items=()
-            read -ra items <<< "${__ARGS_TREE["${level}"]}"
-            for item in "${items[@]}"; do
-                if is::not_empty "${choices}"; then
-                    choices+="|${item}"
-                else
-                    choices="${item}"
-                fi
-            done
-            # Повторяемый уровень: суффикс ... / Variadic level: ... suffix
-            if (( __ARGS_VARIADIC_LEVEL == level )); then
-                choices+="..."
-            fi
-            usage+=" [${choices}]"
-        fi
-    done
-    printf '%s\n' "${usage}"
-
-    if [[ ${#__ARGS_TREE[@]} -gt 0 ]]; then
-        printf '\nParameters / Параметры:\n'
-
-        for ((level = 1; level <= max_level; level++)); do
-            is::empty "${__ARGS_TREE["${level}"]:-}" && continue
-            printf '  level %d: %s\n' "${level}" "${__ARGS_TREE[${level}]// / | }"
-            local IFS=' '
-            local -a items=()
-            read -ra items <<< "${__ARGS_TREE["${level}"]}"
-            for item in "${items[@]}"; do
-                if is::not_empty "${__ARGS_DESCRIPTIONS["${item}"]:-}"; then
-                    printf '    %-16s — %s\n' "${item}" "${__ARGS_DESCRIPTIONS["${item}"]}"
-                fi
-            done
+    __bs_args_hp_level=1
+    while [ "$__bs_args_hp_level" -le "$__bs_args_hp_max" ]; do
+      bs_args_mget bs_args_tree "$__bs_args_hp_level" __bs_args_hp_list
+      if [ -n "$__bs_args_hp_list" ]; then
+        bs_utils_split bs_args_wa "$__bs_args_hp_list" ' '
+        printf '  level %d: %s\n' "$__bs_args_hp_level" "$(bs_arr_join bs_args_wa ' | ')"
+        eval "$(bs_arr_to_args bs_args_wa)"
+        for __bs_args_hp_item in "$@"; do
+          bs_args_mget bs_args_desc "$__bs_args_hp_item" __bs_args_hp_d
+          if [ -n "$__bs_args_hp_d" ]; then
+            printf '    %-16s — %s\n' "$__bs_args_hp_item" "$__bs_args_hp_d"
+          fi
         done
-    fi
+      fi
+      __bs_args_hp_level=$((__bs_args_hp_level + 1))
+    done
+  fi
 
-    # Секция флагов / Flags section
-    if [[ ${#__ARGS_FLAGS[@]} -gt 0 ]]; then
-        printf '\nFlags / Флаги:\n'
-        local flag_name
-        # Итерация по отсортированным именам через read:
-        # word splitting $() сломался бы при IFS=' ' из цикла уровней выше
-        # Iterating sorted names via read:
-        # $() word splitting would break under IFS=' ' from the level loop above
-        while IFS= read -r flag_name; do
-            local flag_label="--${flag_name}"
-            if [[ "${__ARGS_FLAGS["${flag_name}"]:-}" == "value" ]]; then
-                # Хинт типа значения: number / enum:a,b / другое
-                # Value type hint: number / enum:a,b / other
-                local value_hint="value"
-                case "${__ARGS_FLAG_VALIDATORS["${flag_name}"]:-}" in
-                    number) value_hint="number" ;;
-                    enum:*) value_hint="${__ARGS_FLAG_VALIDATORS["${flag_name}"]#enum:}" ;;
-                esac
-                flag_label="--${flag_name} <${value_hint}>"
-            fi
-            if is::not_empty "${__ARGS_FLAG_DESCRIPTIONS["${flag_name}"]:-}"; then
-                printf '    %-28s — %s' "${flag_label}" "${__ARGS_FLAG_DESCRIPTIONS["${flag_name}"]}"
-            else
-                printf '    %-28s' "${flag_label}"
-            fi
-            # Дефолт в help / Default in help
-            if [[ -v __ARGS_FLAG_DEFAULTS["${flag_name}"] ]]; then
-                printf ' (default: %s)\n' "${__ARGS_FLAG_DEFAULTS["${flag_name}"]}"
-            else
-                printf '\n'
-            fi
-        done < <(printf '%s\n' "${!__ARGS_FLAGS[@]}" | sort)
-        printf '    %-28s — %s\n' "--help" "Show this help and exit"
-    fi
+  # Секция флагов / Flags section
+  if [ "$(bs_map_count bs_args_flags)" -gt 0 ]; then
+    printf '\nFlags / Флаги:\n'
+    # Итерация по отсортированным именам через read / Iterating sorted names via read
+    bs_map_keys bs_args_flags | sort | while IFS= read -r __bs_args_hp_flag; do
+      bs_args_mget bs_args_flags "$__bs_args_hp_flag" __bs_args_hp_kind
+      bs_args_mget bs_args_flag_val "$__bs_args_hp_flag" __bs_args_hp_val
+      __bs_args_hp_label="--${__bs_args_hp_flag}"
+      if [ "$__bs_args_hp_kind" = "value" ]; then
+        # Хинт типа значения: number / enum:a,b / другое
+        # Value type hint: number / enum:a,b / other
+        __bs_args_hp_hint="value"
+        case "$__bs_args_hp_val" in
+          number) __bs_args_hp_hint="number" ;;
+          enum:*) __bs_args_hp_hint="${__bs_args_hp_val#enum:}" ;;
+        esac
+        __bs_args_hp_label="--${__bs_args_hp_flag} <${__bs_args_hp_hint}>"
+      fi
+      bs_args_mget bs_args_flag_desc "$__bs_args_hp_flag" __bs_args_hp_d
+      if [ -n "$__bs_args_hp_d" ]; then
+        printf '    %-28s — %s' "$__bs_args_hp_label" "$__bs_args_hp_d"
+      else
+        printf '    %-28s' "$__bs_args_hp_label"
+      fi
+      # Дефолт в help / Default in help
+      if bs_map_has bs_args_flag_def "$__bs_args_hp_flag"; then
+        bs_args_mget bs_args_flag_def "$__bs_args_hp_flag" __bs_args_hp_def
+        printf ' (default: %s)\n' "$__bs_args_hp_def"
+      else
+        printf '\n'
+      fi
+    done
+    printf '    %-28s — %s\n' "--help" "Show this help and exit"
+  fi
 }
 
 # ==========================================
 # Валидация / Validation
 # ==========================================
 
-# @description Проверить входные параметры скрипта по дереву
-#   Успех: заполняет массив ARGS_PARAMS, возвращает 0
+# @description Проверить аргументы по объявленному дереву
+# @description Validate arguments against the declared tree
+#   Успех: заполняет массив bs_args_params, возвращает 0
 #   Ошибка: печатает причину и help в stderr, возвращает E_INVALID
-# @description Validate the script input parameters against the tree
-#   Success: fills the ARGS_PARAMS array, returns 0
+#   Success: fills the bs_args_params array, returns 0
 #   Error: prints the reason and help to stderr, returns E_INVALID
-# @param $@ Script parameters (обычно "$@") / Script parameters (usually "$@")
-# @return 0 on success, E_INVALID on validation error / 0 при успехе, E_INVALID при ошибке
+# @param $@ arguments / аргументы
 # @example
-#   args::require "$@"   # or: args::parse "$@" || bs::exit invalid
-args::parse() {
-    ARGS_PARAMS=()
-    ARGS_FLAGS=()
-    ARGS_REST=()
-    ARGS_HELP_REQUESTED=0
+#   args::parse "$@" || bs::exit invalid
+bs_args_parse() {
+  bs_arr_clear bs_args_params
+  bs_arr_clear bs_args_rest
+  bs_map_clear bs_args_parsed
+  ARGS_HELP_REQUESTED=0
 
-    # Запрос help: -h/--help в любой позиции, не только argv[0].
-    # Объявленные флаги help/h имеют приоритет — их обработает цикл ниже.
-    # Help request: -h/--help at any position, not only argv[0].
-    # Declared flags named help/h take precedence — the loop below handles them.
-    # Просмотр останавливается на "--" (дальше сырые аргументы) и пропускает
-    # значение объявленного флага со значением (--pattern -h).
-    # The scan stops at "--" (raw arguments follow) and skips the value of a
-    # declared value flag (--pattern -h).
-    local arg key help_requested="false" skip_value=0
-    for arg in "$@"; do
-        [[ "${arg}" == "--" ]] && break
-        if (( skip_value == 1 )); then
-            skip_value=0
-            continue
-        fi
-        if [[ "${arg}" == --* && "${arg}" != *=* ]] \
-           && [[ "${__ARGS_FLAGS["${arg#--}"]:-}" == "value" ]]; then
-            skip_value=1
-            continue
-        fi
-        if [[ "${arg}" == "-h" ]] || [[ "${arg}" == "--help" ]]; then
-            key="${arg#--}"
-            [[ "${arg}" == "-h" ]] && key="h"
-            if is::empty "${__ARGS_FLAGS["${key}"]:-}"; then
-                help_requested="true"
-            fi
-        fi
-    done
-    if [[ "${help_requested}" == "true" ]]; then
-        ARGS_HELP_REQUESTED=1
-        args::help
-        return "${E_SUCCESS:-0}"
+  # Запрос help: -h/--help в любой позиции, не только argv[0].
+  # Объявленные флаги help/h имеют приоритет — их обработает цикл ниже.
+  # Просмотр останавливается на "--" (дальше сырые аргументы) и пропускает
+  # значение объявленного флага со значением (--pattern -h).
+  # Help request: -h/--help at any position, not only argv[0].
+  # Declared flags named help/h take precedence — the loop below handles them.
+  # The scan stops at "--" (raw arguments follow) and skips the value of a
+  # declared value flag (--pattern -h).
+  __bs_args_ps_help=0
+  __bs_args_ps_skip=0
+  for __bs_args_ps_arg in "$@"; do
+    if [ "$__bs_args_ps_arg" = "--" ]; then break; fi
+    if [ "$__bs_args_ps_skip" -eq 1 ]; then
+      __bs_args_ps_skip=0
+      continue
     fi
-
-    if [[ ${#__ARGS_TREE[@]} -eq 0 ]] && [[ ${#__ARGS_FLAGS[@]} -eq 0 ]]; then
-        log::error "args::parse: parameter tree is empty, call args::define, args::level or args::flag first"
-        return "${E_ERROR:-1}"
+    case "$__bs_args_ps_arg" in
+      --*=*) ;;
+      --*)
+        bs_args_mget bs_args_flags "${__bs_args_ps_arg#--}" __bs_args_ps_t
+        if [ "$__bs_args_ps_t" = "value" ]; then
+          __bs_args_ps_skip=1
+          continue
+        fi
+        ;;
+    esac
+    if [ "$__bs_args_ps_arg" = "-h" ] || [ "$__bs_args_ps_arg" = "--help" ]; then
+      __bs_args_ps_key=${__bs_args_ps_arg#--}
+      if [ "$__bs_args_ps_arg" = "-h" ]; then __bs_args_ps_key=h; fi
+      bs_args_mget bs_args_flags "$__bs_args_ps_key" __bs_args_ps_t
+      if [ -z "$__bs_args_ps_t" ]; then __bs_args_ps_help=1; fi
     fi
-
-    local max_level=0
-    local level
-    for level in "${!__ARGS_TREE[@]}"; do
-        [[ "${level}" -gt "${max_level}" ]] && max_level="${level}"
-    done
-
-    local -a argv=("$@")
-    local argc=${#argv[@]}
-    local position=0
-    local i=0
-
-    while [[ ${i} -lt ${argc} ]]; do
-        local param="${argv[i]}"
-
-        # Разделитель "--": всё после — сырые аргументы (ARGS_REST)
-        # The "--" separator: everything after — raw arguments (ARGS_REST)
-        if [[ "${param}" == "--" ]]; then
-            ARGS_REST=("${argv[@]:i+1}")
-            break
-        fi
-
-        # Флаги: --name, --name value, --name=value
-        # Flags: --name, --name value, --name=value
-        if [[ "${param}" == --* ]]; then
-            local flag_spec="${param#--}"
-            local flag_name="${flag_spec%%=*}"
-            local inline_value=""
-            local has_inline="false"
-            if [[ "${flag_spec}" == *=* ]]; then
-                inline_value="${flag_spec#*=}"
-                has_inline="true"
-            fi
-
-            # Неизвестный флаг / Unknown flag
-            if is::empty "${__ARGS_FLAGS["${flag_name}"]:-}"; then
-                log::error "unknown flag: \"--${flag_name}\""
-                args::help >&2
-                return "${E_INVALID:-2}"
-            fi
-
-            if [[ "${__ARGS_FLAGS["${flag_name}"]}" == "value" ]]; then
-                # Флаг со значением: --name=value или --name value
-                # Value flag: --name=value or --name value
-                if [[ "${has_inline}" == "true" ]]; then
-                    ARGS_FLAGS["${flag_name}"]="${inline_value}"
-                else
-                    ((++i))
-                    if [[ ${i} -ge ${argc} ]]; then
-                        log::error "flag \"--${flag_name}\" requires a value"
-                        args::help >&2
-                        return "${E_INVALID:-2}"
-                    fi
-                    if [[ "${argv[i]}" == "--" ]]; then
-                        # Разделитель "--" не съедаем: значение отсутствует (пустое);
-                        # откатываем i назад, чтобы "--" обработала ветка разделителя
-                        # Do not eat the "--" separator: the value is missing (empty);
-                        # rewind i so the "--" branch handles the separator
-                        ARGS_FLAGS["${flag_name}"]=""
-                        # Присваивание, а не ((--i)): декремент 1→0 дал бы
-                        # статус 1 и убил бы set -e вызывающего / assignment,
-                        # not ((--i)): decrement 1→0 returns status 1 and would
-                        # kill a set -e caller
-                        i=$(( i - 1 ))
-                    else
-                        ARGS_FLAGS["${flag_name}"]="${argv[i]}"
-                    fi
-                fi
-                # Валидация значения / Value validation
-                if ! args::__validate_flag_value "${flag_name}" "${ARGS_FLAGS["${flag_name}"]}"; then
-                    log::error "flag \"--${flag_name}\" has an invalid value: \"${ARGS_FLAGS["${flag_name}"]}\" (expected $(args::__flag_value_hint "${flag_name}"))"
-                    args::help >&2
-                    return "${E_INVALID:-2}"
-                fi
-            else
-                # bool-флаг не принимает значение / bool flag takes no value
-                if [[ "${has_inline}" == "true" ]]; then
-                    log::error "flag \"--${flag_name}\" does not take a value"
-                    args::help >&2
-                    return "${E_INVALID:-2}"
-                fi
-                ARGS_FLAGS["${flag_name}"]=1
-            fi
-
-            ((++i))
-            continue
-        fi
-
-        # Позиционный параметр / Positional parameter
-        ((++position))
-
-        # Параметров больше, чем уровней в дереве
-        # More parameters than tree levels
-        if [[ "${position}" -gt "${max_level}" ]]; then
-            # Повторяемый уровень / Variadic level
-            if (( __ARGS_VARIADIC_LEVEL > 0 )) && args::__is_allowed_at "${__ARGS_VARIADIC_LEVEL}" "${param}"; then
-                ARGS_PARAMS+=("${param}")
-                ((++i))
-                continue
-            fi
-            log::error "too many parameters: \"${param}\" is beyond level ${max_level}"
-            args::help >&2
-            return "${E_INVALID:-2}"
-        fi
-
-        # Параметр допустим на этом уровне / Parameter allowed at this level
-        if args::__is_allowed_at "${position}" "${param}"; then
-            ARGS_PARAMS+=("${param}")
-            ((++i))
-            continue
-        fi
-
-        # Параметр есть в дереве, но на другом уровне
-        # Parameter exists in the tree but at another level
-        local real_level
-        real_level="$(args::__level_of "${param}")"
-        if is::not_empty "${real_level}"; then
-            log::error "parameter \"${param}\" belongs to level ${real_level}, but was used at level ${position}"
-        else
-            log::error "unknown parameter: \"${param}\""
-        fi
-        args::help >&2
-        return "${E_INVALID:-2}"
-    done
-
-    # Минимальное количество позиционных параметров / Minimum positional count
-    if (( __ARGS_REQUIRED > 0 )) && (( position < __ARGS_REQUIRED )); then
-        log::error "at least ${__ARGS_REQUIRED} parameter(s) are required, got ${position}"
-        args::help >&2
-        return "${E_INVALID:-2}"
-    fi
-
+  done
+  if [ "$__bs_args_ps_help" -eq 1 ]; then
+    ARGS_HELP_REQUESTED=1
+    bs_args_help
     return "${E_SUCCESS:-0}"
+  fi
+
+  if [ "$(bs_map_count bs_args_tree)" -eq 0 ] && [ "$(bs_map_count bs_args_flags)" -eq 0 ]; then
+    bs_log_error "args::parse: parameter tree is empty, call args::define, args::level or args::flag first"
+    return "${E_ERROR:-1}"
+  fi
+
+  __bs_args_ps_max=$(bs_args_max_level)
+  __bs_args_ps_pos=0
+
+  while [ $# -gt 0 ]; do
+    __bs_args_ps_param=$1
+    shift
+
+    # Разделитель "--": всё после — сырые аргументы (bs_args_rest)
+    # The "--" separator: everything after — raw arguments (bs_args_rest)
+    if [ "$__bs_args_ps_param" = "--" ]; then
+      if [ $# -gt 0 ]; then bs_arr_push bs_args_rest "$@"; fi
+      break
+    fi
+
+    # Флаги: --name, --name value, --name=value
+    # Flags: --name, --name value, --name=value
+    case "$__bs_args_ps_param" in
+      --*)
+        __bs_args_ps_spec=${__bs_args_ps_param#--}
+        __bs_args_ps_name=${__bs_args_ps_spec%%=*}
+        __bs_args_ps_inline=""
+        __bs_args_ps_has_inline=0
+        case "$__bs_args_ps_spec" in
+          *=*)
+            __bs_args_ps_inline=${__bs_args_ps_spec#*=}
+            __bs_args_ps_has_inline=1
+            ;;
+        esac
+
+        # Неизвестный флаг / Unknown flag
+        bs_args_mget bs_args_flags "$__bs_args_ps_name" __bs_args_ps_kind
+        if [ -z "$__bs_args_ps_kind" ]; then
+          bs_log_error "unknown flag: \"--${__bs_args_ps_name}\""
+          bs_args_help >&2
+          return "${E_INVALID:-2}"
+        fi
+
+        if [ "$__bs_args_ps_kind" = "value" ]; then
+          # Флаг со значением: --name=value или --name value
+          # Value flag: --name=value or --name value
+          if [ "$__bs_args_ps_has_inline" -eq 1 ]; then
+            bs_map_set bs_args_parsed "$__bs_args_ps_name" "$__bs_args_ps_inline"
+          else
+            if [ $# -eq 0 ]; then
+              bs_log_error "flag \"--${__bs_args_ps_name}\" requires a value"
+              bs_args_help >&2
+              return "${E_INVALID:-2}"
+            fi
+            if [ "$1" = "--" ]; then
+              # Разделитель "--" не съедаем: значение отсутствует (пустое);
+              # "--" обработает ветка разделителя на следующем шаге
+              # Do not eat the "--" separator: the value is missing (empty);
+              # the separator branch handles "--" on the next step
+              bs_map_set bs_args_parsed "$__bs_args_ps_name" ""
+            else
+              bs_map_set bs_args_parsed "$__bs_args_ps_name" "$1"
+              shift
+            fi
+          fi
+          # Валидация значения / Value validation
+          bs_args_mget bs_args_parsed "$__bs_args_ps_name" __bs_args_ps_val
+          if ! bs_args_validate_flag_value "$__bs_args_ps_name" "$__bs_args_ps_val"; then
+            bs_log_error "flag \"--${__bs_args_ps_name}\" has an invalid value: \"${__bs_args_ps_val}\" (expected $(bs_args_flag_value_hint "$__bs_args_ps_name"))"
+            bs_args_help >&2
+            return "${E_INVALID:-2}"
+          fi
+        else
+          # bool-флаг не принимает значение / bool flag takes no value
+          if [ "$__bs_args_ps_has_inline" -eq 1 ]; then
+            bs_log_error "flag \"--${__bs_args_ps_name}\" does not take a value"
+            bs_args_help >&2
+            return "${E_INVALID:-2}"
+          fi
+          bs_map_set bs_args_parsed "$__bs_args_ps_name" 1
+        fi
+        continue
+        ;;
+    esac
+
+    # Позиционный параметр / Positional parameter
+    __bs_args_ps_pos=$((__bs_args_ps_pos + 1))
+
+    # Параметров больше, чем уровней в дереве
+    # More parameters than tree levels
+    if [ "$__bs_args_ps_pos" -gt "$__bs_args_ps_max" ]; then
+      # Повторяемый уровень / Variadic level
+      if [ "$__bs_args_variadic" -gt 0 ] && bs_args_is_allowed_at "$__bs_args_variadic" "$__bs_args_ps_param"; then
+        bs_arr_push bs_args_params "$__bs_args_ps_param"
+        continue
+      fi
+      bs_log_error "too many parameters: \"${__bs_args_ps_param}\" is beyond level ${__bs_args_ps_max}"
+      bs_args_help >&2
+      return "${E_INVALID:-2}"
+    fi
+
+    # Параметр допустим на этом уровне / Parameter allowed at this level
+    if bs_args_is_allowed_at "$__bs_args_ps_pos" "$__bs_args_ps_param"; then
+      bs_arr_push bs_args_params "$__bs_args_ps_param"
+      continue
+    fi
+
+    # Параметр есть в дереве, но на другом уровне
+    # Parameter exists in the tree but at another level
+    __bs_args_ps_real=$(bs_args_level_of "$__bs_args_ps_param")
+    if [ -n "$__bs_args_ps_real" ]; then
+      bs_log_error "parameter \"${__bs_args_ps_param}\" belongs to level ${__bs_args_ps_real}, but was used at level ${__bs_args_ps_pos}"
+    else
+      bs_log_error "unknown parameter: \"${__bs_args_ps_param}\""
+    fi
+    bs_args_help >&2
+    return "${E_INVALID:-2}"
+  done
+
+  # Минимальное количество позиционных параметров / Minimum positional count
+  if [ "$__bs_args_required" -gt 0 ] && [ "$__bs_args_ps_pos" -lt "$__bs_args_required" ]; then
+    bs_log_error "at least ${__bs_args_required} parameter(s) are required, got ${__bs_args_ps_pos}"
+    bs_args_help >&2
+    return "${E_INVALID:-2}"
+  fi
+
+  return "${E_SUCCESS:-0}"
 }
 
-# @description Require valid args — parse, or exit with cleanup. The one-liner.
-# @description Требовать валидные аргументы: разбор или выход с очисткой.
+# @description Разбор + выход: ошибка → bs_exit invalid, help → bs_exit success
+# @description Parse + exit: an error → bs_exit invalid, help → bs_exit success
 #   Одна строка вместо идиомы:
 #     args::parse "$@" || bs::exit invalid
 #     [[ "${ARGS_HELP_REQUESTED}" == "1" ]] && bs::exit success
-# @param $@ Script parameters (usually "$@") / Параметры скрипта (обычно "$@")
+#   One line instead of the idiom above.
+# @param $@ arguments / аргументы
 # @example
 #   args::require "$@"
-args::require() {
-    args::parse "$@" || bs::exit invalid
-    if [[ "${ARGS_HELP_REQUESTED:-0}" == "1" ]]; then
-        bs::exit success
-    fi
-    return "${E_SUCCESS:-0}"
+bs_args_require() {
+  bs_args_parse "$@" || bs_exit invalid
+  if [ "${ARGS_HELP_REQUESTED:-0}" = "1" ]; then
+    bs_exit success
+  fi
+  return "${E_SUCCESS:-0}"
 }
 
-# @description Получить провалидированный параметр по позиции (1-based)
+# @description Позиционный параметр по номеру (с 1); 1, если он пуст и дефолт не задан
+# @description A positional parameter by number (from 1); 1 if it is empty and no default is given
 #   С дефолтом (третий аргумент): возвращает его вместо ошибки.
-# @description Get a validated parameter by position (1-based)
-#   With a default (third argument): returns it instead of failing.
-# @param $1 Position / Позиция
-# @param $2 [optional] Default value / [опционально] Значение по умолчанию
-# @return Prints the value; 1 if position not set and no default given
-#   Выводит значение; 1 если позиция пуста и дефолт не задан
+#   With a default (second argument): returns it instead of failing.
+# @param $1 position  $2 [optional] default
+# @stdout the value / значение
 # @example
 #   stage="$(args::get 1)"
 #   env="$(args::get 2 staging)"
-args::get() {
-    local -r position="${1:-}"
+bs_args_get() {
+  __bs_args_gt_pos=${1:-}
 
-    if is::empty "${position}" || ! [[ "${position}" =~ ^[0-9]+$ ]] || [[ "${position}" -eq 0 ]]; then
-        log::warn "args::get: position must be a positive integer, got: ${position}"
-        return "${E_ERROR:-1}"
-    fi
+  if [ -z "$__bs_args_gt_pos" ] || ! bs_is_number "$__bs_args_gt_pos" || [ "$__bs_args_gt_pos" -eq 0 ]; then
+    bs_log_warn "args::get: position must be a positive integer, got: ${__bs_args_gt_pos}"
+    return "${E_ERROR:-1}"
+  fi
 
-    local value="${ARGS_PARAMS[$((position - 1))]:-}"
-    if is::empty "${value}"; then
-        if (( $# >= 2 )); then
-            printf '%s\n' "${2}"
-            return "${E_SUCCESS:-0}"
-        fi
-        return "${E_ERROR:-1}"
+  __bs_args_gt_v=$(bs_arr_get bs_args_params $((__bs_args_gt_pos - 1))) || __bs_args_gt_v=""
+  if [ -z "$__bs_args_gt_v" ]; then
+    if [ $# -ge 2 ]; then
+      printf '%s\n' "$2"
+      return "${E_SUCCESS:-0}"
     fi
-    printf '%s\n' "${value}"
+    return "${E_ERROR:-1}"
+  fi
+  printf '%s\n' "$__bs_args_gt_v"
 }
 
 # ==========================================
-# Bash completion / Автодополнение Bash
+# Автодополнение / Completion
 # ==========================================
 
-# @description Сгенерировать bash-completion функцию из дерева параметров и флагов
+# @private
+# @description Список флагов для генераторов: имя<TAB>вид<TAB>значения, по строке на флаг
+# @description Flags for the generators: name<TAB>kind<TAB>values, one flag per line
+bs_args_completion_flags() {
+  if [ "$(bs_map_count bs_args_flags)" -eq 0 ]; then return 0; fi
+  bs_map_keys bs_args_flags | sort | while IFS= read -r __bs_args_cf_n; do
+    bs_args_mget bs_args_flags "$__bs_args_cf_n" __bs_args_cf_kind
+    bs_args_mget bs_args_flag_val "$__bs_args_cf_n" __bs_args_cf_v
+    if [ "$__bs_args_cf_kind" = "value" ]; then
+      case "$__bs_args_cf_v" in
+        enum:*) printf '%s\tenum\t%s\n' "$__bs_args_cf_n" "${__bs_args_cf_v#enum:}" ;;
+        *)      printf '%s\tvalue\t\n' "$__bs_args_cf_n" ;;
+      esac
+    else
+      printf '%s\tbool\t\n' "$__bs_args_cf_n"
+    fi
+  done
+}
+
+# @description Сгенерировать скрипт автодополнения для bash (по умолчанию), zsh, fish или nu
+# @description Generate a completion script for bash (default), zsh, fish or nu
 #   Вывод можно сохранить в файл и подключить через source или ~/.bashrc
-# @description Generate a bash completion function from the parameter tree and flags
 #   The output can be saved to a file and loaded via source or ~/.bashrc
-# @param $1 [optional] Program name (default: the calling script's basename) / [опционально] Имя программы
-# @param $2 [optional] Target shell: bash (default), zsh, fish, nu; also BS_COMPLETION_SHELL
-#   / [опционально] Оболочка: bash (по умолчанию), zsh, fish, nu; также BS_COMPLETION_SHELL
+# @param $1 program name / имя программы
+# @param $2 [optional] shell: bash (default), zsh, fish, nu; also BS_COMPLETION_SHELL
 # @example
 #   args::completion "deploy.sh" > /etc/bash_completion.d/deploy.sh
-#   source <(args::completion "deploy.sh")
 #   args::completion "deploy.sh" zsh > ~/.zfunc/_deploy.sh
-# shell-gate: в теле — текст bash-completion (compgen, complete -F); генераторы zsh, fish, nu ниже
-# shell-gate: the body holds the bash-completion text (compgen, complete -F); the zsh, fish, nu generators are below
-args::completion() {
-    local prog="${1:-$(basename -- "$(bs::stack_file 1)")}"
-    local target
-    target="$(bs_shell_of_name "${2:-${BS_COMPLETION_SHELL:-bash}}")"
+# shell-gate: в теле — текст bash-completion (compgen, complete -F), который функция печатает, а не выполняет
+# shell-gate: the body holds bash-completion text (compgen, complete -F) that the function prints, not runs
+bs_args_completion() {
+  __bs_args_cp_prog=${1:-${0##*/}}
+  __bs_args_cp_target=$(bs_shell_of_name "${2:-${BS_COMPLETION_SHELL:-bash}}")
 
-    if [[ ${#__ARGS_TREE[@]} -eq 0 ]] && [[ ${#__ARGS_FLAGS[@]} -eq 0 ]]; then
-        log::warn "args::completion: nothing declared, call args::define, args::level or args::flag first"
-        return "${E_ERROR:-1}"
-    fi
+  if [ "$(bs_map_count bs_args_tree)" -eq 0 ] && [ "$(bs_map_count bs_args_flags)" -eq 0 ]; then
+    bs_log_warn "args::completion: nothing declared, call args::define, args::level or args::flag first"
+    return "${E_ERROR:-1}"
+  fi
 
-    case "${target}" in
-        zsh)  args::__completion_zsh "${prog}"; return $? ;;
-        fish) args::__completion_fish "${prog}"; return $? ;;
-        nu)   args::__completion_nu "${prog}"; return $? ;;
-        bash) ;;
-        *)
-            log::error "args::completion: no generator for '${2:-${BS_COMPLETION_SHELL:-}}' (supported: bash zsh fish nu)"
-            return "${E_ERROR:-1}"
-            ;;
-    esac
+  case "$__bs_args_cp_target" in
+    zsh)  bs_args_completion_zsh "$__bs_args_cp_prog"; return $? ;;
+    fish) bs_args_completion_fish "$__bs_args_cp_prog"; return $? ;;
+    nu)   bs_args_completion_nu "$__bs_args_cp_prog"; return $? ;;
+    bash) ;;
+    *)
+      bs_log_error "args::completion: no generator for '${2:-${BS_COMPLETION_SHELL:-}}' (supported: bash zsh fish nu)"
+      return "${E_ERROR:-1}"
+      ;;
+  esac
 
-    # Имя функции: только [a-zA-Z0-9_] / Function name: [a-zA-Z0-9_] only
-    local func_name
-    func_name="_$(printf '%s' "${prog}" | tr -c 'a-zA-Z0-9_' '_')_completion"
+  # Имя функции: только [a-zA-Z0-9_] / Function name: [a-zA-Z0-9_] only
+  __bs_args_cp_fn="_$(printf '%s' "$__bs_args_cp_prog" | tr -c 'a-zA-Z0-9_' '_')_completion"
 
-    # Список всех флагов для дополнения / All flags for completion
-    # Итерация через read: $() word splitting зависит от IFS вызывающего
-    # Iterating via read: $() word splitting depends on the caller's IFS
-    # При пустом множестве флагов printf '%s\n' "${!arr[@]}" выдал бы пустую
-    # строку (ключ ""), read получил бы flag_name="" и индекс "" сломал бы
-    # ассоциативный массив — циклы пропускаются целиком
-    # With an empty flag set, printf '%s\n' "${!arr[@]}" emits an empty line
-    # (key ""), read would set flag_name="" and the "" subscript would break
-    # the associative array — the loops are skipped entirely
-    local flag_words="--help"
-    local value_flags=""
-    if [[ ${#__ARGS_FLAGS[@]} -gt 0 ]]; then
-        local flag_name
-        while IFS= read -r flag_name; do
-            flag_words+=" --${flag_name}"
-        done < <(printf '%s\n' "${!__ARGS_FLAGS[@]}" | sort)
-
-        # Список value-флагов (после них значение не дополняется);
-        # enum-флаги исключаются — для них дополняются значения
-        # Value flags list (their values are not completed);
-        # enum flags are excluded — their values ARE completed
-        while IFS= read -r flag_name; do
-            if [[ "${__ARGS_FLAGS["${flag_name}"]:-}" == "value" ]] && \
-               [[ "${__ARGS_FLAG_VALIDATORS["${flag_name}"]:-}" != enum:* ]]; then
-                value_flags+=" --${flag_name}"
-            fi
-        done < <(printf '%s\n' "${!__ARGS_FLAGS[@]}" | sort)
-    fi
-
-    # Уровни дерева / Tree levels
-    local max_level=0
-    local level
-    for level in "${!__ARGS_TREE[@]}"; do
-        [[ "${level}" -gt "${max_level}" ]] && max_level="${level}"
+  # Список всех флагов для дополнения / All flags for completion
+  __bs_args_cp_words="--help"
+  __bs_args_cp_vflags=""
+  if [ "$(bs_map_count bs_args_flags)" -gt 0 ]; then
+    # Список value-флагов (после них значение не дополняется);
+    # enum-флаги исключаются — для них дополняются значения
+    # Value flags list (their values are not completed);
+    # enum flags are excluded — their values ARE completed
+    __bs_args_cp_sorted=$(bs_map_keys bs_args_flags | sort)
+    bs_arr_from_lines bs_args_cp_names "$__bs_args_cp_sorted"
+    eval "$(bs_arr_to_args bs_args_cp_names)"
+    for __bs_args_cp_n in "$@"; do
+      __bs_args_cp_words="${__bs_args_cp_words} --${__bs_args_cp_n}"
+      bs_args_mget bs_args_flags "$__bs_args_cp_n" __bs_args_cp_kind
+      bs_args_mget bs_args_flag_val "$__bs_args_cp_n" __bs_args_cp_v
+      if [ "$__bs_args_cp_kind" = "value" ]; then
+        case "$__bs_args_cp_v" in
+          enum:*) ;;
+          *) __bs_args_cp_vflags="${__bs_args_cp_vflags} --${__bs_args_cp_n}" ;;
+        esac
+      fi
     done
+  fi
 
-    cat <<EOF
-# Bash completion for ${prog} — generated by core/args.sh (args::completion)
-# Автодополнение Bash для ${prog} — сгенерировано core/args.sh (args::completion)
-${func_name}() {
+  __bs_args_cp_max=$(bs_args_max_level)
+
+  cat <<EOF
+# Bash completion for ${__bs_args_cp_prog} — generated by core/args.sh (args::completion)
+# Автодополнение Bash для ${__bs_args_cp_prog} — сгенерировано core/args.sh (args::completion)
+${__bs_args_cp_fn}() {
     local cur prev word positional i
     COMPREPLY=()
     cur="\${COMP_WORDS[COMP_CWORD]}"
     prev="\${COMP_WORDS[COMP_CWORD-1]}"
 EOF
 
-    # После value-флага значение не дополняем / Do not complete after a value flag
-    if is::not_empty "${value_flags}"; then
-        local IFS=' '
-        local vf_patterns=""
-        local vf
-        local -a vfs=()
-        read -ra vfs <<< "${value_flags}"
-        for vf in "${vfs[@]}"; do
-            if is::not_empty "${vf_patterns}"; then
-                vf_patterns+="|${vf}"
-            else
-                vf_patterns="${vf}"
-            fi
-        done
-        cat <<EOF
+  # После value-флага значение не дополняем / Do not complete after a value flag
+  __bs_args_cp_pat=""
+  if [ -n "$__bs_args_cp_vflags" ]; then
+    bs_utils_split bs_args_wa "$__bs_args_cp_vflags" ' '
+    __bs_args_cp_pat=$(bs_arr_join bs_args_wa '|')
+    cat <<EOF
 
     # value-флаги: значение не дополняется / value flags: value is not completed
     case "\${prev}" in
-        ${vf_patterns}) return 0 ;;
+        ${__bs_args_cp_pat}) return 0 ;;
     esac
 EOF
-    fi
+  fi
 
-    # enum-значения для value-флагов / enum values for value flags
-    local enum_flag_name enum_values
-    if [[ ${#__ARGS_FLAGS[@]} -gt 0 ]]; then
-        while IFS= read -r enum_flag_name; do
-            if [[ "${__ARGS_FLAGS["${enum_flag_name}"]:-}" == "value" ]] && \
-               [[ "${__ARGS_FLAG_VALIDATORS["${enum_flag_name}"]:-}" == enum:* ]]; then
-                enum_values="${__ARGS_FLAG_VALIDATORS["${enum_flag_name}"]#enum:}"
-                enum_values="${enum_values//,/ }"
-                cat <<EOF
+  # enum-значения для value-флагов / enum values for value flags
+  if [ "$(bs_map_count bs_args_flags)" -gt 0 ]; then
+    eval "$(bs_arr_to_args bs_args_cp_names)"
+    for __bs_args_cp_n in "$@"; do
+      bs_args_mget bs_args_flags "$__bs_args_cp_n" __bs_args_cp_kind
+      bs_args_mget bs_args_flag_val "$__bs_args_cp_n" __bs_args_cp_v
+      if [ "$__bs_args_cp_kind" = "value" ]; then
+        case "$__bs_args_cp_v" in
+          enum:*)
+            __bs_args_cp_enum=$(printf '%s' "${__bs_args_cp_v#enum:}" | tr ',' ' ')
+            __bs_args_cp_enum_bar=$(printf '%s' "$__bs_args_cp_enum" | tr ' ' '|')
+            cat <<EOF
 
-    # enum-значения: --${enum_flag_name} <${enum_values// /|}>
+    # enum-значения: --${__bs_args_cp_n} <${__bs_args_cp_enum_bar}>
     case "\${prev}" in
-        --${enum_flag_name}) COMPREPLY=( \$(compgen -W "${enum_values}" -- "\${cur}") ); return 0 ;;
+        --${__bs_args_cp_n}) COMPREPLY=( \$(compgen -W "${__bs_args_cp_enum}" -- "\${cur}") ); return 0 ;;
     esac
 EOF
-            fi
-        done < <(printf '%s\n' "${!__ARGS_FLAGS[@]}" | sort)
-    fi
+            ;;
+        esac
+      fi
+    done
+  fi
 
-    cat <<EOF
+  cat <<EOF
 
     # Дополнение флагов / Flag completion
     if [[ "\${cur}" == --* ]]; then
-        COMPREPLY=( \$(compgen -W "${flag_words}" -- "\${cur}") )
+        COMPREPLY=( \$(compgen -W "${__bs_args_cp_words}" -- "\${cur}") )
         return 0
     fi
 
@@ -969,13 +853,13 @@ EOF
         case "\${word}" in
 EOF
 
-    if is::not_empty "${value_flags}"; then
-        cat <<EOF
-            ${vf_patterns}) ((++i)) ;;   # пропускаем значение value-флага / skip value flag value
-EOF
-    fi
-
+  if [ -n "$__bs_args_cp_vflags" ]; then
     cat <<EOF
+            ${__bs_args_cp_pat}) ((++i)) ;;   # пропускаем значение value-флага / skip value flag value
+EOF
+  fi
+
+  cat <<EOF
             --*) ;;                      # bool-флаг / bool flag
             *) ((++positional)) ;;
         esac
@@ -986,20 +870,22 @@ EOF
     case \$((positional + 1)) in
 EOF
 
-    local item
-    for ((level = 1; level <= max_level; level++)); do
-        if is::not_empty "${__ARGS_TREE["${level}"]:-}"; then
-            printf '        %d) choices="%s" ;;\n' "${level}" "${__ARGS_TREE[${level}]}"
-        fi
-    done
+  __bs_args_cp_level=1
+  while [ "$__bs_args_cp_level" -le "$__bs_args_cp_max" ]; do
+    bs_args_mget bs_args_tree "$__bs_args_cp_level" __bs_args_cp_list
+    if [ -n "$__bs_args_cp_list" ]; then
+      printf '        %d) choices="%s" ;;\n' "$__bs_args_cp_level" "$__bs_args_cp_list"
+    fi
+    __bs_args_cp_level=$((__bs_args_cp_level + 1))
+  done
 
-    cat <<EOF
+  cat <<EOF
     esac
 
-    COMPREPLY=( \$(compgen -W "\${choices} ${flag_words}" -- "\${cur}") )
+    COMPREPLY=( \$(compgen -W "\${choices} ${__bs_args_cp_words}" -- "\${cur}") )
     return 0
 }
-complete -F ${func_name} "${prog}"
+complete -F ${__bs_args_cp_fn} "${__bs_args_cp_prog}"
 EOF
 }
 
@@ -1009,139 +895,150 @@ EOF
 # Not verified on real fish and nu: only the text is tested.
 # ==========================================
 
-# @private Single-quote a string for a POSIX-like shell / Экранировать строку в одинарных кавычках
-args::__sq() {
-    local -r v="${1-}"
-    printf "'%s'" "${v//\'/\'\\\'\'}"
+# @private
+bs_args_completion_zsh() {
+  __bs_args_zs_prog=$1
+  __bs_args_zs_fn="_$(printf '%s' "$__bs_args_zs_prog" | tr -c 'a-zA-Z0-9_' '_')_completion"
+  bs_arr_clear bs_args_specs
+  bs_arr_push bs_args_specs "'--help[show help]'"
+  __bs_args_zs_flags=$(bs_args_completion_flags)
+  while IFS="$(printf '\t')" read -r __bs_args_zs_name __bs_args_zs_kind __bs_args_zs_values; do
+    [ -n "$__bs_args_zs_name" ] || continue
+    case "$__bs_args_zs_kind" in
+      enum)
+        __bs_args_zs_vals=$(printf '%s' "$__bs_args_zs_values" | tr ',' ' ')
+        bs_arr_push bs_args_specs "$(bs_quote "--${__bs_args_zs_name}=:value:(${__bs_args_zs_vals})")" ;;
+      value) bs_arr_push bs_args_specs "$(bs_quote "--${__bs_args_zs_name}=:value: ")" ;;
+      *)     bs_arr_push bs_args_specs "$(bs_quote "--${__bs_args_zs_name}")" ;;
+    esac
+  done <<EOF
+${__bs_args_zs_flags}
+EOF
+  __bs_args_zs_max=$(bs_args_max_level)
+  __bs_args_zs_level=1
+  while [ "$__bs_args_zs_level" -le "$__bs_args_zs_max" ]; do
+    bs_args_mget bs_args_tree "$__bs_args_zs_level" __bs_args_zs_list
+    if [ -n "$__bs_args_zs_list" ]; then
+      bs_arr_push bs_args_specs "$(bs_quote "${__bs_args_zs_level}:argument ${__bs_args_zs_level}:(${__bs_args_zs_list})")"
+    fi
+    __bs_args_zs_level=$((__bs_args_zs_level + 1))
+  done
+  printf '#compdef %s\n' "$__bs_args_zs_prog"
+  printf '# zsh completion for %s — generated by core/args.sh (args::completion)\n' "$__bs_args_zs_prog"
+  printf '# Автодополнение zsh для %s — сгенерировано core/args.sh (args::completion)\n' "$__bs_args_zs_prog"
+  printf '%s() {\n  _arguments -S \\\n' "$__bs_args_zs_fn"
+  __bs_args_zs_n=$(bs_arr_len bs_args_specs)
+  __bs_args_zs_i=0
+  while [ "$__bs_args_zs_i" -lt "$__bs_args_zs_n" ]; do
+    __bs_args_zs_spec=$(bs_arr_get bs_args_specs "$__bs_args_zs_i")
+    if [ "$__bs_args_zs_i" -lt $((__bs_args_zs_n - 1)) ]; then
+      printf '    %s \\\n' "$__bs_args_zs_spec"
+    else
+      printf '    %s\n' "$__bs_args_zs_spec"
+    fi
+    __bs_args_zs_i=$((__bs_args_zs_i + 1))
+  done
+  printf '}\n'
+  printf 'compdef %s %s\n' "$__bs_args_zs_fn" "$__bs_args_zs_prog"
 }
 
-# @private Flag model: one line "name<TAB>kind<TAB>values", kind is bool|value|enum
-# @private Модель флагов: строка "имя<TAB>вид<TAB>значения", вид — bool|value|enum
-args::__completion_flags() {
-    [[ ${#__ARGS_FLAGS[@]} -gt 0 ]] || return 0
-    local n kind v
-    while IFS= read -r n; do
-        kind="${__ARGS_FLAGS["${n}"]:-}"
-        v="${__ARGS_FLAG_VALIDATORS["${n}"]:-}"
-        if [[ "${kind}" == "value" && "${v}" == enum:* ]]; then
-            printf '%s\tenum\t%s\n' "${n}" "${v#enum:}"
-        elif [[ "${kind}" == "value" ]]; then
-            printf '%s\tvalue\t\n' "${n}"
-        else
-            printf '%s\tbool\t\n' "${n}"
-        fi
-    done < <(printf '%s\n' "${!__ARGS_FLAGS[@]}" | sort)
+# @private
+bs_args_completion_fish() {
+  __bs_args_fi_prog=$1
+  __bs_args_fi_q=$(bs_quote "$__bs_args_fi_prog")
+  printf '# fish completion for %s — generated by core/args.sh (args::completion)\n' "$__bs_args_fi_prog"
+  printf '# Автодополнение fish для %s — сгенерировано core/args.sh (args::completion)\n' "$__bs_args_fi_prog"
+  printf 'complete -c %s -f\n' "$__bs_args_fi_q"
+  printf 'complete -c %s -l help -d %s\n' "$__bs_args_fi_q" "$(bs_quote "show help")"
+  __bs_args_fi_flags=$(bs_args_completion_flags)
+  while IFS="$(printf '\t')" read -r __bs_args_fi_name __bs_args_fi_kind __bs_args_fi_values; do
+    [ -n "$__bs_args_fi_name" ] || continue
+    case "$__bs_args_fi_kind" in
+      enum)  printf 'complete -c %s -l %s -x -a %s\n' "$__bs_args_fi_q" "$__bs_args_fi_name" "$(bs_quote "$(printf '%s' "$__bs_args_fi_values" | tr ',' ' ')")" ;;
+      value) printf 'complete -c %s -l %s -r\n' "$__bs_args_fi_q" "$__bs_args_fi_name" ;;
+      *)     printf 'complete -c %s -l %s\n' "$__bs_args_fi_q" "$__bs_args_fi_name" ;;
+    esac
+  done <<EOF
+${__bs_args_fi_flags}
+EOF
+  __bs_args_fi_max=$(bs_args_max_level)
+  __bs_args_fi_level=1
+  while [ "$__bs_args_fi_level" -le "$__bs_args_fi_max" ]; do
+    bs_args_mget bs_args_tree "$__bs_args_fi_level" __bs_args_fi_list
+    if [ -n "$__bs_args_fi_list" ]; then
+      printf 'complete -c %s -n %s -a %s\n' "$__bs_args_fi_q" \
+        "$(bs_quote "__fish_is_nth_token ${__bs_args_fi_level}")" "$(bs_quote "$__bs_args_fi_list")"
+    fi
+    __bs_args_fi_level=$((__bs_args_fi_level + 1))
+  done
 }
 
-# @private Highest declared positional level / Наибольший объявленный уровень
-args::__completion_levels() {
-    local level max=0
-    for level in "${!__ARGS_TREE[@]}"; do
-        [[ "${level}" -gt "${max}" ]] && max="${level}"
-    done
-    printf '%d\n' "${max}"
-}
-
-# @description zsh completion (_arguments) / автодополнение zsh
-args::__completion_zsh() {
-    local -r prog="${1}"
-    local -r fn="_$(printf '%s' "${prog}" | tr -c 'a-zA-Z0-9_' '_')_completion"
-    local -a specs=("'--help[show help]'")
-    local name kind values level max
-    while IFS=$'\t' read -r name kind values; do
-        [[ -n "${name}" ]] || continue
-        case "${kind}" in
-            enum)  specs+=("$(args::__sq "--${name}=:value:(${values//,/ })")") ;;
-            value) specs+=("$(args::__sq "--${name}=:value: ")") ;;
-            *)     specs+=("$(args::__sq "--${name}")") ;;
-        esac
-    done < <(args::__completion_flags)
-    max="$(args::__completion_levels)"
-    for ((level = 1; level <= max; level++)); do
-        [[ -n "${__ARGS_TREE["${level}"]:-}" ]] || continue
-        specs+=("$(args::__sq "${level}:argument ${level}:(${__ARGS_TREE["${level}"]})")")
-    done
-    printf '#compdef %s\n' "${prog}"
-    printf '# zsh completion for %s — generated by core/args.sh (args::completion)\n' "${prog}"
-    printf '# Автодополнение zsh для %s — сгенерировано core/args.sh (args::completion)\n' "${prog}"
-    printf '%s() {\n  _arguments -S \\\n' "${fn}"
-    local i
-    for ((i = 0; i < ${#specs[@]}; i++)); do
-        if (( i < ${#specs[@]} - 1 )); then
-            printf '    %s \\\n' "${specs[i]}"
-        else
-            printf '    %s\n' "${specs[i]}"
-        fi
-    done
-    printf '}\n'
-    printf 'compdef %s %s\n' "${fn}" "${prog}"
-}
-
-# @description fish completion (complete -c) / автодополнение fish
-args::__completion_fish() {
-    local -r prog="${1}"
-    local name kind values level max
-    printf '# fish completion for %s — generated by core/args.sh (args::completion)\n' "${prog}"
-    printf '# Автодополнение fish для %s — сгенерировано core/args.sh (args::completion)\n' "${prog}"
-    printf 'complete -c %s -f\n' "$(args::__sq "${prog}")"
-    printf 'complete -c %s -l help -d %s\n' "$(args::__sq "${prog}")" "$(args::__sq "show help")"
-    while IFS=$'\t' read -r name kind values; do
-        [[ -n "${name}" ]] || continue
-        case "${kind}" in
-            enum)  printf 'complete -c %s -l %s -x -a %s\n' "$(args::__sq "${prog}")" "${name}" "$(args::__sq "${values//,/ }")" ;;
-            value) printf 'complete -c %s -l %s -r\n' "$(args::__sq "${prog}")" "${name}" ;;
-            *)     printf 'complete -c %s -l %s\n' "$(args::__sq "${prog}")" "${name}" ;;
-        esac
-    done < <(args::__completion_flags)
-    max="$(args::__completion_levels)"
-    for ((level = 1; level <= max; level++)); do
-        [[ -n "${__ARGS_TREE["${level}"]:-}" ]] || continue
-        printf 'complete -c %s -n %s -a %s\n' "$(args::__sq "${prog}")" \
-            "$(args::__sq "__fish_is_nth_token ${level}")" "$(args::__sq "${__ARGS_TREE["${level}"]}")"
-    done
-}
-
-# @description nushell completion (extern + completers) / автодополнение nushell
-args::__completion_nu() {
-    local -r prog="${1}"
-    local name kind values level max item
-    local -a items=()
-    printf '# nushell completion for %s — generated by core/args.sh (args::completion)\n' "${prog}"
-    printf '# Автодополнение nushell для %s — сгенерировано core/args.sh (args::completion)\n' "${prog}"
-    local -a decl=("  --help")
-    while IFS=$'\t' read -r name kind values; do
-        [[ -n "${name}" ]] || continue
-        case "${kind}" in
-            enum)
-                printf 'def "nu-complete %s --%s" [] { [' "${prog}" "${name}"
-                IFS=',' read -ra items <<< "${values}"
-                for item in "${items[@]}"; do printf ' "%s"' "${item}"; done
-                printf ' ] }\n'
-                decl+=("  --${name}: string@\"nu-complete ${prog} --${name}\"") ;;
-            value) decl+=("  --${name}: string") ;;
-            *)     decl+=("  --${name}") ;;
-        esac
-    done < <(args::__completion_flags)
-    max="$(args::__completion_levels)"
-    for ((level = 1; level <= max; level++)); do
-        [[ -n "${__ARGS_TREE["${level}"]:-}" ]] || continue
-        printf 'def "nu-complete %s arg %d" [] { [' "${prog}" "${level}"
-        IFS=' ' read -ra items <<< "${__ARGS_TREE["${level}"]}"
-        for item in "${items[@]}"; do printf ' "%s"' "${item}"; done
+# @private
+bs_args_completion_nu() {
+  __bs_args_nu_prog=$1
+  printf '# nushell completion for %s — generated by core/args.sh (args::completion)\n' "$__bs_args_nu_prog"
+  printf '# Автодополнение nushell для %s — сгенерировано core/args.sh (args::completion)\n' "$__bs_args_nu_prog"
+  bs_arr_clear bs_args_decl
+  bs_arr_push bs_args_decl "  --help"
+  __bs_args_nu_flags=$(bs_args_completion_flags)
+  while IFS="$(printf '\t')" read -r __bs_args_nu_name __bs_args_nu_kind __bs_args_nu_values; do
+    [ -n "$__bs_args_nu_name" ] || continue
+    case "$__bs_args_nu_kind" in
+      enum)
+        printf 'def "nu-complete %s --%s" [] { [' "$__bs_args_nu_prog" "$__bs_args_nu_name"
+        bs_utils_split bs_args_wa "$__bs_args_nu_values" ','
+        eval "$(bs_arr_to_args bs_args_wa)"
+        for __bs_args_nu_item in "$@"; do printf ' "%s"' "$__bs_args_nu_item"; done
         printf ' ] }\n'
-        decl+=("  arg${level}?: string@\"nu-complete ${prog} arg ${level}\"")
-    done
-    printf 'extern "%s" [\n' "${prog}"
-    printf '%s\n' "${decl[@]}"
-    printf ']\n'
+        bs_arr_push bs_args_decl "  --${__bs_args_nu_name}: string@\"nu-complete ${__bs_args_nu_prog} --${__bs_args_nu_name}\"" ;;
+      value) bs_arr_push bs_args_decl "  --${__bs_args_nu_name}: string" ;;
+      *)     bs_arr_push bs_args_decl "  --${__bs_args_nu_name}" ;;
+    esac
+  done <<EOF
+${__bs_args_nu_flags}
+EOF
+  __bs_args_nu_max=$(bs_args_max_level)
+  __bs_args_nu_level=1
+  while [ "$__bs_args_nu_level" -le "$__bs_args_nu_max" ]; do
+    bs_args_mget bs_args_tree "$__bs_args_nu_level" __bs_args_nu_list
+    if [ -n "$__bs_args_nu_list" ]; then
+      printf 'def "nu-complete %s arg %d" [] { [' "$__bs_args_nu_prog" "$__bs_args_nu_level"
+      bs_utils_split bs_args_wa "$__bs_args_nu_list" ' '
+      eval "$(bs_arr_to_args bs_args_wa)"
+      for __bs_args_nu_item in "$@"; do printf ' "%s"' "$__bs_args_nu_item"; done
+      printf ' ] }\n'
+      bs_arr_push bs_args_decl "  arg${__bs_args_nu_level}?: string@\"nu-complete ${__bs_args_nu_prog} arg ${__bs_args_nu_level}\""
+    fi
+    __bs_args_nu_level=$((__bs_args_nu_level + 1))
+  done
+  printf 'extern "%s" [\n' "$__bs_args_nu_prog"
+  eval "$(bs_arr_to_args bs_args_decl)"
+  printf '%s\n' "$@"
+  printf ']\n'
 }
 
 # ==========================================
-# Инициализация модуля / Module initialization
+# Псевдонимы и инициализация / Aliases and initialization
 # ==========================================
 
-# @global ARGS_LOADED — Module loaded flag (category: module-flag)
-# @global ARGS_LOADED — Флаг загрузки модуля (категория: module-flag)
-declare -g ARGS_LOADED="1"
+# args::parse, args::reset и args::require приходят из lib/compat/args.sh (они ещё заполняют
+# массивы bash); остальные имена — простые псевдонимы
+# args::parse, args::reset and args::require come from lib/compat/args.sh (they also fill the
+# bash arrays); the other names are plain aliases
+bs_shell_alias bs_args_define args::define
+bs_shell_alias bs_args_level args::level
+bs_shell_alias bs_args_required args::required
+bs_shell_alias bs_args_describe args::describe
+bs_shell_alias bs_args_flag args::flag
+bs_shell_alias bs_args_flag_describe args::flag_describe
+bs_shell_alias bs_args_flag_get args::flag_get
+bs_shell_alias bs_args_flag_is_set args::flag_is_set
+bs_shell_alias bs_args_has args::has
+bs_shell_alias bs_args_rest args::rest
+bs_shell_alias bs_args_help args::help
+bs_shell_alias bs_args_get args::get
+bs_shell_alias bs_args_completion args::completion
 
-log::debug "Args module initialized, version: ${ARGS_VERSION}" 2>/dev/null || true
+ARGS_LOADED="1"
+
+bs_log_debug "Args module initialized, version: ${ARGS_VERSION}" 2>/dev/null || :

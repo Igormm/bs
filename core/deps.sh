@@ -1,5 +1,7 @@
-#!/usr/bin/env bash
-# @shell bash4 — нужны конструкции bash: double-bracket [[ ]], array, nameref, local/declare flags / needs bash constructs: double-bracket [[ ]], array, nameref, local/declare flags
+#!/bin/sh
+# shellcheck shell=sh
+# @shell posix — валидный POSIX sh: case, подстановки параметров, grep/sed; массивы — из core/data.sh / valid POSIX sh: case, parameter expansion, grep/sed; arrays come from core/data.sh
+# @tier core — builtins, grep and sed; works everywhere
 #
 # core/deps.sh — Dependency checker for BS modules
 # core/deps.sh — проверка зависимостей для модулей BS
@@ -13,16 +15,25 @@
 #   deps::require curl "curl is required for HTTP requests"
 #   deps::list_missing "lib/integration/http"
 #
+# ИМЕНА / NAMES
+#   Real functions: bs_deps_has, bs_deps_require, bs_deps_list_missing, bs_deps_check_module,
+#   bs_deps_missing_tools (the result goes into a data-layer array) and the private
+#   bs_deps_parse_optdeps; in bash and zsh also deps::* (the old names). The old
+#   deps::missing_tools, whose result is a REAL bash array, lives in lib/compat/deps.sh.
+#   Настоящие функции — bs_deps_*; в bash и zsh — ещё и прежние deps::*. Прежняя
+#   deps::missing_tools (результат — НАСТОЯЩИЙ массив bash) — в lib/compat/deps.sh.
+#
 # @depends core/const, core/logger, core/utils
 
-bs::guard "CORE_DEPS" || return 0
+bs_guard "CORE_DEPS" || return 0
 
 # Зависимости / Dependencies
-bs::source_relative "const.sh" "logger.sh" "utils.sh"
+bs_source_relative "const.sh" "logger.sh" "utils.sh"
 
 # @global CORE_DEPS_VERSION — Module version (category: module-flag)
 # @global CORE_DEPS_VERSION — Версия модуля (категория: module-flag)
-declare -g CORE_DEPS_VERSION="1.0.0"
+# shellcheck disable=SC2034  # читают другие модули и тесты / read by other modules and tests
+CORE_DEPS_VERSION="1.0.0"
 
 # ==========================================
 # Private helpers / Приватные вспомогательные функции
@@ -33,193 +44,162 @@ declare -g CORE_DEPS_VERSION="1.0.0"
 # @description Разобрать опциональные зависимости из заголовка модуля.
 # @param $1 Module path relative to BS_ROOT / Путь модуля относительно BS_ROOT
 # @stdout Space-separated list of commands / Список команд через пробел
-__deps::parse_optdeps() {
-  local module_path="${1:-}"
-  local module_file="${BS_ROOT}/${module_path}.sh"
-
-  if is::empty "${module_path}" || ! is::file "${module_file}"; then
+bs_deps_parse_optdeps() {
+  __bs_dp_file="${BS_ROOT}/${1:-}.sh"
+  if [ -z "${1:-}" ] || [ ! -f "$__bs_dp_file" ]; then
     return 0
   fi
-
-  local line
-  line=$(grep -m1 "^[[:space:]]*#.*@optdeps" "${module_file}" 2>/dev/null || true)
-
-  if is::empty "${line}"; then
+  __bs_dp_line=$(grep -m1 "^[[:space:]]*#.*@optdeps" "$__bs_dp_file" 2>/dev/null || true)
+  if [ -z "$__bs_dp_line" ]; then
     return 0
   fi
-
-  echo "${line}" | sed 's/.*@optdeps[[:space:]]*//; s/[[:space:]]*$//; s/,[[:space:]]*/ /g; s/[[:space:]]\+/ /g'
+  printf '%s\n' "$__bs_dp_line" | sed 's/.*@optdeps[[:space:]]*//; s/[[:space:]]*$//; s/,[[:space:]]*/ /g; s/[[:space:]]\{1,\}/ /g'
 }
 
 # ==========================================
 # Public API / Публичный API
 # ==========================================
 
-# @description Check if a command is available with diagnostic logging.
-# @description Проверить наличие команды с диагностическим логом.
+# @description Check whether a command is available.
+# @description Проверить, доступна ли команда.
 # @param $1 Command name / Имя команды
-# @return 0 if available, 1 otherwise / 0 если доступна
+# @return 0 if available, 1 otherwise / 0 если доступна, иначе 1
 # @example
-#   if deps::has jq; then ...
-deps::has() {
-  local cmd="${1:-}"
-
-  if is::empty "${cmd}"; then
-    log::warn "deps::has: command name required"
+#   if deps::has jq; then ...; fi
+bs_deps_has() {
+  if [ -z "${1:-}" ]; then
+    bs_log_warn "deps::has: command name required"
     return 1
   fi
-
-  if utils::has "${cmd}"; then
-    log::debug "Dependency available: ${cmd}"
+  if bs_utils_has "$1"; then
+    bs_log_debug "Dependency available: $1"
     return 0
   fi
-
-  log::debug "Dependency missing: ${cmd}"
+  bs_log_debug "Dependency missing: $1"
   return 1
 }
 
-# @description Require a command to be available; error if missing.
-# @description Требовать наличие команды; ошибка, если её нет.
+# @description Require a command; log an error and return a code if it is missing.
+# @description Потребовать команду; при отсутствии — ошибка в лог и код возврата.
 # @param $1 Command name / Имя команды
-# @param $2 [optional] Error message / Сообщение об ошибке
+# @param $2 Custom error message (optional) / Своё сообщение об ошибке (необязательно)
 # @return 0 if available, INTEGRATION_ERROR_MISSING_DEPS otherwise
 # @example
 #   deps::require curl "HTTP module requires curl"
-deps::require() {
-  local cmd="${1:-}"
-  local message="${2:-}"
-
-  if is::empty "${cmd}"; then
-    log::warn "deps::require: command name required"
+bs_deps_require() {
+  if [ -z "${1:-}" ]; then
+    bs_log_warn "deps::require: command name required"
     return "${E_INVALID}"
   fi
-
-  if deps::has "${cmd}"; then
+  if bs_deps_has "$1"; then
     return 0
   fi
-
-  if is::not_empty "${message}"; then
-    log::error "${message}"
+  if [ -n "${2:-}" ]; then
+    bs_log_error "$2"
   else
-    log::error "Required dependency not found: ${cmd}"
+    bs_log_error "Required dependency not found: $1"
   fi
-
   return "${INTEGRATION_ERROR_MISSING_DEPS}"
 }
 
-# @description List missing optional dependencies for a module.
-# @description Список недостающих опциональных зависимостей модуля.
-# @param $1 Module path / Путь модуля
-# @stdout Space-separated list of missing commands / Список недостающих команд
-# @return 0 if all available, 1 if any missing
-# @example
-#   missing=$(deps::list_missing "lib/integration/http")
-deps::list_missing() {
-  local module_path="${1:-}"
-
-  if is::empty "${module_path}"; then
-    log::warn "deps::list_missing: module path required"
+# @description List the missing optional dependencies of a module (from its @optdeps).
+# @description Перечислить недостающие опциональные зависимости модуля (из его @optdeps).
+# @param $1 Module path relative to BS_ROOT / Путь модуля относительно BS_ROOT
+# @stdout Space-separated missing commands / Недостающие команды через пробел
+# @return 0 if nothing is missing, 1 if something is / 0 если всё есть, 1 если чего-то нет
+bs_deps_list_missing() {
+  if [ -z "${1:-}" ]; then
+    bs_log_warn "deps::list_missing: module path required"
     return "${E_INVALID}"
   fi
-
-  local optdeps
-  optdeps="$(__deps::parse_optdeps "${module_path}")"
-
-  if is::empty "${optdeps}"; then
+  __bs_dp_rest=$(bs_deps_parse_optdeps "$1")
+  if [ -z "$__bs_dp_rest" ]; then
     return 0
   fi
-
-  local -a deps=()
-  utils::split deps "${optdeps}" " "
-
-  local missing=()
-  local cmd
-  for cmd in "${deps[@]}"; do
-    if ! utils::has "${cmd}"; then
-      missing+=("${cmd}")
+  __bs_dp_missing=''
+  # слова — через подстановки параметров: zsh не делит переменную по IFS / words by parameter expansion: zsh does not split a variable by IFS
+  while [ -n "$__bs_dp_rest" ]; do
+    __bs_dp_cmd=${__bs_dp_rest%% *}
+    case "$__bs_dp_rest" in *' '*) __bs_dp_rest=${__bs_dp_rest#* } ;; *) __bs_dp_rest='' ;; esac
+    [ -n "$__bs_dp_cmd" ] || continue
+    if ! bs_utils_has "$__bs_dp_cmd"; then
+      __bs_dp_missing="${__bs_dp_missing:+${__bs_dp_missing} }${__bs_dp_cmd}"
     fi
   done
-
-  if [[ ${#missing[@]} -gt 0 ]]; then
-    local IFS=' '  # склейка пробелом независимо от строгого IFS / space-joined whatever the strict IFS
-    printf '%s\n' "${missing[*]}"
+  if [ -n "$__bs_dp_missing" ]; then
+    printf '%s\n' "$__bs_dp_missing"
     return 1
   fi
-
   return 0
 }
 
-# @description Check if all optional dependencies for a module are available.
-# @description Проверить, что все опциональные зависимости модуля доступны.
-# @param $1 Module path / Путь модуля
-# @return 0 if all available, 1 otherwise
-# @example
-#   deps::check_module "lib/integration/llm"
-deps::check_module() {
-  local module_path="${1:-}"
-
-  if is::empty "${module_path}"; then
-    log::warn "deps::check_module: module path required"
+# @description Check a module's optional dependencies; warn if any are missing.
+# @description Проверить опциональные зависимости модуля; предупредить, если чего-то нет.
+# @param $1 Module path relative to BS_ROOT / Путь модуля относительно BS_ROOT
+# @return 0 if satisfied, 1 if something is missing / 0 если всё есть, 1 если чего-то нет
+bs_deps_check_module() {
+  if [ -z "${1:-}" ]; then
+    bs_log_warn "deps::check_module: module path required"
     return "${E_INVALID}"
   fi
-
-  local missing
-  missing="$(deps::list_missing "${module_path}" 2>/dev/null || true)"
-
-  if is::not_empty "${missing}"; then
-    log::warn "Module ${module_path} is missing optional dependencies: ${missing}"
+  __bs_dp_mod=$1
+  __bs_dp_miss=$(bs_deps_list_missing "$__bs_dp_mod" 2>/dev/null || true)
+  if [ -n "$__bs_dp_miss" ]; then
+    bs_log_warn "Module ${__bs_dp_mod} is missing optional dependencies: ${__bs_dp_miss}"
     return 1
   fi
-
-  log::debug "Module ${module_path} dependencies satisfied"
+  bs_log_debug "Module ${__bs_dp_mod} dependencies satisfied"
   return 0
 }
 
-# @description Collect missing tools into an array (package names).
-# @description Собрать отсутствующие инструменты в массив (имена пакетов).
-#   Linguistic replacement for the repeated `if ! utils::has X; then
-#   missing+=("pkg"); fi` blocks in module check_dependencies functions.
-#   Each spec is "cmd", "cmd:package" or "cmdA|cmdB:package" (alternatives:
-#   any one is enough). Package defaults to the command name; several
-#   packages can be space-separated.
-# @param $1 Name of the output array (filled with missing package names)
+# @description Collect missing tools into a data-layer array (package names).
+# @description Собрать отсутствующие инструменты в массив слоя данных (имена пакетов).
+#   Each spec is "cmd", "cmd:package" or "cmdA|cmdB:package" (alternatives: any one is enough).
+#   The package defaults to the command name; several packages can be space-separated.
+#   For a REAL bash array use deps::missing_tools from lib/compat/deps.sh.
+#   Спецификация — «cmd», «cmd:пакет» или «cmdA|cmdB:пакет» (альтернативы: хватит любой). Пакет
+#   по умолчанию — имя команды; пакетов может быть несколько через пробел. Для НАСТОЯЩЕГО
+#   массива bash — deps::missing_tools из lib/compat/deps.sh.
+# @param $1 Name of the output array (cleared first) / Имя массива-результата (сначала очищается)
 # @param $@ Tool specs / Спецификации инструментов
 # @return Always 0 — the result is in the array / Всегда 0
 # @example
-#   local -a missing=()
-#   deps::missing_tools missing wg:wireguard-tools "netstat|ss:net-tools iproute2"
-deps::missing_tools() {
-  local -n __deps_out="${1:?output array name required}"
+#   bs_deps_missing_tools missing jq xmllint:libxml2-utils "netstat|ss:net-tools iproute2"
+bs_deps_missing_tools() {
+  __bs_dp_out=${1:?output array name required}
   shift
-
-  local spec cmd pkg alt
-  local -a alts=()
-  for spec in "$@"; do
-    cmd="${spec%%:*}"
-    pkg="${spec#*:}"
-
-    local found=1
-    IFS='|' read -r -a alts <<< "${cmd}"
-    for alt in "${alts[@]}"; do
-      if utils::has "${alt}"; then
-        found=0
+  bs_arr_clear "$__bs_dp_out" || return 2
+  for __bs_dp_spec in "$@"; do
+    __bs_dp_cmds=${__bs_dp_spec%%:*}
+    __bs_dp_pkg=${__bs_dp_spec#*:}
+    __bs_dp_found=1
+    # альтернативы cmdA|cmdB / the alternatives cmdA|cmdB
+    __bs_dp_alts=$__bs_dp_cmds
+    while [ -n "$__bs_dp_alts" ]; do
+      # '|' в кавычках: в ksh93 голый | в шаблоне — это альтернатива / '|' is quoted: a bare | in a ksh93 pattern is an alternation
+      __bs_dp_alt=${__bs_dp_alts%%'|'*}
+      case "$__bs_dp_alts" in *'|'*) __bs_dp_alts=${__bs_dp_alts#*'|'} ;; *) __bs_dp_alts='' ;; esac
+      if bs_utils_has "$__bs_dp_alt"; then
+        __bs_dp_found=0
         break
       fi
     done
-
-    if [[ "${found}" -ne 0 ]]; then
-      local p
-      local -a pkgs=()
-      # pkg may hold several space-separated package names; split on spaces
-      # explicitly: under bs strict mode IFS is newline/tab and a bare
-      # `for p in ${pkg}` would keep "net-tools iproute2" as ONE name
-      # pkg может содержать несколько имён через пробел; делим по пробелам явно
-      IFS=' ' read -r -a pkgs <<< "${pkg}"
-      for p in "${pkgs[@]}"; do
-        __deps_out+=("${p}")
+    if [ "$__bs_dp_found" -ne 0 ]; then
+      # пакеты через пробел / space-separated packages
+      __bs_dp_pk=$__bs_dp_pkg
+      while [ -n "$__bs_dp_pk" ]; do
+        __bs_dp_p=${__bs_dp_pk%% *}
+        case "$__bs_dp_pk" in *' '*) __bs_dp_pk=${__bs_dp_pk#* } ;; *) __bs_dp_pk='' ;; esac
+        [ -n "$__bs_dp_p" ] || continue
+        bs_arr_push "$__bs_dp_out" "$__bs_dp_p"
       done
     fi
   done
-
   return 0
 }
+
+bs_shell_alias bs_deps_parse_optdeps __deps::parse_optdeps
+bs_shell_alias bs_deps_has deps::has
+bs_shell_alias bs_deps_require deps::require
+bs_shell_alias bs_deps_list_missing deps::list_missing
+bs_shell_alias bs_deps_check_module deps::check_module

@@ -22,7 +22,7 @@ documentation/   # Гайды, справочники API, примеры
 Ключевые точки входа:
 
 - Shebang-режим: скрипты начинаются с `#!/usr/bin/env bs` (устанавливает `BS_SHEBANG=1`).
-- CLI: `bs help|version|env|list|doctor|run|init-shell`.
+- CLI: `bs help|version|env|list|doctor|run|build|repl|calc|init-shell|shebang|call|update|uninstall|where` (полный список — `bs help`).
 - Инициализация: из `BS_ROOT` подключается `bootstrap/init.sh`, загружается ядро и выставляются флаги.
 
 ## Тестовая стратегия
@@ -62,7 +62,7 @@ documentation/   # Гайды, справочники API, примеры
 
 - **Загрузчик модулей**: зависимости объявляются в комментарии
   `# @depends core/const, core/logger`; загрузчик отслеживает циклы через
-  `BS_LOAD_STACK` и дедуплицирует через `BS_LOADED_MODULES`.
+  своему стеку загрузки и дедуплицирует через реестр (`bs_load_is_loaded`).
 - **Централизованные проверки shell**: версию Bash 4.2+ в точках входа проверяет
   POSIX-пролог (`bs_shell_host_ok`); при подключении `init.sh` из своего скрипта —
   `bootstrap/bs.sh::bs::shell::ensure_version` (доступен до загрузки loader'а;
