@@ -137,6 +137,12 @@ bs_log_get_level_color() {
 bs_log_replace_all() {
   __bs_log_rs=$1
   __bs_log_out=''
+  # Пустая подстрока совпадала бы везде, и цикл не кончался бы.
+  # An empty substring would match everywhere and the loop would never end.
+  if [ -z "$2" ]; then
+    __bs_log_out=$1
+    return 0
+  fi
   while :; do
     case "$__bs_log_rs" in
       *"$2"*)
