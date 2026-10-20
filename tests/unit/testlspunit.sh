@@ -186,9 +186,9 @@ test_lsp_description_search() {
     out="$(
         {
             lsp_test::frame '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
-            lsp_test::frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/q.sh","languageId":"shell","version":1,"text":"?обрезать строку\n# обрезать пробелы по краям\n?slc\n?обрезать пробелы\n"}}}'
-            # ?query в коде: "обрезать строку" / ?query in code
-            lsp_test::frame '{"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/q.sh"},"position":{"line":0,"character":16}}}'
+            lsp_test::frame '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/q.sh","languageId":"shell","version":1,"text":"?слайс строку\n# обрезать пробелы по краям\n?slc\n?обрезать пробелы\n"}}}'
+            # ?query в коде: "слайс строку" (строку ~ строки) / ?query in code, inflected
+            lsp_test::frame '{"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/q.sh"},"position":{"line":0,"character":13}}}'
             # внутри комментария: "обрезать пробелы" / inside a comment
             lsp_test::frame '{"jsonrpc":"2.0","id":3,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/q.sh"},"position":{"line":1,"character":27}}}'
             # fuzzy по имени: подпоследовательность "slc" / name subsequence
@@ -211,7 +211,7 @@ test_lsp_description_search() {
         printf '%s\n' "${resps[$i]}" > "${tmp_dir}/s${i}.json"
     done
 
-    # "?обрезать строку" — ищем по описанию
+    # "?слайс строку" — ищем по описанию, «строку» ~ «строки» / description search with inflection
     testframework::assert_command "jq -e '[.result.items[].label] | any(contains(\"slice\"))' '${tmp_dir}/s1.json'" "lsp ?query finds str::slice by description"
 
     # внутри комментария "обрезать пробелы" — комментарий как запрос

@@ -75,6 +75,7 @@ test_no_dc() {
 
 test_aliases() {
     local sh_name sh_bin
+    utils::has dc || { printf '  skip: dc is not installed / dc не установлен\n'; return 0; }
     for sh_name in bash zsh; do
         sh_bin="$(command -v "${sh_name}" || true)"
         [[ -n "${sh_bin}" ]] || continue
