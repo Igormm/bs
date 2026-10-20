@@ -26,6 +26,8 @@ source "${RUNNER_DIR}/testframework.sh"
 declare -i total_tests=0
 declare -i passed_tests=0
 declare -i failed_tests=0
+# Имена упавших тестов — для сводки / Names of failed tests, for the summary
+declare -a failed_names=()
 declare -i skipped_tests=0
 
 # Разбор аргументов
@@ -99,6 +101,7 @@ run_test() {
   else
     echo -e "${RED}✗ $test_name: FAILED${NC}"
     ((++failed_tests))
+    failed_names+=("${test_name}")
     echo
     # Падение теста не обрывает прогон (set -e): считаем и идём дальше, итог — по failed_tests
     # A failing test does not abort the run (set -e): count it and go on, the verdict comes from failed_tests
@@ -160,6 +163,13 @@ main() {
   echo -e "${RED}Failed / Провалено:${NC} $failed_tests"
   echo -e "${YELLOW}Skipped / Пропущено:${NC} $skipped_tests"
   echo
+  if (( ${#failed_names[@]} > 0 )); then
+    # Длинный лог CI обрезается: список упавших — рядом с итогом
+    # A long CI log gets cut: the list of failures sits next to the verdict
+    echo -e "${RED}Failed tests / Упавшие тесты:${NC}"
+    printf '  ✗ %s\n' "${failed_names[@]}"
+    echo
+  fi
 
   if [[ $failed_tests -eq 0 ]]; then
     echo -e "${GREEN}🎉 All tests passed!${NC}"
