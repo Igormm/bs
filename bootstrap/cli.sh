@@ -6,12 +6,12 @@
 # bootstrap/cli.sh — команды bs, которые работают в любой оболочке (POSIX-часть bs::cli::*)
 # bootstrap/cli.sh — the bs commands that run in any shell (the POSIX part of bs::cli::*)
 #
-# Остальные команды (lang-doc, lsp, chat, api, ts, audit, build, rfc, run, update,
-# repl) пока в bootstrap/bs.sh на bash; в оболочке
+# Остальные команды (lang-doc, lsp, chat, api, ts, audit, build, rfc, run, repl),
+# запускающие код lib/, пока в bootstrap/bs.sh на bash; в оболочке
 # без bash bs_cli_delegate отвечает, что команде нужен bash. Тела функций вызывают ядро и
 # выполняются только после его загрузки.
-# The other commands (lang-doc, lsp, chat, api, ts, audit, build, rfc, run, update,
-# repl) are still in bootstrap/bs.sh in bash; in a
+# The other commands (lang-doc, lsp, chat, api, ts, audit, build, rfc, run, repl),
+# which run lib/ code, are still in bootstrap/bs.sh in bash; in a
 # shell without bash bs_cli_delegate answers that the command needs bash. The function bodies call
 # the kernel and run only after it is loaded.
 #
@@ -20,9 +20,10 @@
 #   bs_cli_short_sha, bs_cli_install_info_get, bs_cli_update_manifest_valid,
 #   bs_cli_bs_full_info_lines, bs_cli_bs_running_block, bs_cli_version_cmd, bs_cli_env_cmd,
 #   bs_cli_list_cmd, bs_cli_init_shell_*, bs_cli_shebang_*, bs_cli_call_*, bs_cli_doctor_cmd,
-#   bs_cli_uninstall_cmd, bs_cli_where_cmd (with bs_cli_where_*), and the helpers that update,
+#   bs_cli_uninstall_cmd, bs_cli_where_cmd (with bs_cli_where_*), bs_cli_update_cmd (with the
+#   bs_cli_update_* steps: fetch, lock, apply, rollback, manifest, …), and the helpers that update,
 #   uninstall and where share (bs_cli_update_box, bs_cli_update_die, bs_cli_update_missing_lines,
-#   bs_cli_bs_running_info, …); in bash and zsh also
+#   bs_cli_bs_running_info, bs_cli_path_hits, …); in bash and zsh also
 #   bs::cli::die, bs::cli::help, … (the old names).
 #   Настоящие функции — bs_cli_*; в bash и zsh — ещё и прежние bs::cli::die, bs::cli::help, …
 
@@ -140,7 +141,7 @@ bs_cli_help_cmd() {
     build)          bs_cli_delegate build bs::cli::build_cmd --help ;;
     repl)           printf 'Usage: bs repl\n\nInteractive REPL (BS shell).\n' ;;
     calc)           printf 'Usage: bs calc [expression]\n\nRPN calculator on dc.\n' ;;
-    update|sync)    bs_cli_delegate update bs::cli::update_cmd --help ;;
+    update|sync)    bs_cli_update_cmd --help ;;
     uninstall)      bs_cli_uninstall_cmd --help ;;
     where)          bs_cli_where_cmd --help ;;
     init-shell)     bs_cli_init_shell_usage ;;
@@ -1294,29 +1295,6 @@ bs_cli_where_add() {
   bs_arr_push bs_cli_wh_cands "${__bs_cli_wa_r}"
 }
 
-# @private Все исполняемые `bs` в PATH, по порядку, с повторами — как `type -aP bs`
-# в bash: пустой элемент PATH значит текущий каталог, каталог без хвостового «/»
-# получает его. Результат в массив bs_cli_wh_hits.
-# @private Every executable `bs` in PATH, in order, repeats kept — like bash's
-# `type -aP bs`: an empty PATH element means the current directory, a directory
-# without a trailing "/" gets one. The result goes to the array bs_cli_wh_hits.
-bs_cli_where_path_hits() {
-  bs_arr_clear bs_cli_wh_hits
-  __bs_cli_wp_rest="${BS_CALLER_PATH:-${PATH}}:"
-  while [ -n "${__bs_cli_wp_rest}" ]; do
-    __bs_cli_wp_dir=${__bs_cli_wp_rest%%:*}
-    __bs_cli_wp_rest=${__bs_cli_wp_rest#*:}
-    case "${__bs_cli_wp_dir}" in
-      '') __bs_cli_wp_file=./bs ;;
-      */) __bs_cli_wp_file=${__bs_cli_wp_dir}bs ;;
-      *)  __bs_cli_wp_file=${__bs_cli_wp_dir}/bs ;;
-    esac
-    if [ -x "${__bs_cli_wp_file}" ] && [ ! -d "${__bs_cli_wp_file}" ]; then
-      bs_arr_push bs_cli_wh_hits "${__bs_cli_wp_file}"
-    fi
-  done
-}
-
 # @private Остатки прерванных обновлений и установок рядом с установкой (по строке).
 # @private Leftovers of interrupted updates and installs next to an install (one per line).
 # @param $1 Install directory / Каталог установки
@@ -1373,7 +1351,7 @@ bs_cli_where_main() {
 
   # --- bs в PATH ---
   printf '\n== Команда bs в PATH / The bs command in PATH ==\n'
-  bs_cli_where_path_hits
+  bs_cli_path_hits bs_cli_wh_hits "${BS_CALLER_PATH:-${PATH}}"
   __bs_cli_wh_nhits=$(bs_arr_len bs_cli_wh_hits)
   if [ "${__bs_cli_wh_nhits}" -eq 0 ]; then
     printf '  bs не найдена в PATH этой оболочки / bs is not in the PATH of this shell\n'
@@ -1720,6 +1698,1130 @@ EOF
   return 0
 }
 
+
+# ==========================================================================
+# bs update: источник, замки, откат, манифест / source, locks, rollback, manifest
+# ==========================================================================
+
+# Перевод строки для склейки текста: $'\n' в POSIX sh нет.
+# A newline for joining text: POSIX sh has no $'\n'.
+# @global BS_CLI_NL — CLI: символ перевода строки (категория: constant)
+# @global BS_CLI_NL — CLI: the newline character (category: constant)
+BS_CLI_NL='
+'
+bs_shell_readonly BS_CLI_NL
+
+# URL репозитория по умолчанию для `bs update --github` (переопределяется
+# флагом --repo или переменной BS_UPDATE_REPO).
+# Default repository URL for `bs update --github` (override with --repo or
+# the BS_UPDATE_REPO variable).
+# @global UPDATE_DEFAULT_REPO — Update: репозиторий по умолчанию для --github (категория: constant)
+# @global UPDATE_DEFAULT_REPO — Update: default repository for --github (category: constant)
+UPDATE_DEFAULT_REPO="https://github.com/Igormm/bs"
+bs_shell_readonly UPDATE_DEFAULT_REPO
+
+# @global UPDATE_FETCH_DIR — Update: каталог со скачанным источником; удаляется стеком cleanup (категория: private)
+# @global UPDATE_FETCH_DIR — Update: directory with the downloaded source; removed by the cleanup stack (category: private)
+UPDATE_FETCH_DIR=""
+
+# @global UPDATE_INF_TARGET — Update: цель, чья замена в процессе (категория: private)
+# @global UPDATE_INF_TARGET — Update: the target being replaced (category: private)
+UPDATE_INF_TARGET=""
+# @global UPDATE_INF_TMP — Update: временный каталог незавершённой замены (категория: private)
+# @global UPDATE_INF_TMP — Update: temp directory of an unfinished swap (category: private)
+UPDATE_INF_TMP=""
+# @global UPDATE_INF_OLD — Update: каталог со старыми частями незавершённой замены (категория: private)
+# @global UPDATE_INF_OLD — Update: directory with the old parts of an unfinished swap (category: private)
+UPDATE_INF_OLD=""
+# @global UPDATE_INF_SUDO — Update: "sudo" или пусто для незавершённой замены (категория: private)
+# @global UPDATE_INF_SUDO — Update: "sudo" or empty for an unfinished swap (category: private)
+UPDATE_INF_SUDO=""
+
+# Занятые замки — два массива слоя данных (создаются при первом bs_arr_push):
+#   bs_cli_ul_locks — каталоги-замки; bs_cli_ul_sudo — "sudo" или пусто для каждого.
+# Held locks — two data-layer arrays (created by the first bs_arr_push):
+#   bs_cli_ul_locks — the lock directories; bs_cli_ul_sudo — "sudo" or empty for each.
+
+# @private Все исполняемые `bs` в PATH, по порядку, с повторами — как `type -aP bs`
+# в bash: пустой элемент PATH значит текущий каталог, каталог без хвостового «/»
+# получает его. Результат в массив $1.
+# @private Every executable `bs` in PATH, in order, repeats kept — like bash's
+# `type -aP bs`: an empty PATH element means the current directory, a directory
+# without a trailing "/" gets one. The result goes to the array $1.
+# @param $1 Array name / имя массива
+# @param $2 PATH string / строка PATH
+bs_cli_path_hits() {
+  __bs_cli_ph_name=$1
+  bs_arr_clear "${__bs_cli_ph_name}"
+  __bs_cli_ph_rest="$2:"
+  while [ -n "${__bs_cli_ph_rest}" ]; do
+    __bs_cli_ph_dir=${__bs_cli_ph_rest%%:*}
+    __bs_cli_ph_rest=${__bs_cli_ph_rest#*:}
+    case "${__bs_cli_ph_dir}" in
+      '') __bs_cli_ph_file=./bs ;;
+      */) __bs_cli_ph_file=${__bs_cli_ph_dir}bs ;;
+      *)  __bs_cli_ph_file=${__bs_cli_ph_dir}/bs ;;
+    esac
+    if [ -x "${__bs_cli_ph_file}" ] && [ ! -d "${__bs_cli_ph_file}" ]; then
+      bs_arr_push "${__bs_cli_ph_name}" "${__bs_cli_ph_file}"
+    fi
+  done
+}
+
+# @private Запустить команду с ограничением по времени, если есть timeout.
+# @private Run a command with a time limit when timeout exists.
+# @param $1 Seconds / секунды
+# @param $@ Command / команда
+bs_cli_with_timeout() {
+  __bs_cli_wt_secs=$1
+  shift
+  if bs_utils_has timeout; then
+    timeout "${__bs_cli_wt_secs}" "$@"
+  else
+    "$@"
+  fi
+}
+
+bs_cli_update_fetch_cleanup() {
+  if [ -n "${UPDATE_FETCH_DIR}" ]; then rm -rf -- "${UPDATE_FETCH_DIR}"; fi
+  return 0
+}
+
+# @private Скачать репозиторий во временный каталог: git clone (shallow),
+# иначе tar-архив через curl/wget. Путь кладётся в UPDATE_FETCH_DIR.
+# При неудаче — сообщение с причиной (нет git/curl, нет сети, нет такой
+# ветки/тега, это не репозиторий); временный каталог убирает стек cleanup.
+# @private Download the repository into a temp dir: shallow git clone, else
+# a tarball via curl/wget. The path is stored in UPDATE_FETCH_DIR. On failure
+# the message names the cause (no git/curl, no network, no such branch/tag,
+# not a repository); the temp dir is removed by the cleanup stack.
+# @param $1 Repo URL / URL репозитория
+# @param $2 Branch or tag / Ветка или тег
+bs_cli_update_fetch() {
+  __bs_cli_uf_repo=${1%.git}
+  __bs_cli_uf_ref=$2
+  UPDATE_FETCH_DIR="$(mktemp -d)" \
+    || bs_cli_update_die "update: cannot create a temporary directory / не удалось создать временный каталог"
+  bs_cleanup_add bs_cli_update_fetch_cleanup
+  __bs_cli_uf_dest="${UPDATE_FETCH_DIR}/src"
+  if ! bs_utils_has git && ! bs_utils_has curl && ! bs_utils_has wget; then
+    bs_cli_update_die "update: нужен git или curl/wget для --github / need git or curl/wget for --github (or use: bs update --from <repo-path>)"
+  fi
+
+  __bs_cli_uf_err=""
+  __bs_cli_uf_reach=0
+  if bs_utils_has git; then
+    # подоболочка: GIT_TERMINAL_PROMPT=0 не утекает в окружение bs / a subshell keeps GIT_TERMINAL_PROMPT=0 out of the bs environment
+    if __bs_cli_uf_err="$(GIT_TERMINAL_PROMPT=0; export GIT_TERMINAL_PROMPT; bs_cli_with_timeout 120 git clone --quiet --depth 1 --branch "${__bs_cli_uf_ref}" -- "${__bs_cli_uf_repo}" "${__bs_cli_uf_dest}" 2>&1)"; then
+      return 0
+    fi
+    rm -rf -- "${__bs_cli_uf_dest}"
+    if (GIT_TERMINAL_PROMPT=0; export GIT_TERMINAL_PROMPT; bs_cli_with_timeout 120 git ls-remote --exit-code -- "${__bs_cli_uf_repo}" HEAD >/dev/null 2>&1); then
+      __bs_cli_uf_reach=1
+    fi
+  fi
+  if [ "${__bs_cli_uf_reach}" -eq 1 ]; then
+    bs_cli_update_die "update: ветка/тег '${__bs_cli_uf_ref}' не найден в ${__bs_cli_uf_repo} / branch or tag '${__bs_cli_uf_ref}' not found in ${__bs_cli_uf_repo} (--ref REF)"
+  fi
+  mkdir -p -- "${__bs_cli_uf_dest}"
+
+  __bs_cli_uf_archive="${__bs_cli_uf_repo}/archive/${__bs_cli_uf_ref}.tar.gz"
+  if bs_utils_has curl; then
+    if curl -fsSL -- "${__bs_cli_uf_archive}" 2>/dev/null | bs_utils_quiet tar -xz -C "${__bs_cli_uf_dest}" --strip-components=1; then
+      return 0
+    fi
+  elif bs_utils_has wget; then
+    if wget -qO- -- "${__bs_cli_uf_archive}" 2>/dev/null | bs_utils_quiet tar -xz -C "${__bs_cli_uf_dest}" --strip-components=1; then
+      return 0
+    fi
+  fi
+  __bs_cli_uf_note=""
+  if [ -n "${__bs_cli_uf_err}" ]; then __bs_cli_uf_note=" [git: ${__bs_cli_uf_err%%"${BS_CLI_NL}"*}]"; fi
+  bs_cli_update_die "update: не удалось получить ${__bs_cli_uf_repo} (${__bs_cli_uf_ref}): нет сети, репозиторий не найден или ветки/тега нет / cannot fetch ${__bs_cli_uf_repo} (${__bs_cli_uf_ref}): no network, repository or ref not found${__bs_cli_uf_note}"
+}
+
+# @private Сравнить локальный checkout с удалённой веткой, ничего не меняя
+# в репозитории (ls-remote, без fetch). Печатает одно слово:
+#   same     — HEAD совпадает с удалённой веткой
+#   ahead    — локально есть коммиты, которых нет на удалённой стороне
+#   behind   — на удалённой стороне есть код, которого нет локально
+#              (в т.ч. разошедшиеся истории)
+#   unknown  — не git-checkout, нет сети или нет такой ветки
+# @private Compare a local checkout with the remote branch without touching
+# the repository (ls-remote, no fetch). Prints one word: same | ahead |
+# behind (remote has code the checkout lacks, diverged included) | unknown.
+# @param $1 Local checkout / Локальный checkout
+# @param $2 Repo URL / URL репозитория
+# @param $3 Branch / Ветка
+bs_cli_update_local_state() {
+  __bs_cli_ls_dir=$1
+  __bs_cli_ls_repo=${2%.git}
+  __bs_cli_ls_ref=$3
+  if ! bs_utils_has git || [ ! -e "${__bs_cli_ls_dir}/.git" ]; then
+    printf 'unknown\n'
+    return 0
+  fi
+  __bs_cli_ls_remote="$(GIT_TERMINAL_PROMPT=0; export GIT_TERMINAL_PROMPT; bs_cli_with_timeout 15 git ls-remote -- "${__bs_cli_ls_repo}" "refs/heads/${__bs_cli_ls_ref}" 2>/dev/null | cut -f1)" || __bs_cli_ls_remote=""
+  __bs_cli_ls_head="$(git -C "${__bs_cli_ls_dir}" rev-parse HEAD 2>/dev/null)" || __bs_cli_ls_head=""
+  if [ -z "${__bs_cli_ls_remote}" ] || [ -z "${__bs_cli_ls_head}" ]; then
+    printf 'unknown\n'
+  elif [ "${__bs_cli_ls_remote}" = "${__bs_cli_ls_head}" ]; then
+    printf 'same\n'
+  elif bs_utils_quiet git -C "${__bs_cli_ls_dir}" merge-base --is-ancestor "${__bs_cli_ls_remote}" HEAD; then
+    printf 'ahead\n'
+  else
+    printf 'behind\n'
+  fi
+}
+
+# @private Вернуть прежние части из old-каталога и убрать временные.
+# @private Restore the previous parts from the old dir and drop the temp dirs.
+# @param $1 Target / $2 temp dir / $3 old dir / $4 "sudo" or empty
+bs_cli_update_rollback() {
+  __bs_cli_rb_target=$1
+  __bs_cli_rb_tmp=$2
+  __bs_cli_rb_old=$3
+  __bs_cli_rb_sudo=$4
+  if [ -z "${__bs_cli_rb_target}" ]; then return 0; fi
+  for __bs_cli_rb_part in bs bootstrap core lib; do
+    if [ -e "${__bs_cli_rb_old}/${__bs_cli_rb_part}" ]; then
+      if [ "${__bs_cli_rb_part}" = "bs" ]; then
+        ${__bs_cli_rb_sudo} mv -f -- "${__bs_cli_rb_old}/bs" "${__bs_cli_rb_target}/bs" || true
+      else
+        ${__bs_cli_rb_sudo} rm -rf -- "${__bs_cli_rb_target}/${__bs_cli_rb_part}" || true
+        ${__bs_cli_rb_sudo} mv -- "${__bs_cli_rb_old}/${__bs_cli_rb_part}" "${__bs_cli_rb_target}/${__bs_cli_rb_part}" || true
+      fi
+    elif [ -e "${__bs_cli_rb_old}/.added-${__bs_cli_rb_part}" ]; then
+      ${__bs_cli_rb_sudo} rm -rf -- "${__bs_cli_rb_target}/${__bs_cli_rb_part}" || true
+    fi
+  done
+  ${__bs_cli_rb_sudo} rm -rf -- "${__bs_cli_rb_tmp}" "${__bs_cli_rb_old}" || true
+}
+
+# @private EXIT/сигнал: незавершённая замена откатывается, замки снимаются.
+# @private EXIT/signal: an unfinished swap is rolled back and locks released.
+bs_cli_update_inflight_cleanup() {
+  if [ -n "${UPDATE_INF_TARGET}" ]; then
+    bs_cli_update_rollback "${UPDATE_INF_TARGET}" "${UPDATE_INF_TMP}" "${UPDATE_INF_OLD}" "${UPDATE_INF_SUDO}"
+    UPDATE_INF_TARGET=""
+  fi
+  __bs_cli_ic_n=$(bs_arr_len bs_cli_ul_locks)
+  __bs_cli_ic_i=0
+  while [ "${__bs_cli_ic_i}" -lt "${__bs_cli_ic_n}" ]; do
+    __bs_cli_ic_lock=''
+    __bs_cli_ic_sudo=''
+    bs_arr_get bs_cli_ul_locks "${__bs_cli_ic_i}" __bs_cli_ic_lock
+    bs_arr_get bs_cli_ul_sudo "${__bs_cli_ic_i}" __bs_cli_ic_sudo
+    __bs_cli_ic_i=$((__bs_cli_ic_i + 1))
+    if [ -z "${__bs_cli_ic_lock}" ]; then continue; fi
+    if [ -n "${__bs_cli_ic_sudo}" ]; then
+      sudo rm -rf -- "${__bs_cli_ic_lock}" || true
+    else
+      rm -rf -- "${__bs_cli_ic_lock}" || true
+    fi
+  done
+  bs_arr_clear bs_cli_ul_locks
+  bs_arr_clear bs_cli_ul_sudo
+  return 0
+}
+
+# @private Убрать хвосты упавших запусков (.update.PID / .update-old.PID,
+# чей процесс мёртв). Незавершённая замена откатывается; завершённая
+# (маркер .committed) просто удаляется.
+# @private Drop leftovers of crashed runs (.update.PID / .update-old.PID whose
+# process is dead). An unfinished swap is rolled back; a committed one
+# (.committed marker) is simply deleted.
+# @param $1 Target / $2 optional "sudo"
+bs_cli_update_cleanup_stale() {
+  __bs_cli_cs_target=$1
+  __bs_cli_cs_sudo=${2:-}
+  __bs_cli_cs_list=$(
+    for __bs_cli_cs_pat in '.update.*' '.update-old.*'; do
+      find "${__bs_cli_cs_target}" -maxdepth 1 -name "${__bs_cli_cs_pat}" 2>/dev/null | sort
+    done
+  )
+  while IFS= read -r __bs_cli_cs_d; do
+    if [ -z "${__bs_cli_cs_d}" ] || [ ! -d "${__bs_cli_cs_d}" ]; then continue; fi
+    __bs_cli_cs_pid=${__bs_cli_cs_d##*.}
+    case "${__bs_cli_cs_pid}" in
+      ''|*[!0-9]*) continue ;;
+    esac
+    if kill -0 "${__bs_cli_cs_pid}" 2>/dev/null; then continue; fi
+    case "${__bs_cli_cs_d}" in
+      */.update-old.*)
+        if [ ! -e "${__bs_cli_cs_d}/.committed" ]; then
+          bs_cli_update_rollback "${__bs_cli_cs_target}" "${__bs_cli_cs_target}/.update.${__bs_cli_cs_pid}" "${__bs_cli_cs_d}" "${__bs_cli_cs_sudo}"
+          bs_log_info "update: восстановлена установка после прерванного запуска / restored after an interrupted run: ${__bs_cli_cs_target}"
+        fi ;;
+    esac
+    ${__bs_cli_cs_sudo} rm -rf -- "${__bs_cli_cs_d}" || true
+  done <<EOF
+${__bs_cli_cs_list}
+EOF
+  return 0
+}
+
+# @private Взять замок цели (mkdir атомарен; pid устаревшего замка проверяется).
+# @private Take the target lock (mkdir is atomic; a stale lock pid is checked).
+# @param $1 Target / $2 optional "sudo"
+# @return 0 got it, 1 another update is running
+bs_cli_update_lock() {
+  __bs_cli_lk_target=$1
+  __bs_cli_lk_sudo=${2:-}
+  __bs_cli_lk_dir="${__bs_cli_lk_target}/.update-lock"
+  for __bs_cli_lk_try in 1 2; do
+    if ${__bs_cli_lk_sudo} mkdir -- "${__bs_cli_lk_dir}" 2>/dev/null; then
+      printf '%s\n' "$$" | ${__bs_cli_lk_sudo} tee -- "${__bs_cli_lk_dir}/pid" >/dev/null || true
+      bs_arr_push bs_cli_ul_locks "${__bs_cli_lk_dir}"
+      bs_arr_push bs_cli_ul_sudo "${__bs_cli_lk_sudo}"
+      return 0
+    fi
+    __bs_cli_lk_pid=""
+    if [ -r "${__bs_cli_lk_dir}/pid" ]; then
+      IFS= read -r __bs_cli_lk_pid < "${__bs_cli_lk_dir}/pid" || true
+    fi
+    case "${__bs_cli_lk_pid}" in
+      ''|*[!0-9]*) ;;
+      *)
+        if kill -0 "${__bs_cli_lk_pid}" 2>/dev/null; then return 1; fi ;;
+    esac
+    ${__bs_cli_lk_sudo} rm -rf -- "${__bs_cli_lk_dir}" || return 1
+  done
+  return 1
+}
+
+# @param $1 Target / цель
+bs_cli_update_unlock() {
+  __bs_cli_ul_n=$(bs_arr_len bs_cli_ul_locks)
+  __bs_cli_ul_i=0
+  while [ "${__bs_cli_ul_i}" -lt "${__bs_cli_ul_n}" ]; do
+    __bs_cli_ul_lock=''
+    __bs_cli_ul_sudo=''
+    bs_arr_get bs_cli_ul_locks "${__bs_cli_ul_i}" __bs_cli_ul_lock
+    bs_arr_get bs_cli_ul_sudo "${__bs_cli_ul_i}" __bs_cli_ul_sudo
+    if [ "${__bs_cli_ul_lock}" = "$1/.update-lock" ]; then
+      if [ -n "${__bs_cli_ul_sudo}" ]; then
+        sudo rm -rf -- "${__bs_cli_ul_lock}" || true
+      else
+        rm -rf -- "${__bs_cli_ul_lock}" || true
+      fi
+      # место не удаляется (индексы остальных замков не сдвигаются) — запись пустеет
+      # the slot is not removed (the indexes of the other locks stay) — the entry is emptied
+      bs_arr_set bs_cli_ul_locks "${__bs_cli_ul_i}" ""
+      bs_arr_set bs_cli_ul_sudo "${__bs_cli_ul_i}" ""
+    fi
+    __bs_cli_ul_i=$((__bs_cli_ul_i + 1))
+  done
+  return 0
+}
+
+# @private Починить shebang файла под эту машину (bs_shebang_fix), от имени sudo при необходимости.
+# @private Repair the shebang of a file for this machine (bs_shebang_fix), as sudo if needed.
+# @param $1 file / файл
+# @param $2 optional command prefix (sudo) / необязательный префикс (sudo)
+bs_cli_update_fix_shebang() {
+  __bs_cli_fs_file=$1
+  __bs_cli_fs_sudo=${2:-}
+  # bash 4.2+ есть — тот же bash, что исполняет bs; нет — POSIX-оболочка sh (bootstrap/shebang.sh — @shell posix)
+  # a bash 4.2+ exists — the same bash that runs bs; none — the POSIX shell sh (bootstrap/shebang.sh is @shell posix)
+  if bs_shell_host_ok; then
+    __bs_cli_fs_host=$(bs_shell_host)
+  else
+    __bs_cli_fs_host='sh'
+  fi
+  # shellcheck disable=SC2016  # скрипт для дочерней оболочки, $1 и $2 раскрывает она / the child shell script: it expands $1 and $2
+  ${__bs_cli_fs_sudo} "${__bs_cli_fs_host}" -c '. "$1"; bs_shebang_fix "$2"' _ "${BS_BOOTSTRAP_DIR}/shebang.sh" "${__bs_cli_fs_file}"
+}
+
+# @private Самопроверка установленной копии: bs version печатает версию источника.
+# bs запускается КАК ПРОГРАММА (через свой shebang), чтобы сломанный shebang
+# (Termux без /usr/bin/env) не проходил проверку.
+# @private Smoke test of the installed copy: bs version prints the source's version.
+# bs runs AS A PROGRAM (through its own shebang), so a broken shebang (Termux
+# without /usr/bin/env) does not pass the test.
+# @param $1 Target / $2 expected version
+bs_cli_update_smoke() {
+  __bs_cli_sk_t=$1
+  __bs_cli_sk_want=$2
+  if bs_utils_has timeout; then
+    __bs_cli_sk_out="$(env -u BS_INITIALIZED -u BS_VERSION BS_ROOT="${__bs_cli_sk_t}" BS_HOME="${__bs_cli_sk_t}" BS_SILENT=1 \
+      timeout 60 "${__bs_cli_sk_t}/bs" version 2>&1)" || return 1
+  else
+    __bs_cli_sk_out="$(env -u BS_INITIALIZED -u BS_VERSION BS_ROOT="${__bs_cli_sk_t}" BS_HOME="${__bs_cli_sk_t}" BS_SILENT=1 \
+      "${__bs_cli_sk_t}/bs" version 2>&1)" || return 1
+  fi
+  case "${__bs_cli_sk_out}" in
+    *"version: ${__bs_cli_sk_want}"*) return 0 ;;
+  esac
+  return 1
+}
+
+# @private Заменить части установки: новое — во временный каталог, старое —
+# в .update-old.PID, затем smoke-test; при любом сбое — откат.
+# @private Replace install parts: new into a temp dir, old into
+# .update-old.PID, then smoke test; any failure rolls back.
+# @param $1 Target / $2 source / $3 expected version / $4 optional "sudo"
+# @return 0 ok, 1 copy/swap failed, 2 smoke test failed (both rolled back)
+bs_cli_update_apply() {
+  __bs_cli_ap_target=$1
+  __bs_cli_ap_from=$2
+  __bs_cli_ap_want=$3
+  __bs_cli_ap_sudo=${4:-}
+  __bs_cli_ap_tmp="${__bs_cli_ap_target}/.update.$$"
+  __bs_cli_ap_old="${__bs_cli_ap_target}/.update-old.$$"
+  ${__bs_cli_ap_sudo} rm -rf -- "${__bs_cli_ap_tmp}" "${__bs_cli_ap_old}" || return 1
+  ${__bs_cli_ap_sudo} mkdir -p -- "${__bs_cli_ap_tmp}" "${__bs_cli_ap_old}" \
+    || { ${__bs_cli_ap_sudo} rm -rf -- "${__bs_cli_ap_tmp}" "${__bs_cli_ap_old}"; return 1; }
+  UPDATE_INF_TARGET="${__bs_cli_ap_target}"
+  UPDATE_INF_TMP="${__bs_cli_ap_tmp}"
+  UPDATE_INF_OLD="${__bs_cli_ap_old}"
+  UPDATE_INF_SUDO="${__bs_cli_ap_sudo}"
+  if ! ${__bs_cli_ap_sudo} cp -a "${__bs_cli_ap_from}/bootstrap" "${__bs_cli_ap_from}/core" "${__bs_cli_ap_from}/lib" "${__bs_cli_ap_from}/bs" "${__bs_cli_ap_tmp}/"; then
+    bs_cli_update_rollback "${__bs_cli_ap_target}" "${__bs_cli_ap_tmp}" "${__bs_cli_ap_old}" "${UPDATE_INF_SUDO}"
+    UPDATE_INF_TARGET=""
+    return 1
+  fi
+  # shebang bs и обёртки — под эту машину (Termux: нет /usr/bin/env, /bin/sh)
+  # the shebang of bs and of the wrapper — for this machine (Termux: no /usr/bin/env, /bin/sh)
+  bs_cli_update_fix_shebang "${__bs_cli_ap_tmp}/bs" "${__bs_cli_ap_sudo}" \
+    || bs_cli_update_warn "update: не удалось подогнать shebang у ${__bs_cli_ap_tmp}/bs / could not adapt the shebang"
+  __bs_cli_ap_wrapper="$(bs_cli_update_install_wrapper "${__bs_cli_ap_target}")"
+  if [ -n "${__bs_cli_ap_wrapper}" ] && [ -f "${__bs_cli_ap_wrapper}" ]; then
+    bs_cli_update_fix_shebang "${__bs_cli_ap_wrapper}" "${__bs_cli_ap_sudo}" \
+      || bs_cli_update_warn "update: не удалось подогнать shebang у обёртки ${__bs_cli_ap_wrapper} / could not adapt the wrapper shebang"
+  fi
+  __bs_cli_ap_ok=1
+  for __bs_cli_ap_part in bs bootstrap core lib; do
+    if [ "${__bs_cli_ap_part}" = "bs" ]; then
+      if [ -e "${__bs_cli_ap_target}/bs" ]; then
+        ${__bs_cli_ap_sudo} cp -a -- "${__bs_cli_ap_target}/bs" "${__bs_cli_ap_old}/bs" || { __bs_cli_ap_ok=0; break; }
+      else
+        ${__bs_cli_ap_sudo} touch -- "${__bs_cli_ap_old}/.added-bs" || { __bs_cli_ap_ok=0; break; }
+      fi
+      ${__bs_cli_ap_sudo} mv -f -- "${__bs_cli_ap_tmp}/bs" "${__bs_cli_ap_target}/bs" || { __bs_cli_ap_ok=0; break; }
+    else
+      if [ -e "${__bs_cli_ap_target}/${__bs_cli_ap_part}" ]; then
+        ${__bs_cli_ap_sudo} mv -- "${__bs_cli_ap_target}/${__bs_cli_ap_part}" "${__bs_cli_ap_old}/${__bs_cli_ap_part}" || { __bs_cli_ap_ok=0; break; }
+      else
+        ${__bs_cli_ap_sudo} touch -- "${__bs_cli_ap_old}/.added-${__bs_cli_ap_part}" || { __bs_cli_ap_ok=0; break; }
+      fi
+      ${__bs_cli_ap_sudo} mv -- "${__bs_cli_ap_tmp}/${__bs_cli_ap_part}" "${__bs_cli_ap_target}/${__bs_cli_ap_part}" || { __bs_cli_ap_ok=0; break; }
+    fi
+  done
+  if [ "${__bs_cli_ap_ok}" -eq 0 ]; then
+    bs_cli_update_rollback "${__bs_cli_ap_target}" "${__bs_cli_ap_tmp}" "${__bs_cli_ap_old}" "${UPDATE_INF_SUDO}"
+    UPDATE_INF_TARGET=""
+    return 1
+  fi
+  if ! bs_cli_update_smoke "${__bs_cli_ap_target}" "${__bs_cli_ap_want}"; then
+    bs_cli_update_rollback "${__bs_cli_ap_target}" "${__bs_cli_ap_tmp}" "${__bs_cli_ap_old}" "${UPDATE_INF_SUDO}"
+    UPDATE_INF_TARGET=""
+    return 2
+  fi
+  ${__bs_cli_ap_sudo} touch -- "${__bs_cli_ap_old}/.committed" || true
+  UPDATE_INF_TARGET=""
+  ${__bs_cli_ap_sudo} rm -rf -- "${__bs_cli_ap_tmp}" "${__bs_cli_ap_old}" || true
+  return 0
+}
+
+# @private Обновить манифест установки после update: дата, источник, коммит.
+# Нет манифеста (старый установщик) — создаётся; повреждённый — сохраняется
+# как .install.bad и создаётся заново.
+# @private Refresh the install manifest after an update: date, source,
+# commit. A missing manifest (older installer) is created; a corrupt one is
+# kept as .install.bad and recreated.
+# @param $1 Install directory / Каталог установки
+# @param $2 Source directory / Каталог-источник
+# @param $3 Source label (path or URL@ref) / Метка источника
+# @param $4 Optional "sudo" / Необязательный sudo
+bs_cli_update_manifest() {
+  __bs_cli_mf_target=$1
+  __bs_cli_mf_from=$2
+  __bs_cli_mf_label=$3
+  __bs_cli_mf_sudo=${4:-}
+  __bs_cli_mf_file="${__bs_cli_mf_target}/.install"
+  __bs_cli_mf_content=""
+  __bs_cli_mf_commit=""
+  if [ -d "${__bs_cli_mf_file}" ]; then
+    bs_cli_update_warn "update: ${__bs_cli_mf_file} — каталог, манифест не записан / is a directory, manifest not written"
+    return 0
+  fi
+  if bs_cli_update_manifest_valid "${__bs_cli_mf_file}"; then
+    while IFS= read -r __bs_cli_mf_line || [ -n "${__bs_cli_mf_line}" ]; do
+      case "${__bs_cli_mf_line}" in
+        version=*|updated_at=*|updated_from=*|updated_commit=*) ;;
+        *) __bs_cli_mf_content="${__bs_cli_mf_content}${__bs_cli_mf_line}${BS_CLI_NL}" ;;
+      esac
+    done < "${__bs_cli_mf_file}"
+  else
+    if [ -e "${__bs_cli_mf_file}" ]; then
+      ${__bs_cli_mf_sudo} mv -f -- "${__bs_cli_mf_file}" "${__bs_cli_mf_file}.bad" 2>/dev/null || ${__bs_cli_mf_sudo} rm -f -- "${__bs_cli_mf_file}" || true
+      bs_cli_update_warn "update: манифест повреждён или нечитаем, создан заново (старый: ${__bs_cli_mf_file}.bad) / manifest corrupt or unreadable, recreated (old one: ${__bs_cli_mf_file}.bad)"
+    fi
+    __bs_cli_mf_mode="custom"
+    if [ "${__bs_cli_mf_target}" = "${HOME}/.local/lib/bs" ]; then __bs_cli_mf_mode="local"; fi
+    if [ "${__bs_cli_mf_target}" = "$(bs_cli_update_system_lib)" ]; then __bs_cli_mf_mode="system"; fi
+    __bs_cli_mf_content="${__bs_cli_mf_content}# BS install manifest — written by install.sh, updated by bs update${BS_CLI_NL}"
+    __bs_cli_mf_content="${__bs_cli_mf_content}mode=${__bs_cli_mf_mode}${BS_CLI_NL}"
+    __bs_cli_mf_content="${__bs_cli_mf_content}prefix=${__bs_cli_mf_target%/lib/bs}${BS_CLI_NL}"
+    __bs_cli_mf_content="${__bs_cli_mf_content}lib=${__bs_cli_mf_target}${BS_CLI_NL}"
+    __bs_cli_mf_content="${__bs_cli_mf_content}bin=${__bs_cli_mf_target%/lib/bs}/bin/bs${BS_CLI_NL}"
+  fi
+  if bs_utils_has git && [ -e "${__bs_cli_mf_from}/.git" ]; then
+    __bs_cli_mf_commit="$(git -C "${__bs_cli_mf_from}" rev-parse HEAD 2>/dev/null)" || __bs_cli_mf_commit=""
+  fi
+  # Версия ИСТОЧНИКА, а не запущенного bs / the SOURCE version, not the running bs
+  __bs_cli_mf_version="$(bs_version_of "${__bs_cli_mf_from}")"
+  if [ -z "${__bs_cli_mf_version}" ]; then __bs_cli_mf_version="$(bs_version_get)"; fi
+  __bs_cli_mf_content="${__bs_cli_mf_content}version=${__bs_cli_mf_version}${BS_CLI_NL}"
+  __bs_cli_mf_content="${__bs_cli_mf_content}updated_at=$(date '+%Y-%m-%d %H:%M:%S')${BS_CLI_NL}"
+  __bs_cli_mf_content="${__bs_cli_mf_content}updated_from=${__bs_cli_mf_label}${BS_CLI_NL}"
+  __bs_cli_mf_content="${__bs_cli_mf_content}updated_commit=${__bs_cli_mf_commit}${BS_CLI_NL}"
+  printf '%s' "${__bs_cli_mf_content}" | ${__bs_cli_mf_sudo} tee -- "${__bs_cli_mf_file}" >/dev/null \
+    || bs_cli_update_warn "update: cannot write the install manifest: ${__bs_cli_mf_file}"
+  return 0
+}
+
+# @private Кто из обёрток `bs` в PATH что запускает (по порядку PATH).
+# @private Which `bs` wrapper in PATH runs which copy (in PATH order).
+bs_cli_update_path_summary() {
+  printf 'bs в PATH по порядку / bs in PATH, in order:\n'
+  bs_cli_path_hits bs_cli_ps_hits "${PATH}"
+  __bs_cli_ps_n=$(bs_arr_len bs_cli_ps_hits)
+  __bs_cli_ps_i=0
+  while [ "${__bs_cli_ps_i}" -lt "${__bs_cli_ps_n}" ]; do
+    __bs_cli_ps_w=''
+    bs_arr_get bs_cli_ps_hits "${__bs_cli_ps_i}" __bs_cli_ps_w
+    __bs_cli_ps_i=$((__bs_cli_ps_i + 1))
+    __bs_cli_ps_root="$(bs_cli_update_wrapper_root "${__bs_cli_ps_w}")"
+    if [ -n "${__bs_cli_ps_root}" ]; then
+      __bs_cli_ps_first=""
+      if [ "${__bs_cli_ps_i}" -eq 1 ]; then __bs_cli_ps_first=' ← запускается первой / runs first'; fi
+      printf '  %d. %s → %s (version %s)%s\n' "${__bs_cli_ps_i}" "${__bs_cli_ps_w}" "${__bs_cli_ps_root}" \
+        "$(bs_version_of "${__bs_cli_ps_root}")" "${__bs_cli_ps_first}"
+    else
+      printf '  %d. %s (не обёртка BS / not a BS wrapper)\n' "${__bs_cli_ps_i}" "${__bs_cli_ps_w}"
+    fi
+  done
+  if [ "${__bs_cli_ps_n}" -eq 0 ]; then printf '  (bs не найден в PATH / bs not found in PATH)\n'; fi
+  return 0
+}
+
+# @private Можно ли безопасно подтянуть репозиторий: это git-репозиторий, в нём
+# нет незакоммиченных правок отслеживаемых файлов и у ветки есть upstream.
+# Печатает причину отказа (одной строкой) и возвращает 1, если нельзя.
+# @private Can the repository be pulled safely: a git repository, no uncommitted
+# changes to tracked files, and the branch has an upstream. Prints the reason
+# (one line) and returns 1 when it cannot.
+# @param $1 Repository / Репозиторий
+bs_cli_update_pull_blocker() {
+  if ! bs_utils_has git || [ ! -e "$1/.git" ]; then
+    printf 'не git-репозиторий (или нет git) / not a git repository (or no git)'
+    return 1
+  fi
+  if [ -n "$(git -C "$1" status --porcelain --untracked-files=no 2>/dev/null)" ]; then
+    printf 'есть незакоммиченные правки отслеживаемых файлов / uncommitted changes to tracked files'
+    return 1
+  fi
+  if ! git -C "$1" rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
+    printf 'у текущей ветки нет upstream (detached HEAD?) / the current branch has no upstream'
+    return 1
+  fi
+  return 0
+}
+
+# @private git pull --ff-only в репозитории: только перемотка вперёд, история
+# не переписывается, ничего не сливается. Возвращает 1 с объяснением при отказе.
+# @private git pull --ff-only in the repository: a fast-forward only, history
+# is never rewritten, nothing is merged. Returns 1 with an explanation on refusal.
+# @param $1 Repository / Репозиторий
+bs_cli_update_pull_checkout() {
+  __bs_cli_pc_dir=$1
+  if ! __bs_cli_pc_why="$(bs_cli_update_pull_blocker "${__bs_cli_pc_dir}")"; then
+    bs_cli_update_warn "update: git pull пропущен для ${__bs_cli_pc_dir}: ${__bs_cli_pc_why}"
+    return 1
+  fi
+  __bs_cli_pc_before="$(git -C "${__bs_cli_pc_dir}" rev-parse --short=7 HEAD 2>/dev/null || printf '?')"
+  if ! __bs_cli_pc_out="$(GIT_TERMINAL_PROMPT=0; export GIT_TERMINAL_PROMPT; bs_cli_with_timeout 120 git -C "${__bs_cli_pc_dir}" pull --ff-only 2>&1)"; then
+    bs_cli_update_warn "update: git pull --ff-only не удался в ${__bs_cli_pc_dir} (история разошлась или нет сети) / failed (diverged history or no network): $(bs_str_replace "${__bs_cli_pc_out}" "${BS_CLI_NL}" ' | ')"
+    return 1
+  fi
+  __bs_cli_pc_after="$(git -C "${__bs_cli_pc_dir}" rev-parse --short=7 HEAD 2>/dev/null || printf '?')"
+  if [ "${__bs_cli_pc_before}" = "${__bs_cli_pc_after}" ]; then
+    bs_log_info "update: репозиторий уже актуален / the repository is already up to date: ${__bs_cli_pc_dir} @ ${__bs_cli_pc_after}"
+  else
+    bs_log_info "update: репозиторий подтянут / the repository was pulled: ${__bs_cli_pc_dir} ${__bs_cli_pc_before} → ${__bs_cli_pc_after}"
+  fi
+  return 0
+}
+
+# @private Итог по трём сущностям: установка, репозиторий, GitHub. Расхождение
+# между установкой и репозиторием (examples/ и tests/ старее bs) раньше никак
+# не показывалось — отсюда «обновил, а флага нет».
+# @private The outcome for the three things: the install, the repository and
+# GitHub. A mismatch between the install and the repository (examples/ and
+# tests/ older than bs) used to go unnoticed — hence "updated, yet no flag".
+# @param $1 Repository around (may be empty) / Репозиторий рядом (может быть пуст)
+# @param $2 Its relation to the remote: same|ahead|behind|unknown / Отношение к удалённому
+# @param $3 Version that was installed / Установленная версия
+bs_cli_update_state_summary() {
+  __bs_cli_ss_checkout=$1
+  __bs_cli_ss_state=$2
+  __bs_cli_ss_inst=$3
+  if [ -z "${__bs_cli_ss_checkout}" ]; then return 0; fi
+  __bs_cli_ss_commit=""
+  __bs_cli_ss_ok=1
+  __bs_cli_ss_rc=0
+  __bs_cli_ss_repo="$(bs_version_of "${__bs_cli_ss_checkout}")"
+  if [ -e "${__bs_cli_ss_checkout}/.git" ] && bs_utils_has git; then
+    __bs_cli_ss_commit="$(git -C "${__bs_cli_ss_checkout}" rev-parse --short=7 HEAD 2>/dev/null || true)"
+  fi
+  case "${__bs_cli_ss_state}" in
+    same)   __bs_cli_ss_rel="совпадает с GitHub / same as GitHub" ;;
+    ahead)  __bs_cli_ss_rel="впереди GitHub (есть непушенные коммиты) / ahead of GitHub" ;;
+    behind) __bs_cli_ss_rel="ОТСТАЁТ от GitHub / BEHIND GitHub"; __bs_cli_ss_ok=0 ;;
+    *)      __bs_cli_ss_rel="связь с GitHub не проверена (нет сети?) / relation to GitHub unknown" ;;
+  esac
+  if [ -n "${__bs_cli_ss_inst}" ] && [ -n "${__bs_cli_ss_repo}" ]; then
+    bs_version_compare "${__bs_cli_ss_repo}" "${__bs_cli_ss_inst}" || __bs_cli_ss_rc=$?
+    if [ "${__bs_cli_ss_rc}" -eq 2 ]; then __bs_cli_ss_ok=0; fi
+  fi
+  __bs_cli_ss_cm=""
+  if [ -n "${__bs_cli_ss_commit}" ]; then __bs_cli_ss_cm=", commit ${__bs_cli_ss_commit}"; fi
+  printf '\n== Состояние после обновления / State after the update ==\n'
+  printf '  Установка / Install:   версия / version %s\n' "${__bs_cli_ss_inst:-?}"
+  printf '  Репозиторий / Repo:    %s — версия / version %s%s — %s\n' \
+    "${__bs_cli_ss_checkout}" "${__bs_cli_ss_repo:-?}" "${__bs_cli_ss_cm}" "${__bs_cli_ss_rel}"
+  if [ "${__bs_cli_ss_ok}" -eq 1 ]; then
+    printf '  Вердикт / Verdict:     установка и репозиторий согласованы / the install and the repository agree\n'
+  else
+    printf '  Вердикт / Verdict:     ⚠ examples/ и tests/ репозитория старее установки (bs update их не копирует) / the repository is older than the install\n'
+    printf '  Что сделать / Fix:     bs update --pull   (или / or:  git -C %s pull)\n' "${__bs_cli_ss_checkout}"
+  fi
+}
+
+# @private Дописать в конец массива $1 все элементы массива $2.
+# @private Append every element of the array $2 to the end of the array $1.
+# @param $1 Destination / назначение; $2 source / источник
+bs_cli_arr_append() {
+  __bs_cli_aa_dst=$1
+  eval "$(bs_arr_to_args "$2")"
+  bs_arr_push "${__bs_cli_aa_dst}" "$@"
+}
+
+# shellcheck disable=SC2016  # $BS_SYSTEM_PREFIX и обратные кавычки — текст справки / $BS_SYSTEM_PREFIX and backticks are help text
+bs_cli_update_help() {
+  printf 'Использование / Usage: bs update [--local] [--system] [--lib DIR]\n'
+  printf '                 [--from DIR | --github [--repo URL] [--ref REF]] [-v]\n\n'
+  printf 'Применяет изменения фреймворка к установленным копиям, без переустановки.\n'
+  printf 'Applies framework changes to installed copies without reinstalling.\n'
+  printf 'Targets / Цели:\n'
+  printf '  --local   ~/.local/lib/bs                (local install / локальная)\n'
+  printf '  --system  $BS_SYSTEM_PREFIX/lib/bs       (system install, default prefix /usr/local, needs root)\n'
+  printf '  --lib DIR a custom install directory / свой каталог установки\n'
+  printf '            (flags may be combined and repeated; duplicates are merged)\n'
+  printf 'Source / Источник:\n'
+  printf '  --from DIR  local repo checkout / локальный репозиторий\n'
+  printf '  --pull      first fast-forward the local repo (git pull --ff-only): bs update does\n'
+  printf '              not touch the repository, so examples/ and tests/ stay old without it\n'
+  printf '              / сначала подтянуть локальный репозиторий; examples/ иначе не обновятся\n'
+  printf '  --github    download from GitHub (%s)\n' "${UPDATE_DEFAULT_REPO}"
+  printf '  --repo URL  another repository (or BS_UPDATE_REPO); implies --github\n'
+  printf '  --ref REF   branch or tag (default: main); implies --github\n'
+  printf 'Default source: the repo in CWD (./bs update); from an installed copy\n'
+  printf 'with no repo around — GitHub. A local git checkout is compared with\n'
+  printf 'GitHub first (non-interactive: warns, uses local).\n'
+  printf 'Without target flags: every detected install — ~/.local/lib/bs, the\n'
+  printf 'system one, the copy bs runs from, the one behind `bs` in PATH.\n'
+  printf 'Safety / Безопасность:\n'
+  printf '  - the target must be a BS install (bs + bootstrap/init.sh, or .install);\n'
+  printf '    a source checkout (.git / tests/) is never a target\n'
+  printf '    цель обязана быть установкой BS, чужие каталоги не трогаются\n'
+  printf '  - the source must have bs, bootstrap/{init,loader}.sh, core/, lib/ and a\n'
+  printf '    readable core/version.sh; checked BEFORE any write\n'
+  printf '  - old files are kept aside, the new copy is smoke-tested (bs version),\n'
+  printf '    on failure or Ctrl-C the previous version is restored\n'
+  printf '  - two updates of one target do not run at once (lock)\n'
+  printf 'Every notice shows which bs copy printed it: "Запущен / Running: bs VER | ROOT | KIND".\n'
+  printf 'Environment: BS_SYSTEM_PREFIX (default /usr/local) — system install prefix\n'
+  printf '(lib=$BS_SYSTEM_PREFIX/lib/bs, wrapper=$BS_SYSTEM_PREFIX/bin/bs);\n'
+  printf 'BS_UPDATE_REPO — default repository for --github.\n'
+  printf 'Exit code: 0 updated / nothing to do; 1 a target or the source was refused or failed.\n'
+}
+
+# bs update: применить изменения фреймворка к установленным копиям / apply framework changes to installed copies
+bs_cli_update_cmd() {
+  __bs_cli_uc_from=${BS_ROOT}
+  __bs_cli_uc_from_explicit=0
+  __bs_cli_uc_github=0
+  __bs_cli_uc_pull=0
+  __bs_cli_uc_repo=${BS_UPDATE_REPO:-${UPDATE_DEFAULT_REPO}}
+  __bs_cli_uc_repo_set=0
+  __bs_cli_uc_ref_set=0
+  __bs_cli_uc_ref=main
+  bs_arr_clear bs_cli_uc_targets
+  bs_arr_clear bs_cli_uc_kinds
+  __bs_cli_uc_explicit=0
+  __bs_cli_uc_verbose=0
+  __bs_cli_uc_banner=1
+  for __bs_cli_uc_a in "$@"; do
+    case "${__bs_cli_uc_a}" in
+      -h|--help) __bs_cli_uc_banner=0 ;;
+    esac
+  done
+  bs_cli_update_ctx
+  # Первая строка любого реального запуска: какая копия bs работает.
+  # First line of every real run: which bs copy is running.
+  if [ "${__bs_cli_uc_banner}" -eq 1 ]; then
+    printf '%s\n' "${UPDATE_RUN_BLOCK}"
+  fi
+  trap 'exit 130' INT
+  trap 'exit 143' TERM HUP
+  bs_cleanup_add bs_cli_update_inflight_cleanup
+
+  while [ $# -gt 0 ]; do
+    case "${1:-}" in
+      --local)
+        __bs_cli_uc_explicit=1
+        bs_arr_push bs_cli_uc_targets "${HOME}/.local/lib/bs"
+        bs_arr_push bs_cli_uc_kinds local
+        shift ;;
+      --system)
+        __bs_cli_uc_explicit=1
+        bs_arr_push bs_cli_uc_targets "$(bs_cli_update_system_lib)"
+        bs_arr_push bs_cli_uc_kinds system
+        shift ;;
+      --lib)
+        shift
+        bs_cli_update_flag_value "--lib" "a target directory" "$@"
+        __bs_cli_uc_explicit=1
+        bs_arr_push bs_cli_uc_targets "$1"
+        bs_arr_push bs_cli_uc_kinds lib
+        shift ;;
+      --from)
+        shift
+        bs_cli_update_flag_value "--from" "a source directory" "$@"
+        if [ "${__bs_cli_uc_from_explicit}" -eq 1 ] && [ "${__bs_cli_uc_from}" != "$1" ]; then
+          bs_cli_update_die "update: --from указан дважды с разными значениями / given twice with different values: ${__bs_cli_uc_from} и/and $1"
+        fi
+        __bs_cli_uc_from=$1
+        __bs_cli_uc_from_explicit=1
+        shift ;;
+      --github)
+        __bs_cli_uc_github=1
+        shift ;;
+      --pull)
+        __bs_cli_uc_pull=1
+        shift ;;
+      --repo)
+        shift
+        bs_cli_update_flag_value "--repo" "a repository URL" "$@"
+        case "$1" in
+          *[[:space:]]*) bs_cli_update_die "update: --repo не может содержать пробелы / must not contain whitespace: '$1'" ;;
+        esac
+        if [ "${__bs_cli_uc_repo_set}" -eq 1 ] && [ "${__bs_cli_uc_repo}" != "$1" ]; then
+          bs_cli_update_die "update: --repo указан дважды с разными значениями / given twice with different values"
+        fi
+        __bs_cli_uc_github=1
+        __bs_cli_uc_repo=$1
+        __bs_cli_uc_repo_set=1
+        shift ;;
+      --ref)
+        shift
+        bs_cli_update_flag_value "--ref" "a branch or tag" "$@"
+        case "$1" in
+          ''|*[!A-Za-z0-9._/@+-]*) bs_cli_update_die "update: недопустимое имя ветки/тега / invalid branch or tag name: '$1'" ;;
+        esac
+        if [ "${__bs_cli_uc_ref_set}" -eq 1 ] && [ "${__bs_cli_uc_ref}" != "$1" ]; then
+          bs_cli_update_die "update: --ref указан дважды с разными значениями / given twice with different values"
+        fi
+        __bs_cli_uc_github=1
+        __bs_cli_uc_ref=$1
+        __bs_cli_uc_ref_set=1
+        shift ;;
+      -v|--verbose)
+        __bs_cli_uc_verbose=1
+        shift ;;
+      -h|--help)
+        bs_cli_update_help
+        return 0 ;;
+      *)
+        bs_cli_update_die "update: неизвестный аргумент / unknown argument: $1 (bs update --help)" ;;
+    esac
+  done
+
+  # Источник: --from и --github исключают друг друга.
+  # Source: --from and --github are mutually exclusive.
+  if [ "${__bs_cli_uc_github}" -eq 1 ] && [ "${__bs_cli_uc_from_explicit}" -eq 1 ]; then
+    bs_cli_update_die "update: --from и --github несовместимы / are mutually exclusive"
+  fi
+  # Локальный checkout рядом (для сверки с GitHub): CWD-репозиторий, иначе
+  # BS_ROOT, если это репозиторий, а не установленная копия (в ней нет tests/).
+  # Local checkout around (to compare with GitHub): the CWD repo, else BS_ROOT
+  # when it is a repo and not an installed copy (which has no tests/).
+  __bs_cli_uc_checkout=""
+  if [ "${__bs_cli_uc_from_explicit}" -eq 1 ]; then
+    __bs_cli_uc_checkout=${__bs_cli_uc_from}
+  elif [ -f "${PWD}/bs" ] && [ -d "${PWD}/core" ] && [ -d "${PWD}/tests" ]; then
+    __bs_cli_uc_checkout=${PWD}
+  elif [ -d "${__bs_cli_uc_from}/tests" ]; then
+    __bs_cli_uc_checkout=${__bs_cli_uc_from}
+  fi
+
+  if [ "${__bs_cli_uc_github}" -eq 0 ] && [ "${__bs_cli_uc_from_explicit}" -eq 0 ]; then
+    if [ -n "${__bs_cli_uc_checkout}" ]; then
+      __bs_cli_uc_from=${__bs_cli_uc_checkout}
+    else
+      # Развилка: bs запущен из установленной копии и репозитория рядом
+      # нет — локального источника нет, берём с GitHub.
+      # Fork: bs runs from an installed copy and there is no repo around —
+      # no local source, so fetch from GitHub.
+      __bs_cli_uc_github=1
+    fi
+  fi
+
+  # Конфликт источников: локальный checkout и GitHub могут расходиться.
+  # Source conflict: the local checkout and GitHub may differ.
+  __bs_cli_uc_state="unknown"
+  # --pull: сначала подтянуть сам репозиторий (bs update его не трогает)
+  # --pull: first pull the repository itself (bs update does not touch it)
+  if [ "${__bs_cli_uc_pull}" -eq 1 ]; then
+    if [ -z "${__bs_cli_uc_checkout}" ]; then
+      bs_cli_update_die "update: --pull: рядом нет репозитория BS — запустите из его каталога или укажите --from DIR / no BS repository around: run from its directory or pass --from DIR"
+    fi
+    bs_cli_update_pull_checkout "${__bs_cli_uc_checkout}" \
+      || bs_cli_update_die "update: --pull не выполнен, ничего не изменено / --pull failed, nothing was changed"
+  fi
+  if [ -n "${__bs_cli_uc_checkout}" ]; then
+    __bs_cli_uc_state="$(bs_cli_update_local_state "${__bs_cli_uc_checkout}" "${__bs_cli_uc_repo}" "${__bs_cli_uc_ref}")"
+  fi
+  if [ "${__bs_cli_uc_github}" -eq 0 ] && [ "${__bs_cli_uc_state}" = "behind" ]; then
+    bs_cli_update_warn "update: local repo is behind ${__bs_cli_uc_repo%.git}@${__bs_cli_uc_ref} — it lacks new code / локальный репозиторий отстаёт от GitHub"
+    bs_cli_update_warn "update:   ${__bs_cli_uc_checkout}"
+    if [ "${__bs_cli_uc_from_explicit}" -eq 0 ] && [ -t 0 ] && [ -t 1 ]; then
+      __bs_cli_uc_answer=""
+      __bs_cli_uc_why=""
+      __bs_cli_uc_dflt="p"
+      __bs_cli_uc_why="$(bs_cli_update_pull_blocker "${__bs_cli_uc_checkout}")" || __bs_cli_uc_dflt="g"
+      if [ "${__bs_cli_uc_dflt}" = "g" ]; then
+        printf 'Подтянуть репозиторий нельзя (%s) / cannot pull: %s\n' "${__bs_cli_uc_why}" "${__bs_cli_uc_why}"
+        printf 'Источник / Source: [g]ithub (репозиторий не изменится / the repo stays old), [l]ocal, [a]bort? [g] '
+      else
+        printf 'Источник / Source: [p]ull — подтянуть репозиторий и ставить из него (рекомендуется), [g]ithub (репозиторий останется старым), [l]ocal, [a]bort? [p] '
+      fi
+      read -r __bs_cli_uc_answer || __bs_cli_uc_answer="a"
+      if [ -z "${__bs_cli_uc_answer}" ]; then __bs_cli_uc_answer=${__bs_cli_uc_dflt}; fi
+      case "$(bs_str_lower "${__bs_cli_uc_answer}")" in
+        p|pull)
+          bs_cli_update_pull_checkout "${__bs_cli_uc_checkout}" \
+            || bs_cli_update_die "update: git pull не удался, ничего не изменено / git pull failed, nothing was changed"
+          __bs_cli_uc_state="$(bs_cli_update_local_state "${__bs_cli_uc_checkout}" "${__bs_cli_uc_repo}" "${__bs_cli_uc_ref}")" ;;
+        g|github) __bs_cli_uc_github=1 ;;
+        l|local)  : ;;
+        *)        bs_cli_update_die "update: aborted / отменено" ;;
+      esac
+    else
+      bs_cli_update_warn "update: installing the LOCAL code; for the newest run: bs update --pull (или / or git pull), or bs update --github"
+    fi
+  fi
+  if [ "${__bs_cli_uc_github}" -eq 1 ] && [ "${__bs_cli_uc_state}" = "behind" ]; then
+    # bs update ставит только bs, bootstrap, core, lib: examples/ и tests/
+    # репозитория остаются прежними — это не ошибка, но об этом нужно сказать
+    # bs update installs bs, bootstrap, core and lib only: examples/ and
+    # tests/ of the repository stay as they are — not an error, but say so
+    bs_cli_update_warn "update: репозиторий ${__bs_cli_uc_checkout} отстаёт от GitHub и НЕ обновлён (bs update ставит только bs, bootstrap, core, lib; examples/ и tests/ не затрагиваются). Обновить репозиторий: bs update --pull (или git -C ${__bs_cli_uc_checkout} pull) / the repository is behind GitHub and was NOT updated (examples/ and tests/ are not touched)"
+  fi
+  if [ "${__bs_cli_uc_github}" -eq 1 ] && [ -n "${__bs_cli_uc_checkout}" ]; then
+    if [ "${__bs_cli_uc_state}" = "ahead" ]; then
+      bs_cli_update_warn "update: local repo has commits not pushed to ${__bs_cli_uc_repo%.git}@${__bs_cli_uc_ref} — GitHub lacks them / на GitHub нет локальных коммитов: ${__bs_cli_uc_checkout}"
+    fi
+    if bs_utils_has git && [ -e "${__bs_cli_uc_checkout}/.git" ] \
+       && [ -n "$(git -C "${__bs_cli_uc_checkout}" status --porcelain -- bs bootstrap core lib 2>/dev/null)" ]; then
+      bs_cli_update_warn "update: local repo has uncommitted changes — they are NOT installed from GitHub / незакоммиченные правки не попадут в установку: ${__bs_cli_uc_checkout}"
+    fi
+  fi
+
+  # Запуск от root/sudo: ~ — каталог root, а не пользователя.
+  # Run as root/sudo: ~ is root's home, not the user's.
+  if [ "${__bs_cli_uc_explicit}" -eq 0 ] && [ -n "${SUDO_USER:-}" ]; then
+    __bs_cli_uc_sudo_home="$(bs_cli_update_sudo_home)"
+    if [ -n "${__bs_cli_uc_sudo_home}" ] && [ "${__bs_cli_uc_sudo_home}" != "${HOME}" ] && bs_cli_update_is_install "${__bs_cli_uc_sudo_home}/.local/lib/bs"; then
+      bs_log_info "update: запущено через sudo: ~ = ${HOME}. Локальная установка ${SUDO_USER} (${__bs_cli_uc_sudo_home}/.local/lib/bs) не затронута — обновите её без sudo: bs update --local / run via sudo: its local install is untouched"
+    fi
+  fi
+
+  # Детект установок: стандартные каталоги, установленная копия, из которой
+  # запущен bs, и каталог из обёртки `bs` в PATH (нестандартный --lib).
+  # Detect installs: the standard directories, the installed copy bs runs
+  # from, and the directory named by the `bs` wrapper in PATH (custom --lib).
+  if [ "${__bs_cli_uc_explicit}" -eq 0 ]; then
+    bs_arr_new bs_cli_uc_found "${HOME}/.local/lib/bs" "$(bs_cli_update_system_lib)"
+    if [ ! -d "${BS_ROOT}/tests" ]; then bs_arr_push bs_cli_uc_found "${BS_ROOT}"; fi
+    bs_cli_path_hits bs_cli_uc_hits "${PATH}"
+    eval "$(bs_arr_to_args bs_cli_uc_hits)"
+    for __bs_cli_uc_wrapper in "$@"; do
+      __bs_cli_uc_wroot="$(bs_cli_update_wrapper_root "${__bs_cli_uc_wrapper}")"
+      if [ -z "${__bs_cli_uc_wroot}" ]; then continue; fi
+      if [ ! -d "${__bs_cli_uc_wroot}" ]; then
+        # Сломанная обёртка: раньше молча игнорировалась / was silently ignored
+        bs_cli_update_warn "update: обёртка ${__bs_cli_uc_wrapper} указывает на несуществующий ${__bs_cli_uc_wroot} — переустановите или удалите её / the wrapper points to a missing directory — reinstall or delete it"
+        continue
+      fi
+      bs_arr_push bs_cli_uc_found "${__bs_cli_uc_wroot}"
+    done
+    bs_arr_clear bs_cli_uc_seen
+    eval "$(bs_arr_to_args bs_cli_uc_found)"
+    for __bs_cli_uc_dir in "$@"; do
+      __bs_cli_uc_dir=${__bs_cli_uc_dir%/}
+      if [ ! -d "${__bs_cli_uc_dir}" ]; then continue; fi
+      if [ "${__bs_cli_uc_dir}" = "${__bs_cli_uc_checkout%/}" ]; then continue; fi
+      if bs_arr_contains bs_cli_uc_seen "${__bs_cli_uc_dir}"; then continue; fi
+      bs_arr_push bs_cli_uc_seen "${__bs_cli_uc_dir}"
+      bs_arr_push bs_cli_uc_targets "${__bs_cli_uc_dir}"
+      bs_arr_push bs_cli_uc_kinds auto
+    done
+  fi
+
+  if [ "$(bs_arr_len bs_cli_uc_targets)" -eq 0 ]; then
+    bs_cli_update_box "BS НЕ УСТАНОВЛЕНА / BS NOT INSTALLED" \
+      "Установок BS не найдено / no BS installs found." \
+      "" \
+      "Установите / Install:" \
+      "  ./install.sh --local        (для себя / for you)" \
+      "  sudo ./install.sh           (для всех / system-wide)" \
+      "или укажите каталог / or point to one: bs update --lib DIR"
+    exit 1
+  fi
+  __bs_cli_uc_label=${__bs_cli_uc_from}
+  if [ "${__bs_cli_uc_github}" -eq 1 ]; then
+    __bs_cli_uc_label="${__bs_cli_uc_repo%.git}@${__bs_cli_uc_ref}"
+    bs_log_info "fetching ${__bs_cli_uc_label}"
+    bs_cli_update_fetch "${__bs_cli_uc_repo}" "${__bs_cli_uc_ref}"
+    __bs_cli_uc_from="${UPDATE_FETCH_DIR}/src"
+  fi
+  # Источник проверяется ДО любых записей в цели.
+  # The source is verified BEFORE anything is written to a target.
+  bs_arr_from_lines bs_cli_uc_srcmiss "$(bs_cli_update_source_missing "${__bs_cli_uc_from}")"
+  if [ "$(bs_arr_len bs_cli_uc_srcmiss)" -gt 0 ]; then
+    bs_arr_new bs_cli_uc_lines "Источник не годится / unusable source: ${__bs_cli_uc_label}" "Не хватает / missing:"
+    eval "$(bs_arr_to_args bs_cli_uc_srcmiss)"
+    for __bs_cli_uc_m in "$@"; do bs_arr_push bs_cli_uc_lines "  • ${__bs_cli_uc_m}"; done
+    bs_arr_push bs_cli_uc_lines "" "Ничего не изменено / nothing was changed." \
+      "Нужен репозиторий BS: bs, bootstrap/{init,loader}.sh, core/, lib/ / a BS repository is required"
+    eval "$(bs_arr_to_args bs_cli_uc_lines)"
+    bs_cli_update_box "ИСТОЧНИК НЕ ПОДХОДИТ / INVALID SOURCE" "$@"
+    exit 1
+  fi
+  __bs_cli_uc_from_real="$(bs_cli_update_realpath "${__bs_cli_uc_from}")"
+
+  __bs_cli_uc_ok=0
+  __bs_cli_uc_new_ver="$(bs_version_of "${__bs_cli_uc_from}")"
+  bs_arr_clear bs_cli_uc_same
+  bs_arr_clear bs_cli_uc_miss
+  bs_arr_clear bs_cli_uc_ro
+  bs_arr_clear bs_cli_uc_uptodate
+  bs_arr_clear bs_cli_uc_bad
+  bs_arr_clear bs_cli_uc_fail
+  bs_arr_clear bs_cli_uc_done
+  __bs_cli_uc_seen_real="|"
+  __bs_cli_uc_count=$(bs_arr_len bs_cli_uc_targets)
+  __bs_cli_uc_idx=0
+  while [ "${__bs_cli_uc_idx}" -lt "${__bs_cli_uc_count}" ]; do
+    __bs_cli_uc_raw=''
+    __bs_cli_uc_kind=''
+    bs_arr_get bs_cli_uc_targets "${__bs_cli_uc_idx}" __bs_cli_uc_raw
+    bs_arr_get bs_cli_uc_kinds "${__bs_cli_uc_idx}" __bs_cli_uc_kind
+    __bs_cli_uc_idx=$((__bs_cli_uc_idx + 1))
+    __bs_cli_uc_tin=${__bs_cli_uc_raw%/}
+    if [ -z "${__bs_cli_uc_tin}" ]; then __bs_cli_uc_tin="/"; fi
+    if [ ! -d "${__bs_cli_uc_tin}" ]; then
+      if [ -e "${__bs_cli_uc_tin}" ]; then
+        bs_arr_push bs_cli_uc_bad "• ${__bs_cli_uc_tin} — это не каталог / not a directory"
+      else
+        bs_cli_push_lines bs_cli_uc_miss "$(bs_cli_update_missing_lines "${__bs_cli_uc_tin}" "${__bs_cli_uc_kind}")"
+      fi
+      continue
+    fi
+    __bs_cli_uc_target="$(bs_cli_update_realpath "${__bs_cli_uc_tin}")"
+    case "${__bs_cli_uc_seen_real}" in
+      *"|${__bs_cli_uc_target}|"*) continue ;;
+    esac
+    __bs_cli_uc_seen_real="${__bs_cli_uc_seen_real}${__bs_cli_uc_target}|"
+    if [ -L "${__bs_cli_uc_tin}" ]; then
+      bs_log_info "update: ${__bs_cli_uc_tin} — символическая ссылка → ${__bs_cli_uc_target} / is a symlink"
+    fi
+    if [ "${__bs_cli_uc_from_real}" = "${__bs_cli_uc_target}" ]; then
+      # В финальную рамку, а не WARN в цикле: «ничего не обновлено» — это
+      # не ошибка, а приглашение запустить update из репозитория.
+      # Collected for the final box, not a per-target WARN.
+      bs_arr_push bs_cli_uc_same "${__bs_cli_uc_target}"
+      continue
+    fi
+    # Защита от чужих каталогов: цель обязана быть установкой BS, иначе
+    # rm -rf core/lib/bootstrap стёр бы чужие данные.
+    # Guard against foreign directories: the target must be a BS install,
+    # else replacing core/lib/bootstrap would erase someone's data.
+    if bs_cli_update_is_checkout "${__bs_cli_uc_target}"; then
+      bs_arr_push bs_cli_uc_bad "• ${__bs_cli_uc_target} — исходный репозиторий (.git/tests), не установка; не тронут / a source checkout, not an install; left untouched"
+      continue
+    fi
+    if ! bs_cli_update_is_install "${__bs_cli_uc_target}"; then
+      bs_arr_push bs_cli_uc_bad "• ${__bs_cli_uc_target} — не установка BS (нет bs + bootstrap/init.sh и нет .install); не тронут / not a BS install; left untouched"
+      continue
+    fi
+    case "${__bs_cli_uc_from_real}" in
+      "${__bs_cli_uc_target}"/*)
+        bs_arr_push bs_cli_uc_bad "• ${__bs_cli_uc_target} — источник ${__bs_cli_uc_from_real} внутри цели: обновление стёрло бы его / the source is inside the target"
+        continue ;;
+    esac
+    case "${__bs_cli_uc_target}" in
+      "${__bs_cli_uc_from_real}"/bootstrap/*|"${__bs_cli_uc_from_real}"/core/*|"${__bs_cli_uc_from_real}"/lib/*)
+        bs_arr_push bs_cli_uc_bad "• ${__bs_cli_uc_target} — цель внутри копируемых каталогов источника / the target is inside the source's bootstrap/core/lib"
+        continue ;;
+    esac
+    # Установка без обёртки: bs из PATH её не найдёт.
+    # An install without a wrapper: bs from PATH will not find it.
+    __bs_cli_uc_wrap_path="$(bs_cli_update_install_wrapper "${__bs_cli_uc_target}")"
+    if [ -n "${__bs_cli_uc_wrap_path}" ] && [ ! -e "${__bs_cli_uc_wrap_path}" ]; then
+      bs_cli_update_warn "update: у установки ${__bs_cli_uc_target} нет обёртки ${__bs_cli_uc_wrap_path} — команда bs из PATH её не запустит; восстановить: ./install.sh (--local) / no wrapper"
+    fi
+    # Уже актуально: содержимое совпадает — копировать нечего.
+    # Already up to date: identical content — nothing to copy.
+    if cmp -s "${__bs_cli_uc_from}/bs" "${__bs_cli_uc_target}/bs" \
+       && diff -rq "${__bs_cli_uc_from}/bootstrap" "${__bs_cli_uc_target}/bootstrap" >/dev/null 2>&1 \
+       && diff -rq "${__bs_cli_uc_from}/core" "${__bs_cli_uc_target}/core" >/dev/null 2>&1 \
+       && diff -rq "${__bs_cli_uc_from}/lib" "${__bs_cli_uc_target}/lib" >/dev/null 2>&1; then
+      bs_arr_push bs_cli_uc_uptodate "${__bs_cli_uc_target}"
+      continue
+    fi
+    # Нет прав на запись: в терминале повышаем права через sudo сами; без
+    # терминала — только предупреждение.
+    # Not writable: in a terminal elevate with sudo ourselves; without one warn.
+    __bs_cli_uc_root=""
+    if [ ! -w "${__bs_cli_uc_target}" ]; then
+      if [ -t 0 ] && bs_utils_has sudo; then
+        bs_log_info "update: ${__bs_cli_uc_target} needs root — using sudo / нужны права root"
+        __bs_cli_uc_root=sudo
+      else
+        bs_cli_update_warn "update: target not writable: ${__bs_cli_uc_target} (try: sudo bs update --system)"
+        bs_arr_push bs_cli_uc_ro "${__bs_cli_uc_target}"
+        continue
+      fi
+    fi
+    __bs_cli_uc_old_ver="$(bs_version_of "${__bs_cli_uc_target}")"
+    bs_log_info "syncing ${__bs_cli_uc_label} -> ${__bs_cli_uc_target}" \
+      "(version ${__bs_cli_uc_old_ver:-?} → ${__bs_cli_uc_new_ver})"
+    # Откат на более старую версию — не ошибка, но о нём стоит сказать вслух
+    # Installing an OLDER version is not an error, but worth saying aloud
+    if [ -n "${__bs_cli_uc_old_ver}" ]; then
+      __bs_cli_uc_rc_cmp=0
+      bs_version_compare "${__bs_cli_uc_old_ver}" "${__bs_cli_uc_new_ver}" || __bs_cli_uc_rc_cmp=$?
+      if [ "${__bs_cli_uc_rc_cmp}" -eq 1 ]; then
+        bs_cli_update_warn "update: DOWNGRADE ${__bs_cli_uc_old_ver} → ${__bs_cli_uc_new_ver} (the source is older than the install): ${__bs_cli_uc_target}"
+      fi
+    fi
+    bs_cli_update_cleanup_stale "${__bs_cli_uc_target}" "${__bs_cli_uc_root}"
+    if ! bs_cli_update_lock "${__bs_cli_uc_target}" "${__bs_cli_uc_root}"; then
+      bs_arr_push bs_cli_uc_fail "• ${__bs_cli_uc_target} — уже идёт другое обновление этой цели (замок ${__bs_cli_uc_target}/.update-lock); повторите позже / another update of this target is running; retry later"
+      continue
+    fi
+    __bs_cli_uc_rc_apply=0
+    bs_cli_update_apply "${__bs_cli_uc_target}" "${__bs_cli_uc_from}" "${__bs_cli_uc_new_ver}" "${__bs_cli_uc_root}" || __bs_cli_uc_rc_apply=$?
+    if [ "${__bs_cli_uc_rc_apply}" -eq 1 ]; then
+      bs_cli_update_unlock "${__bs_cli_uc_target}"
+      bs_cli_update_warn "update: copy failed for ${__bs_cli_uc_target} (нет места/прав?); прежняя версия сохранена / disk full or no permission? the previous version is kept"
+      bs_arr_push bs_cli_uc_fail "• ${__bs_cli_uc_target} — копирование не удалось (нет места/прав?); прежняя версия сохранена / copy failed; the previous version is kept"
+      continue
+    elif [ "${__bs_cli_uc_rc_apply}" -eq 2 ]; then
+      bs_cli_update_unlock "${__bs_cli_uc_target}"
+      bs_cli_update_warn "update: самопроверка не прошла (bs version), прежняя версия ${__bs_cli_uc_old_ver:-?} восстановлена / smoke test failed, previous version restored: ${__bs_cli_uc_target}"
+      bs_arr_push bs_cli_uc_fail "• ${__bs_cli_uc_target} — новая копия не прошла самопроверку; прежняя версия ${__bs_cli_uc_old_ver:-?} восстановлена / new copy failed the smoke test; rolled back"
+      continue
+    fi
+    bs_cli_update_manifest "${__bs_cli_uc_target}" "${__bs_cli_uc_from}" "${__bs_cli_uc_label}" "${__bs_cli_uc_root}"
+    bs_cli_update_unlock "${__bs_cli_uc_target}"
+    __bs_cli_uc_ok=1
+    bs_arr_push bs_cli_uc_done "${__bs_cli_uc_target}: ${__bs_cli_uc_old_ver:-?} → ${__bs_cli_uc_new_ver}"
+    if [ "${__bs_cli_uc_verbose}" -eq 1 ]; then
+      bs_log_info "  files: $(find "${__bs_cli_uc_from}/core" "${__bs_cli_uc_from}/lib" -name '*.sh' | wc -l) modules copied"
+    fi
+  done
+
+  bs_arr_clear bs_cli_uc_reasons
+  eval "$(bs_arr_to_args bs_cli_uc_same)"
+  for __bs_cli_uc_p in "$@"; do
+    bs_arr_push bs_cli_uc_reasons "• ${__bs_cli_uc_p} — источник совпадает с целью (bs запущен из этой копии) / source equals target (running from this copy)"
+  done
+  bs_cli_arr_append bs_cli_uc_reasons bs_cli_uc_miss
+  eval "$(bs_arr_to_args bs_cli_uc_ro)"
+  for __bs_cli_uc_p in "$@"; do
+    bs_arr_push bs_cli_uc_reasons "• ${__bs_cli_uc_p} — нет прав на запись / not writable (try: sudo bs update --system)"
+  done
+  bs_cli_arr_append bs_cli_uc_reasons bs_cli_uc_bad
+  bs_cli_arr_append bs_cli_uc_reasons bs_cli_uc_fail
+  eval "$(bs_arr_to_args bs_cli_uc_uptodate)"
+  for __bs_cli_uc_p in "$@"; do
+    bs_arr_push bs_cli_uc_reasons "• ${__bs_cli_uc_p} — уже актуально / already up to date (version $(bs_version_of "${__bs_cli_uc_p}"))"
+  done
+  if [ "$(bs_arr_len bs_cli_uc_same)" -gt 0 ]; then
+    bs_arr_push bs_cli_uc_reasons \
+      "" \
+      "Запустите из каталога репозитория / Run from the repo directory:" \
+      "  cd <repo> && ./bs update" \
+      "или укажите источник / or pass the source:" \
+      "  bs update --from <repo-path>" \
+      "или обновитесь с GitHub / or update from GitHub:" \
+      "  bs update --github"
+  fi
+  # Отказ: цели, что не удалось обновить. Автопоиск: отказ от чужого/сломанного
+  # каталога не считается ошибкой запуска.
+  # Failures: targets that could not be updated. In autodetect mode refusing a
+  # foreign/broken directory is not a run failure.
+  __bs_cli_uc_failures=0
+  if [ "$(bs_arr_len bs_cli_uc_miss)" -gt 0 ]; then __bs_cli_uc_failures=1; fi
+  __bs_cli_uc_nro=$(bs_arr_len bs_cli_uc_ro)
+  __bs_cli_uc_nfail=$(bs_arr_len bs_cli_uc_fail)
+  __bs_cli_uc_failures=$((__bs_cli_uc_failures + __bs_cli_uc_nro + __bs_cli_uc_nfail))
+  if [ "${__bs_cli_uc_explicit}" -ne 0 ]; then
+    __bs_cli_uc_nbad=$(bs_arr_len bs_cli_uc_bad)
+    __bs_cli_uc_failures=$((__bs_cli_uc_failures + __bs_cli_uc_nbad))
+  fi
+
+  if [ "${__bs_cli_uc_ok}" -eq 1 ]; then
+    bs_log_header "UPDATE COMPLETE / ОБНОВЛЕНИЕ ЗАВЕРШЕНО"
+    printf '%s\n' "${UPDATE_RUN_BLOCK}"
+    eval "$(bs_arr_to_args bs_cli_uc_done)"
+    for __bs_cli_uc_p in "$@"; do
+      printf '  ✓ %s\n' "${__bs_cli_uc_p}"
+    done
+    bs_cli_update_path_summary
+    bs_cli_update_state_summary "${__bs_cli_uc_checkout}" "${__bs_cli_uc_state}" "${__bs_cli_uc_new_ver}"
+    if [ "$(bs_arr_len bs_cli_uc_reasons)" -gt 0 ]; then
+      __bs_cli_uc_title="ПРОПУЩЕНО / SKIPPED"
+      if [ "${__bs_cli_uc_failures}" -ne 0 ]; then __bs_cli_uc_title="ЧАСТЬ ЦЕЛЕЙ ПРОПУЩЕНА / SOME TARGETS SKIPPED"; fi
+      eval "$(bs_arr_to_args bs_cli_uc_reasons)"
+      bs_cli_update_box "${__bs_cli_uc_title}" "$@"
+    fi
+    if [ "${__bs_cli_uc_failures}" -eq 0 ]; then
+      bs_log_success "sync done — changes are live without reinstalling"
+      return 0
+    fi
+    bs_cli_update_die "update: часть целей не обновлена / some targets were not updated (см. выше / see above)"
+  fi
+
+  # Итоговая рамка вместо сырого ERROR: понятно, что случилось и что делать.
+  # A framed summary instead of a raw ERROR: clear what happened and what to do.
+  __bs_cli_uc_title="ОБНОВЛЕНИЙ НЕТ / NO UPDATES"
+  if [ "${__bs_cli_uc_failures}" -ne 0 ]; then __bs_cli_uc_title="ОБНОВЛЕНИЕ НЕ ВЫПОЛНЕНО / UPDATE NOT DONE"; fi
+  eval "$(bs_arr_to_args bs_cli_uc_reasons)"
+  bs_cli_update_box "${__bs_cli_uc_title}" "$@"
+  if [ "${__bs_cli_uc_failures}" -eq 0 ]; then
+    bs_cli_update_state_summary "${__bs_cli_uc_checkout}" "${__bs_cli_uc_state}" "${__bs_cli_uc_new_ver}"
+  fi
+  if [ "${__bs_cli_uc_failures}" -ne 0 ]; then exit 1; fi
+  return 0
+}
+
 bs_shell_alias bs_cli_die bs::cli::die
 bs_shell_alias bs_cli_help bs::cli::help
 bs_shell_alias bs_cli_help_cmd bs::cli::help_cmd
@@ -1765,3 +2867,20 @@ bs_shell_alias bs_cli_where_kind_by_path bs::cli::where_kind_by_path
 bs_shell_alias bs_cli_where_size bs::cli::where_size
 bs_shell_alias bs_cli_where_help bs::cli::where_help
 bs_shell_alias bs_cli_where_cmd bs::cli::where_cmd
+bs_shell_alias bs_cli_update_fetch_cleanup bs::cli::update_fetch_cleanup
+bs_shell_alias bs_cli_update_fetch bs::cli::update_fetch
+bs_shell_alias bs_cli_update_local_state bs::cli::update_local_state
+bs_shell_alias bs_cli_update_rollback bs::cli::update_rollback
+bs_shell_alias bs_cli_update_inflight_cleanup bs::cli::update_inflight_cleanup
+bs_shell_alias bs_cli_update_cleanup_stale bs::cli::update_cleanup_stale
+bs_shell_alias bs_cli_update_lock bs::cli::update_lock
+bs_shell_alias bs_cli_update_unlock bs::cli::update_unlock
+bs_shell_alias bs_cli_update_fix_shebang bs::cli::update_fix_shebang
+bs_shell_alias bs_cli_update_smoke bs::cli::update_smoke
+bs_shell_alias bs_cli_update_apply bs::cli::update_apply
+bs_shell_alias bs_cli_update_manifest bs::cli::update_manifest
+bs_shell_alias bs_cli_update_path_summary bs::cli::update_path_summary
+bs_shell_alias bs_cli_update_pull_blocker bs::cli::update_pull_blocker
+bs_shell_alias bs_cli_update_pull_checkout bs::cli::update_pull_checkout
+bs_shell_alias bs_cli_update_state_summary bs::cli::update_state_summary
+bs_shell_alias bs_cli_update_cmd bs::cli::update_cmd

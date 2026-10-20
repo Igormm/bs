@@ -4,7 +4,7 @@
 # tests/unit/testbsnobashunit.sh — команда bs на машине БЕЗ bash: ash, dash, ksh, mksh и zsh
 #
 # The `bs` entry point is "@shell posix": with no bash 4.2+ it stays in the current shell and serves the
-# commands that are POSIX already (help, version, env, list, calc, init-shell, shebang, call, doctor, uninstall, where); the others answer that they need bash,
+# commands that are POSIX already (help, version, env, list, calc, init-shell, shebang, call, doctor, uninstall, where, update); the others answer that they need bash,
 # with exit code 1. Every bash is hidden behind a mount namespace (unshare -Urm). A machine where the
 # namespace cannot be made is reported, never counted as passed.
 # Точка входа `bs` — "@shell posix": без bash 4.2+ она остаётся в текущей оболочке и обслуживает команды,
@@ -58,8 +58,24 @@ run uninstall > "\$H/un2.txt" 2>&1; echo "uninstall-none=\$?"
 grep -q 'УДАЛЯТЬ НЕЧЕГО' "\$H/un2.txt" && echo nothing-box
 run where > "\$H/where.txt" 2>&1; echo "where=\$?"
 grep -q '== Итог' "\$H/where.txt" && echo where-summary
-run update > "\$H/update.txt" 2>&1; echo "update=\$?"
-grep -q 'требует bash 4.2+' "\$H/update.txt" && echo update-says-bash
+U="\$H/up"; mkdir -p "\$U/src/bootstrap" "\$U/src/core" "\$U/src/lib" "\$U/lib/bs/bootstrap" "\$U/bin"
+for f in bootstrap/init.sh bootstrap/loader.sh bootstrap/shell.sh bootstrap/trampoline.sh bootstrap/shebang.sh bootstrap/bs.sh core/prereq.sh; do : > "\$U/src/\$f"; done
+printf 'export BS_VERSION="9.9.9"\n' > "\$U/src/core/version.sh"
+printf '#!${sb}/bin/dash\necho "BS Framework version: 9.9.9"\n' > "\$U/src/bs"; chmod +x "\$U/src/bs"
+: > "\$U/lib/bs/bs"; chmod +x "\$U/lib/bs/bs"; : > "\$U/lib/bs/bootstrap/init.sh"
+printf 'mode=custom\nbin=%s\n' "\$U/bin/bs" > "\$U/lib/bs/.install"
+printf 'export BS_ROOT="%s"\n' "\$U/lib/bs" > "\$U/bin/bs"
+run update --lib "\$U/lib/bs" --from "\$U/src" > "\$H/up.txt" 2>&1; echo "update=\$?"
+grep -q 'sync done' "\$H/up.txt" && echo update-done
+"\$U/lib/bs/bs" version | grep -q 'version: 9.9.9' && echo new-bs
+grep -q '^updated_from=' "\$U/lib/bs/.install" && echo manifest-updated
+if [ -z "\$(ls -A "\$U/lib/bs" | grep '^[.]update')" ]; then echo no-leftovers; fi
+printf '#!${sb}/bin/dash\necho nope\n' > "\$U/src/bs"
+printf 'export BS_VERSION="9.9.10"\n' > "\$U/src/core/version.sh"
+run update --lib "\$U/lib/bs" --from "\$U/src" > "\$H/up2.txt" 2>&1; echo "update-bad=\$?"
+"\$U/lib/bs/bs" version | grep -q 'version: 9.9.9' && echo rolled-back
+run build > "\$H/build.txt" 2>&1; echo "build=\$?"
+grep -q 'требует bash 4.2+' "\$H/build.txt" && echo build-says-bash
 run nonsense > "\$H/bad.txt" 2>&1; echo "unknown=\$?"
 RUNNER
 }
@@ -76,11 +92,12 @@ main() {
     : > "${T}/nobash"; chmod +x "${T}/nobash"
     local sb="${T}/sb" tool p sh_name sh_bin out H
     mkdir -p "${sb}/bin"
-    for tool in busybox printf ls cat head tail tr sed grep readlink mktemp cp mv rm chmod mkdir rmdir dirname basename wc cut od env uname id date git sort touch awk find dc; do
+    for tool in busybox printf ls cat head tail tr sed grep readlink mktemp cp mv rm chmod mkdir rmdir dirname basename wc cut od env uname id date git sort touch awk find dc tee cmp diff timeout du stat ln; do
         p="$(PATH="/usr/bin:/bin" type -P "${tool}" 2>/dev/null || true)"
         [[ -n "${p}" && "${p}" == /* ]] && ln -sf "${p}" "${sb}/bin/${tool}"
     done
     ln -sf "$(command -v busybox)" "${sb}/bin/ash"
+    ln -sf "$(command -v busybox)" "${sb}/bin/sh"
     for sh_name in dash ksh mksh zsh; do
         p="$(PATH="/usr/bin:/bin" type -P "${sh_name}" 2>/dev/null || true)"
         [[ -n "${p}" && "${p}" == /* ]] && ln -sf "${p}" "${sb}/bin/${sh_name}"
@@ -90,7 +107,7 @@ main() {
         if [[ ! -x "${sb}/bin/${sh_name}" ]]; then echo "skip: ${sh_name} is not installed — NOT verified / не установлен — НЕ проверено" >&2; continue; fi
         H="${T}/home-${sh_name}"; mkdir -p "${H}"
         out="$(timeout 300 unshare -Urm busybox sh "${T}/runner.sh" "${sh_name}" "${H}" 2>&1 | tr '\n' ' ' | sed 's/ $//')" || true
-        testframework::assert_equal "version=BS Framework version: 0.8.0 help=BS Framework 0.8.0 list=N modules calc=35 init-shell=# BS for dash shebang=#! call=1.5 MiB doctor=0 doctor: N passed, 0 failed uninstall=0 lib-gone bin-gone uninstall-none=1 nothing-box where=0 where-summary update=1 update-says-bash unknown=1" "${out}" "${sh_name}: version, help, list, calc work; doctor, uninstall and where work; the rest and an unknown command fail clearly" || true
+        testframework::assert_equal "version=BS Framework version: 0.8.0 help=BS Framework 0.8.0 list=N modules calc=35 init-shell=# BS for dash shebang=#! call=1.5 MiB doctor=0 doctor: N passed, 0 failed uninstall=0 lib-gone bin-gone uninstall-none=1 nothing-box where=0 where-summary update=0 update-done new-bs manifest-updated no-leftovers update-bad=1 rolled-back build=1 build-says-bash unknown=1" "${out}" "${sh_name}: version, help, list, calc work; doctor, uninstall, where and update work; the rest and an unknown command fail clearly" || true
     done
     rm -rf "${T:?}"
     testframework::summary
