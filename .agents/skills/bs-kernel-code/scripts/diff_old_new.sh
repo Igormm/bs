@@ -14,8 +14,13 @@
 # сниппеты зовут привычные вызывающим имена (log::info, utils::has …): они и не должны меняться.
 #
 # Usage / Использование:
-#   bash diff_old_new.sh --file core/logger.sh [--ref HEAD] [--cases FILE] [--env NAME=v1,v2]... [--show N]
+#   bash diff_old_new.sh --file core/logger.sh [--ref HEAD] [--also FILE]... [--cases FILE] [--env NAME=v1,v2]... [--show N]
 #   --file  path of the converted file, relative to the repo root (required)
+#   --also  one more file taken from --ref into the old tree, repeatable. Needed when the conversion
+#           changed a caller that the old file cannot work without, e.g. bootstrap/init.sh, which
+#           now calls bs_config_load: the old core/config.sh does not define it
+#           / ещё один файл из --ref в старое дерево, повторяемый: нужен, когда перевод изменил
+#           вызывающего (bootstrap/init.sh зовёт bs_config_load, в старом config.sh её нет)
 #   --ref   where the old version lives (default HEAD: the committed file against the working copy;
 #           use e.g. 3a20a84^ for an already committed conversion)
 #   --cases file with one snippet per line (# lines and blank lines are skipped); default: stdin
@@ -28,11 +33,12 @@ set -uo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)" # shell-gate: a bash tool of its own
 file=""; ref="HEAD"; cases="-"; show=3
-declare -a env_names=() env_vals=()
+declare -a env_names=() env_vals=() also=()
 while (( $# > 0 )); do
   case "$1" in
     --file) file="${2:?--file needs a path}"; shift 2 ;;
     --ref) ref="${2:?--ref needs a revision}"; shift 2 ;;
+    --also) also+=("${2:?--also needs a path}"); shift 2 ;;
     --cases) cases="${2:?--cases needs a file}"; shift 2 ;;
     --env)
       [[ "${2:-}" == *=* ]] || { echo "bad --env: ${2:-}" >&2; exit 2; }
@@ -52,6 +58,10 @@ tmp="$(mktemp -d)"; trap 'rm -rf "${tmp:?}"' EXIT
 mkdir -p "${tmp}/old" "${tmp}/home"
 tar --exclude=.git --exclude=.claude -cf - . | tar -xf - -C "${tmp}/old"
 git show "${ref}:${file}" > "${tmp}/old/${file}"
+for extra in ${also[@]+"${also[@]}"}; do
+  git cat-file -e "${ref}:${extra}" 2>/dev/null || { echo "${extra} does not exist in ${ref}" >&2; exit 2; }
+  git show "${ref}:${extra}" > "${tmp}/old/${extra}"
+done
 
 declare -a snippets=()
 while IFS= read -r line || [[ -n "${line}" ]]; do
