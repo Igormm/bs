@@ -621,6 +621,17 @@ bs_cli_doctor_cmd() {
     fi
   done
 
+  # Мосты совместимости: init.sh грузит их в режиме full (bash) / Compatibility bridges: init.sh loads them in the full mode (bash)
+  for __bs_cli_df2 in lib/compat/deps.sh lib/compat/lang.sh lib/compat/args.sh; do
+    if [ -f "${BS_ROOT}/${__bs_cli_df2}" ]; then
+      bs_log_success "$(printf '  %-8s | %-30s | %s' "OK" "${__bs_cli_df2}" "compat bridge (bash)")"
+      __bs_cli_dpass=$((__bs_cli_dpass + 1))
+    else
+      bs_log_error "$(printf '  %-8s | %-30s | %s' "FAIL" "${__bs_cli_df2}" "compat bridge missing")"
+      __bs_cli_dfail=1
+    fi
+  done
+
   # Required directories / Обязательные директории
   for __bs_cli_dd in core lib; do
     if [ -d "${BS_ROOT}/${__bs_cli_dd}" ]; then
