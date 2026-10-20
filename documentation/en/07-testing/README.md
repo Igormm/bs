@@ -90,7 +90,14 @@ Test files source `tests/testframework.sh`, which provides assertions and counte
 | `testframework::assert_equal "expected" "$actual" "name"` | String equality |
 | `testframework::assert_file_exists "path" "name"` | File exists |
 | `testframework::assert_command "cmd" "name"` | Command exits with 0 |
+| `testframework::skip "name" "reason"` | Skip a check this environment cannot run (root, a missing tool); printed, counted and listed by `runalltests.sh`, never a pass |
+| `testframework::is_root` | True under root (file modes do not stop root) |
 | `testframework::summary` | Print totals; returns 0 when nothing failed |
+
+The framework also prepares the environment: under a non-UTF-8 locale (POSIX/C,
+common in containers and CI) it switches `LC_CTYPE` to a UTF-8 locale and says so
+in one line, because glyph and frame-width checks need character counting; and it
+turns off git commit signing for the temporary repositories tests create.
 
 A typical test (pattern used by the real unit tests):
 

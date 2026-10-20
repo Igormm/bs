@@ -28,6 +28,12 @@ declare -i passed_tests=0
 declare -i failed_tests=0
 declare -i skipped_tests=0
 
+# Пропущенные проверки внутри файлов (testframework::skip) собираются сюда для итога
+# Checks skipped inside the files (testframework::skip) are collected here for the summary
+BS_TEST_SKIP_LOG="$(mktemp)"
+export BS_TEST_SKIP_LOG
+trap 'rm -f "${BS_TEST_SKIP_LOG}"' EXIT
+
 # Разбор аргументов
 with_root=0
 for arg in "$@"; do
@@ -159,6 +165,15 @@ main() {
   echo -e "${GREEN}Passed / Пройдено:${NC} $passed_tests"
   echo -e "${RED}Failed / Провалено:${NC} $failed_tests"
   echo -e "${YELLOW}Skipped / Пропущено:${NC} $skipped_tests"
+  local -i skipped_checks
+  skipped_checks="$(wc -l < "${BS_TEST_SKIP_LOG}")"
+  if [[ $skipped_checks -gt 0 ]]; then
+    echo -e "${YELLOW}Skipped checks inside tests / Пропущено проверок внутри тестов:${NC} $skipped_checks"
+    local line
+    while IFS= read -r line; do
+      echo -e "  ${YELLOW}⊘${NC} ${line}"
+    done < "${BS_TEST_SKIP_LOG}"
+  fi
   echo
 
   if [[ $failed_tests -eq 0 ]]; then
