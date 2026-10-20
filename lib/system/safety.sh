@@ -160,6 +160,22 @@ safety::validate_path() {
     while [[ "${canon}" != "/" && "${canon}" == */ ]]; do
         canon="${canon%/}"
     done
+    # Сегменты "." и ".." разбираются лексически: без realpath (macOS, урезанный
+    # PATH) "/tmp/../etc" иначе прошёл бы проверку, а root может писать в /etc
+    # "." and ".." segments are resolved lexically: without realpath (macOS, a
+    # trimmed PATH) "/tmp/../etc" would otherwise pass, and root can write to /etc
+    [[ "${canon}" == /* ]] || canon="${PWD%/}/${canon}"
+    local -a segs=()
+    local seg norm=""
+    IFS='/' read -r -a segs <<< "${canon}"
+    for seg in "${segs[@]}"; do
+        case "${seg}" in
+            ''|.) ;;
+            ..) norm="${norm%/*}" ;;
+            *) norm+="/${seg}" ;;
+        esac
+    done
+    canon="${norm:-/}"
     if utils::has realpath; then
         real="$(realpath -m -- "${path}" 2>/dev/null)" || real=""
     fi

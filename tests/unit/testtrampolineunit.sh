@@ -90,6 +90,8 @@ test_arguments_survive() {
     local sh_name sh_bin
     while IFS= read -r sh_bin; do
         sh_name="${sh_bin##*/}"
+        # bs calc ведёт к dc / bs calc ends in dc
+        utils::has dc || { testframework::skip "${sh_name}: an argument with spaces arrives intact" "dc is not installed / dc не установлен"; continue; }
         run "${sh_bin}" ./bs calc '2 3 + 4 *'
         eq "20" "${OUT}" "${sh_name}: an argument with spaces arrives intact"
     done < <(testframework::posix_shells 2>/dev/null)

@@ -462,7 +462,7 @@ declare -g SYSTEM_HW_LOADED="1"
 #   режим EFI — uefi/bios;  виртуализация — vmx/svm/no;  маркеры флагов — "1"
 #
 # Test hooks (override paths) / Тестовые хуки (переопределение путей):
-#   HW_DMI_PATH, HW_HWMON_PATH, HW_POWER_PATH, HW_NET_PATH, HW_BLOCK_PATH
+#   HW_DMI_PATH, HW_HWMON_PATH, HW_POWER_PATH, HW_NET_PATH, HW_BLOCK_PATH, HW_BUS_PATH
 # ==========================================
 
 # @global HW_DMI_PATH — Hook: DMI sysfs path /sys/class/dmi/id (category: hook)
@@ -480,6 +480,9 @@ declare -g SYSTEM_HW_LOADED="1"
 # @global HW_BLOCK_PATH — Hook: block devices sysfs path /sys/class/block (category: hook)
 # @global HW_BLOCK_PATH — Хук: путь блочных устройств в sysfs /sys/class/block (категория: hook)
 : "${HW_BLOCK_PATH:=/sys/block}"
+# @global HW_BUS_PATH — Hook: bus sysfs path /sys/bus (usb, pci) (category: hook)
+# @global HW_BUS_PATH — Хук: путь шин в sysfs /sys/bus (usb, pci) (категория: hook)
+: "${HW_BUS_PATH:=/sys/bus}"
 
 # @global HW_DB — Hw: hardware database map (category: constant)
 # @global HW_DB — Hw: база данных оборудования (категория: constant)
@@ -508,6 +511,24 @@ hw::__read_file() {
   if [[ -r "${1}" ]]; then
     printf '%s' "$(<"${1}")"
   fi
+}
+
+# @private
+# @description Count the entries of a directory; 0 when it is missing (no USB bus
+# in a container or VM). No ls | wc pipeline: under the caller's pipefail a
+# missing directory made it fail and stopped the whole build.
+# @description Посчитать записи каталога; 0, если его нет (нет шины USB в
+# контейнере или VM). Без конвейера ls | wc: при pipefail вызывающего
+# отсутствующий каталог ронял его и обрывал всю сборку.
+# @param $1 Directory / Каталог
+# @stdout the count / число
+hw::__count_entries() {
+  local -a entries=()
+  if [[ -d "${1}" ]]; then
+    entries=("${1}"/*)
+    [[ -e "${entries[0]}" || -L "${entries[0]}" ]] || entries=()
+  fi
+  printf '%d' "${#entries[@]}"
 }
 
 # @private
@@ -608,13 +629,8 @@ hw::__build() {
   hw::__build_storage
 
   # --- Counters / счётчики
-  # wc -l выводит с ведущими пробелами — приводим к чистому целому
-  # wc -l pads with leading spaces — normalize to a plain integer
-  local usb_count pci_count
-  usb_count="$(ls -1 /sys/bus/usb/devices 2>/dev/null | wc -l)"
-  pci_count="$(ls -1 /sys/bus/pci/devices 2>/dev/null | wc -l)"
-  hw::__set mb.usb.count "$(printf '%d' "${usb_count}")"
-  hw::__set mb.pci.count "$(printf '%d' "${pci_count}")"
+  hw::__set mb.usb.count "$(hw::__count_entries "${HW_BUS_PATH}/usb/devices")"
+  hw::__set mb.pci.count "$(hw::__count_entries "${HW_BUS_PATH}/pci/devices")"
   if [[ -d /sys/class/tpm/tpm0 ]]; then
     hw::__set mb.tpm.present "yes"
   else

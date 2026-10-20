@@ -20,6 +20,64 @@ else
   readonly TF_COLOR=1
 fi
 
+# Локаль: тесты проверяют ширину рамок и символы (┌ ▸ █, кириллица), а ${#s} и
+# ${s:0:1} в bash считают символы только в UTF-8-локали. В POSIX/C (ssh без LANG,
+# контейнеры, CI) переключаем LC_CTYPE на UTF-8-локаль, если она есть, и пишем об
+# этом одну строку; остальные категории (сортировка, сообщения) не трогаем. Нет
+# UTF-8-локали — предупреждение, и такие тесты падают честно.
+# Locale: tests check frame widths and glyphs (┌ ▸ █, Cyrillic), and bash's ${#s}
+# and ${s:0:1} count characters only under a UTF-8 locale. Under POSIX/C (ssh
+# without LANG, containers, CI) LC_CTYPE is switched to a UTF-8 locale when one
+# exists, with a one-line note; the other categories (collation, messages) stay
+# as they are. No UTF-8 locale means a warning, and such tests fail honestly.
+testframework::__is_utf8() {
+  local s='ж'
+  (( ${#s} == 1 ))
+}
+
+if ! testframework::__is_utf8; then
+  __tf_was="${LC_ALL:-${LC_CTYPE:-${LANG:-POSIX}}}"
+  __tf_utf8=""
+  for __tf_loc in C.UTF-8 C.utf8 en_US.UTF-8 en_US.utf8; do
+    if ( unset LC_ALL; export LC_CTYPE="${__tf_loc}"; testframework::__is_utf8 ) 2>/dev/null; then
+      __tf_utf8="${__tf_loc}"
+      break
+    fi
+  done
+  if [[ -n "${__tf_utf8}" ]]; then
+    # LC_ALL перекрывает LC_CTYPE: его значение уходит в LANG / LC_ALL overrides LC_CTYPE: its value moves to LANG
+    if [[ -n "${LC_ALL:-}" ]]; then
+      export LANG="${LC_ALL}"
+      unset LC_ALL
+    fi
+    export LC_CTYPE="${__tf_utf8}"
+    printf 'note: LC_CTYPE=%s for the tests (was %s) / примечание: LC_CTYPE=%s для тестов (было %s)\n' \
+      "${__tf_utf8}" "${__tf_was}" "${__tf_utf8}" "${__tf_was}" >&2
+  else
+    printf 'warning: no UTF-8 locale (was %s); glyph and frame-width tests will fail / предупреждение: нет UTF-8-локали (было %s); тесты символов и ширины рамок упадут\n' \
+      "${__tf_was}" "${__tf_was}" >&2
+  fi
+  unset __tf_was __tf_utf8 __tf_loc
+fi
+
+# git: тесты коммитят во временные репозитории; подпись коммитов из личного
+# ~/.gitconfig (gpg/ssh-ключ, внешний подписчик) там не нужна и роняет коммит.
+# Отключаем только её, через переменные окружения git (git ≥ 2.31), прочие
+# настройки (safe.directory и т.д.) остаются.
+# git: tests commit into temporary repositories; commit signing from a personal
+# ~/.gitconfig (a gpg/ssh key, an external signer) is not needed there and breaks
+# the commit. Only signing is turned off, through git's environment config
+# (git >= 2.31); every other setting (safe.directory and so on) stays. Pairs
+# already in GIT_CONFIG_* are kept: ours are appended once.
+# Уже заданные пары GIT_CONFIG_* сохраняются: наши дописываются один раз.
+if [[ -z "${BS_TEST_GIT_NOSIGN:-}" ]]; then
+  __tf_n="${GIT_CONFIG_COUNT:-0}"
+  export "GIT_CONFIG_KEY_${__tf_n}=commit.gpgsign" "GIT_CONFIG_VALUE_${__tf_n}=false"
+  export "GIT_CONFIG_KEY_$((__tf_n + 1))=tag.gpgsign" "GIT_CONFIG_VALUE_$((__tf_n + 1))=false"
+  export GIT_CONFIG_COUNT=$((__tf_n + 2)) BS_TEST_GIT_NOSIGN=1
+  unset __tf_n
+fi
+
 # Интерпретатор для запуска CLI в тестах: тот же bash, что исполняет BS (не первый в PATH)
 # The interpreter that runs the CLI in tests: the same bash that runs BS (not the first in PATH)
 if declare -F bs::shell::host >/dev/null 2>&1; then
@@ -48,6 +106,7 @@ fi
 declare -g tests_run=0
 declare -g tests_passed=0
 declare -g tests_failed=0
+declare -g tests_skipped=0
 
 # Заголовок
 # @description Print a bilingual box-drawing header banner / Рамка-заголовок на двух языках
@@ -72,6 +131,7 @@ testframework::init() {
   tests_run=0
   tests_passed=0
   tests_failed=0
+  tests_skipped=0
 }
 
 # Функция проверки условия
@@ -142,6 +202,33 @@ testframework::assert_false() {
     ((++tests_failed))
     return 1
   fi
+}
+
+# Функция пропуска проверки
+# @description Skip a check that cannot run in this environment (root, a missing tool).
+#   Not a pass: the line is printed, counted in the summary and, when the runner sets
+#   BS_TEST_SKIP_LOG, listed in its final report. Never use it to silence a failure.
+# @description Пропустить проверку, которую нельзя выполнить в этом окружении (root,
+#   нет утилиты). Это не «пройдено»: строка печатается, учитывается в сводке и, если
+#   раннер задал BS_TEST_SKIP_LOG, попадает в его итоговый отчёт. Не для заглушки падений.
+# @param $1 Test name / Название теста
+# @param $2 Reason / Причина
+# @example testframework::skip "uninstall refuses a read-only lib" "root ignores file modes"
+testframework::skip() {
+  local test_name="${1:-Unknown test}"
+  local reason="${2:-no reason given}"
+
+  ((++tests_skipped))
+  echo -e "  ${YELLOW}⊘ $test_name: SKIPPED — $reason${NC}"
+  if [[ -n "${BS_TEST_SKIP_LOG:-}" ]]; then
+    printf '%s — %s\n' "${test_name}" "${reason}" >> "${BS_TEST_SKIP_LOG}" || true
+  fi
+  return 0
+}
+
+# @description True when the tests run as root (root ignores file modes) / Тесты идут под root
+testframework::is_root() {
+  [[ "${EUID:-$(id -u)}" -eq 0 ]]
 }
 
 # Функция проверки равенства
@@ -255,6 +342,9 @@ testframework::summary() {
   echo -e "${BLUE}Tests run / Тестов запущено:${NC} $tests_run"
   echo -e "${GREEN}Passed / Пройдено:${NC} $tests_passed"
   echo -e "${RED}Failed / Провалено:${NC} $tests_failed"
+  if [[ $tests_skipped -gt 0 ]]; then
+    echo -e "${YELLOW}Skipped / Пропущено:${NC} $tests_skipped"
+  fi
   echo
 
   if [[ $tests_failed -eq 0 ]]; then

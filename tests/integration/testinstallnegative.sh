@@ -225,7 +225,7 @@ t_uninstall_other_wrapper() {
 # --------------------------------------------------------------------------
 
 t_unwritable_system() {
-    (( IS_ROOT )) && { printf "  ⊘ Skipping: running as root (permission bits do not apply)\n"; return 0; }
+    (( IS_ROOT )) && { testframework::skip "${FUNCNAME[0]}" "running as root (permission bits do not apply)"; return 0; }
     new_env
     mkdir -p "${E}/ro"; chmod 555 "${E}/ro"
     run BS_SYSTEM_PREFIX="${E}/ro" -- install
@@ -258,7 +258,7 @@ t_writable_prefix_without_root() {
 }
 
 t_unwritable_custom_prefix() {
-    (( IS_ROOT )) && { printf "  ⊘ Skipping: running as root\n"; return 0; }
+    (( IS_ROOT )) && { testframework::skip "${FUNCNAME[0]}" "running as root (permission bits do not apply)"; return 0; }
     new_env
     mkdir -p "${E}/ro"; chmod 555 "${E}/ro"
     run PREFIX="${E}/ro/deep/x" -- install
@@ -418,7 +418,7 @@ t_local_custom_bindir_path() {
 }
 
 t_rc_readonly_on_install() {
-    (( IS_ROOT )) && { printf "  ⊘ Skipping: running as root\n"; return 0; }
+    (( IS_ROOT )) && { testframework::skip "${FUNCNAME[0]}" "running as root (permission bits do not apply)"; return 0; }
     new_env
     : > "${E}/home/.bashrc"; chmod 444 "${E}/home/.bashrc"
     run -- --local
@@ -455,7 +455,7 @@ t_uninstall_keeps_std_path_line() {
 # --------------------------------------------------------------------------
 
 t_transaction_fresh_failure() {
-    (( IS_ROOT )) && { printf "  ⊘ Skipping: running as root (cp ignores modes)\n"; return 0; }
+    (( IS_ROOT )) && { testframework::skip "${FUNCNAME[0]}" "running as root (cp ignores modes)"; return 0; }
     new_env; mk_src
     chmod 000 "${E}/src/lib/io"
     RC=0
@@ -471,7 +471,7 @@ t_transaction_fresh_failure() {
 }
 
 t_transaction_keeps_previous() {
-    (( IS_ROOT )) && { printf "  ⊘ Skipping: running as root\n"; return 0; }
+    (( IS_ROOT )) && { testframework::skip "${FUNCNAME[0]}" "running as root (permission bits do not apply)"; return 0; }
     new_env; mk_src
     run -- --local
     echo mark > "${E}/home/.local/lib/bs/MARK"
@@ -537,7 +537,13 @@ t_uninstall_local_when_only_system() {
     has "УДАЛЯТЬ НЕЧЕГО / NOTHING TO REMOVE" "wrong kind: frame"
     has "есть системная установка" "wrong kind: RU pointer"
     has "a system install exists" "wrong kind: EN pointer"
-    has "sudo ./install.sh uninstall" "wrong kind: exact command"
+    # root получает команду без sudo (install/notice.sh) / root gets the command without sudo
+    if (( IS_ROOT )); then
+        has "./install.sh uninstall" "wrong kind: exact command (root)"
+        lacks "sudo ./install.sh uninstall" "wrong kind: no sudo for root"
+    else
+        has "sudo ./install.sh uninstall" "wrong kind: exact command"
+    fi
     unchanged "${E}/sys/bin/bs" "${before}" "wrong kind: system install untouched"
 }
 
@@ -580,7 +586,7 @@ t_uninstall_partial() {
 }
 
 t_uninstall_unwritable() {
-    (( IS_ROOT )) && { printf "  ⊘ Skipping: running as root\n"; return 0; }
+    (( IS_ROOT )) && { testframework::skip "${FUNCNAME[0]}" "running as root (permission bits do not apply)"; return 0; }
     new_env
     run PREFIX="${E}/sys" -- install
     chmod 555 "${E}/sys/bin" "${E}/sys/lib"
