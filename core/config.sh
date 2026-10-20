@@ -18,18 +18,29 @@
 # ИМЕНА / NAMES
 #   Real functions: bs_config_load, bs_config_get, bs_config_set, bs_config_list,
 #   bs_config_user_file, bs_config_local_file and the private bs_config_set_defaults,
-#   bs_config_load_file, bs_config_export_to_env; in bash and zsh also config::* (the old names).
+#   bs_config_load_file, bs_config_export_to_env, bs_config_key_usable; in bash and zsh also
+#   config::* (the old names).
 #   The loaded configuration is the data-layer map bs_config (it was the associative array BS_CONFIG).
 #   Настоящие функции — bs_config_*; в bash и zsh — ещё и config::*. Загруженная конфигурация —
 #   словарь слоя данных bs_config (был ассоциативным массивом BS_CONFIG).
 #
-# @depends core/const, core/logger, core/utils, core/data
+# КЛЮЧИ / KEYS
+#   A key is also the name of an environment variable, so it is checked before any eval: a variable
+#   name (bs_var_is_name), not the kernel's own (__bs_*) and not read-only (assigning to a read-only
+#   variable ends a non-interactive shell). A key that fails the check is skipped in a file (a warning
+#   for a reserved or read-only name) and refused by bs_config_set (status 2).
+#   Ключ — ещё и имя переменной окружения, поэтому он проверяется до любого eval: имя переменной
+#   (bs_var_is_name), не служебное (__bs_*) и не только для чтения (присваивание такой переменной
+#   завершает неинтерактивную оболочку). Негодный ключ в файле пропускается (для служебного и
+#   read-only имени — с предупреждением), bs_config_set его отклоняет (статус 2).
+#
+# @depends core/const, core/logger, core/utils, core/data, core/var
 
 # shellcheck disable=SC2154  # значения присваиваются через eval / values are assigned through eval
 bs_guard "CORE_CONFIG" || return 0
 
 # Зависимости / Dependencies
-bs_source_relative "const.sh" "logger.sh" "utils.sh" "data.sh"
+bs_source_relative "const.sh" "logger.sh" "utils.sh" "data.sh" "var.sh"
 
 # @global CORE_CONFIG_VERSION — Module version (category: module-flag)
 # @global CORE_CONFIG_VERSION — Версия модуля (категория: module-flag)
@@ -73,12 +84,18 @@ bs_config_set_defaults() {
 }
 
 # @private
-# @description Is this a valid variable name? / Допустимо ли это имя переменной?
-# @param $1 name / имя
-bs_config_valid_key() {
-  case "${1-}" in
-    ''|[!A-Za-z_]*|*[!A-Za-z0-9_]*) return 1 ;;
+# @description Can the key become an environment variable: a valid name, not the kernel's own (__bs_*), not read-only. / Может ли ключ стать переменной окружения: допустимое имя, не служебное (__bs_*), не только для чтения.
+# @param $1 key / ключ
+# @returns 0 usable / 1 not
+bs_config_key_usable() {
+  bs_var_is_name "${1-}" || return 1
+  case "$1" in
+    __bs_*) return 1 ;;
   esac
+  # bs_var_is_readonly пробует присваивание в подоболочке и не завершает вызывающего / bs_var_is_readonly tries the assignment in a subshell and cannot end the caller
+  if bs_var_is_readonly "$1"; then
+    return 1
+  fi
   return 0
 }
 
@@ -102,7 +119,7 @@ bs_config_load_file() {
     # ключ — идентификатор в начале строки, за ним необязательные пробелы и «=» / the key is an identifier at the start of the line, then optional spaces and "="
     __bs_cf_key=${__bs_cf_line%%=*}
     __bs_cf_key=${__bs_cf_key%"${__bs_cf_key##*[![:space:]]}"}
-    bs_config_valid_key "$__bs_cf_key" || continue
+    bs_var_is_name "$__bs_cf_key" || continue
     __bs_cf_val=${__bs_cf_line#*=}
     __bs_cf_val=${__bs_cf_val#"${__bs_cf_val%%[![:space:]]*}"}
     if [ "$__bs_cf_trust" = "local" ]; then
@@ -112,6 +129,10 @@ bs_config_load_file() {
           bs_log_warn "config: ${__bs_cf_file}: key ${__bs_cf_key} is not allowed in a project-local file, ignored"
           continue ;;
       esac
+    fi
+    if ! bs_config_key_usable "$__bs_cf_key"; then
+      bs_log_warn "config: ${__bs_cf_file}: key ${__bs_cf_key} is reserved or read-only, ignored"
+      continue
     fi
     # значение в двойных или одинарных кавычках — снять их / a value in double or single quotes loses them
     case "$__bs_cf_val" in
@@ -134,8 +155,8 @@ bs_config_export_to_env() {
   eval "$(bs_arr_to_args bscfgkeys)"
   for __bs_cf_key in "$@"; do
     bs_map_get_to bs_config "$__bs_cf_key" __bs_cf_val || continue
-    if [ -n "$__bs_cf_val" ]; then
-      eval "${__bs_cf_key}=\${__bs_cf_val}"
+    # bs_var_set отказывает негодному имени (статус 2): export такого имени завершил бы dash / bs_var_set refuses a bad name (status 2): export of such a name would end dash
+    if [ -n "$__bs_cf_val" ] && bs_var_set "$__bs_cf_key" "$__bs_cf_val"; then
       export "${__bs_cf_key?}"
     fi
   done
@@ -174,7 +195,8 @@ bs_config_load() {
   bs_map_keys_to bs_config bscfgkeys
   eval "$(bs_arr_to_args bscfgkeys)"
   for __bs_cf_key in "$@"; do
-    eval "__bs_cf_env=\${${__bs_cf_key}:-}"
+    __bs_cf_env=''
+    bs_var_get "$__bs_cf_key" __bs_cf_env || :
     if [ -n "$__bs_cf_env" ]; then
       bs_map_set bs_config "$__bs_cf_key" "$__bs_cf_env"
     fi
@@ -209,20 +231,20 @@ bs_config_get() {
 # @description Установить значение конфигурации — в словаре и в окружении.
 # @param $1 Key / Ключ
 # @param $2 Value / Значение
-# @return 0 on success, E_INVALID if the key is empty or not a variable name / 0 при успехе, E_INVALID если ключ пуст или не имя переменной
+# @return 0 on success, E_INVALID if the key is empty, not a variable name, reserved (__bs_*) or read-only / 0 при успехе, E_INVALID если ключ пуст, не имя переменной, служебный (__bs_*) или только для чтения
 bs_config_set() {
   if [ -z "${1:-}" ]; then
     bs_log_warn "config::set: key required"
     return "${E_INVALID}"
   fi
-  if ! bs_config_valid_key "$1"; then
-    bs_log_warn "config::set: not a valid variable name: $1"
+  if ! bs_config_key_usable "$1"; then
+    bs_log_warn "config::set: not a usable variable name (invalid, reserved or read-only): $1"
     return "${E_INVALID}"
   fi
   __bs_cf_key=$1
   __bs_cf_val=${2:-}
   bs_map_set bs_config "$__bs_cf_key" "$__bs_cf_val"
-  eval "${__bs_cf_key}=\${__bs_cf_val}"
+  bs_var_set "$__bs_cf_key" "$__bs_cf_val"
   export "${__bs_cf_key?}"
   return "${E_SUCCESS}"
 }

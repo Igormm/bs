@@ -416,7 +416,7 @@ The keys a project-local `./.bsrc` may set are listed in `BS_CONFIG_LOCAL_KEYS`:
 - Prints the value, or the default; returns `E_INVALID` if there is neither.
 
 #### `config::set <key> <value>`
-- Sets the value in the map `bs_config` and exports the variable; returns `E_INVALID` if the key is empty or is not a variable name.
+- Sets the value in the map `bs_config` and exports the variable; returns `E_INVALID` (and changes nothing) if the key is empty, is not a variable name, is reserved (`__bs_*`) or is read-only. In a config file such a key is skipped with a warning.
 
 #### `config::list`, `config::user_file`, `config::local_file`
 - `list` prints `KEY=value` pairs sorted by key; the other two print the path of the user file and the name of the local file.
