@@ -75,6 +75,20 @@ test_dmi_mock() {
     rm -rf "${tmp_dir}"
 }
 
+test_no_bus() {
+    # Регрессия: без /sys/bus/usb (контейнер, VM) сборка не обрывается под pipefail
+    # Regression: without /sys/bus/usb (a container, a VM) the build does not stop under pipefail
+    local tmp_dir
+    tmp_dir="$(mktemp -d)"
+    mkdir -p "${tmp_dir}/pci/devices/0000:00:00.0" "${tmp_dir}/pci/devices/0000:00:01.0"
+    hw::reset
+    testframework::assert_equal "0" "$(HW_BUS_PATH="${tmp_dir}" hw::get mb.usb.count)" "no USB bus: mb.usb.count is 0"
+    hw::reset
+    testframework::assert_equal "2" "$(HW_BUS_PATH="${tmp_dir}" hw::get mb.pci.count)" "PCI devices are counted"
+    hw::reset
+    rm -rf "${tmp_dir}"
+}
+
 test_flags_loop_ifs() {
     # Регрессия: цикл флагов не зависит от IFS вызывающего (без пробела)
     # Regression: the flags loop does not depend on the caller's IFS (no space)
@@ -124,6 +138,7 @@ main() {
 
     testframework::section "DMI hook / Хук DMI"
     test_dmi_mock
+    test_no_bus
 
     testframework::section "Regression: IFS / os-release / Регрессия: IFS и os-release"
     test_flags_loop_ifs
