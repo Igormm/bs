@@ -59,8 +59,12 @@ check_file() {
         '[0-9]+ файлов ядра от bash'
         '[0-9]+ kernel files and the prologue'
         '[0-9]+ kernel files labelled'
-        '(Already done|State): [0-9]+ of the 15'
-        '(Уже готово|готово) [0-9]+ из 15'
+        '(Already done|State): [0-9]+ of the [0-9]+'
+        '(Уже готово|готово) [0-9]+ из [0-9]+'
+        '(Already done|State): all [0-9]+'
+        '(Уже готовы|готовы) все [0-9]+'
+        'all [0-9]+ `@shell posix`'
+        'все [0-9]+ файлов ядра'
         'only [0-9]+ small `@shell posix`'
         'от bash не зависят только [0-9]+'
     )
@@ -125,6 +129,12 @@ test_negative_control() {
     out="$(check_file "${tmp}" | grep -c '^bad:' || true)"
     rm -f "${tmp}"
     testframework::assert_true "${out} -ge 2" "the wrong numbers are reported (${out})" || true
+    # the "state" sentences count against the real total, not a fixed 15 (they went stale at 18 of 19 unnoticed)
+    tmp="$(mktemp)"
+    printf 'State: 98 of the 19 `core/` files are done. Состояние: Уже готово 97 из 19 файлов. State: all 96 core files. Уже готовы все 95 файлов ядра.\n' > "${tmp}"
+    out="$(check_file "${tmp}" | grep -c '^bad:' || true)"
+    rm -f "${tmp}"
+    testframework::assert_true "${out} -ge 3" "stale state sentences are reported (${out})" || true
 }
 
 main() {

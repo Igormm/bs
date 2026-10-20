@@ -88,6 +88,7 @@ rc=0" "${sh_name}: required positionals"
         eq "$(probe "${sh_bin}" 'is_even() { [ $(( $1 % 2 )) -eq 0 ]; }; bs_args_flag n value "" is_even; bs_args_flag m value "" nosuchfn; bs_args_parse --n 4 >/dev/null 2>&1; printf "%s " $?; bs_args_parse --n 3 >/dev/null 2>&1; printf "%s " $?; bs_args_parse --m 1 >/dev/null 2>&1; printf "%s" $?')" "0 2 2" "${sh_name}: custom validator function"
         eq "$(probe "${sh_bin}" 'bs_args_define a; bs_args_parse a; bs_args_reset; bs_args_parse x >/dev/null 2>&1; echo "rc=$? n=$(bs_args_has 1; echo $?)"')" "rc=1 n=1" "${sh_name}: reset empties the tree"
         eq "$(probe "${sh_bin}" 'bs_args_level 0 a; echo "rc=$?"; bs_args_level x a; echo "rc=$?"; bs_args_level 1; echo "rc=$?"; bs_args_define; echo "rc=$?"; bs_args_flag f weird; echo "rc=$?"' | grep '^rc=' | tr '\n' ' ')" "rc=1 rc=1 rc=1 rc=1 rc=1 " "${sh_name}: bad declarations are refused"
+        eq "$(probe "${sh_bin}" 'bs_args_level 1 a b; bs_args_parse "a b" >/dev/null 2>&1; echo "rc=$?"; bs_args_parse b >/dev/null 2>&1; echo "rc=$?"; bs_args_parse "a  b" >/dev/null 2>&1; echo "rc=$?"' | tr '\n' ' ')" "rc=2 rc=0 rc=2 " "${sh_name}: one word with a blank is not two neighbouring names"
         eq "$(probe "${sh_bin}" 'bs_args_define "dash-name" under_name; bs_args_flag "dry-run"; bs_args_flag "a b" value; bs_args_parse dash-name under_name --dry-run --"a b"=1 >/dev/null 2>&1; echo "rc=$? f=$(bs_args_flag_get dry-run)"')" "rc=0 f=1" "${sh_name}: names with dashes and spaces"
     done < <(testframework::posix_shells)
 }

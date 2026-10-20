@@ -115,6 +115,10 @@ bs_args_max_level() {
 # @return Prints level number or empty string / Выводит номер уровня или пустую строку
 bs_args_level_of() {
   __bs_args_lo_name=$1
+  # Имя с пробелом совпало бы с двумя соседними именами списка / A name with a blank would match two neighbouring names of the list
+  case $__bs_args_lo_name in
+    *[[:space:]]*) printf '\n'; return "${E_SUCCESS:-0}" ;;
+  esac
   bs_map_keys_to bs_args_tree bs_args_lk
   eval "$(bs_arr_to_args bs_args_lk)"
   for __bs_args_lo_k in "$@"; do
@@ -135,6 +139,10 @@ bs_args_level_of() {
 bs_args_is_allowed_at() {
   bs_args_mget bs_args_tree "$1" __bs_args_aa_l
   if [ -z "$__bs_args_aa_l" ]; then return "${E_ERROR:-1}"; fi
+  # Имя с пробелом совпало бы с двумя соседними именами списка / A name with a blank would match two neighbouring names of the list
+  case $2 in
+    *[[:space:]]*) return "${E_ERROR:-1}" ;;
+  esac
   case " $__bs_args_aa_l " in
     *" $2 "*) return "${E_SUCCESS:-0}" ;;
   esac

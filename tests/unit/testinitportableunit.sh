@@ -43,12 +43,13 @@ test_modes() {
     while IFS= read -r sh_bin; do
         sh_name="${sh_bin##*/}"
         want_mode=posix; want_count=16; want_bridge=no-bridge
-        if [[ "${sh_name}" == bash ]]; then want_mode=full; want_count=18; want_bridge=bridge; fi
+        if [[ "${sh_name}" == bash ]]; then want_mode=full; want_count=19; want_bridge=bridge; fi
         eq "mode=${want_mode} modules=${want_count}" "$(probe "${sh_bin}" 'printf "mode=%s modules=%s" "$BS_KERNEL_MODE" "$(bs_map_count bs_loaded_modules)"')" "${sh_name}: the kernel mode and the number of loaded modules"
         eq "ok" "$(probe "${sh_bin}" 'bs_map_has bs_loaded_modules core/logger && bs_map_has bs_loaded_modules core/deps && bs_map_has bs_loaded_modules core/num && echo ok')" "${sh_name}: logger, deps and num are loaded"
         eq "ok|false" "$(probe "${sh_bin}" 'bs_map_has bs_loaded_modules core/config && printf "ok|"; bs_config_get BS_FILES_ATOMIC')" "${sh_name}: config is loaded and bs_config_load ran, in both kernel modes"
         eq "ok|dir" "$(probe "${sh_bin}" 'if bs_map_has bs_loaded_modules core/lang && bs_is_dir /; then printf "ok|dir"; fi')" "${sh_name}: lang is loaded and bs_is_dir works, in both kernel modes"
-        eq "${want_bridge}" "$(probe "${sh_bin}" 'if bs_map_has bs_loaded_modules lib/compat/lang && bs_map_has bs_loaded_modules lib/compat/deps; then echo bridge; else echo no-bridge; fi')" "${sh_name}: the bridges lib/compat/lang and lib/compat/deps are loaded only in the full mode"
+        eq "${want_bridge}" "$(probe "${sh_bin}" 'if bs_map_has bs_loaded_modules lib/compat/lang && bs_map_has bs_loaded_modules lib/compat/deps && bs_map_has bs_loaded_modules lib/compat/args; then echo bridge; else echo no-bridge; fi')" "${sh_name}: the bridges lib/compat/lang, lib/compat/deps and lib/compat/args are loaded only in the full mode"
+        eq "ondemand|ok" "$(probe "${sh_bin}" 'if bs_map_has bs_loaded_modules core/args; then printf "loaded|"; else printf "ondemand|"; fi; bs_load core/args; bs_args_define go; bs_args_parse go >/dev/null 2>&1 && echo ok')" "${sh_name}: args is not loaded at start, bs_load core/args works in both kernel modes"
     done < <(testframework::posix_shells)
 }
 
