@@ -198,7 +198,7 @@ bs_str_repeat() {
 # @stdout the string / строка
 bs_str_join() {
   __bs_str_sep=${1-}
-  shift
+  if [ $# -gt 0 ]; then shift; fi
   __bs_str_ro=''
   __bs_str_first=1
   for __bs_str_w in "$@"; do

@@ -105,6 +105,7 @@ test_repeat_join_split() {
         eq "a,b,c" "$(probe "${sh_bin}" 'IFS=$(printf "\n\t"); bs_str_join , a b c')" "${sh_name}: join under the strict IFS"
         eq "abc" "$(probe "${sh_bin}" 'bs_str_join "" a b c')" "${sh_name}: join with an empty separator"
         eq "[]" "$(probe "${sh_bin}" 'printf "[%s]" "$(bs_str_join ,)"')" "${sh_name}: join of nothing"
+        eq "rc=0 []" "$(probe "${sh_bin}" 'bs_str_join >/dev/null; printf "rc=%s []" "$?"')" "${sh_name}: join with no arguments at all does not end the shell"
         eq "a b, c" "$(probe "${sh_bin}" 'bs_str_join ", " "a b" c')" "${sh_name}: join keeps words with spaces"
         eq "key" "$(probe "${sh_bin}" 'bs_str_before "key=val=2" "="')" "${sh_name}: before the first separator"
         eq "val=2" "$(probe "${sh_bin}" 'bs_str_after "key=val=2" "="')" "${sh_name}: after the first separator"
