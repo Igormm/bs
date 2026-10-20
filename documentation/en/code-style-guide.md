@@ -266,7 +266,7 @@ the name mask and whether a doc snippet is required.
 | 9 | Env vars | `BS_*` | `BS_ROOT`, `BS_SILENT`, `BS_CONFIG_*` | yes |
 | 10 | Module hooks | `<MODULE>_*_{DIR,PATH,MOCK,FILE,TIMEOUT}` | `HW_DMI_PATH`, `LLM_MOCK_RESPONSE`, `VK_API_CACHE_DIR` | yes |
 | 11 | Module constants | `readonly SCREAMING_SNAKE` | `COLOR_RESET`, `SSH_NETWORK_CONNECT_TIMEOUT` | yes |
-| 12 | Module internal state | `__<MODULE>_*` | `__ARGS_TREE`, `__ARGS_FLAGS` | yes |
+| 12 | Module internal state | `__<MODULE>_*` | `__SSH_FLAG_USER`, `__SSH_FLAG_HOST` | yes |
 | 13 | Module state (public mutable) | `<MODULE>_*` (non-hook, non-readonly) | `TUI_KEY`, `TUI_MODAL_STACK`, `SSHD_WZ_VALUES` | yes |
 
 A `: "${VAR:=...}"` declaration is always a **hook** (category 10) regardless

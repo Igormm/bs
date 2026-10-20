@@ -104,9 +104,9 @@ sudo ./install.sh uninstall      # system
 ./bs version --full   # + where this copy is from
 ```
 
-- `bs doctor` проверяет наличие `bootstrap/init.sh`, core-модулей и каталогов
-  `core/` и `lib/` в `BS_ROOT` и возвращает ненулевой код, если чего-то не
-  хватает.
+- `bs doctor` проверяет наличие `bootstrap/init.sh`, core-модулей, мостов
+  совместимости `lib/compat/{deps,lang,args}.sh` и каталогов `core/` и `lib/`
+  в `BS_ROOT` и возвращает ненулевой код, если чего-то не хватает.
 - `bs list` выводит модули, лежащие непосредственно в `core/` и `lib/`
   (например, `core/args.sh`, `lib/automation.sh`). Вложенные модули вроде
   `lib/io/streams.sh` находятся в подкаталогах и подключаются по пути.
@@ -175,11 +175,13 @@ flowchart TB
     shell["shell.sh<br/>shell registry"]:::posix
     tramp["trampoline.sh<br/>re-run in bash"]:::posix
     sheb["shebang.sh<br/>#! management"]:::posix
+    base["base.sh<br/>pre-kernel helpers"]:::posix
+    init["init.sh<br/>modes full / posix"]:::posix
+    loader["loader.sh<br/>bs_load, @depends"]:::posix
+    cli["cli.sh<br/>commands without bash"]:::posix
   end
   subgraph B["bootstrap/ · bash4"]
-    bssh["bs.sh<br/>pre-kernel, bs::cli"]:::bash4
-    init["init.sh"]:::bash4
-    loader["loader.sh<br/>load, @depends"]:::bash4
+    bssh["bs.sh<br/>call stack, bs::cli for lib/"]:::bash4
   end
   subgraph C["core/"]
     direction TB
@@ -215,7 +217,9 @@ flowchart TB
   inst -.-> shell
   shell -.-> tramp
   bs -.-> bssh
+  bs -.-> cli
   bssh -.-> init
+  init -.-> base
   init -.-> loader
   loader -.-> CP
   init -.-> L
@@ -249,7 +253,7 @@ sequenceDiagram
   sh-->>bs: да: bash ≥ 4.2, не режим POSIX
   bs->>bsh: source (bs::strict, bs::cli::*)
   bs->>init: source
-  init->>core: load prereq, lang, const, logger, errorhandler, version, quiet, utils, config, deps
+  init->>core: load prereq, lang, const, var, str, num, msg, logger, quiet, fmt, data, errorhandler, version, utils, config, deps
   init-->>bs: BS_INITIALIZED=1
   bs->>bs: BS_SHEBANG=1: первый аргумент — файл
   bs->>S: новый bash: init.sh, затем source скрипта

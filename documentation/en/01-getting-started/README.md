@@ -104,9 +104,10 @@ sudo ./install.sh uninstall      # system
 ./bs version --full   # + where this copy is from
 ```
 
-- `bs doctor` checks that `bootstrap/init.sh`, the core modules, and the
-  `core/` and `lib/` directories are present under `BS_ROOT`, and exits
-  non-zero if anything is missing.
+- `bs doctor` checks that `bootstrap/init.sh`, the core modules, the
+  compatibility bridges `lib/compat/{deps,lang,args}.sh` and the `core/` and
+  `lib/` directories are present under `BS_ROOT`, and exits non-zero if
+  anything is missing.
 - `bs list` prints the modules located directly in `core/` and `lib/`
   (for example `core/args.sh`, `lib/automation.sh`). Nested modules such as
   `lib/io/streams.sh` live in subdirectories and are loaded by path.
@@ -176,11 +177,13 @@ flowchart TB
     shell["shell.sh<br/>shell registry"]:::posix
     tramp["trampoline.sh<br/>re-run in bash"]:::posix
     sheb["shebang.sh<br/>#! management"]:::posix
+    base["base.sh<br/>pre-kernel helpers"]:::posix
+    init["init.sh<br/>modes full / posix"]:::posix
+    loader["loader.sh<br/>bs_load, @depends"]:::posix
+    cli["cli.sh<br/>commands without bash"]:::posix
   end
   subgraph B["bootstrap/ · bash4"]
-    bssh["bs.sh<br/>pre-kernel, bs::cli"]:::bash4
-    init["init.sh"]:::bash4
-    loader["loader.sh<br/>load, @depends"]:::bash4
+    bssh["bs.sh<br/>call stack, bs::cli for lib/"]:::bash4
   end
   subgraph C["core/"]
     direction TB
@@ -216,7 +219,9 @@ flowchart TB
   inst -.-> shell
   shell -.-> tramp
   bs -.-> bssh
+  bs -.-> cli
   bssh -.-> init
+  init -.-> base
   init -.-> loader
   loader -.-> CP
   init -.-> L
@@ -250,7 +255,7 @@ sequenceDiagram
   sh-->>bs: yes: bash ≥ 4.2, not POSIX mode
   bs->>bsh: source (bs::strict, bs::cli::*)
   bs->>init: source
-  init->>core: load prereq, lang, const, logger, errorhandler, version, quiet, utils, config, deps
+  init->>core: load prereq, lang, const, var, str, num, msg, logger, quiet, fmt, data, errorhandler, version, utils, config, deps
   init-->>bs: BS_INITIALIZED=1
   bs->>bs: BS_SHEBANG=1: the first argument is a file
   bs->>S: a new bash: init.sh, then source the script

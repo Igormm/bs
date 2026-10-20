@@ -272,7 +272,7 @@ get_endpoint() {
 | 9 | Env-переменные | `BS_*` | `BS_ROOT`, `BS_SILENT`, `BS_CONFIG_*` | да |
 | 10 | Хуки модулей | `<MODULE>_*_{DIR,PATH,MOCK,FILE,TIMEOUT}` | `HW_DMI_PATH`, `LLM_MOCK_RESPONSE`, `VK_API_CACHE_DIR` | да |
 | 11 | Константы модуля | `readonly SCREAMING_SNAKE` | `COLOR_RESET`, `SSH_NETWORK_CONNECT_TIMEOUT` | да |
-| 12 | Внутреннее состояние модуля | `__<MODULE>_*` | `__ARGS_TREE`, `__ARGS_FLAGS` | да |
+| 12 | Внутреннее состояние модуля | `__<MODULE>_*` | `__SSH_FLAG_USER`, `__SSH_FLAG_HOST` | да |
 | 13 | Состояние модуля (публичное, изменяемое) | `<MODULE>_*` (не хук, не readonly) | `TUI_KEY`, `TUI_MODAL_STACK`, `SSHD_WZ_VALUES` | да |
 
 Объявление через `: "${VAR:=...}"` — всегда **хук** (категория 10)
