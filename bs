@@ -1,15 +1,26 @@
-#!/usr/bin/env bash
-# @shell bash4 — bash 4.2+ file behind a POSIX prologue: sh/dash/zsh/bash 3.2 re-run it in bash (bootstrap/trampoline.sh)
-# @shell bash4 — файл bash 4.2+ за POSIX-прологом: sh/dash/zsh/bash 3.2 перезапускают его в bash (bootstrap/trampoline.sh)
+#!/bin/sh
+# shellcheck shell=sh
+# @shell posix — валидный POSIX sh: диспетчер команд; help, version, env, list, calc работают без bash, остальным нужен bash 4.2+ / valid POSIX sh: the command dispatcher; help, version, env, list, calc work without bash, the others need bash 4.2+
+# @tier core — builtins and the commands of the kernel; works everywhere
 #
 #  BS Framework – STAGE-2 UNIFIED ENTRY-POINT / INTERPRETER
 #  Назначение / Purpose:
 #    - инициализировать окружение фреймворка;
 #    - обрабатывать пользовательские команды (run, doctor, list …);
 #    - работать как shebang-интерпретатор (#!/usr/bin/env bs).
-#  Зависимости: bash 4.0+, bootstrap/init.sh, структура каталогов
-#              core/, lib/ (опционально, но doctor ругается).
+#  Зависимости: bootstrap/init.sh, структура каталогов core/, lib/ (опционально, но doctor
+#              ругается). В bash 4.2+ работают все команды; без bash — те, что уже на POSIX
+#              (bootstrap/cli.sh), остальные отвечают, что им нужен bash.
+#  Dependencies: bootstrap/init.sh, the core/ and lib/ layout (optional, but doctor complains).
+#              In bash 4.2+ every command works; without bash only the ones that are POSIX
+#              already (bootstrap/cli.sh) do, the others say they need bash.
 #
+
+# Точка входа умеет работать без bash: трамплин перезапускает её в bash 4.2+, если он есть,
+# иначе она остаётся в текущей оболочке (BS_KERNEL_MODE=posix).
+# The entry point can run without bash: the trampoline re-runs it in a bash 4.2+ when there is
+# one and otherwise it stays in the current shell (BS_KERNEL_MODE=posix).
+BS_POSIX_ENTRY=1
 
 # --- POSIX-пролог (валиден в sh/dash/ash/zsh/bash) / POSIX prologue ---------
 # Если запущены не bash 4+ (sh install.sh, zsh ./bs, bash 3.2, bash как sh),
@@ -36,12 +47,13 @@ if ! bs_shell_host_ok; then
 fi
 unset __BS_TRAMPOLINE __bs_p __bs_r __bs_s
 # --- конец пролога / end of the prologue ------------------------------------
+unset BS_POSIX_ENTRY
 
 # PATH вызвавшей оболочки. Загрузка ядра дописывает ~/.local/bin в PATH
-# ЭТОГО процесса (bs::append_local_bin_to_path), поэтому `bs where` сверяется
+# ЭТОГО процесса (bs_append_local_bin_to_path), поэтому `bs where` сверяется
 # с этой копией, а не с PATH процесса.
 # The PATH of the calling shell. Loading the core prepends ~/.local/bin to the
-# PATH of THIS process (bs::append_local_bin_to_path), so `bs where` checks
+# PATH of THIS process (bs_append_local_bin_to_path), so `bs where` checks
 # this copy, not the process PATH.
 BS_CALLER_PATH="${PATH}"
 
@@ -49,28 +61,44 @@ BS_CALLER_PATH="${PATH}"
 # readlink -f: bs можно вызвать по символической ссылке (~/bin/bs -> .../bs)
 BS_DIR="${BS_ENTRY_DIR}"
 
-# 2. Pre-kernel root namespace: shell version gate (bash 3.2-compatible)
-#    Строгий режим включается именованной pre-kernel функцией bs::strict.
-#    Strict mode is enabled via the named pre-kernel helper bs::strict.
-if [[ -f "${BS_DIR}/bootstrap/bs.sh" ]]; then
-  source "${BS_DIR}/bootstrap/bs.sh"
-  bs::strict
+# 2. Pre-kernel: POSIX-часть (base.sh) везде, bash-слой (bs.sh) только в bash.
+#    Строгий режим включается именованной pre-kernel функцией bs_strict.
+#    Pre-kernel: the POSIX part (base.sh) everywhere, the bash layer (bs.sh) in bash only.
+#    Strict mode is enabled via the named pre-kernel helper bs_strict.
+if [ -f "${BS_DIR}/bootstrap/base.sh" ]; then
+  # shellcheck disable=SC1090,SC1091
+  . "${BS_DIR}/bootstrap/base.sh"
+  case "$(bs_shell_family)" in
+    bash)
+      if [ -f "${BS_DIR}/bootstrap/bs.sh" ]; then
+        # shellcheck disable=SC1090,SC1091
+        . "${BS_DIR}/bootstrap/bs.sh"
+      else
+        printf 'ERROR: bootstrap/bs.sh not found in %s\n' "$BS_DIR" >&2
+        exit 2
+      fi ;;
+    *)
+      # POSIX-часть команд: в bash её подключает bs.sh / the POSIX part of the commands: in bash bs.sh sources it
+      # shellcheck disable=SC1090,SC1091
+      . "${BS_DIR}/bootstrap/cli.sh" ;;
+  esac
+  bs_strict
   # Версию bash уже проверил POSIX-пролог (bs_shell_host_ok) — повторять нечего
   # The POSIX prologue (bs_shell_host_ok) has already checked the bash version
 else
-  printf 'ERROR: bootstrap/bs.sh not found in %s\n' "$BS_DIR" >&2
+  printf 'ERROR: bootstrap/base.sh not found in %s\n' "$BS_DIR" >&2
   exit 2
 fi
 
 # 3. Определение BS_ROOT (если ещё не задан)
-if [[ -z "${BS_ROOT:-}" ]]; then
+if [ -z "${BS_ROOT:-}" ]; then
   # Если bs запущен из репо-корня, bootstrap/init.sh рядом
-  if [[ -f "${BS_DIR}/bootstrap/init.sh" ]]; then
+  if [ -f "${BS_DIR}/bootstrap/init.sh" ]; then
     BS_ROOT=$BS_DIR
   else
     # Ищем в стандартных местах
-    for dir in "${HOME}/.local/lib/bs" "${BS_SYSTEM_PREFIX:-/usr/local}/lib/bs"; do
-      if [[ -f "${dir}/bootstrap/init.sh" ]]; then
+    for dir in "${HOME:-}/.local/lib/bs" "${BS_SYSTEM_PREFIX:-/usr/local}/lib/bs"; do
+      if [ -f "${dir}/bootstrap/init.sh" ]; then
         BS_ROOT=$dir
         break
       fi
@@ -93,64 +121,25 @@ export BS_HOME
 export BS_SILENT
 
 # 5. Загрузка ядра
-if [[ ! -f "${BS_ROOT}/bootstrap/init.sh" ]]; then
+if [ ! -f "${BS_ROOT}/bootstrap/init.sh" ]; then
   printf 'ERROR: bootstrap/init.sh not found in BS_ROOT=%s\n' "$BS_ROOT" >&2
   exit 2
 fi
 # CLI всегда загружает ядро заново, даже если окружение уже
 # инициализировано (BS_INITIALIZED из sourced-сессии иначе пропустит загрузку)
 unset BS_INITIALIZED
-source "${BS_ROOT}/bootstrap/init.sh"
+# shellcheck disable=SC1090,SC1091
+. "${BS_ROOT}/bootstrap/init.sh"
 
-# EXIT-trap для стека cleanup (ядро при source trap больше не ставит)
-# EXIT trap for the cleanup stack (core no longer sets it when sourced)
-errorhandler::setup_trap
-
-
-# ==========================================
-# bs build: standalone self-extracting script / сборка в один файл
-# ==========================================
-
-
-# ==========================================
-# bs api: OpenAPI 3.x client (spec load, introspect, call)
-# bs api: OpenAPI 3.x клиент (загрузка схемы, интроспекция, вызовы)
-# ==========================================
-
-
-# ==========================================
-# bs audit: GNU-only tool usage in core/ and lib/
-# bs audit: использование GNU-only инструментов в core/ и lib/
-# ==========================================
-
-
-# ==========================================
-# bs update: apply repo changes (local checkout or GitHub) to installed copies
-# bs update: применить изменения репозитория (локального или с GitHub) к установленным копиям
-# ==========================================
-
-
-# ---------- Что запущено сейчас / what is running now ----------
-
-
+# Сводки о запущенной копии для bs update / bs uninstall (заполняются лениво, bash-слой)
+# Summaries of the running copy for bs update / bs uninstall (filled lazily, the bash layer)
 UPDATE_RUN_INFO=""
 UPDATE_RUN_BLOCK=""
 UPDATE_RUN_SHORT=""
 
-
-# ---------- Блокировка, откат, чистка / lock, rollback, cleanup ----------
-
-
-# ==========================================
-# bs uninstall: remove installed BS copies / удаление установленных копий
-# ==========================================
-
-
-# ==========================================
-# bs where: следы BS в системе (только чтение, ничего не запускается)
-# bs where: traces of BS on this system (read-only, nothing is executed)
-# ==========================================
-
+# EXIT-trap для стека cleanup (ядро при source trap больше не ставит)
+# EXIT trap for the cleanup stack (core no longer sets it when sourced)
+bs_errorhandler_setup_trap
 
 # 6b. Глобальный флаг --strict-shell: tier модулей lib/ против оболочки запуска
 # Global flag --strict-shell: lib/ module tiers against the shell BS was started from
@@ -164,43 +153,48 @@ export BS_ORIGIN_SHELL
 # name (--strict-shell=dash or --strict-shell dash) — against the NAMED shell: "will this work in
 # dash", wherever it is started. A separate-word name is taken only if it is a known shell
 # (otherwise it is a command: `bs --strict-shell run x`).
-if [[ "${1:-}" == "--strict-shell" || "${1:-}" == --strict-shell=* ]]; then
-  export BS_SHELL_STRICT=1
-  strict_name=""
-  if [[ "${1}" == --strict-shell=* ]]; then
-    strict_name="${1#--strict-shell=}"
-    shift
-    [[ -n "${strict_name}" ]] || bs::cli::die "--strict-shell=: shell name is empty (known: bash zsh ash dash sh ksh mksh oksh osh fish nu)"
-  else
-    shift
-    if [[ $# -ge 1 && "$(bs_shell_of_name "$1")" != "unknown" ]]; then
-      strict_name="$1"
-      shift
+case "${1:-}" in
+  --strict-shell|--strict-shell=*)
+    export BS_SHELL_STRICT=1
+    __bs_strict_name=""
+    case "${1}" in
+      --strict-shell=*)
+        __bs_strict_name="${1#--strict-shell=}"
+        shift
+        if [ -z "${__bs_strict_name}" ]; then
+          bs_cli_die "--strict-shell=: shell name is empty (known: bash zsh ash dash sh ksh mksh oksh osh fish nu)"
+        fi ;;
+      *)
+        shift
+        if [ $# -ge 1 ] && [ "$(bs_shell_of_name "$1")" != "unknown" ]; then
+          __bs_strict_name="$1"
+          shift
+        fi ;;
+    esac
+    if [ -n "${__bs_strict_name}" ]; then
+      __bs_strict_family="$(bs_shell_of_name "${__bs_strict_name}")"
+      if [ "${__bs_strict_family}" = "unknown" ]; then
+        bs_cli_die "--strict-shell: unknown shell: ${__bs_strict_name} (known: bash zsh ash dash sh ksh mksh oksh osh fish nu)"
+      fi
+      BS_ORIGIN_SHELL="${__bs_strict_family}"
+      export BS_ORIGIN_SHELL
+      export BS_SHELL_STRICT_NAMED=1
     fi
-  fi
-  if [[ -n "${strict_name}" ]]; then
-    strict_family="$(bs_shell_of_name "${strict_name}")"
-    [[ "${strict_family}" != "unknown" ]] \
-      || bs::cli::die "--strict-shell: unknown shell: ${strict_name} (known: bash zsh ash dash sh ksh mksh oksh osh fish nu)"
-    BS_ORIGIN_SHELL="${strict_family}"
-    export BS_ORIGIN_SHELL
-    export BS_SHELL_STRICT_NAMED=1
-  fi
-  unset strict_name strict_family
-fi
+    unset __bs_strict_name __bs_strict_family ;;
+esac
 
 # 7. Shebang-режим
 # Если bs вызван как интерпретатор shebang'а (#!/usr/bin/env bs),
 # первый аргумент — путь к существующему скрипту, а не команда.
-if [[ $# -ge 1 && -f "$1" ]]; then
+if [ $# -ge 1 ] && [ -f "$1" ]; then
   case "$1" in
     help|-h|--help|version|env|list|lang-doc|lsp|chat|sync|rfc|api|ts|audit|doctor|run|build|repl|calc|init-shell|shebang|call|update|uninstall|where) : ;;
     *) BS_SHEBANG=1 ;;
   esac
 fi
-if [[ "${BS_SHEBANG:-0}" == "1" ]]; then
-  [[ $# -ge 1 ]] || bs::cli::die "shebang mode: script path required"
-  bs::cli::run_cmd "$@"
+if [ "${BS_SHEBANG:-0}" = "1" ]; then
+  if [ $# -lt 1 ]; then bs_cli_die "shebang mode: script path required"; fi
+  bs_cli_delegate run bs::cli::run_cmd "$@"
   # Функция bs::cli::run_cmd сама сделает exec, поэтому дальше не продолжаем.
 fi
 
@@ -208,41 +202,42 @@ fi
 case "${1:-help}" in
   help|-h|--help)
     shift || true
-    if [[ $# -ge 1 ]]; then
-      bs::cli::help_cmd "$1"
+    if [ $# -ge 1 ]; then
+      bs_cli_help_cmd "$1"
     else
-      bs::cli::help
+      bs_cli_help
     fi
     ;;
-  version)        shift; bs::cli::version_cmd "$@" ;;
-  env)            bs::cli::env_cmd ;;
-  list)           bs::cli::list_cmd ;;
-  lang-doc)       shift; bs::cli::lang_doc_cmd "$@" ;;
-  lsp)            shift; bs::cli::lsp_cmd "$@" ;;
-  chat)           shift; bs::cli::chat_cmd "$@" ;;
-  update)         shift; bs::cli::update_cmd "$@" ;;
-  uninstall)      shift; bs::cli::uninstall_cmd "$@" ;;
-  where)          shift; bs::cli::where_cmd "$@" ;;
-  sync)           shift; log::warn "sync is deprecated — use: bs update" && bs::cli::update_cmd "$@" ;;
-  rfc)            shift; bs::cli::rfc_cmd "$@" ;;
-  api)            shift; bs::cli::api_cmd "$@" ;;
-  ts)             shift; bs::cli::ts_cmd "$@" ;;
-  audit)          shift; bs::cli::audit_cmd "$@" ;;
-  doctor)         shift || true; bs::cli::doctor_cmd "$@" ;;
-  run)            shift; bs::cli::run_cmd "$@" ;;
-  build)          shift; bs::cli::build_cmd "$@" ;;
+  version)        shift; bs_cli_version_cmd "$@" ;;
+  env)            bs_cli_env_cmd ;;
+  list)           bs_cli_list_cmd ;;
+  lang-doc)       shift; bs_cli_delegate lang-doc bs::cli::lang_doc_cmd "$@" ;;
+  lsp)            shift; bs_cli_delegate lsp bs::cli::lsp_cmd "$@" ;;
+  chat)           shift; bs_cli_delegate chat bs::cli::chat_cmd "$@" ;;
+  update)         shift; bs_cli_update_cmd "$@" ;;
+  uninstall)      shift; bs_cli_uninstall_cmd "$@" ;;
+  where)          shift; bs_cli_where_cmd "$@" ;;
+  sync)           shift; bs_log_warn "sync is deprecated — use: bs update"; bs_cli_update_cmd "$@" ;;
+  rfc)            shift; bs_cli_delegate rfc bs::cli::rfc_cmd "$@" ;;
+  api)            shift; bs_cli_delegate api bs::cli::api_cmd "$@" ;;
+  ts)             shift; bs_cli_delegate ts bs::cli::ts_cmd "$@" ;;
+  audit)          shift; bs_cli_delegate audit bs::cli::audit_cmd "$@" ;;
+  doctor)         shift || true; bs_cli_doctor_cmd "$@" ;;
+  run)            shift; bs_cli_delegate run bs::cli::run_cmd "$@" ;;
+  build)          shift; bs_cli_delegate build bs::cli::build_cmd "$@" ;;
   repl)           shift
-                  if ! load "lib/ui/repl"; then
-                    bs::cli::die "repl: lib/ui/repl.sh not found"
+                  if [ "$BS_KERNEL_MODE" != full ]; then bs_cli_need_bash repl; fi
+                  if ! bs_load "lib/ui/repl"; then
+                    bs_cli_die "repl: lib/ui/repl.sh not found"
                   fi
                   repl::main "$@" ;;
   calc)           shift
-                  if ! source -- "${BS_ROOT}/core/calc.sh"; then
-                    bs::cli::die "calc: core/calc.sh not found"
+                  if ! bs_load "core/calc"; then
+                    bs_cli_die "calc: core/calc.sh not found"
                   fi
-                  calc::main "$@" ;;
-  init-shell)     shift; bs::cli::init_shell_cmd "$@" ;;
-  shebang)        shift; bs::cli::shebang_cmd "$@" ;;
-  call)           shift; bs::cli::call_cmd "$@" ;;
-  *)              bs::cli::die "unknown command: $1" ;;
+                  bs_calc_main "$@" ;;
+  init-shell)     shift; bs_cli_init_shell_cmd "$@" ;;
+  shebang)        shift; bs_cli_shebang_cmd "$@" ;;
+  call)           shift; bs_cli_call_cmd "$@" ;;
+  *)              bs_cli_die "unknown command: $1" ;;
 esac

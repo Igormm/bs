@@ -28,7 +28,7 @@ probe() {
     done
     printf '%s\n' "${snippet}" >> "${T}/probe.sh"
     # shellcheck disable=SC2086  # envs — список VAR=значение, делится по словам намеренно / a VAR=value list, split on purpose
-    env -i HOME="${T}/h" PATH="/usr/bin:/bin" BS_LOG_TIMESTAMP=false ${envs} "${sh_bin}" "${T}/probe.sh" 2>&1
+    timeout 60 env -i HOME="${T}/h" PATH="/usr/bin:/bin" BS_LOG_TIMESTAMP=false ${envs} "${sh_bin}" "${T}/probe.sh" 2>&1
 }
 
 eq() { testframework::assert_equal "$1" "$2" "$3" || true; }
@@ -66,6 +66,12 @@ test_behaviour() {
         eq "[INFO ] ╭────╮|[INFO ] │ Hi │|[INFO ] ╰────╯|" "${out}" "${sh_name}: header box"
         out="$(probe "${sh_bin}" '' 'bs_log_header Title =' | tr '\n' '|')"
         eq "[INFO ] |[INFO ] Title|[INFO ] =====|[INFO ] |" "${out}" "${sh_name}: header line"
+        out="$(probe "${sh_bin}" '' 'bs_log_header Привет' | tr '\n' '|')"
+        eq "[INFO ] ╭────────╮|[INFO ] │ Привет │|[INFO ] ╰────────╯|" "${out}" "${sh_name}: header box counts UTF-8 characters, not bytes"
+        out="$(probe "${sh_bin}" '' 'bs_log_header Привет =' | tr '\n' '|')"
+        eq "[INFO ] |[INFO ] Привет|[INFO ] ======|[INFO ] |" "${out}" "${sh_name}: header line counts UTF-8 characters, not bytes"
+        eq "[abc]" "$(probe "${sh_bin}" '' 'bs_log_replace_all abc "" X; echo "[$__bs_log_out]"')" "${sh_name}: replace_all with an empty substring returns the string (no endless loop)"
+        eq "[aXc]" "$(probe "${sh_bin}" '' 'bs_log_replace_all abc b X; echo "[$__bs_log_out]"')" "${sh_name}: replace_all still replaces a real substring"
         out="$(probe "${sh_bin}" '' 'bs_log_list a "b c"; bs_log_table r1 "r 2"' | tr '\n' '|')"
         eq "[INFO ]   * a|[INFO ]   * b c|[INFO ]   r1|[INFO ]   r 2|" "${out}" "${sh_name}: list and table"
         out="$(probe "${sh_bin}" '' 'bs_log_progress 5 10 10; bs_log_progress 10 10 10' | tr '\r\n' '/|')"

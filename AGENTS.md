@@ -7,8 +7,7 @@
 BS is a modular Bash 4.2+ framework and standard library. It provides:
 
 - `bs` — shebang interpreter and CLI (`#!/usr/bin/env bs`)
-- `bootstrap/loader.sh` — module loader with dependency resolution (`load "lib/io/streams"`), `@shell posix`
-- `bootstrap/kernel.sh` — loads all of `core/` in any shell (`BS_ROOT=… . bootstrap/kernel.sh`), `@shell posix`
+- `bootstrap/loader.sh` — module loader with dependency resolution (`load "lib/io/streams"`)
 - `bootstrap/bs.sh` — pre-kernel root namespace: dependency-free helpers available
   before the loader (shell detection `bs::shell::*`, `bs::script_dir`, PATH tweak);
   sourced by entry points, `bootstrap/init.sh` and the loader itself
@@ -16,7 +15,7 @@ BS is a modular Bash 4.2+ framework and standard library. It provides:
 - `lib/` — standard library: `io/streams`, `io/files`, `io/process`, `system/*`, `integration/*`, `ui/*`, etc.
 - `tests/` — custom test framework, ShellCheck validation, syntax validation
 
-**BS requires bash 4.2+**: all of `lib/` (87 modules), plus the CLI `bootstrap/bs.sh` and the installer are Bash 4.2+ scripts. Only the 15 `@shell posix` files of `core/` (and the prologue of the entry points) are shell-independent. No external dependencies are required at runtime.
+**BS requires bash 4.2+**: all of `lib/` (87 modules) and the `bootstrap/bs.sh` commands that run it are Bash 4.2+ scripts. Only the 19 `@shell posix` files of `core/` (all of them), `bootstrap/loader.sh`, `base.sh`, `init.sh` (its POSIX mode), `install/*` with `install.sh` (the installer runs without bash), `boot.sh` and the prologue of the entry points are shell-independent; `bs` itself runs `help`, `version`, `env`, `list`, `calc`, `doctor`, `uninstall`, `where`, `update`, `init-shell`, `shebang` and `call` without bash (`bootstrap/cli.sh`); its other commands, `bootstrap/bs.sh` and `lib/` still need bash. No external dependencies are required at runtime.
 
 ## How AI should work with this framework
 
@@ -55,7 +54,7 @@ group::module::function() {
 
 ## Key conventions
 
-- Shebang: `#!/usr/bin/env bs` for library/example scripts; `#!/usr/bin/env bash` for `core/` and entry points.
+- Shebang: `#!/usr/bin/env bs` for library/example scripts; `#!/usr/bin/env bash` for entry points and `bash4` `core/` files; `#!/bin/sh` for the `@shell posix` kernel files.
 - Add `# shellcheck shell=bash` on line 2 for `#!/usr/bin/env bs` files.
 - Public functions use `module::function` or `module::sub::function` namespaces.
 - Constants are `SCREAMING_SNAKE_CASE` and `readonly`.
@@ -64,6 +63,7 @@ group::module::function() {
 - Use `bs::source_relative` for relative dependency sourcing.
 - Use `utils::has`, `utils::quiet`, `utils::quiet_err`, `utils::ignore` instead of raw redirects.
 - Strict mode (`set -euo pipefail`) is set only in entry points, never in library modules.
+- **Kernel code** (`bootstrap/`, `core/`, `install/`, entry points) is written in the one `bs_` namespace as `@shell posix` code (real names `bs_module_name`, `module::name` kept as bash/zsh aliases): the rules are chapter 12 of `code-style-guide.md`, the procedure is the skill `bs-kernel-code`. The `module::function` / `local` / `[[ ]]` conventions above are for `lib/`, `bootstrap/bs.sh` and the bridges `lib/compat/*`: no `core/` file is `bash4` any more.
 
 ## Testing
 
@@ -119,18 +119,13 @@ Reusable workflow skills live in `.agents/skills/` (Kimi Code / agents-compatibl
 - `bs-shell-portability` — shell-independence of BS: host/user/script shell, `@shell posix|bash4` tiers, POSIX layer (`bootstrap/shell.sh`, trampoline), `tier_scan.sh` and `probe_shells.sh`.
 - `bs-shell-abstraction` — the shell dependency is set once, by the `@shell posix|bash4` tier of a file: no `BASH_SOURCE`/`ZSH_*`/`$SHELL` checks outside the abstraction layer (`bs::is_main`, `bs::script_dir`, `bs::shell::*`), commands as `bs::cli::*`, no bash version checks in modules; `scripts/find_leaks.sh`, `scripts/check_posix_tier.sh` (bash does not take part in the `posix` tier).
 - `bs-docs-shell-claims` — find and fix documentation that says the whole kernel needs bash 4 when only the `bash4` tier does; every shell/version/tier claim must match the code and a real run.
+- `bs-kernel-code` — write or convert a kernel function/module into the one `bs_` namespace as `@shell posix` code: names and `::` aliases, skeleton, six-shell validation, portable test, differential run against the old implementation (`scripts/diff_old_new.sh`, `scripts/fuzz_arr_vs_native.sh`), docs/tier lists/CHANGELOG; rules in code-style-guide chapter 12.
 
 ### Imported shell-safety skills (external)
 
 - `bash-defensive-patterns` — defensive Bash patterns (strict mode, quoting, traps, temp files, idempotency); [wshobson/agents](https://github.com/wshobson/agents), MIT, verbatim + `UPSTREAM.md` with BS notes (BS rules win: strict mode only in entry points).
 - `doc-coauthoring` — three-stage doc workflow (context gathering, section-by-section refinement, reader testing); [anthropics/skills](https://github.com/anthropics/skills), verbatim + `UPSTREAM.md` (license: see there).
 - `bs-code-review-security` — security-first review (injection, quoting, paths, temp files, privilege, `@shell` tier, tests, P0–P3 report); adapted from [DataDog/rshell](https://github.com/DataDog/rshell) `code-review`, Apache-2.0; report-only.
-
-### Imported shell-safety skills (external)
-
-- `bash-defensive-patterns` — defensive Bash patterns (strict mode, quoting, traps, temp files, idempotency); [wshobson/agents](https://github.com/wshobson/agents), MIT, verbatim + `UPSTREAM.md` with BS notes (BS rules win: strict mode only in entry points).
-- `doc-coauthoring` — three-stage doc workflow (context gathering, section-by-section refinement, reader testing); [anthropics/skills](https://github.com/anthropics/skills), verbatim + `UPSTREAM.md` (license: see there).
-- `bs-code-review-security` — security-first review (injection, quoting, paths, temp files, privilege, tests, P0–P3 report); adapted from [DataDog/rshell](https://github.com/DataDog/rshell) `code-review`, Apache-2.0; report-only.
 
 ### Imported methodology skills (external, verbatim)
 

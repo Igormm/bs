@@ -12,7 +12,7 @@ Central place for everything AI-facing in the repo (replaces the old `ai/` direc
 └── guides/     human-facing guides: MCP, using BS with AI, toolchain, TS dev
 ```
 
-## skills/ — reusable workflows (22)
+## skills/ — reusable workflows (28)
 
 | Skill | Purpose |
 |---|---|
@@ -40,6 +40,7 @@ Central place for everything AI-facing in the repo (replaces the old `ai/` direc
 | `bs-shell-portability` | shell-independence of BS: host/user/script shell, `@shell` tiers, trampoline, `tier_scan.sh`, `probe_shells.sh` |
 | `bs-shell-abstraction` | the shell dependency is set by the `@shell` tier; `find_leaks.sh`, `check_posix_tier.sh` (bash does not take part in `posix`) |
 | `bs-docs-shell-claims` | fix documentation that says the whole kernel needs bash 4 when only the `bash4` tier does |
+| `bs-kernel-code` | write/convert kernel code in the `bs_` namespace (`@shell posix`): names + aliases, skeleton, portable test, differential run vs the old implementation; rules in code-style-guide ch. 12 |
 | `bs-check-artifacts` | AI-generation traces + request-text leakage scan |
 | `bs-cli-markdown-style` | markdown-simplicity principle for CLI/output/docs (RU) |
 | `bs-device-module` | Linux device/hardware modules (evdev/sysfs) |

@@ -4,12 +4,20 @@ BS устанавливается модульным установщиком в
 
 ## Структура установщика
 
-- [install.sh](../../install.sh) — точка входа. Проверяет структуру репозитория (`core/`, `bootstrap/`, `install/`), подключает ядро через `bootstrap/init.sh`, включает строгий режим через `utils::strict`, проверяет интерпретатор через `check_shell_environment` (проверка реального процесса, а не `$SHELL`), затем запускает `install/main.sh`.
+- [install.sh](../../install.sh) — точка входа. Проверяет структуру репозитория (`core/`, `bootstrap/`, `install/`), подключает ядро через `bootstrap/init.sh`, включает строгий режим через `bs_utils_strict`, проверяет интерпретатор через `bs_check_shell_environment` (проверка реального процесса, а не `$SHELL`), затем запускает `bs_install_main` из `install/main.sh`.
 - [install/main.sh](../../install/main.sh) — разбор аргументов, выбор режима и путей, вызов действий установки/удаления.
-- [install/checks.sh](../../install/checks.sh) — проверки окружения: `is_already_installed`, `check_shell_environment`.
-- [install/actions.sh](../../install/actions.sh) — `do_install` и `do_uninstall`.
+- [install/checks.sh](../../install/checks.sh) — проверки окружения: `bs_is_already_installed`, `bs_check_shell_environment`.
+- [install/actions.sh](../../install/actions.sh) — `bs_do_install` и `bs_do_uninstall`.
 - [install/notice.sh](../../install/notice.sh) — двуязычные уведомления (рамки и строки ERROR/NOTE), `BS_SYSTEM_PREFIX`, классификация `TARGET_LIB`/`TARGET_BIN`, проверки прав записи и `sudo`.
-- [install/path_manager.sh](../../install/path_manager.sh) — помощники PATH: `print_path_hint`, `auto_update_path`, `update_path_bashrc`.
+- [install/path_manager.sh](../../install/path_manager.sh) — помощники PATH: `bs_print_path_hint`, `bs_auto_update_path`, `bs_remove_path_entry`.
+
+Все эти файлы — `@shell posix` и живут в пространстве `bs_` (`install_box` ↔ `bs_install_box`, `do_install` ↔ `bs_do_install`; прежние имена остаются псевдонимами в bash и zsh).
+
+## Установка без bash
+
+`install.sh` работает в **dash, busybox ash, ksh, mksh, zsh и bash**. POSIX-пролог сначала ищет bash 4.2+ и перезапускает установщик в нём, если он есть; если нет — установщик продолжает в текущей оболочке, а ядро загружает свою POSIX-часть (`BS_KERNEL_MODE=posix`: 17 из 19 файлов `core/` на старте, `calc` по запросу; `lib/` требует bash). Поэтому машина только с busybox (Alpine без `apk add bash`) может установить, переустановить и удалить BS: файлы копируются транзакционно, wrapper записывается, строка PATH идёт в rc-файл вашей оболочки (`~/.profile` для ash, dash, ksh и mksh). `unit/testinstallnobashunit.sh` прячет каждый bash в пространстве монтирования и гоняет весь жизненный цикл в каждой из пяти оболочек.
+
+Что работает без bash после установки: `bs help`, `bs version [--full]`, `bs env`, `bs list`, `bs calc`, `bs doctor` (кроме `--capabilities`), `bs uninstall`, `bs where`, `bs update`, `bs init-shell`, `bs shebang` и `bs call` (`unit/testbsnobashunit.sh` гоняет их в ash, dash, ksh, mksh и zsh). Любая другая команда `bs` (`run`, `build`, …) отвечает «команда пока требует bash 4.2+» и завершается с кодом 1; bash-completion устанавливается, но не используется, а всё из `lib/` — bash. Для этого на такой машине поставьте bash (`apk add bash`).
 
 ## Режимы
 

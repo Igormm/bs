@@ -62,12 +62,14 @@ bs::source_relative "../core/logger.sh" "../core/utils.sh"  # dependencies relat
 
 ---
 
-## Language primitives — `core/lang.sh`
+## Language primitives — `core/lang.sh` and `lib/compat/lang.sh`
 
 The "language kernel": introspection, types, strings and collections over
 pure Bash 4.2+ built-ins (no external commands). Autoloaded right after
-`core/prereq`.
-
+`core/prereq`. The file is split in two: `core/lang.sh` (`@shell posix`) holds only
+the `is::*` predicates below (real names `bs_is_*`, `is::*` are aliases in bash and zsh);
+introspection, types, `str::*`, `arr::*`, `map::*` and `is::function` live in
+`lib/compat/lang.sh`, which `bootstrap/init.sh` loads in bash 4.2+ (the `full` kernel mode).
 ### Introspection
 
 #### `bs::func_name [depth]`
@@ -116,7 +118,8 @@ Friendly replacements for `[[ ... ]]` test flags — no need to remember that
 | `command -v c >/dev/null 2>&1` | `is::command c` |
 | `declare -F f >/dev/null 2>&1` | `is::function f` |
 
-Negation reads naturally: `if ! is::file "${path}"; then`.
+Negation reads naturally: `if ! is::file "${path}"; then`. In code that must run
+in any shell (`@shell posix`) call the real names: `bs_is_file`, `bs_is_dir`, `bs_is_number`, …
 
 ---
 
@@ -396,7 +399,9 @@ Note: internally this checks `command -v timeout >/dev/null 2>&1`; in your own c
 
 ## Configuration — `core/config.sh`
 
-`config::load` fills `BS_CONFIG` from four sources, from the lowest priority to the highest:
+`core/config.sh` is a module of the `@shell posix` tier: the real functions are named `bs_config_load`, `bs_config_get`, `bs_config_set`, `bs_config_list`, `bs_config_user_file`, `bs_config_local_file` (they can be sourced and called from dash, ash, ksh, mksh), and `config::load` and the other `config::*` are their aliases in bash and zsh; all existing code works unchanged. The settings live in the data-layer map `bs_config` (it was the associative array `BS_CONFIG`).
+
+`config::load` fills the map `bs_config` from four sources, from the lowest priority to the highest:
 
 1. built-in defaults;
 2. `~/.config/bs/config.sh` — your own file, trusted: any key is accepted;
@@ -414,7 +419,7 @@ The keys a project-local `./.bsrc` may set are listed in `BS_CONFIG_LOCAL_KEYS`:
 - Prints the value, or the default; returns `E_INVALID` if there is neither.
 
 #### `config::set <key> <value>`
-- Sets the value in `BS_CONFIG` and exports the variable.
+- Sets the value in the map `bs_config` and exports the variable; returns `E_INVALID` (and changes nothing) if the key is empty, is not a variable name, is reserved (`__bs_*`) or is read-only. In a config file such a key is skipped with a warning.
 
 #### `config::list`, `config::user_file`, `config::local_file`
 - `list` prints `KEY=value` pairs sorted by key; the other two print the path of the user file and the name of the local file.

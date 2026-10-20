@@ -5,7 +5,7 @@
 #
 # errorhandler.sh — единый EXIT-хендлер и cleanup-хуки / unified EXIT handler and cleanup hooks
 #
-# @depends core/const, core/logger, core/data
+# @depends core/const, core/var, core/str, core/num, core/logger, core/data
 #
 # Идея / Idea:
 # - любой модуль/скрипт может добавить очистку / any module/script can add cleanup:
@@ -33,7 +33,7 @@
 bs_guard "ERRORHANDLER" || return 0
 
 # Зависимости / Dependencies
-bs_source_relative "const.sh" "logger.sh" "data.sh"
+bs_source_relative "const.sh" "var.sh" "str.sh" "num.sh" "logger.sh" "data.sh"
 
 # ==========================================
 # Очистка / Cleanup
@@ -148,29 +148,34 @@ bs_signal_reset() {
 # Выход / Exit
 # ==========================================
 
+# @private
+# @description Код по имени: E_<ИМЯ>, затем LIB_ERROR_<ИМЯ>; результат в __bs_eh_val, статус 1 — имени нет / A code by name: E_<NAME>, then LIB_ERROR_<NAME>; the result is in __bs_eh_val, status 1 means no such name
+# @param $1 name, any case / имя в любом регистре
+bs_exit_code() {
+  __bs_eh_up=$(bs_str_upper "$1")
+  case "$__bs_eh_up" in
+    ''|*[!A-Z0-9_]*) return 1 ;;
+  esac
+  for __bs_eh_prefix in E_ LIB_ERROR_; do
+    __bs_eh_val=''
+    bs_var_get "${__bs_eh_prefix}${__bs_eh_up}" __bs_eh_val || continue
+    if [ -n "$__bs_eh_val" ]; then return 0; fi
+  done
+  return 1
+}
+
 # @description Run the cleanup and exit; the code is a number or a name (E_<NAME> / LIB_ERROR_<NAME>) / Выполнить очистку и выйти; код — число или имя
 # @param $1 code or name, default 0 / код или имя, по умолчанию 0
 bs_exit() {
   __bs_eh_ecode=${1:-0}
-  case "$__bs_eh_ecode" in
-    ''|*[!0-9]*)
-      # имя кода: имя проверяется, прежде чем попасть в eval / a code name: the name is checked before it reaches eval
-      __bs_eh_up=$(printf '%s' "$__bs_eh_ecode" | tr '[:lower:]' '[:upper:]')
-      __bs_eh_val=''
-      case "$__bs_eh_up" in
-        ''|*[!A-Z0-9_]*) : ;;
-        *)
-          eval "__bs_eh_val=\${E_${__bs_eh_up}:-}"
-          if [ -z "$__bs_eh_val" ]; then
-            eval "__bs_eh_val=\${LIB_ERROR_${__bs_eh_up}:-}"
-          fi ;;
-      esac
-      if [ -z "$__bs_eh_val" ]; then
-        bs_log_error "bs::exit: unknown exit code name: ${1:-}"
-        __bs_eh_val=${E_ERROR:-1}
-      fi
-      __bs_eh_ecode=$__bs_eh_val ;;
-  esac
+  if ! bs_num_is_uint "$__bs_eh_ecode"; then
+    if bs_exit_code "$__bs_eh_ecode"; then
+      __bs_eh_ecode=$__bs_eh_val
+    else
+      bs_log_error "bs::exit: unknown exit code name: ${1:-}"
+      __bs_eh_ecode=${E_ERROR:-1}
+    fi
+  fi
   bs_cleanup_run_all
   exit "$__bs_eh_ecode"
 }
@@ -302,19 +307,11 @@ bs_error_try_with_fallback() {
 # @param $1 attempts (an integer >= 1) / число попыток (целое >= 1)
 # @param $@ command / команда
 bs_error_retry() {
-  __bs_eh_max=${1-}
+  __bs_eh_arg=${1-}
   shift
-  case "$__bs_eh_max" in
-    ''|*[!0-9]*)
-      bs_log_error "error::retry: attempts must be an integer >= 1, got: '${__bs_eh_max}'"
-      return "${E_INVALID:-2}" ;;
-  esac
-  # 10# в bash снимал восьмеричность; здесь отбрасываем ведущие нули сами / 10# in bash dropped octal; here the leading zeros are cut by hand
-  while :; do
-    case "$__bs_eh_max" in 0?*) __bs_eh_max=${__bs_eh_max#0} ;; *) break ;; esac
-  done
-  if [ "$__bs_eh_max" -lt 1 ]; then
-    bs_log_error "error::retry: attempts must be an integer >= 1, got: '${__bs_eh_max}'"
+  # целое >= 1; ведущие нули не делают число восьмеричным (bs_num_dec) / an integer >= 1; leading zeros do not make it octal (bs_num_dec)
+  if ! { bs_num_is_uint "$__bs_eh_arg" && __bs_eh_max=$(bs_num_dec "$__bs_eh_arg") && [ "$__bs_eh_max" -ge 1 ]; }; then
+    bs_log_error "error::retry: attempts must be an integer >= 1, got: '${__bs_eh_arg}'"
     return "${E_INVALID:-2}"
   fi
   __bs_eh_att=1

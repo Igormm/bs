@@ -3,8 +3,8 @@
 # Architecture
 
 BS is a thin runtime layer **on top of bash 4.2+**: all of the `lib/` library (86
-modules), plus the CLI `bootstrap/bs.sh` and the installer (the `bash4` tier) are written in it. The
-exception is 15 `@shell posix` kernel files that run in any shell; the other
+modules) and the `bootstrap/bs.sh` commands that run it are written in it. The
+exception is the 19 small `@shell posix` kernel files that run in any shell; the other
 shells reach BS through a re-run in bash or `bs call`. It consists of two entry scripts
 (`boot.sh`, `bs`) with a shared POSIX prologue, a shell registry
 (`bootstrap/shell.sh`), a bootstrapper (`bootstrap/init.sh`), a module loader
@@ -15,7 +15,7 @@ happens between a script's shebang and its exit.
 ## Loading flow at a glance
 
 Read top to bottom. Three layers: the **POSIX prologue** (runs in any shell),
-**stages 1–2** (`boot.sh`, `bs` — bash 4.2+) and the **kernel**
+**stages 1–2** (`boot.sh`, `bs` — POSIX: all commands in bash 4.2+, the POSIX part elsewhere) and the **kernel**
 (`bootstrap/init.sh` → `bootstrap/loader.sh` → `core/*`).
 
 ```
@@ -40,8 +40,8 @@ Read top to bottom. Three layers: the **POSIX prologue** (runs in any shell),
               ┌───────────────────────────┴───────────────────────────┐
               ▼                                                       ▼
    stage-1: boot.sh                                          stage-2: bs
-    · source bootstrap/bs.sh (pre-kernel)                      (boot.sh execs into it)
-    · bs::strict (prologue checked the version)                      │
+    · . bootstrap/base.sh (pre-kernel, POSIX)                 (boot.sh execs into it)
+    · bs_strict                                                      │
     · BS_ROOT: env → next to boot.sh →                               ▼
       ~/.local/lib/bs → /usr/local/lib/bs        · BS_CALLER_PATH = the caller's PATH
       (not found → exit 2)                       · source bootstrap/bs.sh:
@@ -82,20 +82,18 @@ Read top to bottom. Three layers: the **POSIX prologue** (runs in any shell),
 ```
  source bootstrap/init.sh
    │
-   ├─ POSIX gate: not bash 4.2+ → bilingual explanation, return 1
-   ├─ source bootstrap/bs.sh  (pre-kernel); BS_BOOTSTRAP_DIR
+   ├─ BS_BOOTSTRAP_DIR (bash: path of the file; zsh: %x; others: BS_ENTRY_DIR / BS_ROOT)
+   ├─ source bootstrap/base.sh  (pre-kernel, POSIX); in bash also bootstrap/bs.sh
    ├─ BS_INITIALIZED set and bs::guard exists? → return 0   (idempotency)
    ├─ BS_ROOT (given, else the parent of bootstrap/ that holds the bs file)
-   ├─ bs::shell::ensure_version 4   (source mode: there is no prologue)
+   ├─ BS_KERNEL_MODE: full (bash 4.2+) or posix (dash, ash, ksh, mksh, zsh); an older bash is refused
    ├─ bs::append_local_bin_to_path   (~/.local/bin in the PATH of this process)
    ├─ source bootstrap/kernel.sh      (posix: the same file dash, ash, ksh, mksh, zsh source)
-   │    ├─ BS_HOME (defaults to BS_ROOT)
-   │    ├─ source bootstrap/loader.sh   → load, bs_load and bs::load appear
-   │    ├─ load core/prereq   bs_guard, bs_source_relative (first!)
-   │    ├─ load core/lang, const, logger, quiet, fmt, data, errorhandler,
-   │    │        version, utils, config, deps, args          (all posix)
-   │    └─ bs_config_load     configuration from files and the environment
-   ├─ load lib/compat/{deps,lang,args}   bash bridges: arrays and old functions
+   │    ├─ BS_HOME (defaults to BS_ROOT); the loader appears → bs_load (load and bs::load in bash and zsh)
+   │    ├─ load core/prereq first (bs_guard, bs_source_relative), then lang, const, var, str, num, msg,
+   │    │  logger, quiet, fmt, data, errorhandler, version, utils, config, deps, args   (17 modules)
+   │    └─ bs_config_load      configuration from files and the environment
+   ├─ load lib/compat/deps, lib/compat/lang, lib/compat/args   (full mode only) deps::missing_tools, str::*, arr::*, map::*, ARGS_*
    └─ BS_INITIALIZED=1
 ```
 
@@ -105,14 +103,14 @@ Read top to bottom. Three layers: the **POSIX prologue** (runs in any shell),
  load "lib/io/streams"
    │
    ├─ BS_ROOT set and a directory?            no  → error, return 1
-   ├─ already in the loader registry?          yes → return 0
+   ├─ already loaded (bs_load_is_loaded)?           yes → return 0
    ├─ --strict-shell: does the module's @shell tier fit BS_ORIGIN_SHELL?   no → refuse
-   ├─ module already on the load stack?       yes → circular dependency, return 1
+   ├─ module already on the load stack?        yes → circular dependency, return 1
    ├─ push onto the load stack
    ├─ for each dependency in "# @depends" → load (recursive); failure → return 1
    ├─ BS_CURRENT_FILE=<file>; source ${BS_ROOT}/lib/io/streams.sh
    ├─ pop from the load stack (on error too)
-   └─ add the path to the registry
+   └─ add path to the registry of loaded modules
 ```
 
 ## The kernel by tiers: what every shell gets
@@ -125,8 +123,10 @@ what was really run is in the priority table of
 
 | Tier | `core/` files | Runs directly in | How the other shells get it |
 |---|---|---|---|
-| `posix` (15) | `prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `config`, `lang`, `args` | bash, zsh, dash, busybox ash, ksh93, mksh (verified by running) | — (they source it themselves) |
+| `posix` (19) | `prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `config`, `lang`, `args`, `var`, `str`, `num`, `msg` | bash, zsh, dash, busybox ash, ksh93, mksh (verified by running) | — (they source it themselves) |
 | `bash4` (87) | **all of `lib/`**, every module | bash 4.2+ only (no `lib/` module is POSIX) | the entry point finds bash and re-runs itself in it (trampoline); kernel functions — the `bs call` command |
+
+No `core/` file is `bash4` any more: `repl` moved to `lib/ui/repl`, and what needs real bash arrays (the rest of `lang`, `deps::missing_tools`, `ARGS_PARAMS`/`ARGS_FLAGS`/`ARGS_REST` of `args::parse`) lives in the bridges `lib/compat/lang`, `lib/compat/deps` and `lib/compat/args`, outside the kernel.
 
 What makes it "available to all":
 
@@ -135,16 +135,16 @@ What makes it "available to all":
 2. **The POSIX tier is sourced directly** from bash, zsh, dash, ash, ksh, mksh:
    constants, the version, `bs_utils_has`/`bs_utils_quiet` and the rest, the shell
    registry (`bootstrap/shell.sh`), shebang management (`bootstrap/shebang.sh`).
-   **The whole kernel in one line:** `BS_ROOT=/path/to/bs . /path/to/bs/bootstrap/kernel.sh`
-   loads the loader, all 15 `core/` modules and the configuration (verified in
-   dash, ash, ksh, mksh, zsh and bash by `unit/testkernelportableunit.sh`).
 3. **The bridge `bs call [--load MODULE] FUNCTION [ARGS]`** calls any kernel
    function from fish, nushell and other shells with another syntax; the
    function runs in bash, the output and the exit code go back to the caller.
 
-What the kernel does **not** promise: to run what lies outside `core/` in dash, ash, ksh, mksh, fish or nushell — the CLI `bootstrap/bs.sh` and the installer and all of `lib/` (the `bash4` tier). All 15 `core/` files are `posix`. The bash features the kernel does not need were moved out
-of it into `lib/compat/`: `str::*`, `arr::*`, `map::*` (from `lang`), `deps::missing_tools` and the arrays `ARGS_PARAMS`, `ARGS_FLAGS`, `ARGS_REST` for
-`args::parse`; `repl` into `lib/ui/repl`. Shells without a real run (nushell, oksh, osh) are not considered verified.
+What the kernel does **not** promise: to run `lib/`, the bridges `lib/compat/*` and the
+commands of `bootstrap/bs.sh` (the `bash4` files) in dash, ash, ksh, mksh, fish or nushell. They need
+associative arrays, namerefs and `=~` with `BASH_REMATCH`, which are missing or
+behave differently there. Shells without a real run (nushell, oksh, osh) are
+not considered verified. All 19 `core/` files are `posix` now; they moved one by one (`calc`, `quiet`, `fmt`, `logger`, `data`,
+`utils`, `deps`, `errorhandler`, `config` (its associative array `BS_CONFIG` became the data-layer map `bs_config`), `lang` (the predicates `bs_is_*`), `args` (the tree, the flags and the parse result live in the data layer; the bash arrays `ARGS_PARAMS`, `ARGS_FLAGS`, `ARGS_REST` are filled by `lib/compat/args`) and the new base modules `var`, `str`, `num`, `msg`); the other bash language primitives (`str::*`, `arr::*`, `map::*`, introspection) moved out of `lang` into `lib/compat/lang`; `repl` is outside the kernel.
 
 ## Stage 0: POSIX prologue and the `trampoline`
 
@@ -157,7 +157,6 @@ before the first useful line.
 |---|---|---|
 | `BS_ENTRY_DIR` | prologue | the entry point directory with symlinks resolved; `BS_ROOT` and `bootstrap/` are found from it |
 | `bootstrap/shell.sh` | shell registry | POSIX answers: which shell this is, can it be the host (`bs_shell_host_ok`), where bash 4.2+ is (`bs_shell_host_find`), the tier |
-| `bootstrap/loader.sh`, `bootstrap/kernel.sh` | the loader and the kernel | `load`/`bs_load` with `@depends`, cycle detection and `--strict-shell`; `kernel.sh` loads all of `core/` in the fixed order |
 | `bootstrap/trampoline.sh` | re-run | `exec` into the bash found, same file and arguments; otherwise a message about what to install |
 | `BS_HOST_BASH` | environment | force the bash used for the re-run |
 | `BS_ORIGIN_SHELL` | environment | the shell BS was started from; `--strict-shell` uses it |
@@ -171,11 +170,11 @@ on `@shell posix|bash4` tiers and shells: [shell-portability](../08-development/
 [boot.sh](../../../boot.sh) is a minimal pre-loader whose only job is to verify
 the environment and hand control to `bs` as fast as possible:
 
-1. **Pre-kernel namespace.** It sources `bootstrap/bs.sh` — a dependency-free,
-   bash-3.2-compatible file — and enables strict mode
-   (`bs::strict`). The POSIX prologue (`bs_shell_host_ok`) has already checked
-   the bash version: it replaces an unsuitable bash with a re-run (trampoline)
-   or exits with code `1`.
+1. **Pre-kernel namespace.** It sources `bootstrap/base.sh` — a dependency-free
+   POSIX file — and enables strict mode (`bs_strict`). The POSIX prologue
+   (`bs_shell_host_ok`) has already looked at the shell: it re-runs in a bash
+   4.2+ when there is one and otherwise lets `boot.sh` carry on in the current
+   shell (`BS_POSIX_ENTRY=1`); `bs` then decides what it can run there.
 2. **BS_ROOT lookup**, in priority order:
    - already exported `BS_ROOT`;
    - the directory containing `boot.sh` itself, if `bs` and
@@ -187,8 +186,8 @@ the environment and hand control to `bs` as fast as possible:
 3. **Handover.** `exec "${BS_ROOT}/bs" "$@"` replaces the process, so all
    arguments and standard streams reach stage 2 unchanged.
 
-Exit codes: `0` — `bs` ran successfully; `1` — bash too old; `2` — framework
-not found.
+Exit codes: `0` — `bs` ran successfully; `1` — `bootstrap/base.sh` not found;
+`2` — framework not found.
 
 ## Stage 2: `bs` — CLI and shebang interpreter
 
@@ -243,26 +242,29 @@ Its steps:
    from the file's own location (the parent of `bootstrap/`), verified by the
    presence of the `bs` script. If that fails, initialization aborts with an
    error asking to set `BS_ROOT` manually.
-3. **Pre-kernel namespace.** Sources `bootstrap/bs.sh` and runs the shell
-   version gate `bs::shell::ensure_version 4` before any kernel code loads (in
-   source mode there is no prologue, so `init.sh` checks the version itself) —
-   runtime detection via `BASH_VERSION`/`ZSH_VERSION`, never `$SHELL` (the
-   login shell lies when sourcing from another shell).
+3. **Pre-kernel namespace and the kernel mode.** Sources `bootstrap/base.sh`
+   (POSIX: `bs_strict`, `bs_append_local_bin_to_path`, `bs_shell_*`) and, in
+   bash, `bootstrap/bs.sh`. Then it chooses `BS_KERNEL_MODE`: `full` in bash
+   4.2+, `posix` in every other shell (the 16 POSIX modules, no bridges),
+   and refuses a bash older than 4.2 (`bs_shell_ensure_version`) — runtime
+   detection through the shell registry, never `$SHELL` (the login shell lies
+   when sourcing from another shell).
 4. **PATH tweak.** `~/.local/bin` is prepended to `PATH` once
-   (`bs::append_local_bin_to_path`), which covers local installs.
+   (`bs_append_local_bin_to_path`), which covers local installs.
 5. **BS_HOME.** Defaults to `BS_ROOT` if unset.
-6. **Kernel and loader.** Sources `bootstrap/kernel.sh` (`@shell posix`): it
-   sources the loader `bootstrap/loader.sh` and loads the 15 `core/` modules in a
-   fixed order, then reads the configuration. The same file can be sourced from
-   dash, ash, ksh, mksh and zsh with `BS_ROOT` set.
+6. **Loader.** Sources `bootstrap/loader.sh` (falling back to
+   `${BS_ROOT}/loader.sh`). The loader also sources `bootstrap/bs.sh` for
+   direct users, so `bs::shell::*` and friends are always available.
 7. **Core modules**, loaded via `load` in a fixed order:
    - `core/prereq` — first: the core primitives `bs::guard`,
      `bs::guard_loaded` and `bs::source_relative`, available a priori to all
      other modules (modules never source `prereq.sh` manually); shell
      detection helpers previously here now live in `bootstrap/bs.sh`;
-   - `core/lang` — language primitives over Bash built-ins: introspection
-     (`bs::func_name`, `bs::call_stack`, `bs::type_of`), strings (`str::*`),
-     collections (`arr::*`, `map::*`);
+   - `core/lang` — `@shell posix`: the predicates `bs_is_empty`, `bs_is_file`,
+     `bs_is_dir`, `bs_is_number`, `bs_is_command`, … (`is::*` are aliases in bash
+     and zsh). Introspection (`bs::func_name`, `bs::call_stack`, `bs::type_of`),
+     strings (`str::*`) and collections (`arr::*`, `map::*`) moved to the bridge
+     `lib/compat/lang`, which `init.sh` loads in bash;
    - `core/const` — error codes (`E_SUCCESS`, `E_ERROR`, `LIB_ERROR_*`),
      color constants, framework flags (`FRAMEWORK_DEBUG`,
      `FRAMEWORK_DRY_RUN`);
@@ -300,8 +302,8 @@ Because `core/utils` is always loaded, every BS script can rely on
 
 ## Module loader: `bootstrap/loader.sh`
 
-[bootstrap/loader.sh](../../../bootstrap/loader.sh) (`@shell posix`) provides a single public
-function (the real name is `bs_load`; `load` and `bs::load` are its names):
+[bootstrap/loader.sh](../../../bootstrap/loader.sh) provides a single public
+function:
 
 ```bash
 load "core/args"        # sources ${BS_ROOT}/core/args.sh
@@ -311,11 +313,11 @@ load "lib/io/streams"   # sources ${BS_ROOT}/lib/io/streams.sh
 `load` takes a path **relative to `BS_ROOT` without the `.sh` extension** and
 `sources` the corresponding file. Internals:
 
-- **Duplicate-load protection.** Loaded modules are recorded in a registry string
-  (`bs_load_is_loaded MODULE` asks it); a second `load` of the same module is
+- **Duplicate-load protection.** Loaded modules are recorded in the
+  string `__bs_ld_loaded` (one module per line; it was the bash array `BS_LOADED_MODULES` — the loader runs before `core/data.sh`, so it uses no data layer; ask with `bs_load_is_loaded`); a second `load` of the same module is
   a no-op returning `0`.
 - **Cycle detection.** The modules currently being loaded are kept in the
-  load stack (a string, `bs_load_stack_size` gives its depth). If a module is requested while it is already on the
+  string `__bs_ld_stack` (it was `BS_LOAD_STACK`; `bs_load_stack_size` gives its depth). If a module is requested while it is already on the
   stack, loading fails with a `circular dependency detected` error naming the
   full chain. The stack entry is always popped afterwards, including on
   failure.
@@ -358,7 +360,7 @@ Step by step:
 3. `run_cmd` spawns a clean bash, unsets `BS_INITIALIZED`, sources
    `bootstrap/init.sh` (full core load) and then sources the script.
 4. The script pulls in additional modules with `load`. Already-loaded modules
-   cost nothing thanks to the loader registry.
+   cost nothing thanks to the registry of loaded modules.
 5. During execution the script may register cleanup functions with
    `cleanup::add <fn>`.
 6. On exit — normal, via `bs::exit [code]`, or via `error::exit "msg" [code]` —

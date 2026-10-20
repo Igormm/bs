@@ -4,12 +4,20 @@ BS is installed by the modular installer in the repository root: [install.sh](..
 
 ## Installer layout
 
-- [install.sh](../../install.sh) — entry point. Validates the repository layout (`core/`, `bootstrap/`, `install/`), loads the core via `bootstrap/init.sh`, enables strict mode via `utils::strict`, checks the interpreter via `check_shell_environment` (based on the real process, not `$SHELL`), then runs `install/main.sh`.
+- [install.sh](../../install.sh) — entry point. Validates the repository layout (`core/`, `bootstrap/`, `install/`), loads the core via `bootstrap/init.sh`, enables strict mode via `bs_utils_strict`, checks the interpreter via `bs_check_shell_environment` (based on the real process, not `$SHELL`), then runs `bs_install_main` from `install/main.sh`.
 - [install/main.sh](../../install/main.sh) — argument parsing, mode/path resolution, dispatch to install/uninstall actions.
-- [install/checks.sh](../../install/checks.sh) — environment checks: `is_already_installed`, `check_shell_environment`.
-- [install/actions.sh](../../install/actions.sh) — `do_install` and `do_uninstall`.
+- [install/checks.sh](../../install/checks.sh) — environment checks: `bs_is_already_installed`, `bs_check_shell_environment`.
+- [install/actions.sh](../../install/actions.sh) — `bs_do_install` and `bs_do_uninstall`.
 - [install/notice.sh](../../install/notice.sh) — bilingual notices (boxes and ERROR/NOTE lines), `BS_SYSTEM_PREFIX`, classification of `TARGET_LIB`/`TARGET_BIN`, write-access and `sudo` checks.
-- [install/path_manager.sh](../../install/path_manager.sh) — PATH helpers: `print_path_hint`, `auto_update_path`, `update_path_bashrc`.
+- [install/path_manager.sh](../../install/path_manager.sh) — PATH helpers: `bs_print_path_hint`, `bs_auto_update_path`, `bs_remove_path_entry`.
+
+All of these files are `@shell posix` and live in the `bs_` namespace (`install_box` ↔ `bs_install_box`, `do_install` ↔ `bs_do_install`; the old names stay as aliases in bash and zsh).
+
+## Installing without bash
+
+`install.sh` runs in **dash, busybox ash, ksh, mksh, zsh and bash**. Its POSIX prologue first looks for a bash 4.2+ and re-runs itself in it if there is one; if there is none, the installer carries on in the current shell and the kernel loads its POSIX part (`BS_KERNEL_MODE=posix`: 17 of the 19 `core/` files at start, `calc` on demand; `lib/` needs bash). So a machine with only busybox (Alpine without `apk add bash`) can install, reinstall and uninstall BS: the files are copied transactionally, the wrapper is written and the PATH line goes to the rc file of your shell (`~/.profile` for ash, dash, ksh and mksh). `unit/testinstallnobashunit.sh` hides every bash behind a mount namespace and runs the whole life cycle in each of the five shells.
+
+What works without bash after the install: `bs help`, `bs version [--full]`, `bs env`, `bs list`, `bs calc`, `bs doctor` (except `--capabilities`), `bs uninstall`, `bs where`, `bs update`, `bs init-shell`, `bs shebang` and `bs call` (`unit/testbsnobashunit.sh` runs them in ash, dash, ksh, mksh and zsh). Every other `bs` command (`run`, `build`, …) answers "the command still needs bash 4.2+" and exits with 1; the bash completion is installed but unused, and everything in `lib/` is bash. On such a machine install bash (`apk add bash`) for those.
 
 ## Modes
 

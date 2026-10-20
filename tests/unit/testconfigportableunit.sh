@@ -85,12 +85,72 @@ test_behaviour() {
     done < <(testframework::posix_shells)
 }
 
+# «трудные» значения / hard values: a value is data, it is never run as code or expanded
+HARD_VALUES=('$HOME' '$(touch PWNED)' '`touch PWNED`' '*' 'a\b\\c' "it's" 'a=b=c' 'Привет мир' '-n' 'a; touch PWNED' '"quoted" inside' '%s %d' '~' '${HOME:?}')
+
+test_hard_values() {
+    local sh_bin sh_name i expected get_snippet env_snippet
+    expected="$(printf '%s\n' "${HARD_VALUES[@]}")"
+    get_snippet="" env_snippet=""
+    for i in "${!HARD_VALUES[@]}"; do
+        get_snippet+="bs_config_get HV_${i}; printf '\\n'; "
+        env_snippet+="printf '%s\\n' \"\$HV_${i}\"; "
+    done
+    mkdir -p "${T}/home/.config/bs" "${T}/proj"
+    rm -f "${T}/proj/.bsrc"
+    : > "${T}/home/.config/bs/config.sh"
+    for i in "${!HARD_VALUES[@]}"; do printf 'HV_%s=%s\n' "${i}" "${HARD_VALUES[i]}" >> "${T}/home/.config/bs/config.sh"; done
+    printf '%s\n' "${HARD_VALUES[@]}" > "${T}/hard.txt"
+    while IFS= read -r sh_bin; do
+        sh_name="${sh_bin##*/}"
+        # из файла пользователя / from the user file
+        eq "${expected}" "$(probe "${sh_bin}" '' "bs_config_load >/dev/null; ${get_snippet}")" "${sh_name}: hard values from the user file come back unchanged"
+        eq "${expected}" "$(probe "${sh_bin}" '' "bs_config_load >/dev/null; ${env_snippet}")" "${sh_name}: hard values from the user file are exported unchanged"
+        # через set / through set
+        eq "${expected}" "$(probe "${sh_bin}" '' "i=0; while IFS= read -r v; do bs_config_set \"HVS_\$i\" \"\$v\"; i=\$((i + 1)); done < '${T}/hard.txt'; $(printf '%s' "${get_snippet}" | sed 's/HV_/HVS_/g')")" "${sh_name}: hard values through set come back unchanged"
+        eq "${expected}" "$(probe "${sh_bin}" '' "i=0; while IFS= read -r v; do bs_config_set \"HVS_\$i\" \"\$v\"; i=\$((i + 1)); done < '${T}/hard.txt'; $(printf '%s' "${env_snippet}" | sed 's/HV_/HVS_/g')")" "${sh_name}: hard values through set are exported unchanged"
+        eq 'a
+b' "$(probe "${sh_bin}" '' 'v=$(printf "a\nb"); bs_config_set HV_NL "$v"; bs_config_get HV_NL')" "${sh_name}: a value with a newline"
+        # из окружения / from the environment
+        eq '$(id)' "$(probe "${sh_bin}" 'BS_FILES_BACKUP_SUFFIX=$(id)' 'bs_config_load; bs_config_get BS_FILES_BACKUP_SUFFIX')" "${sh_name}: an environment value is data too"
+        eq "=x" "$(probe "${sh_bin}" '' 'bs_config_set EMPTYKEY ""; bs_config_set EQ "=x"; bs_config_get EMPTYKEY; bs_config_get EQ')" "${sh_name}: an empty value and a value starting with ="
+    done < <(testframework::posix_shells)
+    testframework::assert_command "[ ! -e '${T}/proj/PWNED' ]" "no hard value was run as code" || true
+    rm -f "${T}/home/.config/bs/config.sh"
+}
+
+# плохие имена для каждого eval / bad names for every eval: refused before the eval, the shell survives
+test_bad_names() {
+    local sh_bin sh_name key
+    mkdir -p "${T}/home/.config/bs" "${T}/proj"
+    rm -f "${T}/proj/.bsrc" "${T}/proj/PWNED"
+    while IFS= read -r sh_bin; do
+        sh_name="${sh_bin##*/}"
+        # set: имя не идентификатор, служебное (__bs_*), только для чтения / not an identifier, reserved, read-only
+        for key in 'a;touch PWNED' '$(touch PWNED)' '`touch PWNED`' 'a b' '1x' 'a-b' 'a.b' '' '__bs_cf_val' '__bs_var_v' '__bs_dat_out' 'BS_CONFIG_LOCAL_KEYS' 'BS_CONFIG_USER_DIR' 'E_INVALID'; do
+            eq "rc=2|alive" "$(probe "${sh_bin}" '' "bs_config_set '${key}' x 2>/dev/null; printf 'rc=%s|' \$?; echo alive")" "${sh_name}: set refuses the key [${key}] and the shell survives"
+        done
+        eq "x" "$(probe "${sh_bin}" '' 'bs_config_set _OK_1 x; printf "%s" "$_OK_1"')" "${sh_name}: a name with a leading underscore is fine"
+        # get с плохим именем: ничего не выполняется / get with a bad name runs nothing
+        eq "rc=2" "$(probe "${sh_bin}" '' 'bs_config_get "a;touch PWNED" >/dev/null; echo rc=$?')" "${sh_name}: get of a bad name is a plain miss (2)"
+        # файл: плохие и служебные ключи пропускаются, оболочка жива / a file: bad and reserved keys are skipped, the shell survives
+        printf '%s\n' 'a;touch PWNED=1' '$(touch PWNED)=1' 'a b=1' 'BS_CONFIG_LOCAL_KEYS=x' '__bs_cf_val=1' 'BS_CONFIG_USER_DIR=/x' 'GOOD=1' > "${T}/home/.config/bs/config.sh"
+        eq "3" "$(probe "${sh_bin}" '' 'bs_config_load' | grep -c 'is reserved or read-only, ignored')" "${sh_name}: reserved and read-only keys of a file are reported (3)"
+        eq "alive|1|y|rc=2" "$(probe "${sh_bin}" '' 'bs_config_load >/dev/null 2>&1; printf "alive|%s|" "$(bs_config_get GOOD)"; case "$BS_CONFIG_LOCAL_KEYS" in *" BS_SILENT "*) printf "y|";; *) printf "n|";; esac; bs_config_get "a;touch PWNED" >/dev/null; echo rc=$?')" "${sh_name}: the file loads, the good key lands, the constants stay"
+        # словарь с негодными ключами (в обход API) / a map with bad keys (written around the API)
+        eq "alive|2" "$(probe "${sh_bin}" '' 'bs_map_set bs_config "a;touch PWNED" v; bs_map_set bs_config "\$(touch PWNED)" w; bs_config_load >/dev/null 2>&1; printf "alive|"; bs_config_list | grep -c touch')" "${sh_name}: bad keys in the map are not evaluated and do not end the shell"
+        rm -f "${T}/home/.config/bs/config.sh"
+    done < <(testframework::posix_shells)
+    testframework::assert_command "[ ! -e '${T}/proj/PWNED' ]" "no bad name was run as code" || true
+}
+
 test_aliases() {
     local sh_name sh_bin
     for sh_name in bash zsh; do
         sh_bin="$(command -v "${sh_name}" || true)"
         [[ -n "${sh_bin}" ]] || continue
         eq "false" "$(probe "${sh_bin}" '' 'config::load; config::get BS_FILES_ATOMIC')" "${sh_name}: config::load and config::get are aliases"
+        eq "rc=2" "$(probe "${sh_bin}" '' 'config::set "a;touch PWNED" x 2>/dev/null; echo rc=$?')" "${sh_name}: config::set is the same function (refuses a bad key)"
     done
 }
 
@@ -98,6 +158,8 @@ main() {
     T="$(mktemp -d)"
     testframework::section "Parse and lint / Разбор и линт"; test_parses_and_lints
     testframework::section "Behaviour in every shell / Поведение в каждой оболочке"; test_behaviour
+    testframework::section "Hard values / Трудные значения"; test_hard_values
+    testframework::section "Bad names / Плохие имена"; test_bad_names
     testframework::section "Aliases / Псевдонимы"; test_aliases
     rm -rf "${T:?}"
     testframework::summary

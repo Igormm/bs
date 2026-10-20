@@ -18,10 +18,12 @@ source "${TEST_SCRIPT_DIR}/../testframework.sh"
 
 T=""
 
-# probe <shell> <path> <snippet> — shell.sh, prereq.sh и calc.sh подключены, затем snippet; stdin — от вызывающего
+# probe <shell> <path> <snippet> — shell.sh, prereq.sh и calc.sh подключены (BS_CURRENT_FILE ставится, как это делает загрузчик:
+# calc.sh сам подключает msg.sh), затем snippet; stdin — от вызывающего
 probe() {
     local -r sh_bin="$1" path="$2" snippet="$3"
-    printf '. "%s"\n. "%s"\n. "%s"\n%s\n' "${SHELL_SH}" "${PREREQ_SH}" "${CALC_SH}" "${snippet}" > "${T}/probe.sh"
+    printf 'BS_CURRENT_FILE="%s"\n. "%s"\nBS_CURRENT_FILE="%s"\n. "%s"\nBS_CURRENT_FILE="%s"\n. "%s"\n%s\n' \
+        "${SHELL_SH}" "${SHELL_SH}" "${PREREQ_SH}" "${PREREQ_SH}" "${CALC_SH}" "${CALC_SH}" "${snippet}" > "${T}/probe.sh"
     env -i HOME="${T}/h" PATH="${path}" "${sh_bin}" "${T}/probe.sh" 2>&1
 }
 
@@ -40,7 +42,7 @@ test_parses_and_lints() {
 
 test_behaviour() {
     local sh_bin sh_name out
-    utils::has dc || { testframework::skip "calc behaviour in every shell" "dc is not installed / dc не установлен"; return 0; }
+    utils::has dc || { printf '  skip: dc is not installed / dc не установлен\n'; return 0; }
     while IFS= read -r sh_bin; do
         sh_name="${sh_bin##*/}"
         eq "14" "$(probe "${sh_bin}" /usr/bin:/bin 'bs_calc_eval "2 3 4 * +"')" "${sh_name}: RPN arithmetic"
@@ -73,7 +75,7 @@ test_no_dc() {
 
 test_aliases() {
     local sh_name sh_bin
-    utils::has dc || { testframework::skip "calc::eval aliases" "dc is not installed / dc не установлен"; return 0; }
+    utils::has dc || { printf '  skip: dc is not installed / dc не установлен\n'; return 0; }
     for sh_name in bash zsh; do
         sh_bin="$(command -v "${sh_name}" || true)"
         [[ -n "${sh_bin}" ]] || continue

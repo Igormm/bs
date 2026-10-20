@@ -95,8 +95,16 @@ scan_file() {
   # сообщении или в строке для `bash -c` — не конструкция этого файла)
   # Text without comments; and the same without string literals (a construct
   # inside a message or a `bash -c` string is not a construct of this file)
-  raw="$(grep -vE '^[[:space:]]*#' "${f}" 2>/dev/null || true)"
-  stripped="$(sed -E "s/\"[^\"]*\"//g; s/'[^']*'//g" <<< "${raw}")"
+  # Тела here-document — текст (справка, шаблон), а не конструкции файла; их выбрасываем вместе с комментариями
+  # The bodies of here-documents are text (help, a template), not constructs of the file; dropped with the comments
+  raw="$(grep -vE '^[[:space:]]*#' "${f}" 2>/dev/null | awk '
+    inh { t = $0; sub(/^[ \t]+/, "", t); if ($0 == word || t == word) inh = 0; next }
+    { if (match($0, /(^|[^<])<<-?[ \t]*["\x27]?[A-Za-z_][A-Za-z_0-9]*["\x27]?/)) {
+        h = substr($0, RSTART, RLENGTH); sub(/^[^<]?<<-?[ \t]*["\x27]?/, "", h); sub(/["\x27]$/, "", h); word = h; inh = 1 }
+      print }' || true)"
+  # и операнд-слова ${x:?слова}, ${x:-слова}, ${x:+слова}, ${x:=слова}: это текст, а не конструкции
+  # and the operand words of ${x:?words}, ${x:-words}, ${x:+words}, ${x:=words}: text, not constructs
+  stripped="$(sed -E "s/\"[^\"]*\"//g; s/'[^']*'//g; s/(\\$\\{[A-Za-z_0-9]+:?[?+=-])[^}]*\\}/\\1}/g" <<< "${raw}")"
   found="$(match_patterns "${raw}")"
   found_code="$(match_patterns "${stripped}")"
   [[ -z "${found}" ]] || computed="bash4"

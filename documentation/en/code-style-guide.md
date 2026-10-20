@@ -17,10 +17,12 @@ documentation and protection against errors.
 - Line length: 80 characters.
 - Comments are full sentences.
 - Use `[[ ... ]]` instead of `[ ... ]`, `test` and `/usr/bin/[`.
+  This is the rule for `lib/` and `bash4` code; kernel code in the `bs_` namespace (`@shell posix`)
+  follows the opposite one, see [12](#12-code-in-the-bs_-namespace-the-kernel-tier-shell-posix).
 - Quote variable expansions: `"${var}"`, not `$var`.
+- Strict mode (`set -euo pipefail` and a safe `IFS`, see
+  [1.1](#11-strict-mode)) is enabled by entry points, not by modules.
 - Module files must include:
-  - strict mode (`set -euo pipefail` and a safe `IFS`, see
-    [1.1](#11-strict-mode));
   - a Source Guard against double sourcing (see [1.2](#12-module-file-structure-and-source-guard));
   - dependencies loaded via `load`, not via a direct `source lib/...` call.
 
@@ -264,7 +266,7 @@ the name mask and whether a doc snippet is required.
 | 9 | Env vars | `BS_*` | `BS_ROOT`, `BS_SILENT`, `BS_CONFIG_*` | yes |
 | 10 | Module hooks | `<MODULE>_*_{DIR,PATH,MOCK,FILE,TIMEOUT}` | `HW_DMI_PATH`, `LLM_MOCK_RESPONSE`, `VK_API_CACHE_DIR` | yes |
 | 11 | Module constants | `readonly SCREAMING_SNAKE` | `COLOR_RESET`, `SSH_NETWORK_CONNECT_TIMEOUT` | yes |
-| 12 | Module internal state | `__<MODULE>_*` | `__ARGS_TREE`, `__ARGS_FLAGS` | yes |
+| 12 | Module internal state | `__<MODULE>_*` | `__SSH_FLAG_USER`, `__SSH_FLAG_HOST` | yes |
 | 13 | Module state (public mutable) | `<MODULE>_*` (non-hook, non-readonly) | `TUI_KEY`, `TUI_MODAL_STACK`, `SSHD_WZ_VALUES` | yes |
 
 A `: "${VAR:=...}"` declaration is always a **hook** (category 10) regardless
@@ -600,54 +602,289 @@ busybox (Alpine), glibc and musl. Rules:
    recommendations": [documentation/en/02-core-concepts/portability.md](02-core-concepts/portability.md);
    the rules above are the canon.
 
-## 12. Style of the POSIX tier (`@shell posix`)
+## 12. Code in the `bs_` namespace (the kernel, tier `@shell posix`)
 
-A file labelled `# @shell posix` is sourced by bash, zsh, dash, busybox ash, ksh93 and mksh, and **bash does not take
-part in it**. That is why it has its own rules; the rest of the code style (bilingual comments, `bs_guard`,
-`snake_case`) still applies. Check: `bash .agents/skills/bs-shell-abstraction/scripts/check_posix_tier.sh`.
+This chapter is self-contained: it is how **any kernel function** (`bootstrap/`, `core/`, `install/`, the entry points) is written or converted. A file labelled `# @shell posix` is sourced by bash, zsh, dash, busybox ash, ksh93 and mksh, and **bash does not take part in it**, so it has rules of its own. From sections 1–11 these stay in force: bilingual comments (§3), `bs_guard` (§8.1), strict mode only in entry points (§1.1), `@global` for variables (§4.2) and the capability vector (§11); these do **not** apply: `module::function` in definitions (§2), `local`, arrays and `[[ ]]` (§4.1). The models the chapter cites: [`core/data.sh`](../../core/data.sh) (the data layer), [`core/logger.sh`](../../core/logger.sh), [`core/quiet.sh`](../../core/quiet.sh), [`core/fmt.sh`](../../core/fmt.sh), [`core/calc.sh`](../../core/calc.sh), [`core/utils.sh`](../../core/utils.sh), [`core/errorhandler.sh`](../../core/errorhandler.sh), [`core/prereq.sh`](../../core/prereq.sh).
 
-**File header.**
+The step-by-step procedure with its checks is the skill `bs-kernel-code`; what a tier is and who checks it is `bs-shell-abstraction` and `bs-shell-portability`. This chapter holds the **rules and the reasons**. Every reason was verified by running dash, busybox ash, ksh93, mksh, zsh and bash; where a shell is missing on your machine the rule still holds (the reason is in the shell table of `shell-portability.md`).
+
+### 12.1 What a machine checks and what a person checks
+
+| Rule | Who watches |
+|---|---|
+| The file parses in dash, ash, ksh, mksh, zsh (`X -n`) | `check_posix_tier.sh`, section "parse" |
+| No `[[ ]]`, `(( ))`, arrays, `declare`, `${!x}`, `${x^^}`, `=~`, `<( )`, `$'..'`, `source`, the `function` keyword, `local -x`; no `BASH_*`/`ZSH_*`/`FUNCNAME` outside the layer files | `check_posix_tier.sh`, section "syntax" |
+| Every function is named `bs_…` (or `__bs_…`) and none is defined with `::` | `check_posix_tier.sh`, section "names" |
+| The tier runs in `dash` with no bash in `PATH` | `check_posix_tier.sh`, section "run" |
+| `local`, `[[ ]]`, `printf -v`, `echo -e`, `${x^^}`, `$'..'`, arrays | `shellcheck -s sh` (SC3043, SC3010, SC3045, SC3037, SC3059, SC3003, SC3030) |
+| Every `posix` file of `core/` has a portable test | `tests/unit/testposixtierunit.sh` |
+| The behaviour is the same in all six shells | `tests/unit/test<module>portableunit.sh` |
+| **No machine catches:** `for w in $list` (zsh does not split), `cmd \| while read` (lost variables), `$(( ))` on big numbers, `${#s}` on non-ASCII, a mutation inside `$(...)`, `eval` with an unchecked name, clobbered temporaries | a test on "hard" values + a review against this chapter |
+
+The `# @shell posix` label is searched in the **first 14 lines** of the file (`head -n 14` in the checker): do not push it lower.
+
+### 12.2 Names: one namespace `bs_`
+
+The real function is an identifier without `::`. **All** kernel code lives in one namespace: `bs_` + the old name with `::` turned into `_` and the leading `__` of private names removed. If the old name already began with `bs::`, a second `bs_` is not added.
+
+| Old name | Real name | Note |
+|---|---|---|
+| `utils::has` | `bs_utils_has` | the basic rule |
+| `log::info` | `bs_log_info` | |
+| `calc::eval` | `bs_calc_eval` | |
+| `bs::version::get` | `bs_version_get` | `bs::` is not doubled |
+| `bs::guard` | `bs_guard` | |
+| `cleanup::add` | `bs_cleanup_add` | the `cleanup` namespace is not a file name |
+| `bs::exit` | `bs_exit` | |
+| `function_exists` | `bs_function_exists` | had no `::` — just the prefix |
+| `log::__timestamp` (private) | `bs_log_timestamp` | no leading `__`, marked `# @private` |
+| `utils::__tmp_cleanup` (private) | `bs_utils_tmp_cleanup` | |
+| `arr::push` on a real bash array | stays `arr::push` | the data layer's `bs_arr_push` is a **different** function |
+
+Rules:
+
+1. **The module in the name is a namespace, not a file.** `core/quiet.sh` and `core/fmt.sh` define `bs_utils_*`: that is what `utils::has` and `utils::human_size` were called before they were moved out. When choosing a name ask "what was it called before" (or "which namespace does it live in"), not "which file am I in".
+2. **Forwards is mechanical, backwards is by the alias table.** `bs_utils_quiet_err` ↔ `utils::quiet_err` can only be restored from the alias block at the end of the file: the module/function border in `bs_a_b_c` cannot be guessed from the name. So the alias block is the one source of truth about old names.
+3. **Check for collisions before you pick a name.** `a::b_c` and `a_b::c` both give `bs_a_b_c`. Before a new name: `grep -rn 'bs_module_name' bootstrap core install lib bs boot.sh install.sh`.
+4. **Reserved prefixes:** `bs_shell_*` (the layer `bootstrap/shell.sh`), `bs_guard*`, `bs_source_*` (`core/prereq.sh`), `bs_arr_*`, `bs_map_*`, `bs_data_*`, `bs_quote` (`core/data.sh`), `bs_log_*`, `bs_utils_*`, `bs_cleanup_*`, `bs_error_*`, `bs_signal_*`, `bs_deps_*`, `bs_version_*`, `bs_const_*`, `bs_calc_*`. A new module takes a **new** namespace and stays out of others.
+5. **Private** names have no leading `__` but carry `# @private` in the doc comment (examples: `bs_log_timestamp`, `bs_data_check`). A double underscore inside a name (`bs_guard__var`, `bs_source__one` in `core/prereq.sh`) passes the "names" check but is historical: new code writes `# @private` and a plain name.
+6. **Verbs and order:** `bs_<namespace>_<verb>[_<object>]` (`bs_arr_push`, `bs_log_is_level_allowed`, `bs_cleanup_run_all`). Predicates are `is_`/`has_` and answer with the status, not with output (`bs_utils_has`).
+
+**Aliases.** The old name with `::` is created by `bs_shell_alias real old::name` **at the very end of the file**, one line per function, in the order of definition (for private ones — `log::__timestamp`):
+
+```sh
+bs_shell_alias bs_utils_has utils::has
+bs_shell_alias bs_log_timestamp log::__timestamp
+```
+
+What `bs_shell_alias` (`bootstrap/shell.sh`) does: in bash and zsh it defines a wrapper function `old() { real "$@"; }`, in other shells it does nothing (a `::` in a name is a parse error there). Consequences:
+
+* **POSIX code always calls the real name.** The old name does not exist everywhere; code of the `bash4` tier and `lib/` may write `module::function`, and new code is better off with the real name (one stack frame fewer).
+* **Mock by the real name in tests.** If a test redefines `log::error`, a call of `bs_log_error` from POSIX code does not notice; redefine `bs_log_error` and you intercept both paths (the alias calls the real function by name at call time).
+* A call through an alias adds one frame to the call stack (`bs_error_throw` in `core/errorhandler.sh` allows for it when it looks up the caller).
+* **Do not rename** existing functions or variables: the old names are the public API of `lib/` and user scripts. Retire with `# @deprecated` (example: `bs_utils_guard`).
+* If a function had no `::` name before and bash4 code has no need to call it, an alias is optional; when in doubt add it: it costs one line.
+
+### 12.3 The header and the layout of a file
 
 ```sh
 #!/bin/sh
 # shellcheck shell=sh
 # @shell posix — валидный POSIX sh: <что держит файл> / valid POSIX sh: <what holds the file>
-# @tier core — builtins only; works everywhere
+# @tier core — <external commands needed>; works everywhere
+#
+# core/module.sh — одна строка о назначении
+# core/module.sh — one line about the purpose
+#
+# ИМЕНА / NAMES
+#   Real functions: bs_module_a, bs_module_b; in bash and zsh also module::a, module::b (the old names).
+#   Настоящие функции: bs_module_a, bs_module_b; в bash и zsh — ещё и прежние module::a, module::b.
+
+# Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
+# Note: strict mode (set -euo pipefail) and IFS are set only in entry points
+
 bs_guard MODULE || return 0
+
+# Dependencies / Зависимости
+bs_source_relative "const.sh" "data.sh"
 ```
 
-**Names — one namespace `bs_`.** The real function is an identifier without `::`, and **all** kernel code (`bootstrap/`, `core/`, `install/`, the entry points) lives in one namespace: `bs_` + the `::` name with `::` turned into `_`. The rule is unambiguous and reversible:
+The order of the parts: header → the "ИМЕНА / NAMES" block → `bs_guard` → dependencies → `@global` variables and constants → private helpers → public API → the alias block → actions at load (registration in the cleanup stack, an initial `bs_log_debug`). What the file **does** when sourced stands at the very end and stays minimal: function definitions have no side effects.
 
-| Old name | Real name |
-|---|---|
-| `utils::has` | `bs_utils_has` |
-| `log::info` | `bs_log_info` |
-| `calc::eval` | `bs_calc_eval` |
-| `bs::version::get` | `bs_version_get` |
-| `log::__timestamp` (private) | `bs_log_timestamp` (no leading `__`) |
+* `#!/bin/sh` and `# shellcheck shell=sh` are for editors and `shellcheck -s sh`; the file is sourced with `.`, it is not executable.
+* `@shell posix — <reason> / <reason>` — the reason is bilingual and names **what holds the file**: "case, parameter expansion, mktemp; arrays come from core/data.sh". The label changes only together with the code and the test (`bs-shell-abstraction`).
+* `@tier core — …` is the second axis, not to be confused with `@shell`: which *userland* the file needs (`core` | `gnu-linux`; `bs audit` shows the tier next to the GNU-only tools it finds). After the dash list the external commands the functions cannot do without: `builtins only`, `builtins and date`, `date, awk, head`, `builtins, tr and sleep`. The shorter the list, the earlier the module can be loaded.
+* The "ИМЕНА / NAMES" block lists the real functions and says the old `::` names are bash/zsh aliases (models: `core/quiet.sh`, `core/logger.sh`). If the file replaces a data structure add a "ДАННЫЕ / DATA" block (`core/errorhandler.sh`: the cleanup stack is the array `bs_cleanup_stack`).
+* The kernel load order is set by `bootstrap/init.sh`: `prereq → lang → const → logger → quiet → fmt → data → errorhandler → version → utils → config → deps`. A module may call only what is loaded **before** it (or check `command -v bs_log_error`). A new module is registered in `init.sh` and in the `req` list of `bs doctor` (`bs-new-core-module`).
 
-The old `::` name is created as an alias by `bs_shell_alias real module::function` at the very end of the file: it works in bash and zsh, so old calls such as `utils::has` do not change. New `bash4` code may still write `module::function`; POSIX code calls the real name. **Defining** a function with `::` or without the `bs_`/`__bs_` prefix inside the file is forbidden: `check_posix_tier.sh` checks it (the "names" section).
+### 12.4 The source guard
 
-**Variables.** No `local` (POSIX has none) and no `local -r`: temporaries are global, so they carry a
-`__bs_<function abbreviation>_` prefix (for example `__bs_sb_` in `shebang.sh`, `__bs_vo_` in `version.sh`) to avoid
-clobbering others. Constants go through `bs_shell_readonly NAME=value` (`readonly -g` in zsh).
+`bs_guard NAME || return 0` is the first executable line after the header (`core/quiet.sh`, `core/logger.sh`). The one exception is `core/prereq.sh`: `bs_guard` is defined in it, so it guards itself by hand.
 
-**Constructs.** Allowed: `case`, `[ ]`/`test`, the expansions `${v#p}`, `${v%p}`, `${v:-d}`, `$(( ))`, `$( )`,
-`command -v`, `printf`, `while read`, `for x in list`. Forbidden: `[[ ]]`, `(( ))`, arrays, `declare`/`typeset`,
-`local -x`, `${!x}`, `${x^^}`/`${x,,}`, `=~`, `<( )`, `source`, the `function` keyword, `$'..'`, `mapfile`, `shopt`.
-Split into words with parameter expansion (`${s%% *}`/`${s#* }`), not `for w in $s`: zsh does not split a variable's
-value. `::` names are forbidden inside the file.
+* `NAME` is a **literal** of `A-Z 0-9 _` (`bs_guard` raises lower case with `tr`, but write upper case). For a new module, the module name in capitals: `DATA`, `QUIET`, `FMT`, `LOGGER`, `UTILS`. The existing `CORE_CALC` and `CORE_DEPS` are not renamed.
+* The name must be **unique**: two different parts under one name — the second silently never loads.
+* `bs_guard` returns 1 ("already loaded") and 2 ("bad name"). The `|| return 0` idiom hides the 2, so the name is never built from variables.
+* The mark `__NAME_SOURCED` is made `readonly`: a second `source` in the **same process** returns at once. For tests it means every probe is a fresh process `env -i … sh probe.sh`, not a second `source`.
+* `return 0` is allowed only at the top level of a sourced file. `exit` is never written in a module file.
 
-**Output and errors.** `printf` only (not `echo -e`). Functions return a code (`return N`); `exit` belongs to
-`trampoline.sh` alone. `${1:?message}` is the BS idiom for a **mandatory** argument (a programmer error): in every shell it ends the
-script, and in dash the whole non-interactive shell. For input that can be empty through the user's fault, write
-`[ -n "$1" ] || return 2`.
-Do not enable strict mode or `trap` in a POSIX file.
+### 12.5 Sourcing dependencies and paths
 
-**Sourcing and paths.** Dependencies go through `bs_source_relative`; the directory of a sourced file comes from
-`BS_CURRENT_FILE` (the loader sets it while it sources). `BASH_*`, `ZSH_*`, `FUNCNAME` are allowed only in the layer
-files (`bootstrap/shell.sh`, `trampoline.sh`); a string the layer hands to a **child** shell is the one exception.
+Dependencies go through `bs_source_relative "file.sh" …` (paths from the directory of the calling file), with `# @depends core/const, core/logger` in the header (`core/errorhandler.sh`). The directory of a file comes from `BS_CURRENT_FILE`: the loader and `bs_source_relative` itself set it for the time of the `.` and put the old value back (nested sources do not spoil each other). Bash also reads the call stack; in other shells there is **no other source of the directory**.
 
-**Test.** A POSIX module has `tests/unit/test<module>portableunit.sh`: it sources the file in every installed shell
-under `env -i` and compares the answers (the model is `testquietportableunit.sh`); shells that are not installed are
-reported as "not verified". Before a commit: `X -n` in all six shells, `shellcheck -s sh`, `check_posix_tier.sh`.
+* Never compute the file's path yourself: no `$0`, no `${BASH_SOURCE[0]}`, no `$(dirname …)`. `$0` belongs to the entry-point prologue only (tag `shell-gate`).
+* In probes and tests set `BS_CURRENT_FILE="/absolute/path/file.sh"` before the `.` (as `tests/unit/testdataportableunit.sh` does), otherwise in dash `bs_source_relative` stops with `BS_CURRENT_FILE is not set`.
+* An optional dependency is `command -v bs_log_error >/dev/null 2>&1` at the place of use (examples: `bs_utils_error` in `core/utils.sh`, `bs_calc_log` in `core/calc.sh`), not an unconditional `bs_source_relative "logger.sh"` in a low-level module.
+* A file sourced by a path from an argument goes through `bs_utils_ensure_source FILE FUNCTION` (it checks that the function appeared); add `# shellcheck disable=SC1090` with the reason.
+
+### 12.6 Variables
+
+**No `local`.** Reasons: it is not POSIX; ksh93 has none at all (`local: not found`); the flag acts on the whole list of names — `local -r a=1 b=2` makes `a` **and** `b` readonly (`b=3` afterwards is an error), and a slip in one name of a long `local` line goes unnoticed. So the temporaries of a function are global and carry a prefix:
+
+* **`__bs_<module>_`**, where `<module>` is a short stable code of the file, unique across `bootstrap/`, `core/`, `install/`: `dat` (data), `log` (logger), `fmt`, `calc`, `ut` (utils), `dp` (deps), `eh` (errorhandler), `sb` (shebang), `gd` (guard), `t` (trampoline). A large function may have a code of its own (`vc`/`vo` in `core/version.sh`; `g`, `gv`, `sr`, `so` in `core/prereq.sh`).
+* Check the uniqueness: `grep -rhoE '__bs_[a-z0-9]+_' bootstrap core install bs boot.sh install.sh | sort -u`.
+* Public settings are `BS_*` (`BS_LOG_LEVEL`), defaulted with `: "${BS_LOG_LEVEL:=INFO}"` (the user's value is not overwritten); internal ones are `__bs_*` only.
+* Initialise every variable you read **at the start of the function**: the value from the previous call is not "empty" (`__bs_dat_acc=''`, `__bs_log_text=''`).
+
+**Global temporaries and nested calls.** This is the main price of giving up `local`:
+
+* A function that calls another function **of the same file** shares the prefix with it; if both write one name, the inner one clobbers the outer. In `core/data.sh` `bs_arr_new` keeps the name in `__bs_dat_nn`, not in `__bs_dat_nm`, because `bs_arr_clear` inside overwrites `__bs_dat_nm`; for the same reason `bs_arr_copy` keeps `__bs_dat_src`/`__bs_dat_dst`. Before you call a helper, check which names it touches.
+* Recursion and callbacks clobber variables: `f() { __x=$1; [ "$1" -gt 0 ] && f $(($1 - 1)); echo "$__x"; }` prints `0` at every level (verified). The ways out: do not recurse; keep values in the positional parameters (`bs_source_relative_from` rewrites `"$@"` with `set --`); count the depth (`__bs_dat_depth` in `bs_arr_each`, callback names `__bs_dat_cmd_<depth>`); walk a list with `for x in "$@"` — it is expanded once and does not depend on inner calls.
+* "A helper's result is in a variable" is an acceptable contract if it is **named in the doc comment** ("the result is in `__bs_log_out`", "the name is in `__bs_dat_var`"), see §12.8.
+
+**Constants** go through `bs_shell_readonly NAME=value` (`core/const.sh`), never a bare `readonly`. The reason: the loader `load` is a function, and in zsh `readonly X=1` inside a sourced file makes `X` **local** to that function (verified: after `load` the variable is gone); `bs_shell_readonly` runs `readonly -g` in zsh. A constant that has a fallback (`E_ERROR`) is read as `"${E_ERROR:-1}"`: the module may be sourced without `core/const.sh`.
+
+**Module flags** are declared with `# @global` (§4.2) and a category; for "read by tests and other modules" add `# shellcheck disable=SC2034  # reason / причина`.
+
+### 12.7 Constructs: allowed and forbidden
+
+Before you write a helper by hand look at the base modules: `bs_var_*` (variables by name, checked names), `bs_str_*` (case, trim, literal replace, join), `bs_num_*` (exact integers), `bs_msg_*` (messages with a logger-less fallback), `bs_arr_*`/`bs_map_*` (data). Duplicating them is how the kernel grew five copies of the same name check.
+
+Allowed: `case`, `[ ]`/`test`, the expansions `${v#p}`, `${v%p}`, `${v:-d}`, `${v-}`, `${v:?}`, `$(( ))` on small integers, `$( )`, `command -v`, `printf`, `while read -r`, `for x in list`, `. file`, heredocs, `trap` (inside a function), `eval` (see §12.10).
+
+| Do not write | Write | Why (verified) |
+|---|---|---|
+| `[[ … ]]` | `[ … ]`, patterns with `case` | `[[` is not POSIX; "not found" in dash. Compound conditions are `[ a ] && [ b ]`, not `-a`/`-o` (ambiguous) |
+| `(( … ))`, `let` | `$(( ))` inside `[ ]` or an assignment | not POSIX |
+| Arrays, `declare -A`, `local -n` | `bs_arr_*`, `bs_map_*` (§12.11) | dash and ash have no arrays at all, mksh has no associative ones, and ksh93 declares them with  and zsh arrays count from 1 |
+| `local`, `local -r a b` | global `__bs_<module>_…` | §12.6 |
+| `${v^^}`, `${v,,}` | `tr '[:lower:]' '[:upper:]'` or `case` with `[Tt][Rr]…` (`bs_log_level_to_number`) | "Bad substitution" in dash, mksh, ksh93 |
+| `${v//a/b}`, `${v:3:2}` | a `case … ${v%%"$a"*}` loop (`bs_log_replace_all`), `cut` | the substitution does not exist in dash |
+| `printf -v name …` | `name=$(printf …)` | dash: "Illegal option -v"; mksh prints "-v" as text |
+| `$'\033'`, `$'\n'` | `__bs_esc=$(printf '\033')` once at load | dash does not expand `$'..'` (it prints `$a<TAB>b`) |
+| `echo -e`, `echo "$data"` | `printf '%s\n' "$data"` | dash prints `-e` and interprets `\t` itself; data like `-n` is taken as a flag |
+| `source`, `function f {`, `==` in `[ ]`, `&>`, `\|&`, `<<<` | `.`, `f() {`, `=`, `>f 2>&1`, `2>&1 \|`, a heredoc / `printf \|` | not POSIX |
+| `[[ $x =~ … ]]`, `BASH_REMATCH` | `case "$x" in pattern)` and expansions (`core/version.sh`) | not in POSIX |
+| `${!name}`, `declare -f`, `type -t` | `eval` with a checked name; `command -v` (`bs_function_exists`) | §12.10 |
+| `read -a`, `-p`, `-n`, `-d` | `read -r`; a prompt only if `[ -t 0 ]` (`core/calc.sh`) | the flags are not POSIX; without `-r` `read` eats backslashes |
+| `$RANDOM`, `$SECONDS`, `EPOCHREALTIME`, `BASH_*` | `date`, `awk`; optional ones with a fallback (`bs_utils_now_ms` in `core/fmt.sh`) | not everywhere |
+| `$(( ))` for big numbers | `awk`, `dc` | **`$(( ))` is 32-bit in mksh:** `3*1073741824` gives `-1073741824` (this is how 3 GiB overflowed in `core/fmt.sh`) |
+| `$((08))`, `$((x))` from user input | strip leading zeros and check `case "$x" in ''\|*[!0-9]*)` (`bs_error_retry`) | `08` is an octal error in dash and bash but `8` in mksh |
+| `${#s}` for width/cut of non-ASCII | `bs_str_width`, `bs_str_head` (UTF-8 characters, the same in every shell) | dash and mksh count bytes, bash/zsh/ksh count characters by locale; the `bs_log_header` frame counted bytes until it moved to `bs_str_width` |
+| `for w in $list`, `set -- $string` | a loop over `${s%% *}` / `${s#* }`; join in a loop with an explicit separator | **zsh does not split a variable's value into words** (`set -- $v` gives `$#` = 1); and in BS scripts `IFS` is newline and tab (`bs_shell_strict`), so `"$*"` joins the words with a **newline**, not a space |
+| `cmd \| while read x; do … done` writing variables | `while read … done < file` or a heredoc | in bash, dash, ash, mksh the pipeline runs in a subshell and `n` stays 0, in zsh and ksh93 it does not (`n=2`): the behaviour differs |
+| An unquoted variable | `"$v"`, `"$@"` | globbing and splitting; the only exception is a deliberate `eval "$(…)"` |
+| a bare `\|` in a `${x%%a\|b}` pattern | escape it: `${x%%\|*}`, or use `case` | in ksh93 a bare `\|` in `${x%%\|*}` is an alternation, not a character (found by `testdepsportableunit.sh`) |
+| `while … done < <(cmd)`, `mapfile < <(cmd)` | `x=$(cmd)` and a `while read … done <<EOF` loop with `$x` in the heredoc | process substitution is not POSIX; a heredoc loop runs in the current shell, so variables survive |
+| `. file arg1 arg2`, `source file "$@"` | call a function from the file: `. file; bs_function "$@"` | dash does not pass arguments to a sourced file (the positional parameters stay the caller's) |
+| `for f in "$d"/.x.*` where the glob may match nothing | `find "$d" -maxdepth 1 -name '.x.*' \| sort` and a `while read … done <<EOF` loop | zsh stops with "no matches found" on an unmatched glob, bash and dash keep the pattern as text; `find` behaves the same everywhere (`bs update`, `bs where`) |
+| `$(( a + $(cmd) ))` | `n=$(cmd)`, then `$(( a + n ))` | `check_posix_tier.sh` reads `$(` inside `$(( ))` as a bash-only construct; a separate line is also easier to read |
+| `VAR=x func` (an assignment before a function call) | `( VAR=x; export VAR; func )` or `env VAR=x command` | for a function the assignment may stay after the call (dash) or be dropped; `GIT_TERMINAL_PROMPT=0` for `git` is set in a subshell |
+| `limit='timeout 120'; $limit cmd` | a function (`bs_cli_with_timeout 120 cmd`) or `if`/`else`; a one-word prefix is fine: `${sudo} cmd` | zsh does not split `$limit` into words; an empty `${sudo}` disappears in every shell |
+| `$'\n'` to join text | a constant with a literal newline (`BS_CLI_NL`) and `${s%%"$BS_CLI_NL"*}` | `$'..'` is not POSIX |
+| `case "$x" in "$prefix"*)` with a possibly empty `$prefix` | test `[ -n "$prefix" ]` before the `case` | an empty pattern `""*` matches anything: in `bs_str_ltrim` an empty CR (mksh has no built-in `printf`, the binary was missing) looped the parse forever |
+| relying on a built-in `printf` | assume it is an external command in mksh (R59) | mksh has no built-in `printf`: without the binary in `PATH` every call dies "not found" |
+| `exit` in a function | `return N`; `exit` only in `bs_exit`, entry points, `trampoline.sh` | `exit` in a subshell or in someone else's function kills the wrong thing |
+| `trap` when a file loads | `trap` inside a function (`bs_errorhandler_setup_trap`), cleanup through `bs_cleanup_add` | `trap` **replaces** the previous handler, it does not add to it |
+| `cd` in a function | `( cd -- "$d" && … )` or `$(cd -- "$d" && pwd -P)` | `cd` changes the caller's directory |
+| A last line `[ … ] && command` | `if …; then …; fi` or a closing `return 0` | under `set -e` (the entry points enable it) such a function returns 1 and **ends the caller**: `f(){ [ -n "$1" ] && echo x; }; f ""` kills the script |
+
+The code must work **both with `set -eu` and without it**: every optional parameter is `${1-}`, `${VAR:-}`; an expected non-zero status is `|| :` or an `if`. Normalise the statuses of external commands: `command -v` for a missing command returns 127 in dash and ash and 1 elsewhere, so `bs_utils_has` and `bs_function_exists` do `|| return 1`.
+
+### 12.8 Returning values
+
+| What you need | How | Model |
+|---|---|---|
+| A yes/no answer | the status only, no output | `bs_utils_has`, `bs_arr_contains` |
+| One value | `stdout`, a line = `printf '%s\n'`; status 1 means "no such" | `bs_arr_get`, `bs_map_get` |
+| A value on a hot path (the loader, `bs_guard`, `bs_map_has`) | an **output variable** — a `$(...)` subshell costs a fork | `bs_guard__var` → `__bs_g_var`; `bs_log_replace_all` → `__bs_log_out` |
+| A value if the caller wants it | an optional "variable name" parameter; empty means `stdout` | `bs_arr_pop name [variable]` via `bs_data_ret` |
+| Many values | a data-layer array whose name the caller passes | `bs_utils_split out_array string delimiters` |
+
+* **Functions that change state and return a value (`bs_arr_pop`, `bs_arr_shift`) must not be called as `$(...)`:** the subshell changes its own copy and the real state stays (verified: `v=$(bs_arr_pop a)` returned `z` but the length of `a` stayed 3; `bs_arr_pop a v` made it 2). The doc comment of such a function says "do NOT call it as `$(...)`, take the result into a variable".
+* `$(...)` cuts **trailing newlines**: a value that may end with one cannot go back through `stdout` unharmed — only through a variable.
+* The name of an output variable is **checked before `eval`** (`bs_data_ret`: `case "$1" in [!A-Za-z_]*|*[!A-Za-z0-9_]*) … return 2`).
+* **A function whose `stdout` is the result prints nothing extra.** `bs_log_info`, `bs_log_debug`, `bs_log_trace`, `bs_log_success` write to stdout (warning and error go to stderr), so such a `bs_log_*` inside `$(...)` spoils the result. A "returning" function reports through `bs_log_warn`/`bs_log_error` or to stderr.
+* Output temporaries are documented like parameters (§12.13).
+
+**Return codes.** `0` — success; `1` — "no / false / error" (`${E_ERROR:-1}`); `2` — a wrong call, a bad name, an invalid argument (`${E_INVALID:-2}`); the others are `LIB_ERROR_*` from `core/const.sh`. The status of a function is the status of its last command: end with an explicit `return` if the last command may return the wrong thing.
+
+### 12.9 Errors, exit and messages
+
+* Functions return a code and never call `exit`. Leaving is `bs_exit [code|NAME]` (it runs the cleanup) or `bs_error_exit MESSAGE [code]`; a code name (`E_<NAME>`, `LIB_ERROR_<NAME>`) is checked with `case … *[!A-Z0-9_]*` **before** `eval` (`bs_exit` in `core/errorhandler.sh`).
+* `${1:?message}` is the BS idiom for a **mandatory** argument (a programmer error). It ends the script in bash, dash, ash, ksh93 and zsh, but **not in mksh**: there it prints the message and the script goes on (verified). So it is a diagnostic, not flow control. For input that can be empty through the user's fault write `[ -n "${1-}" ] || return 2`.
+* Strict mode and `IFS` are enabled by the entry points through `bs_shell_strict` only. A module does not enable strict mode and **does not rely on it or on its absence** (§12.7).
+* Messages: once `core/logger.sh` is loaded, `bs_log_error "…"`; in modules that load **before** the logger or must work without it (`quiet`, `data`, `fmt`, `prereq`), and in anything optional, `printf '%s\n' "…" >&2` (models: `bs_data_check`, `bs_utils_error`, `bs_calc_log`). The format is `function_name: what is wrong: value` (`bs_data: invalid name: …`).
+* "Nothing to do" is not an `ERROR`: it is `return 0` (see the skill `bs-cli-noop-output`).
+* Cleanup is registered with `bs_cleanup_add function` (a stack, the last added runs first), not with a `trap` on the spot. Guard the registration at load: `if command -v bs_cleanup_add >/dev/null 2>&1; then …` (the end of `core/utils.sh`).
+
+### 12.10 `eval` safety
+
+The layer needs `eval` for indirect names (there is no `${!x}` and no namerefs) — and it is the most dangerous place of the kernel. Exactly three cases are allowed:
+
+1. **Reading/writing a variable whose name is built from checked parts:** `eval "__bs_dat_n=\${__bs_dat_a_${1}__n:-0}"`.
+2. **An assignment by a name the caller passed:** `eval "$1=\${__bs_dat_out}"` — after a `case` check (`bs_data_ret`).
+3. **Creating an alias** (`bs_shell_alias`): `eval "$2() { $1 \"\$@\"; }"` — only literals from the file itself.
+
+Rules:
+
+* **The name is checked before any `eval`, and refused with code 2.** The model is `bs_data_check`: `''|[!A-Za-z]*|*[!A-Za-z0-9_]*|*__*|*_` (starts with a letter, only letters/digits/`_`, no `__`, no trailing `_` — so it cannot meet the layer's internal names).
+* **Only the checked name is spliced into the `eval` string; values travel by reference** `\${variable}` (expanded a second time inside `eval`), not as pasted text: `eval "…=\${__bs_dat_v}"`, not `eval "…=$value"`.
+* If a value really must be pasted into code, pass it through `bs_quote` (single quotes, `'\''` inside); `eval "$(bs_arr_to_args name)"` is safe exactly because every element went through `bs_quote`.
+* **Never `eval` text from a user, a file, the network or the command line.** Use an allow-list in `case` (`bs_exit` takes a code name only of `A-Z0-9_`).
+* Call a function by name as `"$name" argument`, not through `eval`; check the name with `command -v` (`bs_signal_on`); for `trap "$handler" SIGNAL` add `# shellcheck disable=SC2064  # reason`.
+* Escape `$` inside an `eval` string (`\$`) where it must expand **after** the name is built, and do not escape it where the name is built now: a mistake here is a silent substitution of nothing.
+* A test for `eval` is mandatory: feed a "name" such as `a;touch /tmp/x` and `$(id)` and check code 2 and no side effects (`tests/unit/testdataportableunit.sh`, `bs_arr_push "bad name"`).
+
+### 12.11 The data layer `core/data.sh`
+
+POSIX code gets arrays and maps only from `bs_arr_*`, `bs_map_*`, `bs_quote`; `declare -a`, `declare -A`, `local -n` are forbidden. A structure name is `[A-Za-z][A-Za-z0-9_]*`, with no `__` and no trailing `_`; your own structures are named `bs_<module>_<what>` (`bs_cleanup_stack`, `bs_error_handlers`). Other modules neither read nor write the internal `__bs_dat_*` variables.
+
+* Indexes start at 0, a negative one counts from the end; status 1 means "no such", 2 a bad name.
+* To walk: `eval "$(bs_arr_to_args name)"`, then `for x in "$@"`. This **overwrites the positional parameters of the function** — do it in a function that no longer needs them (like `bs_arr_each`) or save what you need into variables.
+* To drain: `while bs_arr_pop name __bs_eh_fn; do …` (`bs_cleanup_run_all`).
+* The callback of `bs_arr_each name function` / `bs_map_each name function` is a **function name**, not a command line; nesting is counted.
+* Do not call `bs_arr_pop`, `bs_arr_shift` as `$(...)` (§12.8).
+* The price: every access is an `eval`, `bs_arr_shift` and `bs_arr_remove_at` are O(n). For hot loops keep the data in the positional parameters or a delimited string.
+* A map key may hold anything (it is encoded as `_<hex>_`); the insertion order is kept; a value with a newline is read whole by `bs_map_get` to stdout, but `bs_map_keys` prints keys one per line — for keys with a newline use `bs_map_keys_to`.
+* The layer cannot be called from files that load **before** `core/data.sh`.
+
+### 12.12 Logging
+
+After `core/logger.sh` a module reports only through `bs_log_trace|debug|info|success|warn|error|fatal`; `echo`/`printf` for user messages only where there is no logger yet (§12.9). Colour, format (`text|structured|json`), level (`BS_LOG_LEVEL`) and timestamp are set by the environment (`BS_LOG_COLOR`, `BS_LOG_FORMAT`, `BS_LOG_TIMESTAMP`) and `NO_COLOR`; a module neither reads nor changes them. The words of a message are joined with a space whatever the caller's `IFS` (`bs_log_format_message`); pass them as separate arguments or one string, do not build `"$*"`. `bs_log_fatal` returns `${E_ERROR:-1}` and does **not end** the script. A debug message at load is `bs_log_debug "…" 2>/dev/null || true`: the logger may be off.
+
+### 12.13 Doc comments
+
+Bilingual comments are mandatory for every public function and for a private one with a non-trivial contract. Two forms are allowed, keep to the form of the file:
+
+```sh
+# @description Проверить имя массива или словаря / Check an array or map name
+# @param $1 name / имя
+bs_data_check() {
+```
+
+and the two-line form (`core/quiet.sh`, `core/fmt.sh`):
+
+```sh
+# @description Check if command exists in PATH.
+# @description Проверить наличие команды в PATH.
+# @param $1 {string} Имя команды
+# @returns 0  команда доступна
+# @returns 1  команда не найдена
+```
+
+Tags: `@description`, `@param $N name`, `@returns`, `@stdout`, `@private`, `@example`, `@function` (when the documented name differs from the real one), `@deprecated`, `@global`. Rules: the description says **what the function guarantees**, it does not retell the code; every positional parameter is named; **output variables are named** ("the result is in `__bs_log_out`"); the split between codes `1` and `2` is stated; a mutating function says "do NOT call it as `$(...)`"; for mandatory parameters `${1:?}` and the word "required". Every `# shellcheck disable=…` carries a reason in two languages: `# shellcheck disable=SC2154  # присваивается через eval / assigned through eval`. Inline comments in code are "по-русски / in English", short.
+
+### 12.14 Tests and checks
+
+Every `posix` file of `core/` has `tests/unit/test<module>portableunit.sh`: it sources the file in every installed shell (`testframework::posix_shells`) under `env -i`, compares the answers on "hard" values (spaces, quotes, `*`, `$`, a backslash, a newline, Cyrillic, an empty string, `-n`), checks the `::` aliases in bash and zsh and honestly reports "not verified" for missing shells. Models: `testquietportableunit.sh` (minimal), `testdataportableunit.sh` (data structures), `testloggerportableunit.sh` (output). Before a commit:
+
+```bash
+for sh in dash ksh mksh zsh bash; do "$sh" -n core/module.sh; done
+busybox ash -n core/module.sh
+shellcheck -s sh core/module.sh
+bash .agents/skills/bs-shell-abstraction/scripts/check_posix_tier.sh
+bash tests/validatesyntax.sh && bash tests/validateshellcheck.sh && bash tests/validatedocscode.sh
+```
+
+### 12.15 Review checklist
+
+- [ ] The name is `bs_<namespace>_<name>`, no collisions; the alias block is at the end; the old name is untouched
+- [ ] Header: `#!/bin/sh`, `shellcheck shell=sh`, `@shell posix` with a reason (within the first 14 lines), `@tier core`
+- [ ] `bs_guard NAME || return 0`, dependencies through `bs_source_relative`, no computed path
+- [ ] No `local`, `[[ ]]`, `(( ))`, arrays, `printf -v`, `$'..'`, `echo -e`, `${x^^}`
+- [ ] Temporaries are `__bs_<module>_`, initialised, not clobbered by a nested call; constants through `bs_shell_readonly`
+- [ ] The result is a status / stdout / an output variable; a mutating function is not meant for `$(...)`
+- [ ] Every `eval` has a checked name and values by reference; there is a test for a "bad name"
+- [ ] Works with and without `set -eu`; no `[ ] && cmd` as the last line; no `exit`
+- [ ] Messages go through `bs_log_*` (or stderr before the logger); bilingual doc comments
+- [ ] The `portableunit` test in every shell, a differential run against the old implementation, `check_posix_tier.sh` OK

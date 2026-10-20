@@ -3,7 +3,7 @@
 # check_posix_tier.sh — bash does not take part in the `@shell posix` tier (read-only)
 # check_posix_tier.sh — в ярусе `@shell posix` bash не участвует (только чтение)
 #
-# Three checks for every file labelled "# @shell posix" in bootstrap/ and core/:
+# Three checks for every file labelled "# @shell posix" in bootstrap/, core/, install/, install.sh, boot.sh and bs:
 #   1. parse   — every installed NON-bash shell parses it (dash, busybox ash, ksh, mksh, zsh);
 #   2. syntax  — no bash-only construct on a non-comment line: [[ ]], (( )), arrays,
 #                local -x, declare, ${!x}, <( ), =~, mapfile, shopt, source, function keyword,
@@ -11,7 +11,7 @@
 #   2b. names  — every function is in the one namespace bs_* (real name = bs_ + the "::" name with "::" -> "_"), none is defined with "::";
 #   3. run     — the whole tier is sourced and used by dash in a sandbox whose PATH has
 #                NO bash at all (proof that bash does not take part, not only that it parses).
-# Для каждого файла с «# @shell posix» в bootstrap/ и core/: (1) разбор в каждой
+# Для каждого файла с «# @shell posix» в bootstrap/, core/, install/, install.sh, boot.sh и bs: (1) разбор в каждой
 # установленной оболочке, кроме bash; (2) нет bash-конструкций в строках без комментариев;
 # нет BASH_*/ZSH_* вне файлов слоя; (3) весь ярус подключается и работает в dash в песочнице,
 # где в PATH вообще нет bash.
@@ -39,7 +39,7 @@ done
 declare -a tier=()
 while IFS= read -r f; do
   head -n 14 "${f}" | grep -q '^# @shell posix' && tier+=("${f}")
-done < <(git ls-files --cached --others --exclude-standard 'bootstrap/*.sh' 'core/*.sh')
+done < <(git ls-files --cached --others --exclude-standard 'bootstrap/*.sh' 'core/*.sh' 'install/*.sh' 'install.sh' 'boot.sh' 'bs')
 (( ${#files[@]} > 0 )) || files=("${tier[@]}")
 if (( list_only == 1 )); then printf '%s\n' "${files[@]}"; exit 0; fi
 
@@ -121,6 +121,10 @@ elif command -v dash >/dev/null 2>&1; then
   # весь настоящий ярус + проверяемые файлы (probe зовёт функции ярса) / the whole real tier + the files under check
   for f in bootstrap/shell.sh core/prereq.sh core/guard.sh "${tier[@]}" "${files[@]}"; do
     [[ "${f}" == bootstrap/trampoline.sh ]] && continue
+    # install/*.sh и install.sh — сценарии установки: им нужны INSTALLER_DIR, SOURCE_ROOT и т.д., их разбор и синтаксис
+    # проверены выше, а запуск — в unit/testinstallnobashunit.sh / the install scripts need INSTALLER_DIR, SOURCE_ROOT, …:
+    # parse and syntax are checked above, the run is in unit/testinstallnobashunit.sh
+    case "${f}" in install/*|install.sh|boot.sh|bs|*/install/*|*/install.sh|*/boot.sh|*/bs) continue ;; esac
     # BS_CURRENT_FILE ставит загрузчик на время подключения; в dash другого источника каталога нет
     # BS_CURRENT_FILE is set by the loader while a module is sourced; dash has no other source of the directory
     full="${root}/${f}"; [[ "${f}" == /* ]] && full="${f}"

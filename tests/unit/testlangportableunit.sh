@@ -1,7 +1,7 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
-# tests/unit/testquietportableunit.sh — core/lang.sh as POSIX code under dash, ash, ksh, mksh, zsh and bash
-# tests/unit/testquietportableunit.sh — core/lang.sh как POSIX-код под dash, ash, ksh, mksh, zsh и bash
+# tests/unit/testlangportableunit.sh — core/lang.sh as POSIX code under dash, ash, ksh, mksh, zsh and bash
+# tests/unit/testlangportableunit.sh — core/lang.sh как POSIX-код под dash, ash, ksh, mksh, zsh и bash
 #
 # core/lang.sh is "@shell posix": the bs_is_* predicates must give the same answers in every
 # shell. core/lang.sh — "@shell posix": предикаты bs_is_* обязаны давать одинаковые ответы.

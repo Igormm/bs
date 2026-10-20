@@ -17,16 +17,20 @@ your shell is allowed to load is decided by the tier mechanism; see
 ## Requirements
 
 - **bash 4.2+ is a hard requirement.** All of the `lib/` library (87 modules) and
-  the CLI `bootstrap/bs.sh` and the installer are written in bash, so BS does not run without it.
+  the `bootstrap/bs.sh` commands that run it are written in bash, so BS does not run without it.
   Versions 4.2 and 4.3 are accepted by the code, but CI checks from **4.4**
   (nearly every platform ships 4.4 or newer).
-- The exception is the 15 kernel files labelled `@shell posix`: they do not depend
+- The exception is the 19 kernel files labelled `@shell posix` (all of `core/`): they do not depend
   on bash and can be sourced from dash, ash, ksh, mksh, zsh and bash (see "How the
   kernel works"). That is a small set of helpers (constants, the version,
   `bs_utils_has`, `bs_log_info`, `calc`, …), not the whole of BS.
 - You can start `bs` and `install.sh` **from any shell** (dash, ash, zsh, ksh,
-  fish, nushell): the prologue finds bash and re-runs itself in it, so bash must
-  be on the system but need not be your shell.
+  fish, nushell): the prologue finds bash and re-runs itself in it, so for `bs`
+  bash must be on the system but need not be your shell.
+- **`install.sh` does not need bash at all**: with no bash 4.2+ on the machine it
+  runs in dash, ash, ksh, mksh or zsh and installs BS (see
+  [install](../install.md#installing-without-bash)); only the installed `bs`
+  command and `lib/` then need bash.
 - Linux (primary platform; macOS is partially supported: the system bash there
   is 3.2, install bash 4.2+ from Homebrew)
 - Termux (Android): [`bs shebang`](#a-shebang-for-this-machine) fits the first
@@ -37,7 +41,7 @@ tools only.
 
 **Heading for shell independence.** The goal is a kernel (`bootstrap/`, `core/`,
 `install/`, `boot.sh`, `bs`, `install.sh`) in one namespace `bs_*` that does not
-depend on the shell (dash, ash, ksh, mksh, zsh, bash). Already done: 15 of 15
+depend on the shell (dash, ash, ksh, mksh, zsh, bash). Already done: all 19
 `core/` files (including the array and map layer `core/data.sh`) and the shell
 layer in `bootstrap/`; the rest moves by plan (see
 [shell-portability](../08-development/shell-portability.md#heading-for-shell-independence)).
@@ -108,9 +112,10 @@ sudo ./install.sh uninstall      # system
 ./bs version --full   # + where this copy is from
 ```
 
-- `bs doctor` checks that `bootstrap/init.sh`, the core modules, and the
-  `core/` and `lib/` directories are present under `BS_ROOT`, and exits
-  non-zero if anything is missing.
+- `bs doctor` checks that `bootstrap/init.sh`, the core modules, the
+  compatibility bridges `lib/compat/{deps,lang,args}.sh` and the `core/` and
+  `lib/` directories are present under `BS_ROOT`, and exits non-zero if
+  anything is missing.
 - `bs doctor` also shows the `shell (host)` row (which bash runs BS), the
   `shell (yours)` row (your shell and its tier) and the number of modules
   annotated `@shell posix` / `@shell bash4`.
@@ -344,12 +349,13 @@ flowchart TB
     shell["shell.sh<br/>shell registry"]:::posix
     tramp["trampoline.sh<br/>re-run in bash"]:::posix
     sheb["shebang.sh<br/>#! management"]:::posix
-    loader["loader.sh<br/>load, @depends"]:::posix
-    kern["kernel.sh<br/>all of core/"]:::posix
+    base["base.sh<br/>pre-kernel helpers"]:::posix
+    init["init.sh<br/>modes full / posix"]:::posix
+    loader["loader.sh<br/>bs_load, @depends"]:::posix
+    cli["cli.sh<br/>commands without bash"]:::posix
   end
   subgraph B["bootstrap/ · bash4"]
-    bssh["bs.sh<br/>pre-kernel, bs::cli"]:::bash4
-    init["init.sh"]:::bash4
+    bssh["bs.sh<br/>call stack, bs::cli for lib/"]:::bash4
   end
   subgraph C["core/"]
     direction TB
@@ -369,6 +375,10 @@ flowchart TB
       config:::posix
       lang:::posix
       args:::posix
+      var:::posix
+      str:::posix
+      num:::posix
+      msg:::posix
     end
   end
   subgraph L["lib/compat · bash4 (bridges, outside the kernel)"]
@@ -381,9 +391,10 @@ flowchart TB
   inst -.-> shell
   shell -.-> tramp
   bs -.-> bssh
+  bs -.-> cli
   bssh -.-> init
-  init -.-> kern
-  kern -.-> loader
+  init -.-> base
+  init -.-> loader
   loader -.-> CP
   init -.-> L
   L -.-> CP
@@ -416,7 +427,7 @@ sequenceDiagram
   sh-->>bs: yes: bash ≥ 4.2, not POSIX mode
   bs->>bsh: source (bs::strict, bs::cli::*)
   bs->>init: source
-  init->>core: load prereq, lang, const, logger, errorhandler, version, quiet, utils, config, deps
+  init->>core: load prereq, lang, const, var, str, num, msg, logger, quiet, fmt, data, errorhandler, version, utils, config, deps
   init-->>bs: BS_INITIALIZED=1
   bs->>bs: BS_SHEBANG=1: the first argument is a file
   bs->>S: a new bash: init.sh, then source the script

@@ -25,8 +25,7 @@ before that. So:
 | `boot.sh` | everything before `exec "${BS_ROOT}/bs"` |
 | `bs` | everything before `source "${BS_ROOT}/bootstrap/init.sh"` (the commands themselves live in `bootstrap/bs.sh` as `bs::cli::*`) |
 | `bootstrap/init.sh` | everything before `source .../loader.sh` |
-| `bootstrap/loader.sh` | the whole file is `@shell posix` load-time machinery: it uses neither `core/*` nor `lib/*` (the registry is a plain string), only `bootstrap/shell.sh` when `--strict-shell` asks |
-| `bootstrap/kernel.sh` | everything before the first `bs_load` (it sources only `shell.sh` and `loader.sh`) |
+| `bootstrap/loader.sh` | everything before `source .../bs.sh` (the loader itself is load-time machinery; it is `@shell posix` and, on its first call, sources the a-priori bottom layer `core/prereq`, `var`, `str`, `data` itself — the registry of loaded modules lives on the data layer) |
 
 ## Forbidden in pre-kernel scope
 
@@ -62,8 +61,8 @@ sed -n '1,/source .*bootstrap\/init.sh/p' bs | rg -n "is::|log::|utils::|streams
 # 4. init.sh — only the pre-loader section
 sed -n '1,/source .*loader\.sh/p' bootstrap/init.sh | rg -n "is::|log::|utils::|streams::|bs::guard|load\b|E_[A-Z][A-Z_]*|bs::source_relative"
 
-# 5. loader.sh / kernel.sh — the loader is POSIX load-time machinery: nothing of core/ or lib/ may be called
-rg -n "is::|log::|utils::|streams::|bs::guard|bs_log_|bs_utils_|E_[A-Z][A-Z_]*" bootstrap/loader.sh | rg -v '^[0-9]+:\s*#'
+# 5. loader.sh — only before its bs.sh source
+sed -n '1,/source .*bs\.sh/p' bootstrap/loader.sh | rg -n "is::|log::|utils::|streams::|bs::guard|load\b|E_[A-Z][A-Z_]*"
 ```
 
 Rules of interpretation:
@@ -72,8 +71,8 @@ Rules of interpretation:
   `log::` here" is NOT a violation, a call is.
 - `bs::shell::*`, `bs::script_dir`, `bs::append_local_bin_to_path` in
   pre-kernel scope are self-references — allowed, not findings.
-- `bootstrap/loader.sh` has no logging helper of its own: it prints its errors with
-  `printf ... >&2` on purpose, because it runs before `core/logger`.
+- `log::available` inside `bootstrap/loader.sh` (load-time machinery) is
+  allowed — it is the loader's own probe, runs after the boundary.
 
 ## Positive (post-load) spot check
 
@@ -91,7 +90,7 @@ post-load side is the `bs-review-module` skill.
 - boot.sh — ...
 - bs (pre-init) — ...
 - bootstrap/init.sh (pre-loader) — ...
-- bootstrap/loader.sh and kernel.sh — ...
+- bootstrap/loader.sh (pre-bs.sh) — ...
 ## Post-load spot check
 - <file:line> — <finding or CLEAN>
 ```

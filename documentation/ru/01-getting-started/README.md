@@ -18,15 +18,19 @@ dash, ash/busybox, sh, ksh, fish, nushell. Какой bash исполнит ко
 ## Требования
 
 - **bash 4.2+ — обязательное требование.** На bash написаны вся библиотека `lib/`
-  (87 модулей), а также CLI `bootstrap/bs.sh`, установщик, поэтому без bash BS не работает.
+  (87 модулей) и команды `bootstrap/bs.sh`, которые её запускают, поэтому без bash BS не работает.
   Версии 4.2 и 4.3 допускаются кодом, но CI проверяет с **4.4** (почти все
   платформы поставляют 4.4 и новее).
-- Исключение — 15 файлов ядра с меткой `@shell posix`: они не зависят от bash и
+- Исключение — 19 файлов ядра с меткой `@shell posix` (весь `core/`): они не зависят от bash и
   подключаются из dash, ash, ksh, mksh, zsh и bash (см. раздел «Как устроено
   ядро»). Это небольшой набор помощников (константы, версия, `bs_utils_has`,
   `bs_log_info`, `calc` и др.), а не весь BS.
+- **`install.sh` вообще не требует bash**: если bash 4.2+ на машине нет, он
+  работает в dash, ash, ksh, mksh или zsh и устанавливает BS (см.
+  [install](../install.md#установка-без-bash)); bash нужен только установленной
+  команде `bs` и `lib/`.
 - Запускать `bs` и `install.sh` можно **из любой оболочки** (dash, ash, zsh, ksh,
-  fish, nushell): пролог найдёт bash и перезапустится в нём, так что bash должен
+  fish, nushell): пролог найдёт bash и перезапустится в нём, так что для `bs` bash должен
   быть в системе, но не обязан быть вашей оболочкой.
 - Linux (основная платформа; macOS поддерживается частично: системный bash там
   3.2, нужен bash 4.2+ из Homebrew)
@@ -38,7 +42,7 @@ dash, ash/busybox, sh, ksh, fish, nushell. Какой bash исполнит ко
 
 **Курс на независимость от оболочки.** Цель — ядро (`bootstrap/`, `core/`, `install/`,
 `boot.sh`, `bs`, `install.sh`) в одном пространстве имён `bs_*`, не зависящее от
-оболочки (dash, ash, ksh, mksh, zsh, bash). Уже готово 15 из 15 файлов `core/`
+оболочки (dash, ash, ksh, mksh, zsh, bash). Уже готовы все 19 файлов `core/`
 (включая слой массивов и словарей `core/data.sh`) и слой оболочек в `bootstrap/`;
 остальное переводится по плану (см. [shell-portability](../08-development/shell-portability.md#курс-на-независимость-от-оболочки)).
 Вся библиотека `lib/` пока написана для bash 4.2+ (zsh разбирает 85 из 87 файлов,
@@ -109,9 +113,9 @@ sudo ./install.sh uninstall      # system
 ./bs version --full   # + where this copy is from
 ```
 
-- `bs doctor` проверяет наличие `bootstrap/init.sh`, core-модулей и каталогов
-  `core/` и `lib/` в `BS_ROOT` и возвращает ненулевой код, если чего-то не
-  хватает.
+- `bs doctor` проверяет наличие `bootstrap/init.sh`, core-модулей, мостов
+  совместимости `lib/compat/{deps,lang,args}.sh` и каталогов `core/` и `lib/`
+  в `BS_ROOT` и возвращает ненулевой код, если чего-то не хватает.
 - `bs doctor` также показывает строки `shell (host)` (какой bash исполняет
   BS), `shell (yours)` (ваша оболочка и её tier) и число модулей с
   аннотациями `@shell posix` / `@shell bash4`.
@@ -346,12 +350,13 @@ flowchart TB
     shell["shell.sh<br/>shell registry"]:::posix
     tramp["trampoline.sh<br/>re-run in bash"]:::posix
     sheb["shebang.sh<br/>#! management"]:::posix
-    loader["loader.sh<br/>load, @depends"]:::posix
-    kern["kernel.sh<br/>всё ядро"]:::posix
+    base["base.sh<br/>pre-kernel helpers"]:::posix
+    init["init.sh<br/>modes full / posix"]:::posix
+    loader["loader.sh<br/>bs_load, @depends"]:::posix
+    cli["cli.sh<br/>commands without bash"]:::posix
   end
   subgraph B["bootstrap/ · bash4"]
-    bssh["bs.sh<br/>pre-kernel, bs::cli"]:::bash4
-    init["init.sh"]:::bash4
+    bssh["bs.sh<br/>call stack, bs::cli for lib/"]:::bash4
   end
   subgraph C["core/"]
     direction TB
@@ -371,6 +376,10 @@ flowchart TB
       config:::posix
       lang:::posix
       args:::posix
+      var:::posix
+      str:::posix
+      num:::posix
+      msg:::posix
     end
   end
   subgraph L["lib/compat · bash4 (мосты, вне ядра)"]
@@ -383,9 +392,10 @@ flowchart TB
   inst -.-> shell
   shell -.-> tramp
   bs -.-> bssh
+  bs -.-> cli
   bssh -.-> init
-  init -.-> kern
-  kern -.-> loader
+  init -.-> base
+  init -.-> loader
   loader -.-> CP
   init -.-> L
   L -.-> CP
@@ -418,7 +428,7 @@ sequenceDiagram
   sh-->>bs: да: bash ≥ 4.2, не режим POSIX
   bs->>bsh: source (bs::strict, bs::cli::*)
   bs->>init: source
-  init->>core: load prereq, lang, const, logger, errorhandler, version, quiet, utils, config, deps
+  init->>core: load prereq, lang, const, var, str, num, msg, logger, quiet, fmt, data, errorhandler, version, utils, config, deps
   init-->>bs: BS_INITIALIZED=1
   bs->>bs: BS_SHEBANG=1: первый аргумент — файл
   bs->>S: новый bash: init.sh, затем source скрипта

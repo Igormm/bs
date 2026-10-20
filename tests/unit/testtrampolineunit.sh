@@ -140,14 +140,22 @@ test_guards() {
     run "${dash_bin}" -c ". '${BS_PROJECT_ROOT}/bootstrap/trampoline.sh'; echo rc=\$?"
     has "run this file as a program" "trampoline sourced into a shell: explains, does not exec"
 
+    # init.sh — POSIX: из dash и zsh он подключается и грузит POSIX-часть ядра (BS_KERNEL_MODE=posix);
+    # без подсказки о каталоге из dash он говорит, что задать
+    # init.sh is POSIX: from dash and zsh it loads the POSIX part of the kernel (BS_KERNEL_MODE=posix);
+    # with no hint about the directory, dash says what to set
     printf '. "%s/bootstrap/init.sh"\necho "rc=$?"\n' "${BS_PROJECT_ROOT}" > "${T}/init_src.sh"
     run "${dash_bin}" "${T}/init_src.sh"
-    has "only from bash 4.2+" "init.sh sourced from dash: a clear answer"
+    has "set BS_BOOTSTRAP_DIR, BS_ENTRY_DIR or BS_ROOT" "init.sh sourced from dash without a directory hint: says what to set"
     lacks "Bad substitution" "init.sh sourced from dash: no syntax noise"
+    printf 'BS_ENTRY_DIR="%s"\nBS_SILENT=1\n. "%s/bootstrap/init.sh"\necho "mode=$BS_KERNEL_MODE rc=$?"\n' "${BS_PROJECT_ROOT}" "${BS_PROJECT_ROOT}" > "${T}/init_src2.sh"
+    run "${dash_bin}" "${T}/init_src2.sh"
+    has "mode=posix rc=0" "init.sh sourced from dash with BS_ENTRY_DIR: the POSIX part of the kernel loads"
+    lacks "Bad substitution" "init.sh sourced from dash with BS_ENTRY_DIR: no syntax noise"
     local zsh_bin; zsh_bin="$(shell_bin zsh)"
     if [[ -n "${zsh_bin}" ]]; then
         run "${zsh_bin}" "${T}/init_src.sh"
-        has "only from bash 4.2+" "init.sh sourced from zsh: a clear answer"
+        has "BS bootstrap initialized from" "init.sh sourced from zsh: the kernel loads (its directory comes from %x)"
         lacks "bad substitution" "init.sh sourced from zsh: no kernel-load noise"
     fi
 }

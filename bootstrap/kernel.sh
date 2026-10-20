@@ -55,7 +55,7 @@ if ! command -v bs_load >/dev/null 2>&1; then
 fi
 
 # Модули ядра; core/prereq первым / The kernel modules; core/prereq first
-for __bs_k_mod in prereq lang const logger quiet fmt data errorhandler version utils config deps args; do
+for __bs_k_mod in prereq lang const var str num msg logger quiet fmt data errorhandler version utils config deps args; do
   bs_load "core/${__bs_k_mod}" || return 1
 done
 unset __bs_k_mod

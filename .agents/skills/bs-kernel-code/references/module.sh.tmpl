@@ -1,0 +1,54 @@
+#!/bin/sh
+# shellcheck shell=sh
+# @shell posix — валидный POSIX sh: case, подстановки параметров, @DEPS_RU@ / valid POSIX sh: case, parameter expansion, @DEPS_EN@
+# @tier core — builtins only; works everywhere
+#
+# core/@FILE@.sh — @PURPOSE_RU@
+# core/@FILE@.sh — @PURPOSE_EN@
+#
+# ИМЕНА / NAMES
+#   Real functions: bs_@NS@_greet; in bash and zsh also @NS@::greet (the old name).
+#   Настоящие функции: bs_@NS@_greet; в bash и zsh — ещё и прежнее @NS@::greet.
+
+# Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
+# Note: strict mode (set -euo pipefail) and IFS are set only in entry points
+
+bs_guard @GUARD@ || return 0
+
+# Dependencies / Зависимости (удалите, если не нужны / delete if unused)
+# bs_source_relative "const.sh" "data.sh"
+
+# @global @PFXU@_DEFAULT_NAME — @MODULE@: default name for greet (category: constant)
+# @global @PFXU@_DEFAULT_NAME — @MODULE@: имя по умолчанию для greet (категория: constant)
+bs_shell_readonly @PFXU@_DEFAULT_NAME=world
+
+# ==========================================
+# Приватные помощники / Private helpers
+# ==========================================
+
+# @private
+# @description Собрать приветствие; результат в __bs_@PFX@_out / Build the greeting; the result is in __bs_@PFX@_out
+# @param $1 name / имя
+bs_@NS@_build() {
+  __bs_@PFX@_name=${1-}
+  if [ -z "$__bs_@PFX@_name" ]; then
+    __bs_@PFX@_name=$@PFXU@_DEFAULT_NAME
+  fi
+  __bs_@PFX@_out="hello, ${__bs_@PFX@_name}"
+}
+
+# ==========================================
+# Публичный API / Public API
+# ==========================================
+
+# @description Напечатать приветствие / Print a greeting
+# @param $1 name, default "world" / имя, по умолчанию «world»
+# @returns 0 always / всегда 0
+# @stdout the greeting / приветствие
+bs_@NS@_greet() {
+  bs_@NS@_build "${1-}"
+  printf '%s\n' "$__bs_@PFX@_out"
+}
+
+# Псевдонимы прежних имён (bash и zsh) / Aliases of the old names (bash and zsh)
+bs_shell_alias bs_@NS@_greet @NS@::greet

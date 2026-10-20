@@ -1,7 +1,7 @@
 #!/bin/sh
 # shellcheck shell=sh
-# @shell posix — валидный POSIX sh: case, printf, подстановки параметров и $(( )) без local, массивов, ${1^^}, printf -v и $'..'; ширина рамки log::header считается ${#} (в dash/ash — байты) / valid POSIX sh: case, printf, parameter expansion and $(( )) with no local, arrays, ${1^^}, printf -v or $'..'; the width of the log::header frame is ${#} (bytes in dash/ash)
-# @tier core — builtins and date; works everywhere
+# @shell posix — валидный POSIX sh: case, printf, подстановки параметров и $(( )) без local, массивов, ${1^^}, printf -v и $'..'; ширина рамки log::header считается в символах UTF-8 (bs_str_width), а не в байтах / valid POSIX sh: case, printf, parameter expansion and $(( )) with no local, arrays, ${1^^}, printf -v or $'..'; the width of the log::header frame is counted in UTF-8 characters (bs_str_width), not bytes
+# @tier core — builtins, date, tr and wc (bs_str_width); works everywhere
 #
 # core/logger.sh — модуль логирования фреймворка BS
 # core/logger.sh — BS framework logging module
@@ -26,7 +26,6 @@
 # BS_LOG_TIMESTAMP=true|false (по умолчанию true / default: true)
 #
 
-# Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
 # ИМЕНА / NAMES
 #   Real functions: bs_log_trace, bs_log_debug, bs_log_info, bs_log_success, bs_log_warn, bs_log_error, bs_log_fatal,
 #   bs_log_print, bs_log_header, bs_log_list, bs_log_table, bs_log_progress, bs_log_clear_line and the private
@@ -37,12 +36,13 @@
 #   bs_log_format_message; в bash и zsh — ещё и log::* (прежние имена, их зовёт весь фреймворк)
 #   и log::__* для приватных.
 
+# Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points
 
 bs_guard LOGGER || return 0
 
 # Dependencies / Зависимости
-bs_source_relative "const.sh"
+bs_source_relative "const.sh" "str.sh"
 
 # @global BS_LOG_LEVEL — Env: log level (DEBUG/INFO/WARN/ERROR) (category: env)
 # @global BS_LOG_LEVEL — Env: уровень логирования (DEBUG/INFO/WARN/ERROR) (категория: env)
@@ -137,6 +137,12 @@ bs_log_get_level_color() {
 bs_log_replace_all() {
   __bs_log_rs=$1
   __bs_log_out=''
+  # Пустая подстрока совпадала бы везде, и цикл не кончался бы.
+  # An empty substring would match everywhere and the loop would never end.
+  if [ -z "$2" ]; then
+    __bs_log_out=$1
+    return 0
+  fi
   while :; do
     case "$__bs_log_rs" in
       *"$2"*)
@@ -299,7 +305,7 @@ bs_log_header() {
   __bs_log_hchar=${2:-box}
   if [ "$__bs_log_hchar" = "box" ]; then
     __bs_log_inner=" ${__bs_log_htext} "
-    __bs_log_n=${#__bs_log_inner}
+    __bs_log_n=$(bs_str_width "$__bs_log_inner")
     __bs_log_line=''
     while [ "$__bs_log_n" -gt 0 ]; do
       __bs_log_line="${__bs_log_line}─"
@@ -310,7 +316,7 @@ bs_log_header() {
     bs_log_info "╰${__bs_log_line}╯"
     return 0
   fi
-  __bs_log_n=${#__bs_log_htext}
+  __bs_log_n=$(bs_str_width "$__bs_log_htext")
   __bs_log_line=''
   while [ "$__bs_log_n" -gt 0 ]; do
     __bs_log_line="${__bs_log_line}${__bs_log_hchar}"

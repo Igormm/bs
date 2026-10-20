@@ -7,7 +7,7 @@ whenToUse: When writing or changing anything that touches the shell — an insta
 
 # Переносимость между оболочками / Shell portability
 
-Ядро BS делится на **два яруса**: `@shell posix` (все 15 файлов `core/` и слой `bootstrap/` —
+Ядро BS делится на **два яруса**: `@shell posix` (все 19 файлов `core/` и слой `bootstrap/` —
 работают в bash, zsh, dash, busybox ash, ksh93, mksh) и `@shell bash4` (остальное,
 требует bash 4.2+). Яруса bash4 не надо «лечить»: на ассоциативных массивах,
 namerefs и `[[ =~ ]]` стоят сотни функций; для ядра эти конструкции заменяются слоем `core/data.sh` и переводятся по плану (см. `bs-shell-abstraction`), а `lib/` остаётся bash.
@@ -44,8 +44,8 @@ ksh, mksh.
 ```
 
 * `@shell posix` — файл валиден как POSIX sh: его подключат dash, ash/busybox,
-  bash, zsh, ksh, mksh. Сейчас: `bootstrap/shell.sh`, `trampoline.sh`, `shebang.sh`;
-  `core/prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`. **bash в этом ярусе не
+  bash, zsh, ksh, mksh. Сейчас: `bootstrap/shell.sh`, `trampoline.sh`, `shebang.sh`, `loader.sh`, `base.sh`, `init.sh`, `cli.sh`; `install/*.sh`, `install.sh` и `bs`;
+  `core/prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `var`, `str`, `num`, `msg`. **bash в этом ярусе не
   участвует** — это проверяет `.agents/skills/bs-shell-abstraction/scripts/check_posix_tier.sh`
   (разбор в не-bash оболочках, запрет bash-конструкций, запуск в dash без bash в PATH).
   Стиль кода яруса — `documentation/*/code-style-guide.md`, раздел 12.
@@ -92,11 +92,11 @@ bash; PATH/rc/подсказки — под его оболочку), **unsuppor
 
 Не «портируйте» ради галочки. Если модуль держится на ассоциативных массивах,
 namerefs, `mapfile`, `${!x}`, `BASH_REMATCH` — это `@shell bash4` с описанием
-причины (в `core/` таких файлов больше нет; остаются CLI, установщик и `lib/`). Для пользователя другой оболочки такой
+причины (в `core/` таких файлов больше нет; остаются CLI, загрузчик, установщик и `lib/`). Для пользователя другой оболочки такой
 модуль доступен через `bs` (hosted) и `bs call`. В POSIX переводят то, что (а) должно
 работать ДО bash — пролог, трамплин, реестр, шебанг; или (б) нужно скриптам на других
 оболочках и не держится на bash-конструкциях — `quiet`, `version`, `const`, `guard`,
-`prereq`; `core/` переведён целиком; очередь: остаток `init.sh`, `bs::cli::*`, `install/*`, точки входа. Перевод — отдельный
+`prereq`; `core/` переведён целиком (19 файлов, последним — `args`); очередь: остальные команды `bs::cli::*` и `bootstrap/bs.sh`. Перевод — по навыку `bs-kernel-code`, отдельный
 коммит: код, тест в шести оболочках, `check_posix_tier.sh`, строка в документации.
 
 ## 5. Порядок работы / Workflow
