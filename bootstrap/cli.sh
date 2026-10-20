@@ -7,11 +7,11 @@
 # bootstrap/cli.sh — the bs commands that run in any shell (the POSIX part of bs::cli::*)
 #
 # Остальные команды (lang-doc, lsp, chat, api, ts, audit, build, rfc, run, update,
-# where, repl) пока в bootstrap/bs.sh на bash; в оболочке
+# repl) пока в bootstrap/bs.sh на bash; в оболочке
 # без bash bs_cli_delegate отвечает, что команде нужен bash. Тела функций вызывают ядро и
 # выполняются только после его загрузки.
 # The other commands (lang-doc, lsp, chat, api, ts, audit, build, rfc, run, update,
-# where, repl) are still in bootstrap/bs.sh in bash; in a
+# repl) are still in bootstrap/bs.sh in bash; in a
 # shell without bash bs_cli_delegate answers that the command needs bash. The function bodies call
 # the kernel and run only after it is loaded.
 #
@@ -20,8 +20,9 @@
 #   bs_cli_short_sha, bs_cli_install_info_get, bs_cli_update_manifest_valid,
 #   bs_cli_bs_full_info_lines, bs_cli_bs_running_block, bs_cli_version_cmd, bs_cli_env_cmd,
 #   bs_cli_list_cmd, bs_cli_init_shell_*, bs_cli_shebang_*, bs_cli_call_*, bs_cli_doctor_cmd,
-#   bs_cli_uninstall_cmd, and the helpers that update, uninstall and where share (bs_cli_update_box,
-#   bs_cli_update_die, bs_cli_update_missing_lines, bs_cli_bs_running_info, …); in bash and zsh also
+#   bs_cli_uninstall_cmd, bs_cli_where_cmd (with bs_cli_where_*), and the helpers that update,
+#   uninstall and where share (bs_cli_update_box, bs_cli_update_die, bs_cli_update_missing_lines,
+#   bs_cli_bs_running_info, …); in bash and zsh also
 #   bs::cli::die, bs::cli::help, … (the old names).
 #   Настоящие функции — bs_cli_*; в bash и zsh — ещё и прежние bs::cli::die, bs::cli::help, …
 
@@ -141,7 +142,7 @@ bs_cli_help_cmd() {
     calc)           printf 'Usage: bs calc [expression]\n\nRPN calculator on dc.\n' ;;
     update|sync)    bs_cli_delegate update bs::cli::update_cmd --help ;;
     uninstall)      bs_cli_uninstall_cmd --help ;;
-    where)          bs_cli_delegate where bs::cli::where_cmd --help ;;
+    where)          bs_cli_where_cmd --help ;;
     init-shell)     bs_cli_init_shell_usage ;;
     shebang)        bs_cli_shebang_usage ;;
     call)           bs_cli_call_usage ;;
@@ -1188,6 +1189,537 @@ bs_cli_uninstall_cmd() {
   return 0
 }
 
+
+# ==========================================================================
+# bs where: все следы BS на машине / every trace of BS on this machine
+# ==========================================================================
+
+# Строка отчёта: подпись выравнивается по СИМВОЛАМ (printf %-Ns считает байты и
+# ломает колонки с кириллицей).
+# A report row: the label is padded by CHARACTERS (printf %-Ns counts bytes and
+# breaks columns with Cyrillic).
+# @param $1 Label / подпись; $2 Value / значение
+bs_cli_where_row() {
+  __bs_cli_wr_w=$(bs_str_width "$1")
+  if [ "${__bs_cli_wr_w}" -lt 15 ]; then
+    __bs_cli_wr_n=$((15 - __bs_cli_wr_w))
+  else
+    __bs_cli_wr_n=1
+  fi
+  printf '    %s%s%s\n' "$1" "$(bs_str_repeat ' ' "${__bs_cli_wr_n}")" "$2"
+}
+
+# @private Состояние каталога как BS: missing | file | foreign | checkout |
+# install | nomanifest | badmanifest.
+# @private State of a directory as BS: missing | file | foreign | checkout |
+# install | nomanifest | badmanifest.
+# @param $1 Directory / Каталог
+bs_cli_where_classify() {
+  if [ ! -e "$1" ]; then printf 'missing'; return 0; fi
+  if [ ! -d "$1" ]; then printf 'file'; return 0; fi
+  if [ ! -f "$1/bs" ] || [ ! -f "$1/bootstrap/init.sh" ]; then
+    printf 'foreign'; return 0
+  fi
+  if [ -e "$1/.git" ] || [ -d "$1/tests" ]; then printf 'checkout'; return 0; fi
+  if [ ! -e "$1/.install" ]; then printf 'nomanifest'; return 0; fi
+  if bs_cli_update_manifest_valid "$1/.install"; then
+    printf 'install'
+  else
+    printf 'badmanifest'
+  fi
+}
+
+# @private Вид установки по пути, если манифеста нет / install kind by path
+bs_cli_where_kind_by_path() {
+  if [ "$1" = "${HOME}/.local/lib/bs" ]; then
+    printf 'local'
+  elif [ "$1" = "$(bs_cli_update_system_lib)" ]; then
+    printf 'system'
+  else
+    printf 'custom'
+  fi
+}
+
+# @private Размер каталога в человекочитаемом виде (с ограничением по времени)
+# @private Directory size, human readable (with a time limit)
+bs_cli_where_size() {
+  __bs_cli_ws_kb=$(timeout 5 du -sk -- "$1" 2>/dev/null | cut -f1 || true)
+  case "${__bs_cli_ws_kb}" in
+    ''|*[!0-9]*) printf '?' ;;
+    *)
+      if [ "${__bs_cli_ws_kb}" -ge 1024 ]; then
+        printf '%d.%d MB' "$((__bs_cli_ws_kb / 1024))" "$((__bs_cli_ws_kb % 1024 * 10 / 1024))"
+      else
+        printf '%d KB' "${__bs_cli_ws_kb}"
+      fi ;;
+  esac
+}
+
+# shellcheck disable=SC2016  # обратные кавычки в тексте справки / backticks in the help text
+bs_cli_where_help() {
+  printf 'Usage: bs where [--deep]\n\n'
+  printf 'Show every trace of BS on this machine, read-only: the running copy,\n'
+  printf 'every `bs` found in PATH (wrappers and launchers), installs (local,\n'
+  printf 'system, custom) with version/manifest/owner/leftovers, source checkouts,\n'
+  printf 'lines in shell rc files, data and cache directories, environment\n'
+  printf 'variables, and a summary with the commands that fix what looks wrong.\n'
+  printf 'Nothing is changed and no found copy of bs is run.\n\n'
+  printf '  --deep   also search for BS copies under ~, /opt, /usr/local, /srv\n'
+  printf '           (depth-limited, 30 s at most)\n'
+  printf 'Показывает все следы BS на машине: запущенную копию, все `bs` в PATH,\n'
+  printf 'установки (local/system/custom), репозитории, строки в rc-файлах,\n'
+  printf 'каталоги данных и кэша, переменные окружения и итог с командами.\n'
+  printf 'Ничего не меняет и найденные копии bs не запускает.\n'
+}
+
+# Замечание / подсказка без повторов
+# A problem / hint, without duplicates
+bs_cli_where_problem() {
+  if bs_arr_contains bs_cli_wh_problems "$1"; then return 0; fi
+  bs_arr_push bs_cli_wh_problems "$1"
+}
+
+bs_cli_where_hint() {
+  if bs_arr_contains bs_cli_wh_hints "$1"; then return 0; fi
+  bs_arr_push bs_cli_wh_hints "$1"
+}
+
+# Кандидат в каталог BS (без повторов, по реальному пути)
+# A candidate BS directory (deduplicated by real path)
+bs_cli_where_add() {
+  __bs_cli_wa_p=${1%/}
+  if [ -z "${__bs_cli_wa_p}" ]; then return 0; fi
+  __bs_cli_wa_r=$(readlink -f -- "${__bs_cli_wa_p}" 2>/dev/null || printf '%s' "${__bs_cli_wa_p}")
+  if bs_arr_contains bs_cli_wh_cands "${__bs_cli_wa_r}"; then return 0; fi
+  bs_arr_push bs_cli_wh_cands "${__bs_cli_wa_r}"
+}
+
+# @private Все исполняемые `bs` в PATH, по порядку, с повторами — как `type -aP bs`
+# в bash: пустой элемент PATH значит текущий каталог, каталог без хвостового «/»
+# получает его. Результат в массив bs_cli_wh_hits.
+# @private Every executable `bs` in PATH, in order, repeats kept — like bash's
+# `type -aP bs`: an empty PATH element means the current directory, a directory
+# without a trailing "/" gets one. The result goes to the array bs_cli_wh_hits.
+bs_cli_where_path_hits() {
+  bs_arr_clear bs_cli_wh_hits
+  __bs_cli_wp_rest="${BS_CALLER_PATH:-${PATH}}:"
+  while [ -n "${__bs_cli_wp_rest}" ]; do
+    __bs_cli_wp_dir=${__bs_cli_wp_rest%%:*}
+    __bs_cli_wp_rest=${__bs_cli_wp_rest#*:}
+    case "${__bs_cli_wp_dir}" in
+      '') __bs_cli_wp_file=./bs ;;
+      */) __bs_cli_wp_file=${__bs_cli_wp_dir}bs ;;
+      *)  __bs_cli_wp_file=${__bs_cli_wp_dir}/bs ;;
+    esac
+    if [ -x "${__bs_cli_wp_file}" ] && [ ! -d "${__bs_cli_wp_file}" ]; then
+      bs_arr_push bs_cli_wh_hits "${__bs_cli_wp_file}"
+    fi
+  done
+}
+
+# @private Остатки прерванных обновлений и установок рядом с установкой (по строке).
+# @private Leftovers of interrupted updates and installs next to an install (one per line).
+# @param $1 Install directory / Каталог установки
+bs_cli_where_leftovers() {
+  for __bs_cli_wl_pat in '.update.*' '.update-old.*' '.update-lock' '.install.bad'; do
+    find "$1" -maxdepth 1 -name "${__bs_cli_wl_pat}" 2>/dev/null | sort
+  done
+  find "$(dirname -- "$1")" -maxdepth 1 -name '.bs.install.*' 2>/dev/null | sort
+}
+
+# bs where: все следы BS на машине (только чтение) / every trace of BS on this machine (read-only)
+bs_cli_where_cmd() {
+  # В строгом режиме bs IFS = перевод строки/табуляция; здесь нужны пробелы
+  # In bs strict mode IFS is newline/tab; this function needs spaces
+  __bs_cli_wh_ifs=${IFS}
+  IFS=' '
+  bs_cli_where_main "$@"
+  __bs_cli_wh_rc=$?
+  IFS=${__bs_cli_wh_ifs}
+  return "${__bs_cli_wh_rc}"
+}
+
+bs_cli_where_main() {
+  __bs_cli_wh_deep=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --deep)    __bs_cli_wh_deep=1; shift ;;
+      -h|--help) bs_cli_where_help; return 0 ;;
+      *)         bs_cli_die "where: unknown argument: $1 (try: bs where --help)" ;;
+    esac
+  done
+
+  bs_arr_clear bs_cli_wh_cands
+  bs_arr_clear bs_cli_wh_problems
+  bs_arr_clear bs_cli_wh_hints
+  bs_arr_clear bs_cli_wh_checkouts
+  bs_arr_clear bs_cli_wh_ivpaths
+  __bs_cli_wh_n=0
+  __bs_cli_wh_first=""
+
+  printf '== Запущено сейчас / Running now ==\n'
+  bs_cli_bs_running_block
+  bs_cli_where_add "${BS_ROOT}"
+
+  # Оболочка: кто исполняет код BS, чья оболочка у пользователя, tier
+  # The shell: who runs the BS code, whose shell the user has, the tier
+  __bs_cli_wh_ushell=$(bs_shell_user)
+  __bs_cli_wh_utier=$(bs_shell_tier "${__bs_cli_wh_ushell}")
+  printf '\n== Оболочка / Shell ==\n'
+  bs_cli_where_row "хозяин:" "$(bs_shell_family) $(bs_shell_version_string) (исполняет код BS / runs the BS code)"
+  bs_cli_where_row "ваша:" "${__bs_cli_wh_ushell}  (login: $(bs_shell_login), parent: $(bs_shell_parent))"
+  bs_cli_where_row "tier:" "${__bs_cli_wh_utier}"
+  printf '    %s\n' "$(bs_shell_tier_desc "${__bs_cli_wh_utier}")"
+
+  # --- bs в PATH ---
+  printf '\n== Команда bs в PATH / The bs command in PATH ==\n'
+  bs_cli_where_path_hits
+  __bs_cli_wh_nhits=$(bs_arr_len bs_cli_wh_hits)
+  if [ "${__bs_cli_wh_nhits}" -eq 0 ]; then
+    printf '  bs не найдена в PATH этой оболочки / bs is not in the PATH of this shell\n'
+    bs_cli_where_problem "bs не найдена в PATH этой оболочки / bs is not in the PATH of this shell"
+    if [ -x "${HOME}/.local/bin/bs" ]; then
+      # shellcheck disable=SC2016
+      bs_cli_where_hint "$(bs_shell_path_line "${__bs_cli_wh_ushell}" '$HOME/.local/bin')   (в этом терминале сразу / in this terminal right away; shell: ${__bs_cli_wh_ushell})"
+    fi
+    bs_cli_where_hint "$(bs_shell_reload_hint "${__bs_cli_wh_ushell}")  (или новый терминал / or a new terminal)"
+    bs_cli_where_hint "./install.sh --local --update-path   (если строки PATH нет в rc-файле / if the rc file lacks the PATH line)"
+  fi
+  eval "$(bs_arr_to_args bs_cli_wh_hits)"
+  for __bs_cli_wh_hit in "$@"; do
+    __bs_cli_wh_n=$((__bs_cli_wh_n + 1))
+    __bs_cli_wh_real=$(readlink -f -- "${__bs_cli_wh_hit}" 2>/dev/null || printf '%s' "${__bs_cli_wh_hit}")
+    __bs_cli_wh_root=$(bs_cli_update_wrapper_root "${__bs_cli_wh_real}")
+    __bs_cli_wh_what=""
+    if [ -n "${__bs_cli_wh_root}" ]; then
+      if [ -d "${__bs_cli_wh_root}" ]; then
+        __bs_cli_wh_what="wrapper → ${__bs_cli_wh_root} (версия / version $(bs_version_of "${__bs_cli_wh_root}"))"
+        bs_cli_where_add "${__bs_cli_wh_root}"
+      else
+        __bs_cli_wh_what="wrapper → ${__bs_cli_wh_root} — КАТАЛОГ НЕ СУЩЕСТВУЕТ / DIRECTORY MISSING"
+        bs_cli_where_problem "обёртка ${__bs_cli_wh_hit} указывает на несуществующий ${__bs_cli_wh_root} / wrapper ${__bs_cli_wh_hit} points to a missing ${__bs_cli_wh_root}"
+        bs_cli_where_hint "rm ${__bs_cli_wh_hit}  (или переустановить / or reinstall: ./install.sh --local)"
+      fi
+    elif [ -f "$(dirname -- "${__bs_cli_wh_real}")/bootstrap/init.sh" ]; then
+      __bs_cli_wh_root=$(dirname -- "${__bs_cli_wh_real}")
+      __bs_cli_wh_what="лаунчер каталога / launcher of ${__bs_cli_wh_root} (версия / version $(bs_version_of "${__bs_cli_wh_root}"))"
+      bs_cli_where_add "${__bs_cli_wh_root}"
+    else
+      __bs_cli_wh_what="не похоже на BS / does not look like BS"
+    fi
+    __bs_cli_wh_mark=""
+    if [ "${__bs_cli_wh_n}" -eq 1 ]; then
+      __bs_cli_wh_mark="   ← запускается по команде bs / runs as \`bs\`"
+      __bs_cli_wh_first=${__bs_cli_wh_root}
+    fi
+    printf '  %d. %s — %s%s\n' "${__bs_cli_wh_n}" "${__bs_cli_wh_hit}" "${__bs_cli_wh_what}" "${__bs_cli_wh_mark}"
+  done
+
+  # --- Кандидаты из стандартных мест, манифестов, rc-файлов и (--deep) поиска ---
+  bs_cli_where_add "${HOME}/.local/lib/bs"
+  bs_cli_where_add "$(bs_cli_update_system_lib)"
+  if [ -n "${BS_HOME:-}" ]; then bs_cli_where_add "${BS_HOME}"; fi
+
+  # rc-файлы ВСЕХ известных оболочек (bash, zsh, sh/ash/dash, ksh, osh, fish, nu)
+  # из реестра bootstrap/shell.sh, плюс /etc/profile.d
+  # rc files of ALL known shells (bash, zsh, sh/ash/dash, ksh, osh, fish, nu)
+  # from the registry bootstrap/shell.sh, plus /etc/profile.d
+  bs_arr_from_lines bs_cli_wh_rcfiles "$(bs_shell_all_rc_files)"
+  __bs_cli_wh_pd=$(find /etc/profile.d -maxdepth 1 -name '*.sh' 2>/dev/null | sort || true)
+  while IFS= read -r __bs_cli_wh_f; do
+    if [ -n "${__bs_cli_wh_f}" ] && [ -f "${__bs_cli_wh_f}" ]; then bs_arr_push bs_cli_wh_rcfiles "${__bs_cli_wh_f}"; fi
+  done <<EOF
+${__bs_cli_wh_pd}
+EOF
+
+  # Пути из строк вида source ".../bootstrap/init.sh"
+  # Paths from lines like source ".../bootstrap/init.sh"
+  eval "$(bs_arr_to_args bs_cli_wh_rcfiles)"
+  for __bs_cli_wh_f in "$@"; do
+    if [ ! -r "${__bs_cli_wh_f}" ]; then continue; fi
+    __bs_cli_wh_lines=$(grep -E '/bootstrap/init\.sh' "${__bs_cli_wh_f}" 2>/dev/null | grep -vE '^[[:space:]]*#' || true)
+    while IFS= read -r __bs_cli_wh_line; do
+      if [ -z "${__bs_cli_wh_line}" ]; then continue; fi
+      __bs_cli_wh_m=$(printf '%s\n' "${__bs_cli_wh_line}" | grep -oE '[~/$][^"'"'"' ]*/bootstrap/init\.sh' | head -n 1 || true)
+      if [ -z "${__bs_cli_wh_m}" ]; then continue; fi
+      __bs_cli_wh_path=${__bs_cli_wh_m%/bootstrap/init.sh}
+      # shellcheck disable=SC2016
+      case "${__bs_cli_wh_path}" in
+        '~'*)       __bs_cli_wh_path=${HOME}${__bs_cli_wh_path#'~'} ;;
+        '$HOME'*)   __bs_cli_wh_path=${HOME}${__bs_cli_wh_path#'$HOME'} ;;
+        '${HOME}'*) __bs_cli_wh_path=${HOME}${__bs_cli_wh_path#'${HOME}'} ;;
+      esac
+      case "${__bs_cli_wh_path}" in
+        *\$*) ;;
+        /*)   bs_cli_where_add "${__bs_cli_wh_path}" ;;
+      esac
+    done <<EOF
+${__bs_cli_wh_lines}
+EOF
+  done
+
+  if [ "${__bs_cli_wh_deep}" -eq 1 ]; then
+    for __bs_cli_wh_r in "${HOME}" /opt /usr/local /srv; do
+      if [ ! -d "${__bs_cli_wh_r}" ]; then continue; fi
+      __bs_cli_wh_found=$(timeout 30 find "${__bs_cli_wh_r}" -xdev -maxdepth 5 \
+        \( -name .git -o -name node_modules -o -name .cache -o -name proc \) -prune -o \
+        -type f -path '*/bootstrap/init.sh' -print 2>/dev/null || true)
+      while IFS= read -r __bs_cli_wh_f; do
+        if [ -n "${__bs_cli_wh_f}" ]; then
+          bs_cli_where_add "$(dirname -- "$(dirname -- "${__bs_cli_wh_f}")")"
+        fi
+      done <<EOF
+${__bs_cli_wh_found}
+EOF
+    done
+  fi
+
+  # Источники установок из манифестов (откуда ставили) — это тоже следы
+  # Install sources from the manifests (where they came from) are traces too
+  eval "$(bs_arr_to_args bs_cli_wh_cands)"
+  for __bs_cli_wh_c in "$@"; do
+    __bs_cli_wh_src=$(bs_cli_install_info_get "${__bs_cli_wh_c}" source)
+    if [ -n "${__bs_cli_wh_src}" ] && [ -d "${__bs_cli_wh_src}" ]; then bs_cli_where_add "${__bs_cli_wh_src}"; fi
+  done
+
+  # --- Установки ---
+  printf '\n== Установки BS / BS installs ==\n'
+  __bs_cli_wh_ninst=0
+  __bs_cli_wh_versions=" "
+  eval "$(bs_arr_to_args bs_cli_wh_cands)"
+  for __bs_cli_wh_c in "$@"; do
+    __bs_cli_wh_cls=$(bs_cli_where_classify "${__bs_cli_wh_c}")
+    case "${__bs_cli_wh_cls}" in
+      missing) continue ;;
+      checkout) bs_arr_push bs_cli_wh_checkouts "${__bs_cli_wh_c}"; continue ;;
+      foreign|file)
+        # Чужое показываем только в стандартных местах BS
+        # Foreign things are reported only at the standard BS places
+        if [ "${__bs_cli_wh_c}" = "${HOME}/.local/lib/bs" ] || [ "${__bs_cli_wh_c}" = "$(bs_cli_update_system_lib)" ]; then
+          printf '  %s\n' "${__bs_cli_wh_c}"
+          bs_cli_where_row "состояние:" "существует, но это НЕ установка BS / exists but is NOT a BS install (${__bs_cli_wh_cls})"
+          bs_cli_where_problem "${__bs_cli_wh_c} занят чужим / ${__bs_cli_wh_c} is occupied by something that is not BS"
+        fi
+        continue ;;
+    esac
+    __bs_cli_wh_ninst=$((__bs_cli_wh_ninst + 1))
+    __bs_cli_wh_run=""
+    if [ "${__bs_cli_wh_c}" = "$(readlink -f -- "${BS_ROOT}")" ]; then __bs_cli_wh_run='   ← запущена сейчас / running now'; fi
+    printf '  %s%s\n' "${__bs_cli_wh_c}" "${__bs_cli_wh_run}"
+    __bs_cli_wh_mode=$(bs_cli_install_info_get "${__bs_cli_wh_c}" mode)
+    if [ -z "${__bs_cli_wh_mode}" ]; then __bs_cli_wh_mode=$(bs_cli_where_kind_by_path "${__bs_cli_wh_c}"); fi
+    bs_cli_where_row "вид / kind:" "${__bs_cli_wh_mode}, версия / version $(bs_version_of "${__bs_cli_wh_c}")"
+    __bs_cli_wh_versions="${__bs_cli_wh_versions}$(bs_version_of "${__bs_cli_wh_c}") "
+    bs_arr_push bs_cli_wh_ivpaths "${__bs_cli_wh_c}"
+    case "${__bs_cli_wh_cls}" in
+      nomanifest)
+        bs_cli_where_row "манифест:" "нет (установлено старым установщиком) / none (older installer)"
+        bs_cli_where_problem "${__bs_cli_wh_c}: нет манифеста / no manifest"
+        bs_cli_where_hint "bs update --lib ${__bs_cli_wh_c}   (создаст манифест / creates the manifest)" ;;
+      badmanifest)
+        bs_cli_where_row "манифест:" "ПОВРЕЖДЁН / CORRUPT: ${__bs_cli_wh_c}/.install"
+        bs_cli_where_problem "${__bs_cli_wh_c}: повреждённый манифест / corrupt manifest"
+        bs_cli_where_hint "bs update --lib ${__bs_cli_wh_c}   (пересоздаст манифест / recreates the manifest)" ;;
+      install)
+        bs_cli_where_row "установлено:" "$(bs_cli_install_info_get "${__bs_cli_wh_c}" installed_at) by $(bs_cli_install_info_get "${__bs_cli_wh_c}" installed_by)"
+        __bs_cli_wh_src=$(bs_cli_install_info_get "${__bs_cli_wh_c}" source)
+        __bs_cli_wh_gone=""
+        if [ -n "${__bs_cli_wh_src}" ] && [ ! -d "${__bs_cli_wh_src}" ]; then __bs_cli_wh_gone='   (каталога больше нет / directory is gone)'; fi
+        bs_cli_where_row "источник:" "${__bs_cli_wh_src:-?} @ $(bs_cli_short_sha "$(bs_cli_install_info_get "${__bs_cli_wh_c}" source_commit)")${__bs_cli_wh_gone}"
+        if [ -n "$(bs_cli_install_info_get "${__bs_cli_wh_c}" updated_at)" ]; then
+          bs_cli_where_row "обновлено:" "$(bs_cli_install_info_get "${__bs_cli_wh_c}" updated_at) from $(bs_cli_install_info_get "${__bs_cli_wh_c}" updated_from) @ $(bs_cli_short_sha "$(bs_cli_install_info_get "${__bs_cli_wh_c}" updated_commit)")"
+        fi ;;
+    esac
+    # Обёртка этой установки
+    # The wrapper of this install
+    __bs_cli_wh_bin=$(bs_cli_install_info_get "${__bs_cli_wh_c}" bin)
+    if [ -z "${__bs_cli_wh_bin}" ]; then __bs_cli_wh_bin="${__bs_cli_wh_c%/lib/bs}/bin/bs"; fi
+    if [ -f "${__bs_cli_wh_bin}" ]; then
+      __bs_cli_wh_wrap=$(bs_cli_update_wrapper_root "${__bs_cli_wh_bin}")
+      if [ "$(readlink -f -- "${__bs_cli_wh_wrap:-/nonexistent}" 2>/dev/null)" = "${__bs_cli_wh_c}" ]; then
+        case ":${BS_CALLER_PATH:-${PATH}}:" in
+          *":$(dirname -- "${__bs_cli_wh_bin}"):"*) __bs_cli_wh_inpath=' (каталог в PATH / directory in PATH)' ;;
+          *)                                        __bs_cli_wh_inpath=' (каталога НЕТ в PATH / directory NOT in PATH)' ;;
+        esac
+        bs_cli_where_row "wrapper:" "${__bs_cli_wh_bin}${__bs_cli_wh_inpath}"
+      else
+        bs_cli_where_row "wrapper:" "${__bs_cli_wh_bin} — указывает на ${__bs_cli_wh_wrap:-?}, не сюда / points to ${__bs_cli_wh_wrap:-?}, not here"
+        if [ -n "${__bs_cli_wh_wrap}" ] && [ -d "${__bs_cli_wh_wrap}" ]; then
+          bs_cli_where_problem "${__bs_cli_wh_bin} ведёт не в ${__bs_cli_wh_c} / ${__bs_cli_wh_bin} does not lead to ${__bs_cli_wh_c}"
+        else
+          bs_cli_where_problem "обёртка ${__bs_cli_wh_bin} указывает на несуществующий ${__bs_cli_wh_wrap:-?} / wrapper ${__bs_cli_wh_bin} points to a missing ${__bs_cli_wh_wrap:-?}"
+          bs_cli_where_hint "rm ${__bs_cli_wh_bin}  (или переустановить / or reinstall: ./install.sh --local)"
+        fi
+      fi
+    else
+      bs_cli_where_row "wrapper:" "нет / none (ожидался / expected: ${__bs_cli_wh_bin})"
+      if [ "${__bs_cli_wh_cls}" != checkout ]; then
+        __bs_cli_wh_flag=""
+        if [ "${__bs_cli_wh_mode}" = local ]; then __bs_cli_wh_flag='--local'; fi
+        bs_cli_where_problem "${__bs_cli_wh_c}: нет обёртки, команда bs её не найдёт / no wrapper"
+        bs_cli_where_hint "./install.sh ${__bs_cli_wh_flag}   (починит обёртку / repairs the wrapper)"
+      fi
+    fi
+    __bs_cli_wh_owner=$(stat -c %U -- "${__bs_cli_wh_c}" 2>/dev/null || printf '?')
+    if [ -w "${__bs_cli_wh_c}" ]; then
+      __bs_cli_wh_access="доступна на запись / writable"
+    else
+      __bs_cli_wh_access="только чтение, нужен sudo / read-only, needs sudo"
+    fi
+    bs_cli_where_row "владелец:" "${__bs_cli_wh_owner}, ${__bs_cli_wh_access}"
+    # Остатки упавших обновлений и установок
+    # Leftovers of failed updates and installs
+    bs_arr_clear bs_cli_wh_left
+    __bs_cli_wh_ltxt=$(bs_cli_where_leftovers "${__bs_cli_wh_c}")
+    while IFS= read -r __bs_cli_wh_f; do
+      if [ -n "${__bs_cli_wh_f}" ] && [ -e "${__bs_cli_wh_f}" ]; then bs_arr_push bs_cli_wh_left "${__bs_cli_wh_f}"; fi
+    done <<EOF
+${__bs_cli_wh_ltxt}
+EOF
+    if [ "$(bs_arr_len bs_cli_wh_left)" -gt 0 ]; then
+      bs_cli_where_row "остатки:" "$(bs_arr_join bs_cli_wh_left ' ')"
+      bs_cli_where_problem "${__bs_cli_wh_c}: остатки прерванных операций / leftovers of interrupted operations"
+      bs_cli_where_hint "bs update --lib ${__bs_cli_wh_c}   (очистит остатки / cleans the leftovers)"
+    fi
+  done
+  if [ "${__bs_cli_wh_ninst}" -eq 0 ]; then printf '  установок не найдено / no installs found\n'; fi
+
+  # --- Репозитории ---
+  printf '\n== Репозитории BS / BS source checkouts ==\n'
+  if [ "$(bs_arr_len bs_cli_wh_checkouts)" -eq 0 ]; then
+    printf '  не найдено / none found\n'
+  fi
+  eval "$(bs_arr_to_args bs_cli_wh_checkouts)"
+  for __bs_cli_wh_c in "$@"; do
+    __bs_cli_wh_run=""
+    if [ "${__bs_cli_wh_c}" = "$(readlink -f -- "${BS_ROOT}")" ]; then __bs_cli_wh_run='   ← запущен сейчас / running now'; fi
+    printf '  %s%s\n' "${__bs_cli_wh_c}" "${__bs_cli_wh_run}"
+    __bs_cli_wh_git=""
+    if [ -e "${__bs_cli_wh_c}/.git" ] && bs_utils_has git; then
+      __bs_cli_wh_git=", commit $(git -C "${__bs_cli_wh_c}" rev-parse --short=7 HEAD 2>/dev/null || printf '?')"
+    fi
+    bs_cli_where_row "версия / ver.:" "$(bs_version_of "${__bs_cli_wh_c}")${__bs_cli_wh_git}"
+  done
+
+  # --- Следы в оболочке ---
+  printf '\n== Следы в оболочке / Shell traces ==\n'
+  __bs_cli_wh_hitsn=0
+  eval "$(bs_arr_to_args bs_cli_wh_rcfiles)"
+  for __bs_cli_wh_f in "$@"; do
+    if [ ! -r "${__bs_cli_wh_f}" ]; then continue; fi
+    # shellcheck disable=SC2016  # $HOME в шаблоне grep — текст / $HOME in the grep pattern is text
+    __bs_cli_wh_lines=$(grep -nE -- '(bootstrap/init\.sh|BS_ROOT|\.local/lib/bs|/lib/bs/|bs init-shell|export PATH="\$HOME/\.local/bin:\$PATH"|contains -- "\$HOME/\.local/bin"|path join "\.local" "bin")' "${__bs_cli_wh_f}" 2>/dev/null | grep -vE '^[0-9]+:[[:space:]]*#' | sed "s|^|${__bs_cli_wh_f}:|" || true)
+    if [ -z "${__bs_cli_wh_lines}" ]; then continue; fi
+    while IFS= read -r __bs_cli_wh_line; do
+      printf '  %s\n' "$(bs_str_head "${__bs_cli_wh_line}" 150)"
+      __bs_cli_wh_hitsn=$((__bs_cli_wh_hitsn + 1))
+    done <<EOF
+${__bs_cli_wh_lines}
+EOF
+  done
+  if [ "${__bs_cli_wh_hitsn}" -eq 0 ]; then printf '  в rc-файлах строк про BS нет / no BS lines in the rc files\n'; fi
+  case ":${BS_CALLER_PATH:-${PATH}}:" in
+    *":${HOME}/.local/bin:"*) printf '  PATH этой оболочки содержит / contains %s/.local/bin\n' "${HOME}" ;;
+    *) printf '  PATH этой оболочки НЕ содержит / does NOT contain %s/.local/bin\n' "${HOME}" ;;
+  esac
+
+  # --- Данные и кэш ---
+  printf '\n== Данные и кэш / Data and cache ==\n'
+  __bs_cli_wh_datan=0
+  __bs_cli_wh_dseen="|"
+  for __bs_cli_wh_d in "${XDG_CONFIG_HOME:-${HOME}/.config}/bs" "${HOME}/.config/bs" \
+      "${HOME}/.config/bs_frameworks" "${XDG_CACHE_HOME:-${HOME}/.cache}/bs" \
+      "${XDG_STATE_HOME:-${HOME}/.local/state}/bs" "${XDG_DATA_HOME:-${HOME}/.local/share}/bs" \
+      "${BS_BUILD_CACHE_DIR:-}"; do
+    if [ ! -d "${__bs_cli_wh_d}" ]; then continue; fi
+    case "${__bs_cli_wh_dseen}" in
+      *"|${__bs_cli_wh_d}|"*) continue ;;
+    esac
+    __bs_cli_wh_dseen="${__bs_cli_wh_dseen}${__bs_cli_wh_d}|"
+    printf '  %s — %s\n' "${__bs_cli_wh_d}" "$(bs_cli_where_size "${__bs_cli_wh_d}")"
+    __bs_cli_wh_datan=$((__bs_cli_wh_datan + 1))
+  done
+  if [ "${__bs_cli_wh_datan}" -eq 0 ]; then printf '  не найдено / none found\n'; fi
+
+  # --- Переменные окружения ---
+  printf '\n== Переменные окружения / Environment ==\n'
+  __bs_cli_wh_envn=0
+  for __bs_cli_wh_v in BS_SYSTEM_PREFIX BS_UPDATE_REPO BS_BUILD_CACHE_DIR PREFIX BIN_DIR LIB_DIR; do
+    __bs_cli_wh_val=""
+    bs_var_get "${__bs_cli_wh_v}" __bs_cli_wh_val || true
+    if [ -n "${__bs_cli_wh_val}" ]; then
+      printf '  %s=%s\n' "${__bs_cli_wh_v}" "${__bs_cli_wh_val}"
+      __bs_cli_wh_envn=$((__bs_cli_wh_envn + 1))
+    fi
+  done
+  if [ "${__bs_cli_wh_envn}" -eq 0 ]; then
+    printf '  не заданы (BS_ROOT/BS_HOME выставляет сам bs) / none set (BS_ROOT/BS_HOME are set by bs itself)\n'
+  fi
+
+  # --- Итог ---
+  printf '\n== Итог / Summary ==\n'
+  printf '  установок / installs: %d,  репозиториев / checkouts: %d,  bs в PATH / bs in PATH: %d\n' \
+    "${__bs_cli_wh_ninst}" "$(bs_arr_len bs_cli_wh_checkouts)" "$(bs_arr_len bs_cli_wh_hits)"
+  # Разные версии: уникальные, в порядке появления (IFS здесь — пробел)
+  # Different versions: unique, in order of appearance (IFS is a space here)
+  __bs_cli_wh_uniq=""
+  __bs_cli_wh_nuniq=0
+  for __bs_cli_wh_v in ${__bs_cli_wh_versions}; do
+    case " ${__bs_cli_wh_uniq} " in
+      *" ${__bs_cli_wh_v} "*) ;;
+      *)
+        __bs_cli_wh_uniq="${__bs_cli_wh_uniq}${__bs_cli_wh_uniq:+ }${__bs_cli_wh_v}"
+        __bs_cli_wh_nuniq=$((__bs_cli_wh_nuniq + 1)) ;;
+    esac
+  done
+  if [ "${__bs_cli_wh_nuniq}" -gt 1 ]; then
+    bs_cli_where_problem "установки разных версий / installs of different versions: ${__bs_cli_wh_uniq}"
+    bs_cli_where_hint "bs update   (обновит все найденные установки / updates every detected install)"
+  fi
+  if [ -n "${__bs_cli_wh_first}" ] && [ -d "${__bs_cli_wh_first}" ] && [ ! -d "${BS_ROOT}/tests" ] \
+     && [ "$(readlink -f -- "${__bs_cli_wh_first}")" != "$(readlink -f -- "${BS_ROOT}")" ]; then
+    bs_cli_where_problem "сейчас запущена не та копия, что по команде bs: ${BS_ROOT} вместо ${__bs_cli_wh_first} / the running copy is not the one behind \`bs\`"
+  fi
+  # Установка старее найденного репозитория — обновление доступно
+  # An install older than a found checkout — an update is available
+  __bs_cli_wh_c=''
+  __bs_cli_wh_ck=''
+  __bs_cli_wh_ni=$(bs_arr_len bs_cli_wh_ivpaths)
+  __bs_cli_wh_i=0
+  while [ "${__bs_cli_wh_i}" -lt "${__bs_cli_wh_ni}" ]; do
+    bs_arr_get bs_cli_wh_ivpaths "${__bs_cli_wh_i}" __bs_cli_wh_c
+    __bs_cli_wh_i=$((__bs_cli_wh_i + 1))
+    __bs_cli_wh_iv=$(bs_version_of "${__bs_cli_wh_c}")
+    __bs_cli_wh_nk=$(bs_arr_len bs_cli_wh_checkouts)
+    __bs_cli_wh_k=0
+    while [ "${__bs_cli_wh_k}" -lt "${__bs_cli_wh_nk}" ]; do
+      bs_arr_get bs_cli_wh_checkouts "${__bs_cli_wh_k}" __bs_cli_wh_ck
+      __bs_cli_wh_k=$((__bs_cli_wh_k + 1))
+      __bs_cli_wh_cv=$(bs_version_of "${__bs_cli_wh_ck}")
+      if [ -z "${__bs_cli_wh_iv}" ] || [ -z "${__bs_cli_wh_cv}" ]; then continue; fi
+      __bs_cli_wh_cmp=0
+      bs_version_compare "${__bs_cli_wh_iv}" "${__bs_cli_wh_cv}" || __bs_cli_wh_cmp=$?
+      if [ "${__bs_cli_wh_cmp}" -eq 2 ]; then
+        bs_cli_where_problem "установка ${__bs_cli_wh_c} (${__bs_cli_wh_iv}) старее репозитория ${__bs_cli_wh_ck} (${__bs_cli_wh_cv}) / the install ${__bs_cli_wh_c} (${__bs_cli_wh_iv}) is older than the checkout ${__bs_cli_wh_ck} (${__bs_cli_wh_cv})"
+        bs_cli_where_hint "cd ${__bs_cli_wh_ck} && ./bs update --lib ${__bs_cli_wh_c}"
+      fi
+    done
+  done
+  if [ "$(bs_arr_len bs_cli_wh_problems)" -eq 0 ]; then
+    printf '  ✓ всё согласовано / everything looks consistent\n'
+  else
+    printf '  Что вызывает вопросы / What looks wrong:\n'
+    eval "$(bs_arr_to_args bs_cli_wh_problems)"
+    for __bs_cli_wh_p in "$@"; do printf '   • %s\n' "${__bs_cli_wh_p}"; done
+    if [ "$(bs_arr_len bs_cli_wh_hints)" -gt 0 ]; then
+      printf '  Что сделать / What to do:\n'
+      eval "$(bs_arr_to_args bs_cli_wh_hints)"
+      for __bs_cli_wh_p in "$@"; do printf '   → %s\n' "${__bs_cli_wh_p}"; done
+    fi
+  fi
+  return 0
+}
+
 bs_shell_alias bs_cli_die bs::cli::die
 bs_shell_alias bs_cli_help bs::cli::help
 bs_shell_alias bs_cli_help_cmd bs::cli::help_cmd
@@ -1227,3 +1759,9 @@ bs_shell_alias bs_cli_update_missing_lines bs::cli::update_missing_lines
 bs_shell_alias bs_cli_push_lines bs::cli::push_lines
 bs_shell_alias bs_cli_update_box bs::cli::update_box
 bs_shell_alias bs_cli_uninstall_cmd bs::cli::uninstall_cmd
+bs_shell_alias bs_cli_where_row bs::cli::where_row
+bs_shell_alias bs_cli_where_classify bs::cli::where_classify
+bs_shell_alias bs_cli_where_kind_by_path bs::cli::where_kind_by_path
+bs_shell_alias bs_cli_where_size bs::cli::where_size
+bs_shell_alias bs_cli_where_help bs::cli::where_help
+bs_shell_alias bs_cli_where_cmd bs::cli::where_cmd

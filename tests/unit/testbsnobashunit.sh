@@ -4,11 +4,11 @@
 # tests/unit/testbsnobashunit.sh — команда bs на машине БЕЗ bash: ash, dash, ksh, mksh и zsh
 #
 # The `bs` entry point is "@shell posix": with no bash 4.2+ it stays in the current shell and serves the
-# commands that are POSIX already (help, version, env, list, calc, init-shell, shebang, call, doctor, uninstall); the others answer that they need bash,
+# commands that are POSIX already (help, version, env, list, calc, init-shell, shebang, call, doctor, uninstall, where); the others answer that they need bash,
 # with exit code 1. Every bash is hidden behind a mount namespace (unshare -Urm). A machine where the
 # namespace cannot be made is reported, never counted as passed.
 # Точка входа `bs` — "@shell posix": без bash 4.2+ она остаётся в текущей оболочке и обслуживает команды,
-# которые уже на POSIX (help, version, env, list, calc, init-shell, shebang, call, doctor, uninstall); остальные отвечают, что им нужен bash, с кодом 1.
+# которые уже на POSIX (help, version, env, list, calc, init-shell, shebang, call, doctor, uninstall, where); остальные отвечают, что им нужен bash, с кодом 1.
 # Все bash спрятаны через пространство монтирования (unshare -Urm). Если пространство не создаётся,
 # это попадает в отчёт, а не считается пройденным.
 
@@ -57,7 +57,9 @@ if [ -e "\$H/fx/bin" ]; then echo bin-left; else echo bin-gone; fi
 run uninstall > "\$H/un2.txt" 2>&1; echo "uninstall-none=\$?"
 grep -q 'УДАЛЯТЬ НЕЧЕГО' "\$H/un2.txt" && echo nothing-box
 run where > "\$H/where.txt" 2>&1; echo "where=\$?"
-grep -q 'требует bash 4.2+' "\$H/where.txt" && echo where-says-bash
+grep -q '== Итог' "\$H/where.txt" && echo where-summary
+run update > "\$H/update.txt" 2>&1; echo "update=\$?"
+grep -q 'требует bash 4.2+' "\$H/update.txt" && echo update-says-bash
 run nonsense > "\$H/bad.txt" 2>&1; echo "unknown=\$?"
 RUNNER
 }
@@ -88,7 +90,7 @@ main() {
         if [[ ! -x "${sb}/bin/${sh_name}" ]]; then echo "skip: ${sh_name} is not installed — NOT verified / не установлен — НЕ проверено" >&2; continue; fi
         H="${T}/home-${sh_name}"; mkdir -p "${H}"
         out="$(timeout 300 unshare -Urm busybox sh "${T}/runner.sh" "${sh_name}" "${H}" 2>&1 | tr '\n' ' ' | sed 's/ $//')" || true
-        testframework::assert_equal "version=BS Framework version: 0.8.0 help=BS Framework 0.8.0 list=N modules calc=35 init-shell=# BS for dash shebang=#! call=1.5 MiB doctor=0 doctor: N passed, 0 failed uninstall=0 lib-gone bin-gone uninstall-none=1 nothing-box where=1 where-says-bash unknown=1" "${out}" "${sh_name}: version, help, list, calc work; doctor and uninstall work; the rest and an unknown command fail clearly" || true
+        testframework::assert_equal "version=BS Framework version: 0.8.0 help=BS Framework 0.8.0 list=N modules calc=35 init-shell=# BS for dash shebang=#! call=1.5 MiB doctor=0 doctor: N passed, 0 failed uninstall=0 lib-gone bin-gone uninstall-none=1 nothing-box where=0 where-summary update=1 update-says-bash unknown=1" "${out}" "${sh_name}: version, help, list, calc work; doctor, uninstall and where work; the rest and an unknown command fail clearly" || true
     done
     rm -rf "${T:?}"
     testframework::summary
