@@ -28,6 +28,24 @@ test_validate_path_dangerous() {
     done
 }
 
+# Без realpath ".." разбирается лексически: раньше "/tmp/../etc" проходил,
+# и под root доходило до chmod -R над /etc
+# Without realpath ".." is resolved lexically: "/tmp/../etc" used to pass,
+# and under root it reached a chmod -R over /etc
+test_validate_path_without_realpath() {
+    local p out
+    for p in /tmp/../etc /tmp/./../usr/ /var/tmp/../../bin; do
+        out="$(PATH=/nonexistent safety::validate_path "${p}" 2>&1 || true)"
+        testframework::assert_true "'${out}' == *Dangerous* " "without realpath: '${p}' is rejected as dangerous"
+    done
+    out="$(cd /tmp && PATH=/nonexistent safety::validate_path ../etc 2>&1 || true)"
+    testframework::assert_true "'${out}' == *Dangerous* " "without realpath: '../etc' from /tmp is rejected"
+    local tmp
+    tmp="$(mktemp -d)"
+    testframework::assert_command "PATH=/nonexistent safety::validate_path '${tmp}/a/../b'" "without realpath: '..' inside a temp dir is accepted"
+    rm -rf "${tmp}"
+}
+
 test_validate_path_empty() {
     local rc=0
     safety::validate_path "" >/dev/null 2>&1 || rc=$?
@@ -73,6 +91,7 @@ main() {
 
     testframework::section "validate_path"
     test_validate_path_dangerous
+    test_validate_path_without_realpath
     test_validate_path_empty
     test_validate_path_ok
 
