@@ -4,11 +4,11 @@
 # tests/unit/testbsnobashunit.sh — команда bs на машине БЕЗ bash: ash, dash, ksh, mksh и zsh
 #
 # The `bs` entry point is "@shell posix": with no bash 4.2+ it stays in the current shell and serves the
-# commands that are POSIX already (help, version, env, list, calc, init-shell, shebang, call, doctor); the others answer that they need bash,
+# commands that are POSIX already (help, version, env, list, calc, init-shell, shebang, call, doctor, uninstall); the others answer that they need bash,
 # with exit code 1. Every bash is hidden behind a mount namespace (unshare -Urm). A machine where the
 # namespace cannot be made is reported, never counted as passed.
 # Точка входа `bs` — "@shell posix": без bash 4.2+ она остаётся в текущей оболочке и обслуживает команды,
-# которые уже на POSIX (help, version, env, list, calc); остальные отвечают, что им нужен bash, с кодом 1.
+# которые уже на POSIX (help, version, env, list, calc, init-shell, shebang, call, doctor, uninstall); остальные отвечают, что им нужен bash, с кодом 1.
 # Все bash спрятаны через пространство монтирования (unshare -Urm). Если пространство не создаётся,
 # это попадает в отчёт, а не считается пройденным.
 
@@ -34,7 +34,7 @@ for b in \${BASH_PATHS}; do
   [ -e "\$b" ] && mount --bind "${T}/nobash" "\$b" 2>/dev/null
 done
 S=\$1; H=\$2
-run() { env -i HOME="\$H" PATH="${sb}/bin" "${sb}/bin/\$S" "${BS_PROJECT_ROOT}/bs" "\$@"; }
+run() { env -i HOME="\$H" PATH="${sb}/bin" BS_SYSTEM_PREFIX="\$H/nosys" "${sb}/bin/\$S" "${BS_PROJECT_ROOT}/bs" "\$@"; }
 if env -i PATH="${sb}/bin" "${sb}/bin/\$S" -c 'command -v bash' >/dev/null 2>&1; then echo "BASH-STILL-THERE"; exit 3; fi
 for p in /usr/bin/bash /bin/bash; do
   if [ -e "\$p" ]; then o=\$("\$p" -c 'echo BASH-STILL-RUNS' 2>/dev/null); [ "\$o" = BASH-STILL-RUNS ] && { echo BASH-STILL-RUNS; exit 3; }; fi
@@ -48,6 +48,14 @@ echo "shebang=\$(run shebang line --mode portable 2>&1 | head -n 1 | cut -c1-2)"
 echo "call=\$(run call bs_utils_human_size 1536000 2>&1)"
 run doctor > "\$H/doctor.txt" 2>&1; echo "doctor=\$?"
 grep -o 'doctor: [0-9]* passed, 0 failed' "\$H/doctor.txt" | sed 's/[0-9][0-9]*/N/'
+L="\$H/fx/lib/bs"; mkdir -p "\$L/bootstrap" "\$H/fx/bin"; : > "\$L/bs"; : > "\$L/bootstrap/init.sh"
+printf 'export BS_ROOT="%s"\n' "\$L" > "\$H/fx/bin/bs"
+printf 'mode=local\nbin=%s\n' "\$H/fx/bin/bs" > "\$L/.install"
+run uninstall --lib "\$L" > "\$H/un.txt" 2>&1; echo "uninstall=\$?"
+if [ -e "\$L" ]; then echo lib-left; else echo lib-gone; fi
+if [ -e "\$H/fx/bin" ]; then echo bin-left; else echo bin-gone; fi
+run uninstall > "\$H/un2.txt" 2>&1; echo "uninstall-none=\$?"
+grep -q 'УДАЛЯТЬ НЕЧЕГО' "\$H/un2.txt" && echo nothing-box
 run where > "\$H/where.txt" 2>&1; echo "where=\$?"
 grep -q 'требует bash 4.2+' "\$H/where.txt" && echo where-says-bash
 run nonsense > "\$H/bad.txt" 2>&1; echo "unknown=\$?"
@@ -80,7 +88,7 @@ main() {
         if [[ ! -x "${sb}/bin/${sh_name}" ]]; then echo "skip: ${sh_name} is not installed — NOT verified / не установлен — НЕ проверено" >&2; continue; fi
         H="${T}/home-${sh_name}"; mkdir -p "${H}"
         out="$(timeout 300 unshare -Urm busybox sh "${T}/runner.sh" "${sh_name}" "${H}" 2>&1 | tr '\n' ' ' | sed 's/ $//')" || true
-        testframework::assert_equal "version=BS Framework version: 0.8.0 help=BS Framework 0.8.0 list=N modules calc=35 init-shell=# BS for dash shebang=#! call=1.5 MiB doctor=0 doctor: N passed, 0 failed where=1 where-says-bash unknown=1" "${out}" "${sh_name}: version, help, list, calc work; doctor and an unknown command fail clearly" || true
+        testframework::assert_equal "version=BS Framework version: 0.8.0 help=BS Framework 0.8.0 list=N modules calc=35 init-shell=# BS for dash shebang=#! call=1.5 MiB doctor=0 doctor: N passed, 0 failed uninstall=0 lib-gone bin-gone uninstall-none=1 nothing-box where=1 where-says-bash unknown=1" "${out}" "${sh_name}: version, help, list, calc work; doctor and uninstall work; the rest and an unknown command fail clearly" || true
     done
     rm -rf "${T:?}"
     testframework::summary

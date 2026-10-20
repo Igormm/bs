@@ -7,11 +7,11 @@
 # bootstrap/cli.sh — the bs commands that run in any shell (the POSIX part of bs::cli::*)
 #
 # Остальные команды (lang-doc, lsp, chat, api, ts, audit, build, rfc, run, update,
-# uninstall, where, repl) пока в bootstrap/bs.sh на bash; в оболочке
+# where, repl) пока в bootstrap/bs.sh на bash; в оболочке
 # без bash bs_cli_delegate отвечает, что команде нужен bash. Тела функций вызывают ядро и
 # выполняются только после его загрузки.
 # The other commands (lang-doc, lsp, chat, api, ts, audit, build, rfc, run, update,
-# uninstall, where, repl) are still in bootstrap/bs.sh in bash; in a
+# where, repl) are still in bootstrap/bs.sh in bash; in a
 # shell without bash bs_cli_delegate answers that the command needs bash. The function bodies call
 # the kernel and run only after it is loaded.
 #
@@ -19,7 +19,10 @@
 #   Real functions: bs_cli_die, bs_cli_need_bash, bs_cli_delegate, bs_cli_help, bs_cli_help_cmd,
 #   bs_cli_short_sha, bs_cli_install_info_get, bs_cli_update_manifest_valid,
 #   bs_cli_bs_full_info_lines, bs_cli_bs_running_block, bs_cli_version_cmd, bs_cli_env_cmd,
-#   bs_cli_list_cmd, bs_cli_init_shell_*, bs_cli_shebang_*, bs_cli_call_*; in bash and zsh also bs::cli::die, bs::cli::help, … (the old names).
+#   bs_cli_list_cmd, bs_cli_init_shell_*, bs_cli_shebang_*, bs_cli_call_*, bs_cli_doctor_cmd,
+#   bs_cli_uninstall_cmd, and the helpers that update, uninstall and where share (bs_cli_update_box,
+#   bs_cli_update_die, bs_cli_update_missing_lines, bs_cli_bs_running_info, …); in bash and zsh also
+#   bs::cli::die, bs::cli::help, … (the old names).
 #   Настоящие функции — bs_cli_*; в bash и zsh — ещё и прежние bs::cli::die, bs::cli::help, …
 
 # Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
@@ -137,7 +140,7 @@ bs_cli_help_cmd() {
     repl)           printf 'Usage: bs repl\n\nInteractive REPL (BS shell).\n' ;;
     calc)           printf 'Usage: bs calc [expression]\n\nRPN calculator on dc.\n' ;;
     update|sync)    bs_cli_delegate update bs::cli::update_cmd --help ;;
-    uninstall)      bs_cli_delegate uninstall bs::cli::uninstall_cmd --help ;;
+    uninstall)      bs_cli_uninstall_cmd --help ;;
     where)          bs_cli_delegate where bs::cli::where_cmd --help ;;
     init-shell)     bs_cli_init_shell_usage ;;
     shebang)        bs_cli_shebang_usage ;;
@@ -672,6 +675,519 @@ bs_cli_doctor_cmd() {
   return "${__bs_cli_dfail}"
 }
 
+
+# ==========================================================================
+# Общие помощники update / uninstall / where
+# Shared helpers of update / uninstall / where
+# ==========================================================================
+
+# Системный каталог установки; префикс переопределяется BS_SYSTEM_PREFIX
+# (по умолчанию /usr/local) — тесты моделируют system-установку без root.
+# System install directory; the prefix is overridden by BS_SYSTEM_PREFIX
+# (default /usr/local) so tests can model a system install without root.
+bs_cli_update_system_lib() {
+  printf '%s/lib/bs\n' "${BS_SYSTEM_PREFIX:-/usr/local}"
+}
+
+# @private Каталог установки из обёртки `bs` (install.sh пишет в неё
+# export BS_ROOT="..."). Пустой вывод, если файл — не обёртка.
+# @private Install directory named by a `bs` wrapper (install.sh writes
+# export BS_ROOT="..." into it). Empty output if the file is not a wrapper.
+# @param $1 Path to a `bs` executable / Путь к исполняемому `bs`
+bs_cli_update_wrapper_root() {
+  __bs_cli_wn=0
+  while IFS= read -r __bs_cli_wl; do
+    if [ "${__bs_cli_wn}" -ge 5 ]; then break; fi
+    __bs_cli_wn=$((__bs_cli_wn + 1))
+    case "${__bs_cli_wl}" in
+      'export BS_ROOT="'*'"')
+        __bs_cli_wm=${__bs_cli_wl#'export BS_ROOT="'}
+        __bs_cli_wm=${__bs_cli_wm%'"'}
+        case "${__bs_cli_wm}" in
+          ''|*'"'*|*\$*) ;;
+          *)
+            printf '%s\n' "${__bs_cli_wm}"
+            return 0 ;;
+        esac ;;
+    esac
+  done < "$1" 2>/dev/null
+  return 0
+}
+
+# @private Вид запущенной копии: mode из манифеста, source checkout, no manifest.
+# @private Kind of the running copy: manifest mode, source checkout, no manifest.
+bs_cli_bs_running_kind() {
+  __bs_cli_rkm="$(bs_cli_install_info_get "${BS_ROOT}" mode)"
+  if [ -n "${__bs_cli_rkm}" ]; then
+    printf '%s' "${__bs_cli_rkm}"
+  elif [ -e "${BS_ROOT}/.git" ] || [ -d "${BS_ROOT}/tests" ]; then
+    printf 'source checkout'
+  elif [ -e "${BS_ROOT}/.install" ]; then
+    printf 'manifest unreadable'
+  else
+    printf 'no manifest'
+  fi
+}
+
+# @private Компактная сводка запущенной копии (те же данные, что bs version
+# --full): версия | root | вид | коммит | последнее обновление. Только чтение
+# манифеста и git, чужой код не запускается.
+# @private Compact summary of the running copy (same data as bs version
+# --full). Reads the manifest and git only; no foreign code is run.
+bs_cli_bs_running_info() {
+  __bs_cli_rik="$(bs_cli_bs_running_kind)"
+  __bs_cli_rio="bs $(bs_version_get) | ${BS_ROOT} | ${__bs_cli_rik}"
+  if [ "${__bs_cli_rik}" = "source checkout" ]; then
+    if [ -e "${BS_ROOT}/.git" ] && bs_utils_has git; then
+      __bs_cli_ric="$(git -C "${BS_ROOT}" rev-parse --short=7 HEAD 2>/dev/null)" || __bs_cli_ric=""
+      __bs_cli_rid=""
+      if [ -n "$(git -C "${BS_ROOT}" status --porcelain 2>/dev/null)" ]; then __bs_cli_rid=", with uncommitted changes"; fi
+      if [ -n "${__bs_cli_ric}" ]; then __bs_cli_rio="${__bs_cli_rio} | commit ${__bs_cli_ric}${__bs_cli_rid}"; fi
+    fi
+  elif [ -f "${BS_ROOT}/.install" ]; then
+    __bs_cli_ris="$(bs_cli_install_info_get "${BS_ROOT}" source_commit)"
+    __bs_cli_rio="${__bs_cli_rio} | installed $(bs_cli_install_info_get "${BS_ROOT}" installed_at) by $(bs_cli_install_info_get "${BS_ROOT}" installed_by)"
+    __bs_cli_rio="${__bs_cli_rio} | source $(bs_cli_install_info_get "${BS_ROOT}" source) @ $(bs_cli_short_sha "${__bs_cli_ris}")"
+    __bs_cli_riu="$(bs_cli_install_info_get "${BS_ROOT}" updated_at)"
+    if [ -n "${__bs_cli_riu}" ]; then
+      __bs_cli_rio="${__bs_cli_rio} | updated ${__bs_cli_riu} from $(bs_cli_install_info_get "${BS_ROOT}" updated_from) @ $(bs_cli_short_sha "$(bs_cli_install_info_get "${BS_ROOT}" updated_commit)")"
+    fi
+  fi
+  printf '%s' "${__bs_cli_rio}"
+}
+
+# @private Подготовить сводки (один раз за запуск) / prepare summaries once
+bs_cli_update_ctx() {
+  if [ -n "${UPDATE_RUN_INFO:-}" ]; then return 0; fi
+  UPDATE_RUN_INFO="$(bs_cli_bs_running_info)"
+  UPDATE_RUN_BLOCK="$(bs_cli_bs_running_block)"
+  UPDATE_RUN_SHORT="Запущен / Running: ${UPDATE_RUN_INFO}"
+  return 0
+}
+
+# ERROR/WARN с короткой сводкой запущенной копии в конце.
+# ERROR/WARN with the short running-copy summary appended.
+bs_cli_update_die() {
+  bs_cli_update_ctx
+  bs_log_error "$1 (${UPDATE_RUN_SHORT})"
+  bs_exit "${2:-1}"
+}
+
+bs_cli_update_warn() {
+  bs_cli_update_ctx
+  bs_log_warn "$1 (${UPDATE_RUN_SHORT})"
+  return 0
+}
+
+# Значение флага: непустое и не похожее на другой флаг (--ref --github).
+# A flag value: non-empty and not another flag (--ref --github).
+bs_cli_update_flag_value() {
+  __bs_cli_fv_flag=$1
+  __bs_cli_fv_what=$2
+  shift 2
+  __bs_cli_fv_bad=0
+  if [ $# -lt 1 ] || [ -z "$1" ]; then
+    __bs_cli_fv_bad=1
+  else
+    case "$1" in -*) __bs_cli_fv_bad=1 ;; esac
+  fi
+  if [ "${__bs_cli_fv_bad}" = 1 ]; then
+    bs_cli_update_die "update: ${__bs_cli_fv_flag} требует значение / requires ${__bs_cli_fv_what}"
+  fi
+}
+
+bs_cli_update_realpath() {
+  readlink -f -- "$1" 2>/dev/null || printf '%s\n' "$1"
+}
+
+# @private Каталог похож на установку BS: bs + bootstrap/init.sh либо .install.
+# @private The directory looks like a BS install: bs + bootstrap/init.sh or .install.
+bs_cli_update_is_install() {
+  [ -d "$1" ] || return 1
+  if [ -f "$1/bs" ] && [ -f "$1/bootstrap/init.sh" ]; then return 0; fi
+  [ -f "$1/.install" ]
+}
+
+# @private Исходный репозиторий (.git или tests/): не установка / a source checkout
+bs_cli_update_is_checkout() {
+  [ -e "$1/.git" ] || [ -d "$1/tests" ]
+}
+
+# @private Чего не хватает каталогу-источнику (по строке на пункт).
+# @private What a source directory lacks (one item per line).
+bs_cli_update_source_missing() {
+  __bs_cli_sm_d=$1
+  if [ ! -d "${__bs_cli_sm_d}" ]; then
+    printf '%s\n' "каталог не найден / directory not found"
+    return 0
+  fi
+  if [ ! -f "${__bs_cli_sm_d}/bs" ]; then printf '%s\n' "bs"; fi
+  if [ ! -f "${__bs_cli_sm_d}/bootstrap/init.sh" ]; then printf '%s\n' "bootstrap/init.sh"; fi
+  if [ ! -f "${__bs_cli_sm_d}/bootstrap/loader.sh" ]; then printf '%s\n' "bootstrap/loader.sh"; fi
+  for __bs_cli_sm_f in bootstrap/shell.sh bootstrap/trampoline.sh bootstrap/shebang.sh bootstrap/bs.sh core/prereq.sh; do
+    if [ ! -f "${__bs_cli_sm_d}/${__bs_cli_sm_f}" ]; then printf '%s\n' "${__bs_cli_sm_f}"; fi
+  done
+  if [ ! -d "${__bs_cli_sm_d}/core" ]; then printf '%s\n' "core/"; fi
+  if [ ! -d "${__bs_cli_sm_d}/lib" ]; then printf '%s\n' "lib/"; fi
+  if [ ! -f "${__bs_cli_sm_d}/core/version.sh" ]; then
+    printf '%s\n' "core/version.sh"
+  elif [ -z "$(bs_version_of "${__bs_cli_sm_d}")" ]; then
+    printf '%s\n' "core/version.sh: версия не читается / no readable version"
+  fi
+  return 0
+}
+
+# @private Обёртка установки: из манифеста, иначе из пути .../lib/bs.
+# @private The wrapper of an install: from the manifest, else from .../lib/bs.
+bs_cli_update_install_wrapper() {
+  __bs_cli_iw="$(bs_cli_install_info_get "$1" bin)"
+  if [ -z "${__bs_cli_iw}" ]; then
+    case "$1" in
+      */lib/bs) __bs_cli_iw="${1%/lib/bs}/bin/bs" ;;
+    esac
+  fi
+  printf '%s' "${__bs_cli_iw}"
+}
+
+# @private Домашний каталог пользователя SUDO_USER (пусто, если неизвестен).
+# @private Home directory of SUDO_USER (empty if unknown).
+bs_cli_update_sudo_home() {
+  if [ -z "${SUDO_USER:-}" ]; then return 0; fi
+  bs_utils_has getent || return 0
+  getent passwd "${SUDO_USER}" 2>/dev/null | cut -d: -f6 || true
+}
+
+# @private Пояснение, почему цель не найдена, и что делать (строки для рамки).
+# @param $1 Target / цель; $2 kind: local|system|lib|auto
+# @private Why a target is missing and what to do (box lines).
+bs_cli_update_missing_lines() {
+  __bs_cli_ml_t=$1
+  __bs_cli_ml_kind=$2
+  __bs_cli_ml_verb=${3:-update}
+  __bs_cli_ml_sys="$(bs_cli_update_system_lib)"
+  __bs_cli_ml_loc="${HOME}/.local/lib/bs"
+  case "${__bs_cli_ml_kind}" in
+    local)
+      printf '%s\n' "• ${__bs_cli_ml_t} — локальной установки нет / no local install"
+      if bs_cli_update_is_install "${__bs_cli_ml_sys}" && ! bs_cli_update_is_checkout "${__bs_cli_ml_sys}"; then
+        __bs_cli_ml_ver="$(bs_version_of "${__bs_cli_ml_sys}")"
+        printf '%s\n' "  но найдена системная / but a system install exists: ${__bs_cli_ml_sys} (версия/version ${__bs_cli_ml_ver:-?})" \
+          "  → bs ${__bs_cli_ml_verb} --system   или / or   bs ${__bs_cli_ml_verb}"
+      else
+        printf '%s\n' "  BS не установлена / BS is not installed → ./install.sh --local"
+      fi
+      if [ "$(bs_cli_euid)" -eq 0 ] || [ -n "${SUDO_USER:-}" ]; then
+        printf '%s\n' "  вы root/sudo (HOME=${HOME}): ~ — это домашний каталог root / you run as root: ~ is root's home"
+        __bs_cli_ml_sh="$(bs_cli_update_sudo_home)"
+        if [ -n "${__bs_cli_ml_sh}" ] && [ "${__bs_cli_ml_sh}" != "${HOME}" ]; then
+          printf '%s\n' "  установка пользователя ${SUDO_USER} / its local install: ${__bs_cli_ml_sh}/.local/lib/bs" \
+            "  → bs ${__bs_cli_ml_verb} --lib ${__bs_cli_ml_sh}/.local/lib/bs"
+        fi
+      fi ;;
+    system)
+      printf '%s\n' "• ${__bs_cli_ml_t} — системной установки нет / no system install"
+      if bs_cli_update_is_install "${__bs_cli_ml_loc}" && ! bs_cli_update_is_checkout "${__bs_cli_ml_loc}"; then
+        __bs_cli_ml_ver="$(bs_version_of "${__bs_cli_ml_loc}")"
+        printf '%s\n' "  но найдена локальная / but a local install exists: ${__bs_cli_ml_loc} (версия/version ${__bs_cli_ml_ver:-?})" \
+          "  → bs ${__bs_cli_ml_verb} --local   или / or   bs ${__bs_cli_ml_verb}"
+      else
+        printf '%s\n' "  BS не установлена / BS is not installed → ./install.sh --local  (sudo ./install.sh)"
+      fi ;;
+    *)
+      printf '%s\n' "• ${__bs_cli_ml_t} — каталог не найден / directory not found" \
+        "  проверьте путь (обычно …/lib/bs) / check the path (usually …/lib/bs)" \
+        "  установить / install: PREFIX=<dir> ./install.sh   или / or   ./install.sh --local" ;;
+  esac
+}
+
+# @private Добавить строки текста в массив (построчно) / Append the lines of a text to an array
+# @param $1 array name / имя массива
+# @param $2 text / текст
+bs_cli_push_lines() {
+  if [ -z "${2-}" ]; then return 0; fi
+  __bs_cli_pl_name=$1
+  bs_arr_from_lines bs_cli_pushtmp "$2"
+  eval "$(bs_arr_to_args bs_cli_pushtmp)"
+  bs_arr_push "${__bs_cli_pl_name}" "$@"
+}
+
+# @private Рамка-уведомление БЕЗ лог-префиксов — таймстампы ломают рамку
+# (bs_log_header страдает этим при включённых таймстампах).
+# @private Boxed notice printed WITHOUT log prefixes — timestamps would
+# break the frame (bs_log_header suffers from this in timestamped output).
+# @param $1 Title / Заголовок
+# @param $@ Body lines, hard-wrapped at inner width / Строки тела с переносом
+bs_cli_update_box() {
+  __bs_cli_ub_title=$1
+  shift
+  __bs_cli_ub_inner=58
+  # Первая строка тела — какая копия bs печатает это уведомление.
+  # First body line: which bs copy prints this notice.
+  bs_cli_update_ctx
+  bs_arr_from_lines bs_cli_ub_rows "${UPDATE_RUN_BLOCK}"
+  bs_arr_push bs_cli_ub_rows ""
+  bs_arr_push bs_cli_ub_rows "$@"
+  bs_arr_clear bs_cli_ub_body
+  eval "$(bs_arr_to_args bs_cli_ub_rows)"
+  for __bs_cli_ub_text in "$@"; do
+    while [ "$(bs_str_width "${__bs_cli_ub_text}")" -gt "${__bs_cli_ub_inner}" ]; do
+      __bs_cli_ub_chunk=$(bs_str_head "${__bs_cli_ub_text}" "${__bs_cli_ub_inner}")
+      bs_arr_push bs_cli_ub_body "${__bs_cli_ub_chunk}"
+      __bs_cli_ub_text=${__bs_cli_ub_text#"${__bs_cli_ub_chunk}"}
+    done
+    bs_arr_push bs_cli_ub_body "${__bs_cli_ub_text}"
+  done
+
+  __bs_cli_ub_cb=''
+  __bs_cli_ub_cr=''
+  if bs_log_is_color_enabled 1; then
+    __bs_cli_ub_cb=$(printf '\033[34m')
+    __bs_cli_ub_cr=$(printf '\033[0m')
+  fi
+  __bs_cli_ub_rule=$(bs_str_repeat '─' "${__bs_cli_ub_inner}")
+  __bs_cli_ub_tw=$(bs_str_width "${__bs_cli_ub_title}")
+  __bs_cli_ub_pad=$((__bs_cli_ub_inner - __bs_cli_ub_tw))
+  __bs_cli_ub_pad=$((__bs_cli_ub_pad / 2))
+  # слишком длинный заголовок: прежний printf '%*s' с отрицательной шириной давал |ширину| пробелов
+  # a title wider than the frame: the old printf '%*s' with a negative width gave |width| spaces
+  if [ "${__bs_cli_ub_pad}" -lt 0 ]; then __bs_cli_ub_pad=$((0 - __bs_cli_ub_pad)); fi
+  __bs_cli_ub_row="$(bs_str_repeat ' ' "${__bs_cli_ub_pad}")${__bs_cli_ub_title}"
+
+  # Паддинг по символам: printf '%-*s' считает БАЙТЫ и ломает кириллицу.
+  # Pad by CHARACTERS: printf '%-*s' measures BYTES and breaks Cyrillic.
+  __bs_cli_ub_w=$(bs_str_width "${__bs_cli_ub_row}")
+  __bs_cli_ub_n=$((__bs_cli_ub_inner - __bs_cli_ub_w))
+  if [ "${__bs_cli_ub_n}" -gt 0 ]; then
+    __bs_cli_ub_row="${__bs_cli_ub_row}$(bs_str_repeat ' ' "${__bs_cli_ub_n}")"
+  fi
+  printf '%s╭%s╮%s\n' "${__bs_cli_ub_cb}" "${__bs_cli_ub_rule}" "${__bs_cli_ub_cr}"
+  printf '%s│%s│%s\n' "${__bs_cli_ub_cb}" "${__bs_cli_ub_row}" "${__bs_cli_ub_cr}"
+  printf '%s├%s┤%s\n' "${__bs_cli_ub_cb}" "${__bs_cli_ub_rule}" "${__bs_cli_ub_cr}"
+  eval "$(bs_arr_to_args bs_cli_ub_body)"
+  for __bs_cli_ub_line in "$@"; do
+    __bs_cli_ub_w=$(bs_str_width "${__bs_cli_ub_line}")
+    __bs_cli_ub_n=$((__bs_cli_ub_inner - __bs_cli_ub_w))
+    if [ "${__bs_cli_ub_n}" -gt 0 ]; then
+      __bs_cli_ub_line="${__bs_cli_ub_line}$(bs_str_repeat ' ' "${__bs_cli_ub_n}")"
+    fi
+    printf '%s│%s│%s\n' "${__bs_cli_ub_cb}" "${__bs_cli_ub_line}" "${__bs_cli_ub_cr}"
+  done
+  printf '%s╰%s╯%s\n' "${__bs_cli_ub_cb}" "${__bs_cli_ub_rule}" "${__bs_cli_ub_cr}"
+}
+
+# @private Эффективный uid: EUID там, где он есть (bash, zsh, ksh), иначе id -u.
+# @private The effective uid: EUID where the shell has it (bash, zsh, ksh), else id -u.
+bs_cli_euid() {
+  if [ -n "${EUID:-}" ]; then
+    printf '%s\n' "${EUID}"
+  else
+    id -u
+  fi
+}
+
+# bs uninstall: удалить установленные копии BS (каталог lib + обёртка)
+# bs uninstall: remove installed BS copies (lib tree + wrapper)
+bs_cli_uninstall_cmd() {
+  bs_arr_clear bs_cli_un_targets
+  bs_arr_clear bs_cli_un_kinds
+  bs_arr_clear bs_cli_un_skipped
+  __bs_cli_un_explicit=0
+  __bs_cli_un_verbose=0
+  __bs_cli_un_banner=1
+  for __bs_cli_un_a in "$@"; do
+    case "${__bs_cli_un_a}" in
+      -h|--help) __bs_cli_un_banner=0 ;;
+    esac
+  done
+  bs_cli_update_ctx
+  if [ "${__bs_cli_un_banner}" -ne 0 ]; then printf '%s\n' "${UPDATE_RUN_BLOCK}"; fi
+
+  while [ $# -gt 0 ]; do
+    case "${1:-}" in
+      --local)
+        __bs_cli_un_explicit=1
+        bs_arr_push bs_cli_un_targets "${HOME:-}/.local/lib/bs"
+        bs_arr_push bs_cli_un_kinds local
+        shift ;;
+      --system)
+        __bs_cli_un_explicit=1
+        bs_arr_push bs_cli_un_targets "$(bs_cli_update_system_lib)"
+        bs_arr_push bs_cli_un_kinds system
+        shift ;;
+      --lib)
+        shift
+        bs_cli_update_flag_value "--lib" "a target directory" "$@"
+        __bs_cli_un_explicit=1
+        bs_arr_push bs_cli_un_targets "$1"
+        bs_arr_push bs_cli_un_kinds lib
+        shift ;;
+      -v|--verbose)
+        __bs_cli_un_verbose=1
+        shift ;;
+      -h|--help)
+        printf 'Использование / Usage: bs uninstall [--local] [--system] [--lib DIR] [-v]\n\n'
+        printf 'Удаляет установленные копии BS (каталог lib + обёртка).\n'
+        printf 'Removes installed BS copies (lib tree + wrapper).\n'
+        printf '  --local   ~/.local/lib/bs and its wrapper in ~/.local/bin\n'
+        # shellcheck disable=SC2016
+        printf '  --system  $BS_SYSTEM_PREFIX/lib/bs (default /usr/local) and its wrapper (needs root)\n'
+        printf '  --lib DIR a custom install directory\n'
+        printf 'Without flags: every detected install (local + system).\n'
+        printf 'Safety / Безопасность: only directories that are unmistakably BS installs\n'
+        printf '(bs + bootstrap/init.sh) are removed; a source checkout (.git/tests) is\n'
+        printf 'refused; a wrapper is deleted only when it points back at the target.\n'
+        printf 'Every notice shows which bs copy printed it. Removing the copy bs runs\n'
+        printf 'from is allowed and announced. Exit code 1 if nothing could be removed.\n'
+        printf 'PATH lines in rc files are cleaned by: ./install.sh --local uninstall\n'
+        return 0 ;;
+      *)
+        bs_cli_update_die "uninstall: неизвестный аргумент / unknown argument: $1 (bs uninstall --help)" ;;
+    esac
+  done
+
+  # Детект установок / Detect installs
+  if [ "${__bs_cli_un_explicit}" -eq 0 ]; then
+    if [ -d "${HOME:-}/.local/lib/bs" ]; then
+      bs_arr_push bs_cli_un_targets "${HOME:-}/.local/lib/bs"
+      bs_arr_push bs_cli_un_kinds auto
+    fi
+    if [ -d "$(bs_cli_update_system_lib)" ]; then
+      bs_arr_push bs_cli_un_targets "$(bs_cli_update_system_lib)"
+      bs_arr_push bs_cli_un_kinds auto
+    fi
+  fi
+
+  __bs_cli_un_count=$(bs_arr_len bs_cli_un_targets)
+  if [ "${__bs_cli_un_count}" -eq 0 ]; then
+    bs_cli_update_box "УДАЛЯТЬ НЕЧЕГО / NOTHING TO UNINSTALL" \
+      "Установок BS не найдено / no BS installs found." \
+      "Укажите каталог / point to one: bs uninstall --lib DIR"
+    exit 1
+  fi
+
+  __bs_cli_un_ok=0
+  __bs_cli_un_seen=""
+  __bs_cli_un_idx=0
+  while [ "${__bs_cli_un_idx}" -lt "${__bs_cli_un_count}" ]; do
+    __bs_cli_un_raw=''
+    __bs_cli_un_kind=''
+    bs_arr_get bs_cli_un_targets "${__bs_cli_un_idx}" __bs_cli_un_raw
+    bs_arr_get bs_cli_un_kinds "${__bs_cli_un_idx}" __bs_cli_un_kind
+    __bs_cli_un_idx=$((__bs_cli_un_idx + 1))
+    __bs_cli_un_tin=${__bs_cli_un_raw%/}
+    if [ ! -d "${__bs_cli_un_tin}" ]; then
+      bs_cli_push_lines bs_cli_un_skipped "$(bs_cli_update_missing_lines "${__bs_cli_un_tin}" "${__bs_cli_un_kind}" uninstall)"
+      continue
+    fi
+    __bs_cli_un_target=$(bs_cli_update_realpath "${__bs_cli_un_tin}")
+    case "${__bs_cli_un_seen}" in
+      *"|${__bs_cli_un_target}|"*) continue ;;
+    esac
+    __bs_cli_un_seen="${__bs_cli_un_seen} |${__bs_cli_un_target}|"
+    # Безопасность: удаляем только каталоги, которые однозначно являются BS
+    # Safety: only remove directories that are unmistakably BS installs
+    if [ ! -f "${__bs_cli_un_target}/bs" ] || [ ! -f "${__bs_cli_un_target}/bootstrap/init.sh" ]; then
+      bs_arr_push bs_cli_un_skipped "• ${__bs_cli_un_target} — не установка BS (нет bs + bootstrap/init.sh); не тронут / not a BS install; left untouched"
+      continue
+    fi
+    # Никогда не удалять исходный чекаут: у него есть .git или tests/.
+    # Never remove the source checkout: it has .git or tests/.
+    if [ -e "${__bs_cli_un_target}/.git" ] || [ -d "${__bs_cli_un_target}/tests" ]; then
+      bs_arr_push bs_cli_un_skipped "• ${__bs_cli_un_target} — исходный репозиторий (.git/tests), не установка; не тронут / source checkout; refusing to remove"
+      continue
+    fi
+    # Обёртка — из манифеста, иначе выводится из пути .../lib/bs.
+    # The wrapper comes from the manifest, else from a .../lib/bs path.
+    __bs_cli_un_wrapper=$(bs_cli_update_install_wrapper "${__bs_cli_un_target}")
+    # lib задан симлинком и манифест без bin=: путь обёртки выводится из него
+    # lib given as a symlink and a manifest without bin=: derive it from the link
+    if [ -z "${__bs_cli_un_wrapper}" ]; then
+      __bs_cli_un_wrapper=$(bs_cli_update_install_wrapper "${__bs_cli_un_tin}")
+    fi
+    __bs_cli_un_bin=${__bs_cli_un_wrapper%/*}
+    __bs_cli_un_mine=0
+    if [ -n "${__bs_cli_un_wrapper}" ] && [ -f "${__bs_cli_un_wrapper}" ]; then
+      if grep -Fq "BS_ROOT=\"${__bs_cli_un_target}\"" "${__bs_cli_un_wrapper}" 2>/dev/null; then
+        __bs_cli_un_mine=1
+      else
+        # Обёртка может называть lib через симлинк (~/.local/lib/bs -> ...):
+        # сравниваем и заданный путь, и реальный.
+        # The wrapper may name the lib through a symlink: compare both the
+        # given path and the real one.
+        __bs_cli_un_wroot=$(bs_cli_update_wrapper_root "${__bs_cli_un_wrapper}")
+        if [ -n "${__bs_cli_un_wroot}" ]; then
+          if [ "${__bs_cli_un_wroot%/}" = "${__bs_cli_un_tin}" ] \
+             || [ "$(bs_cli_update_realpath "${__bs_cli_un_wroot}")" = "${__bs_cli_un_target}" ]; then
+            __bs_cli_un_mine=1
+          fi
+        fi
+      fi
+    fi
+    __bs_cli_un_denied=0
+    if [ ! -w "${__bs_cli_un_target%/*}" ]; then __bs_cli_un_denied=1; fi
+    if [ "${__bs_cli_un_mine}" -eq 1 ] && [ ! -w "${__bs_cli_un_bin}" ]; then __bs_cli_un_denied=1; fi
+    if [ "${__bs_cli_un_denied}" -eq 1 ]; then
+      bs_arr_push bs_cli_un_skipped "• ${__bs_cli_un_target} — нет прав на удаление / no permission to remove (try: sudo bs uninstall --system)"
+      continue
+    fi
+    bs_log_info "uninstalling ${__bs_cli_un_target}"
+    if [ "${__bs_cli_un_target}" = "$(bs_cli_update_realpath "${BS_ROOT}")" ]; then
+      bs_log_info "uninstall: удаляется копия, из которой запущен bs — это нормально / removing the copy bs runs from — this is fine"
+    fi
+    __bs_cli_un_removed=0
+    if [ "${__bs_cli_un_mine}" -eq 0 ] && [ -n "${__bs_cli_un_wrapper}" ] && [ -f "${__bs_cli_un_wrapper}" ]; then
+      bs_cli_update_warn "uninstall: wrapper not matching this install, left in place: ${__bs_cli_un_wrapper} / обёртка не от этой установки, оставлена"
+    fi
+
+    # rm -rf на защищённый target безопасен: выше проверено, что это настоящая
+    # BS-установка, не чекаут и записываемый каталог.
+    # Обёртку удаляем ПОСЛЕ каталога: при сбое rm остаётся рабочая команда bs,
+    # и удаление можно повторить.
+    # rm -rf on the guarded target is safe: it is a real BS install, not a
+    # checkout, and writable. The wrapper goes AFTER the directory: if rm
+    # fails, a working bs command is left and the removal can be retried.
+    if ! rm -rf -- "${__bs_cli_un_target}"; then
+      bs_arr_push bs_cli_un_skipped "• ${__bs_cli_un_target} — удаление не удалось (часть файлов могла быть удалена; обёртка оставлена; остаток удалите вручную) / removal failed (some files may be gone; the wrapper is kept; remove the rest by hand)"
+      continue
+    fi
+    if [ "${__bs_cli_un_verbose}" -eq 1 ]; then
+      bs_log_info "  removed: ${__bs_cli_un_target}"
+    fi
+    # Симлинк на каталог установки больше никуда не ведёт: убираем и его
+    # The symlink to the install directory points nowhere now: drop it too
+    if [ -L "${__bs_cli_un_tin}" ]; then
+      rm -f -- "${__bs_cli_un_tin}" || true
+    fi
+    if [ "${__bs_cli_un_mine}" -eq 1 ]; then
+      rm -f -- "${__bs_cli_un_wrapper}"
+      __bs_cli_un_removed=1
+      if [ "${__bs_cli_un_verbose}" -eq 1 ]; then
+        bs_log_info "  removed: ${__bs_cli_un_wrapper}"
+      fi
+    fi
+    # rmdir удаляет только пустой bin_dir; чужие файлы не трогаются.
+    # rmdir removes only an empty bin_dir; foreign files are never touched.
+    if [ "${__bs_cli_un_removed}" -ne 0 ]; then
+      rmdir -- "${__bs_cli_un_bin}" 2>/dev/null || true
+    fi
+    __bs_cli_un_ok=1
+  done
+
+  if [ "${__bs_cli_un_ok}" -eq 0 ]; then
+    eval "$(bs_arr_to_args bs_cli_un_skipped)"
+    bs_cli_update_box "НИЧЕГО НЕ УДАЛЕНО / NOTHING REMOVED" "$@"
+    exit 1
+  fi
+  __bs_cli_un_nskip=$(bs_arr_len bs_cli_un_skipped)
+  if [ "${__bs_cli_un_nskip}" -gt 0 ]; then
+    eval "$(bs_arr_to_args bs_cli_un_skipped)"
+    bs_cli_update_box "ЧАСТЬ ПРОПУЩЕНА / SOME TARGETS SKIPPED" "$@"
+  fi
+  bs_log_success "uninstall done"
+  if [ "${__bs_cli_un_nskip}" -ne 0 ]; then exit 1; fi
+  return 0
+}
+
 bs_shell_alias bs_cli_die bs::cli::die
 bs_shell_alias bs_cli_help bs::cli::help
 bs_shell_alias bs_cli_help_cmd bs::cli::help_cmd
@@ -692,3 +1208,22 @@ bs_shell_alias bs_cli_shebang_cmd bs::cli::shebang_cmd
 bs_shell_alias bs_cli_call_usage bs::cli::call_usage
 bs_shell_alias bs_cli_call_cmd bs::cli::call_cmd
 bs_shell_alias bs_cli_doctor_cmd bs::cli::doctor_cmd
+bs_shell_alias bs_cli_euid bs::cli::euid
+bs_shell_alias bs_cli_update_system_lib bs::cli::update_system_lib
+bs_shell_alias bs_cli_update_wrapper_root bs::cli::update_wrapper_root
+bs_shell_alias bs_cli_bs_running_kind bs::cli::bs_running_kind
+bs_shell_alias bs_cli_bs_running_info bs::cli::bs_running_info
+bs_shell_alias bs_cli_update_ctx bs::cli::update_ctx
+bs_shell_alias bs_cli_update_die bs::cli::update_die
+bs_shell_alias bs_cli_update_warn bs::cli::update_warn
+bs_shell_alias bs_cli_update_flag_value bs::cli::update_flag_value
+bs_shell_alias bs_cli_update_realpath bs::cli::update_realpath
+bs_shell_alias bs_cli_update_is_install bs::cli::update_is_install
+bs_shell_alias bs_cli_update_is_checkout bs::cli::update_is_checkout
+bs_shell_alias bs_cli_update_source_missing bs::cli::update_source_missing
+bs_shell_alias bs_cli_update_install_wrapper bs::cli::update_install_wrapper
+bs_shell_alias bs_cli_update_sudo_home bs::cli::update_sudo_home
+bs_shell_alias bs_cli_update_missing_lines bs::cli::update_missing_lines
+bs_shell_alias bs_cli_push_lines bs::cli::push_lines
+bs_shell_alias bs_cli_update_box bs::cli::update_box
+bs_shell_alias bs_cli_uninstall_cmd bs::cli::uninstall_cmd

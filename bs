@@ -215,7 +215,7 @@ case "${1:-help}" in
   lsp)            shift; bs_cli_delegate lsp bs::cli::lsp_cmd "$@" ;;
   chat)           shift; bs_cli_delegate chat bs::cli::chat_cmd "$@" ;;
   update)         shift; bs_cli_delegate update bs::cli::update_cmd "$@" ;;
-  uninstall)      shift; bs_cli_delegate uninstall bs::cli::uninstall_cmd "$@" ;;
+  uninstall)      shift; bs_cli_uninstall_cmd "$@" ;;
   where)          shift; bs_cli_delegate where bs::cli::where_cmd "$@" ;;
   sync)           shift; bs_log_warn "sync is deprecated — use: bs update"; bs_cli_delegate update bs::cli::update_cmd "$@" ;;
   rfc)            shift; bs_cli_delegate rfc bs::cli::rfc_cmd "$@" ;;
