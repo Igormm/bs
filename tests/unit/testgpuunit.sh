@@ -303,8 +303,9 @@ test_install_dependencies() {
 
     local -a fake_all=(lspci nvidia-smi glxinfo vulkaninfo nvtop radeontop amdgpu_top intel_gpu_top rocm-smi glmark2 vkcube glxgears gpu-burn vkmark vulkan-memtest)
     local -a FAKE_TOOLS=("${fake_all[@]}")
-    local -r saved_has="$(declare -f utils::has)"
-    utils::has() { local IFS=" "; [[ " ${FAKE_TOOLS[*]} " == *" ${1} "* ]]; }
+    # подмена по настоящему имени: is::command зовёт bs_utils_has, а utils::has — его псевдоним / mock by the real name: is::command calls bs_utils_has, utils::has is its alias
+    local -r saved_has="$(declare -f bs_utils_has)"
+    bs_utils_has() { local IFS=" "; [[ " ${FAKE_TOOLS[*]} " == *" ${1} "* ]]; }
 
     local capture="${root}/captured"
     system::packages::install() { printf '%s\n' "$*" > "${capture}"; return 0; }
