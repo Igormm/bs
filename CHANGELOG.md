@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.9.1] - 2026-10-21 "Lingoa"
+
+### Changed
+- perf(startup): lightweight commands (`help`, `version`, `env`, `list`, `init-shell`, `shebang`) load a minimal kernel (11 modules, no `config`/`deps`/`args`); `run` and the shebang mode no longer load the kernel in the outer process and again in the child. Measured on this machine: `bs version` ~0.38 s instead of ~0.58 s, `bs run` ~0.66 s instead of ~1.07 s. `@depends` is read from the module header only, the `::` alias support is cached once, and the data/config/prereq hot paths avoid extra subshells and repeated key encoding.
+- refactor(bootstrap): the early run/shebang exec moved to `bs_cli_maybe_exec_script` in `bootstrap/cli.sh`; the `@depends` header scan is `bs_load_scan_depends`; the kernel module lists are loaded through `bs_kernel_load_modules`; `bs_arr_copy` copies slots through the regular helpers. Behaviour and startup numbers are unchanged by this readability pass.
+
+### Fixed
+- fix(loader): in POSIX kernel mode a `lib/` module with `@shell bash4` is refused before it is sourced, with a bilingual message and an `apk add bash` hint, instead of failing with a syntax error; `@shell posix` `lib/` modules are allowed and `core/` is always allowed.
+- fix(cli): no early `exec bash` when bash 4.2+ is absent — `bs run` falls through to `bs_cli_need_bash`, so Alpine without bash gets the explicit "install bash" message.
+- test(sshd): the render check no longer uses `grep -q` under `pipefail` (SIGPIPE from the early-closing pipe made it flaky); the unit test now runs the pipeline to EOF.
+
 ## [0.9.0] - 2026-10-21 "Lingoa"
 
 ### Added
