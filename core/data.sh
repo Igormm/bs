@@ -111,11 +111,17 @@ bs_data_drop_at() {
   eval "unset __bs_dat_a_${1}__${2}"
 }
 
-# @description Взять строку в одинарные кавычки так, чтобы eval вернул её как есть / Single-quote a string so eval gives it back unchanged
+# @private
+# @description Взять строку в одинарные кавычки в __bs_dat_qo (без вывода) / Single-quote a string into __bs_dat_qo (no output)
 # @param $1 string / строка
-# @stdout quoted string / строка в кавычках
-bs_quote() {
+bs_quote_to() {
   __bs_dat_qs=${1-}
+  # Частый случай — без апострофов: кавычить нечего / common case — no single
+  # quotes: nothing to escape
+  case "$__bs_dat_qs" in
+    *\'*) ;;
+    *) __bs_dat_qo=$__bs_dat_qs; return 0 ;;
+  esac
   __bs_dat_qo=''
   while :; do
     case "$__bs_dat_qs" in
@@ -127,6 +133,13 @@ bs_quote() {
         break ;;
     esac
   done
+}
+
+# @description Взять строку в одинарные кавычки так, чтобы eval вернул её как есть / Single-quote a string so eval gives it back unchanged
+# @param $1 string / строка
+# @stdout quoted string / строка в кавычках
+bs_quote() {
+  bs_quote_to "${1-}"
   printf "'%s'" "$__bs_dat_qo"
 }
 
@@ -376,9 +389,11 @@ bs_arr_join() {
   printf '%s\n' "$__bs_dat_acc"
 }
 
-# @description Напечатать команду «set -- элементы» для eval: eval "$(bs_arr_to_args NAME)" / Print a "set -- elements" command for eval
+# @private
+# @description Собрать команду «set -- элементы» в переменную (без подоболочки) / Build a "set -- elements" command into a variable (no subshell)
 # @param $1 name / имя
-bs_arr_to_args() {
+# @param $2 result variable / переменная результата
+bs_arr_to_args_to() {
   bs_data_check "$1" || return 2
   __bs_dat_nm=$1
   bs_data_len_of "$__bs_dat_nm"
@@ -386,10 +401,20 @@ bs_arr_to_args() {
   __bs_dat_i=0
   while [ "$__bs_dat_i" -lt "$__bs_dat_n" ]; do
     bs_data_get_at "$__bs_dat_nm" "$__bs_dat_i"
-    __bs_dat_acc="${__bs_dat_acc} $(bs_quote "$__bs_dat_cur")"
+    # bs_quote_to кладёт результат в __bs_dat_qo; без $( ) на каждый элемент
+    # bs_quote_to puts the result in __bs_dat_qo; no $( ) per element
+    bs_quote_to "$__bs_dat_cur"
+    __bs_dat_acc="${__bs_dat_acc} '${__bs_dat_qo}'"
     __bs_dat_i=$((__bs_dat_i + 1))
   done
-  printf '%s\n' "$__bs_dat_acc"
+  bs_var_set "${2:?result variable required}" "$__bs_dat_acc"
+}
+
+# @description Напечатать команду «set -- элементы» для eval: eval "$(bs_arr_to_args NAME)" / Print a "set -- elements" command for eval
+# @param $1 name / имя
+bs_arr_to_args() {
+  bs_arr_to_args_to "$1" __bs_dat_args || return
+  printf '%s\n' "$__bs_dat_args"
 }
 
 # @description Разбить текст по строкам в массив / Split text into lines into an array
@@ -424,8 +449,22 @@ bs_arr_copy() {
   bs_data_check "$2" || return 2
   __bs_dat_src=$1
   __bs_dat_dst=$2
-  eval "$(bs_arr_to_args "$__bs_dat_src")"
-  bs_arr_new "$__bs_dat_dst" "$@"
+  [ "$__bs_dat_src" = "$__bs_dat_dst" ] && return 0
+  # Копируем слоты через штатные помощники: без строки «set -- …» и без
+  # повторного кавычения каждого элемента (раньше был fork на элемент).
+  # Copy the slots via the regular helpers: no "set -- …" string and no
+  # re-quoting of every element (that used to fork per element).
+  bs_arr_clear "$__bs_dat_dst"
+  bs_data_len_of "$__bs_dat_src"
+  __bs_dat_cnt=$__bs_dat_n
+  __bs_dat_i=0
+  while [ "$__bs_dat_i" -lt "$__bs_dat_cnt" ]; do
+    bs_data_get_at "$__bs_dat_src" "$__bs_dat_i"
+    bs_data_put_at "$__bs_dat_dst" "$__bs_dat_i" "$__bs_dat_cur"
+    __bs_dat_i=$((__bs_dat_i + 1))
+  done
+  bs_data_set_len "$__bs_dat_dst" "$__bs_dat_cnt"
+  return 0
 }
 
 # @description Вызвать команду для каждого элемента: КОМАНДА ЭЛЕМЕНТ / Call a command for each element: COMMAND ELEMENT
@@ -501,10 +540,14 @@ bs_map_set() {
   __bs_dat_mn=$1
   __bs_dat_mk=${2-}
   __bs_dat_mv=${3-}
-  if ! bs_map_has "$__bs_dat_mn" "$__bs_dat_mk"; then
+  # bs_map_var один раз: bs_map_has кодировал ключ повторно, а bs_map_var
+  # снова его кодировал после возврата.
+  # bs_map_var once: bs_map_has encoded the key again, and bs_map_var
+  # encoded it once more after it returned.
+  bs_map_var "$__bs_dat_mn" "$__bs_dat_mk"
+  if ! bs_data_var_is_set; then
     bs_arr_push "mk_${__bs_dat_mn}" "$__bs_dat_mk"
   fi
-  bs_map_var "$__bs_dat_mn" "$__bs_dat_mk"
   bs_data_var_write "$__bs_dat_mv"
 }
 
@@ -532,8 +575,11 @@ bs_map_get() {
 # @param $3 variable name / имя переменной
 bs_map_get_to() {
   bs_data_check "$1" || return 2
-  bs_map_has "$1" "${2-}" || return 1
-  eval "__bs_dat_out=\${${__bs_dat_var}}"
+  # bs_map_var один раз вместо bs_map_has + повторного кодирования ключа
+  # bs_map_var once instead of bs_map_has + encoding the key again
+  bs_map_var "$1" "${2-}"
+  bs_data_var_is_set || return 1
+  bs_data_var_read
   bs_data_ret "${3-}"
 }
 

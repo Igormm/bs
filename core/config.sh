@@ -147,12 +147,8 @@ bs_config_load_file() {
 }
 
 # @private
-# shellcheck disable=SC2120  # заменяет позиционные параметры списком ключей / replaces the positional parameters with the key list
-# @description Export non-empty configuration values to the environment.
-# @description Экспортировать непустые значения конфигурации в окружение.
-bs_config_export_to_env() {
-  bs_map_keys_to bs_config bscfgkeys
-  eval "$(bs_arr_to_args bscfgkeys)"
+# @description Export non-empty values for the keys in the positional parameters / Экспортировать непустые значения для ключей из позиционных параметров
+bs_config_export_keys() {
   for __bs_cf_key in "$@"; do
     bs_map_get_to bs_config "$__bs_cf_key" __bs_cf_val || continue
     # bs_var_set отказывает негодному имени (статус 2): export такого имени завершил бы dash / bs_var_set refuses a bad name (status 2): export of such a name would end dash
@@ -160,6 +156,17 @@ bs_config_export_to_env() {
       export "${__bs_cf_key?}"
     fi
   done
+}
+
+# @private
+# shellcheck disable=SC2120  # заменяет позиционные параметры списком ключей / replaces the positional parameters with the key list
+# @description Export non-empty configuration values to the environment.
+# @description Экспортировать непустые значения конфигурации в окружение.
+bs_config_export_to_env() {
+  bs_map_keys_to bs_config bscfgkeys
+  bs_arr_to_args_to bscfgkeys __bs_cf_args
+  eval "$__bs_cf_args"
+  bs_config_export_keys "$@"
 }
 
 # ==========================================
@@ -193,7 +200,8 @@ bs_config_load() {
 
   # Environment variables override / Переменные окружения имеют приоритет
   bs_map_keys_to bs_config bscfgkeys
-  eval "$(bs_arr_to_args bscfgkeys)"
+  bs_arr_to_args_to bscfgkeys __bs_cf_args
+  eval "$__bs_cf_args"
   for __bs_cf_key in "$@"; do
     __bs_cf_env=''
     bs_var_get "$__bs_cf_key" __bs_cf_env || :
@@ -202,7 +210,9 @@ bs_config_load() {
     fi
   done
 
-  bs_config_export_to_env
+  # ключи уже в "$@" — не копируем их из словаря второй раз
+  # the keys are already in "$@" — do not copy them from the map again
+  bs_config_export_keys "$@"
   return "${E_SUCCESS}"
 }
 

@@ -116,6 +116,40 @@ bs_load_dep_list() {
 }
 
 # @private
+# @description Прочитать @depends из шапки модуля в __bs_ld_depends.
+#   Шапка — комментарии и пустые строки до первого кода: @depends объявляют там.
+#   Построчное чтение всего файла в shell или форк sed на каждый модуль стоили
+#   дороже остального loader'а, поэтому цикл читает только шапку и выходит.
+# @description Read @depends from the module header into __bs_ld_depends.
+#   The header is comments and blank lines before the first code line: that is
+#   where @depends belongs. Reading the whole file in shell or forking sed per
+#   module cost more than the rest of the loader, so the loop stops at the header.
+# @param $1 file path / путь к файлу
+# @global __bs_ld_depends — Loader: raw @depends value, then trimmed (category: private)
+# @global __bs_ld_depends — Loader: сырое значение @depends, затем обрезанное (категория: private)
+bs_load_scan_depends() {
+  __bs_ld_depends=''
+  while IFS= read -r __bs_ld_line || [ -n "$__bs_ld_line" ]; do
+    __bs_ld_trim=${__bs_ld_line#"${__bs_ld_line%%[![:space:]]*}"}
+    case "$__bs_ld_trim" in
+      ''|'#'*) ;;
+      *) break ;;
+    esac
+    case "$__bs_ld_trim" in
+      '#'*'@depends'[[:space:]]*)
+        __bs_ld_depends=${__bs_ld_trim#*@depends}
+        break ;;
+    esac
+  done < "$1"
+
+  # Отрезаем trailing-комментарий и пробелы по краям
+  # Strip a trailing comment and the blanks on both sides
+  __bs_ld_depends="${__bs_ld_depends%%#*}"
+  __bs_ld_depends="${__bs_ld_depends#"${__bs_ld_depends%%[![:space:]]*}"}"
+  __bs_ld_depends="${__bs_ld_depends%"${__bs_ld_depends##*[![:space:]]}"}"
+}
+
+# @private
 # @description Загрузить зависимости модуля
 # @description Load module dependencies
 # @param $1 Путь к модулю
@@ -127,29 +161,8 @@ bs_load_deps() {
     return 1
   fi
 
-  # Парсим комментарии вида: # @depends core/logger, lib/system/utils
-  # Parse comments like: # @depends core/logger, lib/system/utils
-  __bs_ld_depends=""
-  while IFS= read -r __bs_ld_line || [ -n "$__bs_ld_line" ]; do
-    # строка комментария, в которой после @depends идёт пробел и список
-    # a comment line with @depends followed by a blank and a list
-    __bs_ld_t="${__bs_ld_line#"${__bs_ld_line%%[![:space:]]*}"}"
-    case "$__bs_ld_t" in
-      '#'*@depends[[:space:]]*)
-        __bs_ld_depends="${__bs_ld_t#*@depends}"
-        # Отрезаем trailing-комментарий (всё после очередного #)
-        # Strip any trailing comment after another #
-        __bs_ld_depends="${__bs_ld_depends%%#*}"
-        __bs_ld_depends="${__bs_ld_depends#"${__bs_ld_depends%%[![:space:]]*}"}"
-        __bs_ld_depends="${__bs_ld_depends%"${__bs_ld_depends##*[![:space:]]}"}"
-        break
-        ;;
-    esac
-  done < "${BS_ROOT}/${1}.sh"
-
-  if [ -z "$__bs_ld_depends" ]; then
-    return 0  # Нет зависимостей / No dependencies
-  fi
+  bs_load_scan_depends "${BS_ROOT}/${1}.sh"
+  [ -n "$__bs_ld_depends" ] || return 0  # Нет зависимостей / No dependencies
 
   # Загружаем каждую зависимость / Load each dependency
   bs_load_dep_list "$1" "$__bs_ld_depends" ""
@@ -158,6 +171,44 @@ bs_load_deps() {
 # ============================================================================
 # ОСНОВНАЯ ФУНКЦИЯ ЗАГРУЗКИ / MAIN LOADING FUNCTION
 # ============================================================================
+
+# @private
+# @description В POSIX-режиме ядра не подключать bash4-модули lib/: иначе на
+#   Alpine без bash пользователь получит синтаксическую ошибку вместо понятного
+#   сообщения. core/ — ядро, ему можно всегда.
+# @description In POSIX kernel mode do not load bash4 lib/ modules: otherwise on
+#   Alpine without bash the user gets a syntax error instead of a clear message.
+#   core/ is the kernel and is always allowed.
+# @param $1 module path / путь модуля
+bs_load_posix_check() {
+  [ "${BS_KERNEL_MODE:-}" = posix ] || return 0
+  case "$1" in
+    lib/*) ;;
+    *) return 0 ;;
+  esac
+  command -v bs_shell_file_tier >/dev/null 2>&1 || return 0
+  __bs_ld_tier="$(bs_shell_file_tier "${BS_ROOT}/${1}.sh")"
+  __bs_ld_family="$(bs_shell_family)"
+  # В POSIX-режиме годится tier posix; из конкретных оболочек — только текущая,
+  # и никогда bash4: ядро уже решило, что bash 4.2+ здесь нет.
+  # In POSIX mode the posix tier fits; of the concrete shells only the current
+  # one, and never bash4: the kernel already decided there is no bash 4.2+ here.
+  if bs_shell_tier_allows "$__bs_ld_tier" posix; then
+    return 0
+  fi
+  case "$__bs_ld_family" in
+    bash) ;;
+    *)
+      if bs_shell_tier_allows "$__bs_ld_tier" "$__bs_ld_family"; then
+        return 0
+      fi ;;
+  esac
+  printf '%s\n' \
+    "BS: модуль '${1}' требует @shell ${__bs_ld_tier}, а ядро работает в POSIX-режиме (${__bs_ld_family})" \
+    "BS: module '${1}' requires @shell ${__bs_ld_tier}, but the kernel is in POSIX mode (${__bs_ld_family})" \
+    "    Установите bash 4.2+ (Alpine: apk add bash) / Install bash 4.2+ (Alpine: apk add bash)" >&2
+  return 1
+}
 
 # @private
 # @description --strict-shell: refuse a lib/ module whose @shell tier does not
@@ -207,6 +258,9 @@ bs_load() {
   if bs_load_is_loaded "$1"; then
     return 0
   fi
+
+  # POSIX-режим: bash4-модули lib/ не подключаем / POSIX mode: no bash4 lib/ modules
+  bs_load_posix_check "$1" || return 1
 
   # --strict-shell: tier модуля против исходной оболочки / module tier vs the origin shell
   bs_load_strict_check "$1" || return 1

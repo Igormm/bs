@@ -75,6 +75,7 @@ test_arrays() {
 b
 c"; bs_arr_join a ,')" "${sh_name}: from_lines"
         eq "3 2" "$(probe "${sh_bin}" 'bs_arr_new a x y z; bs_arr_copy a b; bs_arr_pop a >/dev/null; printf "%s %s" "$(bs_arr_len b)" "$(bs_arr_len a)"')" "${sh_name}: copy is independent"
+        eq "x,y" "$(probe "${sh_bin}" 'bs_arr_new a x y; bs_arr_copy a a; bs_arr_join a ,')" "${sh_name}: copy onto itself is a no-op"
         # трудные значения переживают круг массив → аргументы / hard values survive array → arguments
         out="$(probe "${sh_bin}" "${HARD}"'; eval "$(bs_arr_to_args h)"; printf "%s|" "$#"; for x in "$@"; do printf "[%s]" "$x"; done')"
         eq "10|[a b][it's][][*][\$HOME][back\\slash][new

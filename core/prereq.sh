@@ -130,8 +130,17 @@ case "$(bs_shell_family)" in
     # bootstrap/bs.sh (нет bs::stack_file) — BS_CURRENT_FILE, как в других оболочках
     # A bash branch of its own: the caller is stack frame 1 (no wrapper between);
     # without bootstrap/bs.sh (no bs::stack_file) — BS_CURRENT_FILE, as in other shells
-    eval 'bs_source_relative() { bs_source_relative_from "$(bs::stack_file 1 2>/dev/null || printf "%s" "${BS_CURRENT_FILE:-}")" "$@"; }'
-    eval 'bs::source_relative() { bs_source_relative_from "$(bs::stack_file 1 2>/dev/null || printf "%s" "${BS_CURRENT_FILE:-}")" "$@"; }'
+    # Стек через bs::stack_file_to (без подоболочки): старый $(bs::stack_file 1)
+    # стоил форк на каждую зависимость. Без bootstrap/bs.sh — BS_CURRENT_FILE.
+    # The stack via bs::stack_file_to (no subshell): the old $(bs::stack_file 1)
+    # cost a fork per dependency. Without bootstrap/bs.sh — BS_CURRENT_FILE.
+    if command -v bs::stack_file_to >/dev/null 2>&1; then
+      eval 'bs_source_relative() { bs::stack_file_to __bs_sr_caller 1; bs_source_relative_from "${__bs_sr_caller:-${BS_CURRENT_FILE:-}}" "$@"; }'
+      eval 'bs::source_relative() { bs::stack_file_to __bs_sr_caller 1; bs_source_relative_from "${__bs_sr_caller:-${BS_CURRENT_FILE:-}}" "$@"; }'
+    else
+      eval 'bs_source_relative() { bs_source_relative_from "${BS_CURRENT_FILE:-}" "$@"; }'
+      eval 'bs::source_relative() { bs_source_relative_from "${BS_CURRENT_FILE:-}" "$@"; }'
+    fi
     ;;
   *)
     bs_source_relative() {

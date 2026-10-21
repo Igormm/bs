@@ -16,7 +16,7 @@
 # the kernel and run only after it is loaded.
 #
 # ИМЕНА / NAMES
-#   Real functions: bs_cli_die, bs_cli_need_bash, bs_cli_delegate, bs_cli_help, bs_cli_help_cmd,
+#   Real functions: bs_cli_die, bs_cli_need_bash, bs_cli_delegate, bs_cli_maybe_exec_script, bs_cli_help, bs_cli_help_cmd,
 #   bs_cli_short_sha, bs_cli_install_info_get, bs_cli_update_manifest_valid,
 #   bs_cli_bs_full_info_lines, bs_cli_bs_running_block, bs_cli_version_cmd, bs_cli_env_cmd,
 #   bs_cli_list_cmd, bs_cli_init_shell_*, bs_cli_shebang_*, bs_cli_call_*, bs_cli_doctor_cmd,
@@ -62,6 +62,63 @@ bs_cli_delegate() {
   else
     bs_cli_need_bash "${__bs_cli_dn}"
   fi
+}
+
+# @private
+# @description Для `bs run script` и shebang-режима сразу exec в bash, который
+#   загружает ядро один раз; иначе ядро грузилось бы и в этом процессе, и в дочернем.
+#   Вызывается до загрузки ядра, поэтому не использует bs_cli_die/ядро.
+#   Возвращает 1, если аргументы — не run и не файл (обычный путь диспетчера).
+# @description For `bs run script` and the shebang mode, exec at once into the bash
+#   that loads the kernel once; otherwise the kernel would load in this process and
+#   in the child. Called before the kernel, so it uses neither bs_cli_die nor core.
+#   Returns 1 when the arguments are neither run nor a file (the normal dispatch path).
+# @param $@ the entry-point arguments / аргументы точки входа
+bs_cli_maybe_exec_script() {
+  # Ранний exec возможен только при bash 4.2+ в текущей оболочке; иначе обычный
+  # путь ниже скажет bs_cli_need_bash (например, Alpine без bash).
+  # The early exec needs bash 4.2+ in the current shell; otherwise the normal path
+  # below reports bs_cli_need_bash (for example, Alpine without bash).
+  bs_shell_host_ok || return 1
+
+  __bs_cli_es_script=''
+  case "${1:-}" in
+    run)
+      shift
+      if [ $# -lt 1 ]; then
+        printf 'BS: error: run: script path required\n' >&2
+        exit 2
+      fi
+      __bs_cli_es_script=$1
+      shift
+      if [ ! -f "$__bs_cli_es_script" ]; then
+        printf 'BS: error: run: file not found: %s\n' "$__bs_cli_es_script" >&2
+        exit 2
+      fi ;;
+    '') ;;
+    *)
+      case "$1" in
+        help|-h|--help|version|env|list|lang-doc|lsp|chat|sync|rfc|api|ts|audit|doctor|build|repl|calc|init-shell|shebang|call|update|uninstall|where) ;;
+        *)
+          if [ -f "$1" ]; then
+            __bs_cli_es_script=$1
+            shift
+          fi ;;
+      esac ;;
+  esac
+  [ -n "$__bs_cli_es_script" ] || return 1
+
+  # shellcheck disable=SC2034  # BS_RUN_SCRIPT читает bs::is_main в дочернем процессе / BS_RUN_SCRIPT is read by bs::is_main in the child
+  BS_RUN_SCRIPT=$__bs_cli_es_script
+  export BS_RUN_SCRIPT
+  exec "$(bs_shell_host)" -c '
+    unset BS_INITIALIZED
+    . "$1/bootstrap/init.sh" || exit 1
+    bs_strict
+    __bs_cli_es_child_script=$2
+    shift 2
+    . "$__bs_cli_es_child_script" "$@"
+  ' bs "$BS_ROOT" "$__bs_cli_es_script" "$@"
 }
 
 # @description Справка по командам bs / The help of the bs commands

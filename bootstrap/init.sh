@@ -150,7 +150,7 @@ if [ ! -f "${BS_ROOT}/bootstrap/kernel.sh" ]; then
 fi
 # shellcheck disable=SC1091
 . "${BS_ROOT}/bootstrap/kernel.sh" || return 1
-if [ "$BS_KERNEL_MODE" = full ]; then
+if [ "$BS_KERNEL_MODE" = full ] && [ "${BS_KERNEL_MINIMAL:-0}" != 1 ]; then
   # мосты совместимости (вне ядра): deps::missing_tools с массивом bash; языковые примитивы bash: bs::func_name, str::*, arr::*, map::*; массивы bash ARGS_PARAMS/ARGS_FLAGS/ARGS_REST для args::parse / compatibility bridges (outside the kernel): deps::missing_tools with a bash array; bash language primitives: bs::func_name, str::*, arr::*, map::*; bash arrays ARGS_PARAMS/ARGS_FLAGS/ARGS_REST for args::parse
   bs_load "lib/compat/deps"
   bs_load "lib/compat/lang"

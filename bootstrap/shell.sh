@@ -636,9 +636,12 @@ bs_shell_readonly() {
 # @param $1 real function name, e.g. bs_guard / настоящее имя функции
 # @param $2 namespaced name, e.g. bs::guard / имя с пространством имён
 bs_shell_alias() {
-  if bs_shell__ns_ok; then
-    eval "$2() { $1 \"\$@\"; }"
-  fi
+  # Ответ bs_shell__ns_ok не меняется за время жизни процесса: проверяем один
+  # раз при подключении реестра, а не на каждый из ~120 псевдонимов.
+  # The bs_shell__ns_ok answer does not change for the life of the process: check
+  # it once when the registry is sourced, not for each of ~120 aliases.
+  [ "${__bs_sh_ns_ok:-0}" = 1 ] || return 0
+  eval "$2() { $1 \"\$@\"; }"
 }
 
 # @description True when this shell accepts "::" in function names: zsh, and bash
@@ -656,6 +659,14 @@ bs_shell__ns_ok() {
   esac
   return 0
 }
+
+# @global __bs_sh_ns_ok — Shell: cached "::" support answer: 1 yes, 0 no (category: private)
+# @global __bs_sh_ns_ok — Shell: закэшированный ответ про "::": 1 да, 0 нет (категория: private)
+if bs_shell__ns_ok; then
+  __bs_sh_ns_ok=1
+else
+  __bs_sh_ns_ok=0
+fi
 
 # ==========================================
 # bs::shell::* names for bash and zsh / имена bs::shell::* для bash и zsh

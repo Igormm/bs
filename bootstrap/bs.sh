@@ -87,6 +87,16 @@ bs::stack_file() {
   printf '%s\n' "${BASH_SOURCE[$(( ${1:-0} + 1 ))]:-unknown}"
 }
 
+# @description Put the file of stack frame LEVEL into variable NAME (no subshell).
+# @description Положить файл кадра стека LEVEL в переменную NAME (без подоболочки).
+# @param $1 variable name / имя переменной
+# @param $2 level (default 0) / уровень (по умолчанию 0)
+# @returns 0; 2 if the variable name is not an identifier / 2, если имя не идентификатор
+bs::stack_file_to() {
+  [[ "${1:-}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || return 2
+  printf -v "$1" '%s' "${BASH_SOURCE[$(( ${2:-0} + 1 ))]:-unknown}"
+}
+
 # @description Line (of the call) of the stack frame at LEVEL (0 if absent).
 # @description Строка (вызова) кадра стека на уровне LEVEL (0, если нет).
 # @param $1 level / уровень

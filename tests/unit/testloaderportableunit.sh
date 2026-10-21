@@ -37,6 +37,7 @@ mkroot() {
     printf '%s\n' '# @shell bash4 — test' 'echo "load tiered"' > "${r}/m/tiered.sh"
     mkdir -p "${r}/lib"
     printf '%s\n' '# @shell bash4 — test' 'echo "load libmod"' > "${r}/lib/bashmod.sh"
+    printf '%s\n' '# @shell posix' 'echo "load posixmod"' > "${r}/lib/posixmod.sh"
 }
 
 # probe <shell> <snippet> — shell.sh и loader.sh подключены, BS_ROOT — фиктивный корень
@@ -104,6 +105,15 @@ rc=0" "${sh_name}: module paths with spaces"
         out="$(probe "${sh_bin}" 'BS_SHELL_STRICT=1 BS_ORIGIN_SHELL=dash; load m/tiered; echo "core-like rc=$?"; load lib/bashmod; echo "rc=$?"')"
         eq "$(printf '%s\n' "${out}" | grep -c "^load tiered$\|^core-like rc=0$\|cannot run from shell 'dash' (--strict-shell)\|^rc=1$")" "4" "${sh_name}: --strict-shell refuses a bash4 lib/ module from dash and lets a non-lib module through"
         eq "$(printf '%s\n' "${out}" | grep -c '^load libmod$')" "0" "${sh_name}: the refused module was not sourced"
+        eq "$(probe "${sh_bin}" 'BS_KERNEL_MODE=posix; load lib/bashmod; echo "rc=$?"; bs_load_is_loaded lib/bashmod; echo "loaded=$?"')" \
+"BS: модуль 'lib/bashmod' требует @shell bash4, а ядро работает в POSIX-режиме (${sh_name})
+BS: module 'lib/bashmod' requires @shell bash4, but the kernel is in POSIX mode (${sh_name})
+    Установите bash 4.2+ (Alpine: apk add bash) / Install bash 4.2+ (Alpine: apk add bash)
+rc=1
+loaded=1" "${sh_name}: POSIX kernel mode refuses a bash4 lib/ module"
+        eq "$(probe "${sh_bin}" 'BS_KERNEL_MODE=posix; load lib/posixmod; echo "rc=$?"')" \
+"load posixmod
+rc=0" "${sh_name}: POSIX kernel mode allows a @shell posix lib/ module"
         eq "$(probe "${sh_bin}" 'BS_ROOT=; load m/a; echo "rc=$?"; BS_ROOT=/no/such/dir; load m/a; echo "rc=$?"')" \
 "BS: error: BS_ROOT is not set
 rc=1

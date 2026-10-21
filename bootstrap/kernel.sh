@@ -4,8 +4,13 @@
 # @tier core — builtins only; works everywhere
 # @tier core — только builtin'ы; работает везде
 #
-# bootstrap/kernel.sh — подключает ВСЁ ядро (core/*) в любой оболочке реестра
-# bootstrap/kernel.sh — loads the WHOLE kernel (core/*) in any shell of the registry
+# bootstrap/kernel.sh — подключает ядро (core/*) в любой оболочке реестра
+# bootstrap/kernel.sh — loads the kernel (core/*) in any shell of the registry
+#
+# BS_KERNEL_MINIMAL=1 — только подмножество для help/version/env/list/init-shell/shebang
+# (транзитивные зависимости bootstrap/cli.sh); иначе — все модули и конфигурация.
+# BS_KERNEL_MINIMAL=1 — only the subset for help/version/env/list/init-shell/shebang
+# (the transitive dependencies of bootstrap/cli.sh); otherwise all modules and the config.
 #
 # Использование / Usage (dash, ash, ksh, mksh, zsh, bash):
 #   BS_ROOT=/path/to/bs . /path/to/bs/bootstrap/kernel.sh
@@ -54,11 +59,27 @@ if ! command -v bs_load >/dev/null 2>&1; then
   . "${BS_ROOT}/bootstrap/loader.sh" || return 1
 fi
 
-# Модули ядра; core/prereq первым / The kernel modules; core/prereq first
-for __bs_k_mod in prereq lang const var str num msg logger quiet fmt data errorhandler version utils config deps args; do
-  bs_load "core/${__bs_k_mod}" || return 1
-done
-unset __bs_k_mod
+# @private
+# @description Загрузить перечисленные модули ядра по порядку; core/prereq первым.
+# @description Load the listed kernel modules in order; core/prereq first.
+# @param $@ module names without core/ and .sh / имена модулей без core/ и .sh
+bs_kernel_load_modules() {
+  for __bs_k_mod in "$@"; do
+    bs_load "core/${__bs_k_mod}" || return 1
+  done
+  unset __bs_k_mod
+}
 
-# Конфигурация из файлов и окружения / Configuration from files and environment
-bs_config_load
+# Минимальный режим (BS_KERNEL_MINIMAL=1) — для help/version/env/list/init-shell/
+# shebang: только транзитивные зависимости bootstrap/cli.sh, без args/config/deps.
+# The minimal mode (BS_KERNEL_MINIMAL=1) is for help/version/env/list/init-shell/
+# shebang: only the transitive dependencies of bootstrap/cli.sh, no args/config/deps.
+if [ "${BS_KERNEL_MINIMAL:-0}" = 1 ]; then
+  bs_kernel_load_modules \
+    prereq const version str var num logger quiet data errorhandler utils
+else
+  bs_kernel_load_modules \
+    prereq lang const var str num msg logger quiet fmt data errorhandler version utils config deps args
+  # Конфигурация из файлов и окружения / Configuration from files and environment
+  bs_config_load
+fi

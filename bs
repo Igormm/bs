@@ -120,6 +120,32 @@ export BS_HOME
 : "${BS_SILENT:=1}"
 export BS_SILENT
 
+# 4b. Лёгкие команды не тянут всё ядро / Lightweight commands skip the whole kernel
+# help, version, env, list, init-shell и shebang живут в bootstrap/cli.sh и
+# обходятся без args/config/deps; kernel.sh в минимальном режиме грузит только
+# их транзитивные зависимости. run/build/call и остальные — полное ядро.
+# help, version, env, list, init-shell and shebang live in bootstrap/cli.sh and
+# do not need args/config/deps; in minimal mode kernel.sh loads only their
+# transitive dependencies. run/build/call and the rest get the full kernel.
+case "${1:-help}" in
+  help|-h|--help|version|env|list|init-shell|shebang) BS_KERNEL_MINIMAL=1 ;;
+esac
+: "${BS_KERNEL_MINIMAL:=0}"
+export BS_KERNEL_MINIMAL
+
+# 4c. run и shebang: не грузим ядро дважды / run and shebang: do not load the kernel twice
+# `bs run script` и `#!/usr/bin/env bs` раньше загружали полное ядро в этом
+# процессе и ещё раз в дочернем bash. bs_cli_maybe_exec_script сразу делает exec
+# в bash, который грузит ядро один раз; внешний процесс остаётся на pre-kernel
+# helpers. Если аргументы — не run и не файл, функция возвращает 1.
+# `bs run script` and `#!/usr/bin/env bs` used to load the full kernel in this
+# process and again in the child bash. bs_cli_maybe_exec_script execs into the
+# bash that loads the kernel once; the outer process stays on pre-kernel helpers.
+# If the arguments are neither run nor a file, the function returns 1.
+if bs_cli_maybe_exec_script "$@"; then
+  exit 0
+fi
+
 # 5. Загрузка ядра
 if [ ! -f "${BS_ROOT}/bootstrap/init.sh" ]; then
   printf 'ERROR: bootstrap/init.sh not found in BS_ROOT=%s\n' "$BS_ROOT" >&2
