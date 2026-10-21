@@ -101,6 +101,7 @@ Reusable workflow skills live in `.agents/skills/` (Kimi Code / agents-compatibl
 - `bs-variable-docs` — check that module-level variables carry a bilingual `# @global` snippet naming their category (code-style-guide §4.2).
 - `bs-write-test` — unit/integration test skeleton and `testframework.sh` assert API.
 - `bs-validate` — the mandatory validation cycle after any change.
+- `bs-version-bump` — bump and check the framework version: single source `core/version.sh`, CHANGELOG heading, en/ru docs, hardcoded no-bash test output.
 - `bs-docs-sync` — keep `documentation/en/` and `documentation/ru/` in sync.
 - `bs-commit-style` — commit message conventions and history-safety rules.
 - `bs-commit-pro` — professional commit engineering (atomic intent, staging discipline, bisect/revert safety, series ordering).

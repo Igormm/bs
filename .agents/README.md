@@ -20,6 +20,7 @@ Central place for everything AI-facing in the repo (replaces the old `ai/` direc
 | `bs-new-core-module` | add a `core/` module + registration |
 | `bs-write-test` | unit/integration test skeleton + assert API |
 | `bs-validate` | mandatory validation cycle |
+| `bs-version-bump` | bump/check the framework version: single source, CHANGELOG, en/ru docs, no-bash test |
 | `bs-docs-sync` | keep en/ru documentation in sync |
 | `bs-commit-style` | commit message conventions + history safety |
 | `bs-commit-pro` | professional commit engineering (atomic intent, staging) |
