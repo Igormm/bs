@@ -129,7 +129,9 @@ main() {
     pw_line="$(printf '%s\n' "${rendered}" | grep -n '^PasswordAuthentication ' | cut -d: -f1)"
     testframework::assert_true "port_line -lt pw_line" "catalog order (Port before Password…)"
 
-    testframework::assert_command "printf 'Subsystem=internal-sftp\n' | sshd::render | grep -q '^Subsystem sftp internal-sftp$'" "Subsystem rendered as 'Subsystem sftp …'"
+    # без -q: grep -q закрывает pipe, sshd::render получает SIGPIPE, а pipefail делает FAIL
+    # no -q: grep -q closes the pipe, sshd::render gets SIGPIPE, and pipefail turns it into FAIL
+    testframework::assert_command "printf 'Subsystem=internal-sftp\n' | sshd::render | grep '^Subsystem sftp internal-sftp$' >/dev/null" "Subsystem rendered as 'Subsystem sftp …'"
     vrc=0; sshd::validate AuthenticationMethods publickey,password || vrc=$?
     testframework::assert_equal "0" "${vrc}" "AuthenticationMethods accepts comma list"
 
