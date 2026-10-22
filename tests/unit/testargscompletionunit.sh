@@ -83,6 +83,28 @@ main() {
     out="$(args::completion deploy.sh nushell)"
     has "${out}" 'extern "deploy.sh" [' "nu: the synonym nushell"
 
+    testframework::section "help and completions agree / help и дополнения согласованы"
+    local help_out bash_out zsh_out fish_out nu_out flag value
+    help_out="$(args::help deploy.sh)"
+    bash_out="$(args::completion deploy.sh)"
+    zsh_out="$(args::completion deploy.sh zsh)"
+    fish_out="$(args::completion deploy.sh fish)"
+    nu_out="$(args::completion deploy.sh nu)"
+    for flag in verbose port env; do
+        has "${help_out}" "--${flag}" "help: --${flag}"
+        has "${bash_out}" "--${flag}" "bash: --${flag}"
+        has "${zsh_out}" "--${flag}" "zsh: --${flag}"
+        has "${fish_out}" "-l ${flag}" "fish: --${flag}"
+        has "${nu_out}" "--${flag}" "nu: --${flag}"
+    done
+    for value in staging prod; do
+        has "${help_out}" "${value}" "help: enum value ${value}"
+        has "${bash_out}" "${value}" "bash: enum value ${value}"
+        has "${zsh_out}" "${value}" "zsh: enum value ${value}"
+        has "${fish_out}" "${value}" "fish: enum value ${value}"
+        has "${nu_out}" "${value}" "nu: enum value ${value}"
+    done
+
     testframework::section "errors / ошибки"
     local rc=0
     args::completion deploy.sh dash >/dev/null 2>&1 || rc=$?

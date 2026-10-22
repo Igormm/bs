@@ -4,7 +4,7 @@
 
 BS — тонкий слой времени выполнения **поверх bash 4.2+**: на нём написаны вся
 библиотека `lib/` (87 модулей) и команды `bootstrap/bs.sh`, которые её запускают. Исключение —
-19 небольших файлов ядра `@shell posix`, которые работают в любой оболочке;
+20 небольших файлов ядра `@shell posix`, которые работают в любой оболочке;
 остальные оболочки попадают в BS через перезапуск в bash или `bs call`. Он состоит из двух
 входных скриптов (`boot.sh`, `bs`) с общим POSIX-прологом, реестра оболочек
 (`bootstrap/shell.sh`), инициализатора (`bootstrap/init.sh`),
@@ -123,7 +123,7 @@ BS — тонкий слой времени выполнения **поверх 
 
 | Ярус | Файлы `core/` | Где работает напрямую | Как попадают остальные оболочки |
 |---|---|---|---|
-| `posix` (19) | `prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `config`, `lang`, `args`, `var`, `str`, `num`, `msg` | bash, zsh, dash, busybox ash, ksh93, mksh (проверено запуском) | — (подключаются сами) |
+| `posix` (20) | `prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `config`, `lang`, `args`, `args-completion`, `var`, `str`, `num`, `msg` | bash, zsh, dash, busybox ash, ksh93, mksh (проверено запуском) | — (подключаются сами) |
 | `bash4` (87) | **вся `lib/`**, все модули | только bash 4.2+ (ни один модуль `lib/` не POSIX) | точка входа находит bash и перезапускается в нём (трамплин); функции ядра — командой `bs call` |
 
 Ни один файл `core/` больше не `bash4`: `repl` вынесен в `lib/ui/repl`, а то, что требует настоящих массивов bash (остальной `lang`, `deps::missing_tools`, `ARGS_PARAMS`/`ARGS_FLAGS`/`ARGS_REST` для `args::parse`), живёт в мостах `lib/compat/lang`, `lib/compat/deps` и `lib/compat/args` вне ядра.
@@ -143,7 +143,7 @@ BS — тонкий слой времени выполнения **поверх 
 `bootstrap/bs.sh` (файлы яруса `bash4`) в dash, ash, ksh, mksh, fish или nushell. В них нужны
 ассоциативные массивы, nameref и `=~` с `BASH_REMATCH`, которых нет или которые
 ведут себя иначе. Оболочки без настоящего запуска (nushell, oksh, osh) не
-считаются проверенными. Все 19 файлов `core/` теперь `posix`; переводились по одному (`calc`, `quiet`, `fmt`, `logger`, `data`,
+считаются проверенными. Все 20 файлов `core/` теперь `posix`; переводились по одному (`calc`, `quiet`, `fmt`, `logger`, `data`,
 `utils`, `deps`, `errorhandler`, `config` (его ассоциативный массив `BS_CONFIG` стал словарём слоя данных `bs_config`), `lang` (предикаты `bs_is_*`), `args` (дерево, флаги и результат разбора лежат в слое данных; массивы bash `ARGS_PARAMS`, `ARGS_FLAGS`, `ARGS_REST` заполняет `lib/compat/args`) и новые базовые модули `var`, `str`, `num`, `msg`); остальные языковые примитивы bash (`str::*`, `arr::*`, `map::*`, интроспекция) вынесены из `lang` в `lib/compat/lang`; `repl` вне ядра.
 
 ## Стадия 0: POSIX-пролог и `trampoline`

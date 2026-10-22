@@ -45,8 +45,11 @@
 #   bs_args_rest, bs_args_help, bs_args_parse, bs_args_reset, bs_args_require, bs_args_get,
 #   bs_args_completion; in bash and zsh also args::* (the old names, aliases). args::parse,
 #   args::reset and args::require come from lib/compat/args.sh: they also fill the bash arrays
-#   ARGS_PARAMS, ARGS_FLAGS and ARGS_REST that scripts read after parsing.
+#   ARGS_PARAMS, ARGS_FLAGS and ARGS_REST that scripts read after parsing. The completion
+#   generators (bs_args_completion*) live in core/args-completion.sh, sourced at the end.
 #   Настоящие функции — bs_args_*; в bash и zsh — ещё и args::* (прежние имена, псевдонимы).
+#   Генераторы автодополнения (bs_args_completion*) лежат в core/args-completion.sh и
+#   подключаются в конце.
 #   args::parse, args::reset и args::require приходят из lib/compat/args.sh: они ещё заполняют
 #   массивы bash ARGS_PARAMS, ARGS_FLAGS и ARGS_REST, которые скрипты читают после разбора.
 #
@@ -400,92 +403,164 @@ bs_args_help() {
     return "${E_SUCCESS:-0}"
   fi
 
-  # Собираем usage-строку по уровням / Build the usage line by levels
-  __bs_args_hp_usage="Usage: ${__bs_args_hp_prog}"
-
-  # Флаги в usage-строке / Flags in the usage line
-  if [ "$(bs_map_count bs_args_flags)" -gt 0 ]; then
-    __bs_args_hp_usage="${__bs_args_hp_usage} [flags]"
-  fi
-
-  __bs_args_hp_max=$(bs_args_max_level)
-
-  __bs_args_hp_level=1
-  while [ "$__bs_args_hp_level" -le "$__bs_args_hp_max" ]; do
-    bs_args_mget bs_args_tree "$__bs_args_hp_level" __bs_args_hp_list
-    if [ -n "$__bs_args_hp_list" ]; then
-      bs_utils_split bs_args_wa "$__bs_args_hp_list" ' '
-      __bs_args_hp_choices=$(bs_arr_join bs_args_wa '|')
-      # Повторяемый уровень: суффикс ... / Variadic level: ... suffix
-      if [ "$__bs_args_variadic" -eq "$__bs_args_hp_level" ]; then
-        __bs_args_hp_choices="${__bs_args_hp_choices}..."
-      fi
-      __bs_args_hp_usage="${__bs_args_hp_usage} [${__bs_args_hp_choices}]"
-    fi
-    __bs_args_hp_level=$((__bs_args_hp_level + 1))
-  done
-  printf '%s\n' "$__bs_args_hp_usage"
+  bs_args_help_usage "$__bs_args_hp_prog"
 
   if [ "$(bs_map_count bs_args_tree)" -gt 0 ]; then
     printf '\nParameters / Параметры:\n'
-
-    __bs_args_hp_level=1
-    while [ "$__bs_args_hp_level" -le "$__bs_args_hp_max" ]; do
-      bs_args_mget bs_args_tree "$__bs_args_hp_level" __bs_args_hp_list
-      if [ -n "$__bs_args_hp_list" ]; then
-        bs_utils_split bs_args_wa "$__bs_args_hp_list" ' '
-        printf '  level %d: %s\n' "$__bs_args_hp_level" "$(bs_arr_join bs_args_wa ' | ')"
-        eval "$(bs_arr_to_args bs_args_wa)"
-        for __bs_args_hp_item in "$@"; do
-          bs_args_mget bs_args_desc "$__bs_args_hp_item" __bs_args_hp_d
-          if [ -n "$__bs_args_hp_d" ]; then
-            printf '    %-16s — %s\n' "$__bs_args_hp_item" "$__bs_args_hp_d"
-          fi
-        done
-      fi
-      __bs_args_hp_level=$((__bs_args_hp_level + 1))
-    done
+    bs_args_help_params
   fi
 
-  # Секция флагов / Flags section
   if [ "$(bs_map_count bs_args_flags)" -gt 0 ]; then
     printf '\nFlags / Флаги:\n'
-    # Итерация по отсортированным именам через read / Iterating sorted names via read
-    bs_map_keys bs_args_flags | sort | while IFS= read -r __bs_args_hp_flag; do
-      bs_args_mget bs_args_flags "$__bs_args_hp_flag" __bs_args_hp_kind
-      bs_args_mget bs_args_flag_val "$__bs_args_hp_flag" __bs_args_hp_val
-      __bs_args_hp_label="--${__bs_args_hp_flag}"
-      if [ "$__bs_args_hp_kind" = "value" ]; then
-        # Хинт типа значения: number / enum:a,b / другое
-        # Value type hint: number / enum:a,b / other
-        __bs_args_hp_hint="value"
-        case "$__bs_args_hp_val" in
-          number) __bs_args_hp_hint="number" ;;
-          enum:*) __bs_args_hp_hint="${__bs_args_hp_val#enum:}" ;;
-        esac
-        __bs_args_hp_label="--${__bs_args_hp_flag} <${__bs_args_hp_hint}>"
-      fi
-      bs_args_mget bs_args_flag_desc "$__bs_args_hp_flag" __bs_args_hp_d
-      if [ -n "$__bs_args_hp_d" ]; then
-        printf '    %-28s — %s' "$__bs_args_hp_label" "$__bs_args_hp_d"
-      else
-        printf '    %-28s' "$__bs_args_hp_label"
-      fi
-      # Дефолт в help / Default in help
-      if bs_map_has bs_args_flag_def "$__bs_args_hp_flag"; then
-        bs_args_mget bs_args_flag_def "$__bs_args_hp_flag" __bs_args_hp_def
-        printf ' (default: %s)\n' "$__bs_args_hp_def"
-      else
-        printf '\n'
-      fi
-    done
+    bs_args_help_flags
     printf '    %-28s — %s\n' "--help" "Show this help and exit"
   fi
+}
+
+# @private
+# @description Напечатать строку Usage по уровням / Print the Usage line by levels
+# @param $1 program name / имя программы
+# Scratch globals: __bs_args_hu_* (read/write), bs_args_wa (write via bs_utils_split)
+bs_args_help_usage() {
+  __bs_args_hu_prog=$1
+  __bs_args_hu_usage="Usage: ${__bs_args_hu_prog}"
+
+  if [ "$(bs_map_count bs_args_flags)" -gt 0 ]; then
+    __bs_args_hu_usage="${__bs_args_hu_usage} [flags]"
+  fi
+
+  __bs_args_hu_max=$(bs_args_max_level)
+  __bs_args_hu_level=1
+  while [ "$__bs_args_hu_level" -le "$__bs_args_hu_max" ]; do
+    bs_args_mget bs_args_tree "$__bs_args_hu_level" __bs_args_hu_list
+    if [ -n "$__bs_args_hu_list" ]; then
+      bs_utils_split bs_args_wa "$__bs_args_hu_list" ' '
+      __bs_args_hu_choices=$(bs_arr_join bs_args_wa '|')
+      # Повторяемый уровень: суффикс ... / Variadic level: ... suffix
+      if [ "$__bs_args_variadic" -eq "$__bs_args_hu_level" ]; then
+        __bs_args_hu_choices="${__bs_args_hu_choices}..."
+      fi
+      __bs_args_hu_usage="${__bs_args_hu_usage} [${__bs_args_hu_choices}]"
+    fi
+    __bs_args_hu_level=$((__bs_args_hu_level + 1))
+  done
+  printf '%s\n' "$__bs_args_hu_usage"
+}
+
+# @private
+# @description Напечатать описания позиционных параметров / Print positional parameter descriptions
+# Scratch globals: __bs_args_hd_* (read/write), bs_args_wa (write via bs_utils_split)
+bs_args_help_params() {
+  __bs_args_hd_max=$(bs_args_max_level)
+  __bs_args_hd_level=1
+  while [ "$__bs_args_hd_level" -le "$__bs_args_hd_max" ]; do
+    bs_args_mget bs_args_tree "$__bs_args_hd_level" __bs_args_hd_list
+    if [ -n "$__bs_args_hd_list" ]; then
+      bs_utils_split bs_args_wa "$__bs_args_hd_list" ' '
+      printf '  level %d: %s\n' "$__bs_args_hd_level" "$(bs_arr_join bs_args_wa ' | ')"
+      eval "$(bs_arr_to_args bs_args_wa)"
+      for __bs_args_hd_item in "$@"; do
+        bs_args_mget bs_args_desc "$__bs_args_hd_item" __bs_args_hd_d
+        if [ -n "$__bs_args_hd_d" ]; then
+          printf '    %-16s — %s\n' "$__bs_args_hd_item" "$__bs_args_hd_d"
+        fi
+      done
+    fi
+    __bs_args_hd_level=$((__bs_args_hd_level + 1))
+  done
+}
+
+# @private
+# @description Напечатать описания флагов / Print flag descriptions
+# Scratch globals: __bs_args_hf_* (read/write)
+bs_args_help_flags() {
+  # Итерация по отсортированным именам через read / Iterating sorted names via read
+  bs_map_keys bs_args_flags | sort | while IFS= read -r __bs_args_hf_flag; do
+    bs_args_mget bs_args_flags "$__bs_args_hf_flag" __bs_args_hf_kind
+    bs_args_mget bs_args_flag_val "$__bs_args_hf_flag" __bs_args_hf_val
+    __bs_args_hf_label="--${__bs_args_hf_flag}"
+    if [ "$__bs_args_hf_kind" = "value" ]; then
+      # Хинт типа значения: number / enum:a,b / другое
+      # Value type hint: number / enum:a,b / other
+      __bs_args_hf_hint="value"
+      case "$__bs_args_hf_val" in
+        number) __bs_args_hf_hint="number" ;;
+        enum:*) __bs_args_hf_hint="${__bs_args_hf_val#enum:}" ;;
+      esac
+      __bs_args_hf_label="--${__bs_args_hf_flag} <${__bs_args_hf_hint}>"
+    fi
+    bs_args_mget bs_args_flag_desc "$__bs_args_hf_flag" __bs_args_hf_d
+    if [ -n "$__bs_args_hf_d" ]; then
+      printf '    %-28s — %s' "$__bs_args_hf_label" "$__bs_args_hf_d"
+    else
+      printf '    %-28s' "$__bs_args_hf_label"
+    fi
+    # Дефолт в help / Default in help
+    if bs_map_has bs_args_flag_def "$__bs_args_hf_flag"; then
+      bs_args_mget bs_args_flag_def "$__bs_args_hf_flag" __bs_args_hf_def
+      printf ' (default: %s)\n' "$__bs_args_hf_def"
+    else
+      printf '\n'
+    fi
+  done
 }
 
 # ==========================================
 # Валидация / Validation
 # ==========================================
+
+# @private
+# @description Есть ли в аргументах запрос help / Is there a help request among the arguments
+#   -h/--help в любой позиции, не только argv[0]. Объявленные флаги help/h имеют
+#   приоритет — их обработает основной цикл. Просмотр останавливается на "--"
+#   (дальше сырые аргументы) и пропускает значение объявленного value-флага.
+#   -h/--help at any position, not only argv[0]. Declared flags named help/h take
+#   precedence — the main loop handles them. The scan stops at "--" (raw arguments
+#   follow) and skips the value of a declared value flag.
+# @param $@ arguments / аргументы
+# @returns 0 help requested, 1 no help / 0 — help запрошен, 1 — нет
+# Scratch globals: __bs_args_ph_* (read/write)
+bs_args_parse_help_requested() {
+  __bs_args_ph_skip=0
+  for __bs_args_ph_arg in "$@"; do
+    if [ "$__bs_args_ph_arg" = "--" ]; then return 1; fi
+    if [ "$__bs_args_ph_skip" -eq 1 ]; then
+      __bs_args_ph_skip=0
+      continue
+    fi
+    case "$__bs_args_ph_arg" in
+      --*=*) ;;
+      --*)
+        bs_args_mget bs_args_flags "${__bs_args_ph_arg#--}" __bs_args_ph_t
+        if [ "$__bs_args_ph_t" = "value" ]; then
+          __bs_args_ph_skip=1
+          continue
+        fi
+        ;;
+    esac
+    if [ "$__bs_args_ph_arg" = "-h" ] || [ "$__bs_args_ph_arg" = "--help" ]; then
+      __bs_args_ph_key=${__bs_args_ph_arg#--}
+      if [ "$__bs_args_ph_arg" = "-h" ]; then __bs_args_ph_key=h; fi
+      bs_args_mget bs_args_flags "$__bs_args_ph_key" __bs_args_ph_t
+      if [ -z "$__bs_args_ph_t" ]; then return 0; fi
+    fi
+  done
+  return 1
+}
+
+# @private
+# @description Проверить минимум позиционных параметров / Check the minimum positional count
+# @param $1 positional count / число позиционных
+# @returns 0 enough, E_INVALID too few / 0 — достаточно, E_INVALID — мало
+# Scratch globals: __bs_args_required (read)
+bs_args_parse_required() {
+  if [ "$__bs_args_required" -gt 0 ] && [ "$1" -lt "$__bs_args_required" ]; then
+    bs_log_error "at least ${__bs_args_required} parameter(s) are required, got $1"
+    bs_args_help >&2
+    return "${E_INVALID:-2}"
+  fi
+  return "${E_SUCCESS:-0}"
+}
 
 # @description Проверить аргументы по объявленному дереву
 # @description Validate arguments against the declared tree
@@ -502,40 +577,7 @@ bs_args_parse() {
   bs_map_clear bs_args_parsed
   ARGS_HELP_REQUESTED=0
 
-  # Запрос help: -h/--help в любой позиции, не только argv[0].
-  # Объявленные флаги help/h имеют приоритет — их обработает цикл ниже.
-  # Просмотр останавливается на "--" (дальше сырые аргументы) и пропускает
-  # значение объявленного флага со значением (--pattern -h).
-  # Help request: -h/--help at any position, not only argv[0].
-  # Declared flags named help/h take precedence — the loop below handles them.
-  # The scan stops at "--" (raw arguments follow) and skips the value of a
-  # declared value flag (--pattern -h).
-  __bs_args_ps_help=0
-  __bs_args_ps_skip=0
-  for __bs_args_ps_arg in "$@"; do
-    if [ "$__bs_args_ps_arg" = "--" ]; then break; fi
-    if [ "$__bs_args_ps_skip" -eq 1 ]; then
-      __bs_args_ps_skip=0
-      continue
-    fi
-    case "$__bs_args_ps_arg" in
-      --*=*) ;;
-      --*)
-        bs_args_mget bs_args_flags "${__bs_args_ps_arg#--}" __bs_args_ps_t
-        if [ "$__bs_args_ps_t" = "value" ]; then
-          __bs_args_ps_skip=1
-          continue
-        fi
-        ;;
-    esac
-    if [ "$__bs_args_ps_arg" = "-h" ] || [ "$__bs_args_ps_arg" = "--help" ]; then
-      __bs_args_ps_key=${__bs_args_ps_arg#--}
-      if [ "$__bs_args_ps_arg" = "-h" ]; then __bs_args_ps_key=h; fi
-      bs_args_mget bs_args_flags "$__bs_args_ps_key" __bs_args_ps_t
-      if [ -z "$__bs_args_ps_t" ]; then __bs_args_ps_help=1; fi
-    fi
-  done
-  if [ "$__bs_args_ps_help" -eq 1 ]; then
+  if bs_args_parse_help_requested "$@"; then
     ARGS_HELP_REQUESTED=1
     bs_args_help
     return "${E_SUCCESS:-0}"
@@ -660,11 +702,7 @@ bs_args_parse() {
   done
 
   # Минимальное количество позиционных параметров / Minimum positional count
-  if [ "$__bs_args_required" -gt 0 ] && [ "$__bs_args_ps_pos" -lt "$__bs_args_required" ]; then
-    bs_log_error "at least ${__bs_args_required} parameter(s) are required, got ${__bs_args_ps_pos}"
-    bs_args_help >&2
-    return "${E_INVALID:-2}"
-  fi
+  bs_args_parse_required "$__bs_args_ps_pos" || return $?
 
   return "${E_SUCCESS:-0}"
 }
@@ -717,322 +755,22 @@ bs_args_get() {
 # ==========================================
 # Автодополнение / Completion
 # ==========================================
-
-# @private
-# @description Список флагов для генераторов: имя<TAB>вид<TAB>значения, по строке на флаг
-# @description Flags for the generators: name<TAB>kind<TAB>values, one flag per line
-bs_args_completion_flags() {
-  if [ "$(bs_map_count bs_args_flags)" -eq 0 ]; then return 0; fi
-  bs_map_keys bs_args_flags | sort | while IFS= read -r __bs_args_cf_n; do
-    bs_args_mget bs_args_flags "$__bs_args_cf_n" __bs_args_cf_kind
-    bs_args_mget bs_args_flag_val "$__bs_args_cf_n" __bs_args_cf_v
-    if [ "$__bs_args_cf_kind" = "value" ]; then
-      case "$__bs_args_cf_v" in
-        enum:*) printf '%s\tenum\t%s\n' "$__bs_args_cf_n" "${__bs_args_cf_v#enum:}" ;;
-        *)      printf '%s\tvalue\t\n' "$__bs_args_cf_n" ;;
-      esac
-    else
-      printf '%s\tbool\t\n' "$__bs_args_cf_n"
-    fi
-  done
-}
-
-# @description Сгенерировать скрипт автодополнения для bash (по умолчанию), zsh, fish или nu
-# @description Generate a completion script for bash (default), zsh, fish or nu
-#   Вывод можно сохранить в файл и подключить через source или ~/.bashrc
-#   The output can be saved to a file and loaded via source or ~/.bashrc
-# @param $1 program name / имя программы
-# @param $2 [optional] shell: bash (default), zsh, fish, nu; also BS_COMPLETION_SHELL
-# @example
-#   args::completion "deploy.sh" > /etc/bash_completion.d/deploy.sh
-#   args::completion "deploy.sh" zsh > ~/.zfunc/_deploy.sh
-# shell-gate: в теле — текст bash-completion (compgen, complete -F), который функция печатает, а не выполняет
-# shell-gate: the body holds bash-completion text (compgen, complete -F) that the function prints, not runs
-bs_args_completion() {
-  __bs_args_cp_prog=${1:-${0##*/}}
-  __bs_args_cp_target=$(bs_shell_of_name "${2:-${BS_COMPLETION_SHELL:-bash}}")
-
-  if [ "$(bs_map_count bs_args_tree)" -eq 0 ] && [ "$(bs_map_count bs_args_flags)" -eq 0 ]; then
-    bs_log_warn "args::completion: nothing declared, call args::define, args::level or args::flag first"
-    return "${E_ERROR:-1}"
-  fi
-
-  case "$__bs_args_cp_target" in
-    zsh)  bs_args_completion_zsh "$__bs_args_cp_prog"; return $? ;;
-    fish) bs_args_completion_fish "$__bs_args_cp_prog"; return $? ;;
-    nu)   bs_args_completion_nu "$__bs_args_cp_prog"; return $? ;;
-    bash) ;;
-    *)
-      bs_log_error "args::completion: no generator for '${2:-${BS_COMPLETION_SHELL:-}}' (supported: bash zsh fish nu)"
-      return "${E_ERROR:-1}"
-      ;;
-  esac
-
-  # Имя функции: только [a-zA-Z0-9_] / Function name: [a-zA-Z0-9_] only
-  __bs_args_cp_fn="_$(printf '%s' "$__bs_args_cp_prog" | tr -c 'a-zA-Z0-9_' '_')_completion"
-
-  # Список всех флагов для дополнения / All flags for completion
-  __bs_args_cp_words="--help"
-  __bs_args_cp_vflags=""
-  if [ "$(bs_map_count bs_args_flags)" -gt 0 ]; then
-    # Список value-флагов (после них значение не дополняется);
-    # enum-флаги исключаются — для них дополняются значения
-    # Value flags list (their values are not completed);
-    # enum flags are excluded — their values ARE completed
-    __bs_args_cp_sorted=$(bs_map_keys bs_args_flags | sort)
-    bs_arr_from_lines bs_args_cp_names "$__bs_args_cp_sorted"
-    eval "$(bs_arr_to_args bs_args_cp_names)"
-    for __bs_args_cp_n in "$@"; do
-      __bs_args_cp_words="${__bs_args_cp_words} --${__bs_args_cp_n}"
-      bs_args_mget bs_args_flags "$__bs_args_cp_n" __bs_args_cp_kind
-      bs_args_mget bs_args_flag_val "$__bs_args_cp_n" __bs_args_cp_v
-      if [ "$__bs_args_cp_kind" = "value" ]; then
-        case "$__bs_args_cp_v" in
-          enum:*) ;;
-          *) __bs_args_cp_vflags="${__bs_args_cp_vflags} --${__bs_args_cp_n}" ;;
-        esac
-      fi
-    done
-  fi
-
-  __bs_args_cp_max=$(bs_args_max_level)
-
-  cat <<EOF
-# Bash completion for ${__bs_args_cp_prog} — generated by core/args.sh (args::completion)
-# Автодополнение Bash для ${__bs_args_cp_prog} — сгенерировано core/args.sh (args::completion)
-${__bs_args_cp_fn}() {
-    local cur prev word positional i
-    COMPREPLY=()
-    cur="\${COMP_WORDS[COMP_CWORD]}"
-    prev="\${COMP_WORDS[COMP_CWORD-1]}"
-EOF
-
-  # После value-флага значение не дополняем / Do not complete after a value flag
-  __bs_args_cp_pat=""
-  if [ -n "$__bs_args_cp_vflags" ]; then
-    bs_utils_split bs_args_wa "$__bs_args_cp_vflags" ' '
-    __bs_args_cp_pat=$(bs_arr_join bs_args_wa '|')
-    cat <<EOF
-
-    # value-флаги: значение не дополняется / value flags: value is not completed
-    case "\${prev}" in
-        ${__bs_args_cp_pat}) return 0 ;;
-    esac
-EOF
-  fi
-
-  # enum-значения для value-флагов / enum values for value flags
-  if [ "$(bs_map_count bs_args_flags)" -gt 0 ]; then
-    eval "$(bs_arr_to_args bs_args_cp_names)"
-    for __bs_args_cp_n in "$@"; do
-      bs_args_mget bs_args_flags "$__bs_args_cp_n" __bs_args_cp_kind
-      bs_args_mget bs_args_flag_val "$__bs_args_cp_n" __bs_args_cp_v
-      if [ "$__bs_args_cp_kind" = "value" ]; then
-        case "$__bs_args_cp_v" in
-          enum:*)
-            __bs_args_cp_enum=$(printf '%s' "${__bs_args_cp_v#enum:}" | tr ',' ' ')
-            __bs_args_cp_enum_bar=$(printf '%s' "$__bs_args_cp_enum" | tr ' ' '|')
-            cat <<EOF
-
-    # enum-значения: --${__bs_args_cp_n} <${__bs_args_cp_enum_bar}>
-    case "\${prev}" in
-        --${__bs_args_cp_n}) COMPREPLY=( \$(compgen -W "${__bs_args_cp_enum}" -- "\${cur}") ); return 0 ;;
-    esac
-EOF
-            ;;
-        esac
-      fi
-    done
-  fi
-
-  cat <<EOF
-
-    # Дополнение флагов / Flag completion
-    if [[ "\${cur}" == --* ]]; then
-        COMPREPLY=( \$(compgen -W "${__bs_args_cp_words}" -- "\${cur}") )
-        return 0
-    fi
-
-    # Считаем уже введённые позиционные параметры (флаги уровней не занимают)
-    # Count positionals already entered (flags do not occupy levels)
-    positional=0
-    for ((i = 1; i < COMP_CWORD; i++)); do
-        word="\${COMP_WORDS[i]}"
-        case "\${word}" in
-EOF
-
-  if [ -n "$__bs_args_cp_vflags" ]; then
-    cat <<EOF
-            ${__bs_args_cp_pat}) ((++i)) ;;   # пропускаем значение value-флага / skip value flag value
-EOF
-  fi
-
-  cat <<EOF
-            --*) ;;                      # bool-флаг / bool flag
-            *) ((++positional)) ;;
-        esac
-    done
-
-    # Выбираем варианты по уровню / Choices by level
-    local choices=""
-    case \$((positional + 1)) in
-EOF
-
-  __bs_args_cp_level=1
-  while [ "$__bs_args_cp_level" -le "$__bs_args_cp_max" ]; do
-    bs_args_mget bs_args_tree "$__bs_args_cp_level" __bs_args_cp_list
-    if [ -n "$__bs_args_cp_list" ]; then
-      printf '        %d) choices="%s" ;;\n' "$__bs_args_cp_level" "$__bs_args_cp_list"
-    fi
-    __bs_args_cp_level=$((__bs_args_cp_level + 1))
-  done
-
-  cat <<EOF
-    esac
-
-    COMPREPLY=( \$(compgen -W "\${choices} ${__bs_args_cp_words}" -- "\${cur}") )
-    return 0
-}
-complete -F ${__bs_args_cp_fn} "${__bs_args_cp_prog}"
-EOF
-}
+# Генераторы вынесены в отдельный файл, чтобы args.sh читался как объявление,
+# разбор и справка. Подключаем в конце: `load "core/args"` даёт весь API.
+# The generators live in a separate file so args.sh reads as declaration, parse
+# and help. Sourced at the end: `load "core/args"` still provides the whole API.
+bs_source_relative "args-completion.sh" || return 1
 
 # ==========================================
-# Автодополнение zsh, fish, nushell / Completion for zsh, fish, nushell
-# Не проверено на реальных fish и nu: проверяется только текст.
-# Not verified on real fish and nu: only the text is tested.
-# ==========================================
-
-# @private
-bs_args_completion_zsh() {
-  __bs_args_zs_prog=$1
-  __bs_args_zs_fn="_$(printf '%s' "$__bs_args_zs_prog" | tr -c 'a-zA-Z0-9_' '_')_completion"
-  bs_arr_clear bs_args_specs
-  bs_arr_push bs_args_specs "'--help[show help]'"
-  __bs_args_zs_flags=$(bs_args_completion_flags)
-  while IFS="$(printf '\t')" read -r __bs_args_zs_name __bs_args_zs_kind __bs_args_zs_values; do
-    [ -n "$__bs_args_zs_name" ] || continue
-    case "$__bs_args_zs_kind" in
-      enum)
-        __bs_args_zs_vals=$(printf '%s' "$__bs_args_zs_values" | tr ',' ' ')
-        bs_arr_push bs_args_specs "$(bs_quote "--${__bs_args_zs_name}=:value:(${__bs_args_zs_vals})")" ;;
-      value) bs_arr_push bs_args_specs "$(bs_quote "--${__bs_args_zs_name}=:value: ")" ;;
-      *)     bs_arr_push bs_args_specs "$(bs_quote "--${__bs_args_zs_name}")" ;;
-    esac
-  done <<EOF
-${__bs_args_zs_flags}
-EOF
-  __bs_args_zs_max=$(bs_args_max_level)
-  __bs_args_zs_level=1
-  while [ "$__bs_args_zs_level" -le "$__bs_args_zs_max" ]; do
-    bs_args_mget bs_args_tree "$__bs_args_zs_level" __bs_args_zs_list
-    if [ -n "$__bs_args_zs_list" ]; then
-      bs_arr_push bs_args_specs "$(bs_quote "${__bs_args_zs_level}:argument ${__bs_args_zs_level}:(${__bs_args_zs_list})")"
-    fi
-    __bs_args_zs_level=$((__bs_args_zs_level + 1))
-  done
-  printf '#compdef %s\n' "$__bs_args_zs_prog"
-  printf '# zsh completion for %s — generated by core/args.sh (args::completion)\n' "$__bs_args_zs_prog"
-  printf '# Автодополнение zsh для %s — сгенерировано core/args.sh (args::completion)\n' "$__bs_args_zs_prog"
-  printf '%s() {\n  _arguments -S \\\n' "$__bs_args_zs_fn"
-  __bs_args_zs_n=$(bs_arr_len bs_args_specs)
-  __bs_args_zs_i=0
-  while [ "$__bs_args_zs_i" -lt "$__bs_args_zs_n" ]; do
-    __bs_args_zs_spec=$(bs_arr_get bs_args_specs "$__bs_args_zs_i")
-    if [ "$__bs_args_zs_i" -lt $((__bs_args_zs_n - 1)) ]; then
-      printf '    %s \\\n' "$__bs_args_zs_spec"
-    else
-      printf '    %s\n' "$__bs_args_zs_spec"
-    fi
-    __bs_args_zs_i=$((__bs_args_zs_i + 1))
-  done
-  printf '}\n'
-  printf 'compdef %s %s\n' "$__bs_args_zs_fn" "$__bs_args_zs_prog"
-}
-
-# @private
-bs_args_completion_fish() {
-  __bs_args_fi_prog=$1
-  __bs_args_fi_q=$(bs_quote "$__bs_args_fi_prog")
-  printf '# fish completion for %s — generated by core/args.sh (args::completion)\n' "$__bs_args_fi_prog"
-  printf '# Автодополнение fish для %s — сгенерировано core/args.sh (args::completion)\n' "$__bs_args_fi_prog"
-  printf 'complete -c %s -f\n' "$__bs_args_fi_q"
-  printf 'complete -c %s -l help -d %s\n' "$__bs_args_fi_q" "$(bs_quote "show help")"
-  __bs_args_fi_flags=$(bs_args_completion_flags)
-  while IFS="$(printf '\t')" read -r __bs_args_fi_name __bs_args_fi_kind __bs_args_fi_values; do
-    [ -n "$__bs_args_fi_name" ] || continue
-    case "$__bs_args_fi_kind" in
-      enum)  printf 'complete -c %s -l %s -x -a %s\n' "$__bs_args_fi_q" "$__bs_args_fi_name" "$(bs_quote "$(printf '%s' "$__bs_args_fi_values" | tr ',' ' ')")" ;;
-      value) printf 'complete -c %s -l %s -r\n' "$__bs_args_fi_q" "$__bs_args_fi_name" ;;
-      *)     printf 'complete -c %s -l %s\n' "$__bs_args_fi_q" "$__bs_args_fi_name" ;;
-    esac
-  done <<EOF
-${__bs_args_fi_flags}
-EOF
-  __bs_args_fi_max=$(bs_args_max_level)
-  __bs_args_fi_level=1
-  while [ "$__bs_args_fi_level" -le "$__bs_args_fi_max" ]; do
-    bs_args_mget bs_args_tree "$__bs_args_fi_level" __bs_args_fi_list
-    if [ -n "$__bs_args_fi_list" ]; then
-      printf 'complete -c %s -n %s -a %s\n' "$__bs_args_fi_q" \
-        "$(bs_quote "__fish_is_nth_token ${__bs_args_fi_level}")" "$(bs_quote "$__bs_args_fi_list")"
-    fi
-    __bs_args_fi_level=$((__bs_args_fi_level + 1))
-  done
-}
-
-# @private
-bs_args_completion_nu() {
-  __bs_args_nu_prog=$1
-  printf '# nushell completion for %s — generated by core/args.sh (args::completion)\n' "$__bs_args_nu_prog"
-  printf '# Автодополнение nushell для %s — сгенерировано core/args.sh (args::completion)\n' "$__bs_args_nu_prog"
-  bs_arr_clear bs_args_decl
-  bs_arr_push bs_args_decl "  --help"
-  __bs_args_nu_flags=$(bs_args_completion_flags)
-  while IFS="$(printf '\t')" read -r __bs_args_nu_name __bs_args_nu_kind __bs_args_nu_values; do
-    [ -n "$__bs_args_nu_name" ] || continue
-    case "$__bs_args_nu_kind" in
-      enum)
-        printf 'def "nu-complete %s --%s" [] { [' "$__bs_args_nu_prog" "$__bs_args_nu_name"
-        bs_utils_split bs_args_wa "$__bs_args_nu_values" ','
-        eval "$(bs_arr_to_args bs_args_wa)"
-        for __bs_args_nu_item in "$@"; do printf ' "%s"' "$__bs_args_nu_item"; done
-        printf ' ] }\n'
-        bs_arr_push bs_args_decl "  --${__bs_args_nu_name}: string@\"nu-complete ${__bs_args_nu_prog} --${__bs_args_nu_name}\"" ;;
-      value) bs_arr_push bs_args_decl "  --${__bs_args_nu_name}: string" ;;
-      *)     bs_arr_push bs_args_decl "  --${__bs_args_nu_name}" ;;
-    esac
-  done <<EOF
-${__bs_args_nu_flags}
-EOF
-  __bs_args_nu_max=$(bs_args_max_level)
-  __bs_args_nu_level=1
-  while [ "$__bs_args_nu_level" -le "$__bs_args_nu_max" ]; do
-    bs_args_mget bs_args_tree "$__bs_args_nu_level" __bs_args_nu_list
-    if [ -n "$__bs_args_nu_list" ]; then
-      printf 'def "nu-complete %s arg %d" [] { [' "$__bs_args_nu_prog" "$__bs_args_nu_level"
-      bs_utils_split bs_args_wa "$__bs_args_nu_list" ' '
-      eval "$(bs_arr_to_args bs_args_wa)"
-      for __bs_args_nu_item in "$@"; do printf ' "%s"' "$__bs_args_nu_item"; done
-      printf ' ] }\n'
-      bs_arr_push bs_args_decl "  arg${__bs_args_nu_level}?: string@\"nu-complete ${__bs_args_nu_prog} arg ${__bs_args_nu_level}\""
-    fi
-    __bs_args_nu_level=$((__bs_args_nu_level + 1))
-  done
-  printf 'extern "%s" [\n' "$__bs_args_nu_prog"
-  eval "$(bs_arr_to_args bs_args_decl)"
-  printf '%s\n' "$@"
-  printf ']\n'
-}
-
-# ==========================================
-# Псевдонимы и инициализация / Aliases and initialization
+# Псевдонимы / Aliases
 # ==========================================
 
 # args::parse, args::reset и args::require приходят из lib/compat/args.sh (они ещё заполняют
-# массивы bash); остальные имена — простые псевдонимы
+# массивы bash); остальные имена — простые псевдонимы. args::completion живёт в
+# args-completion.sh вместе с генераторами.
 # args::parse, args::reset and args::require come from lib/compat/args.sh (they also fill the
-# bash arrays); the other names are plain aliases
+# bash arrays); the other names are plain aliases. args::completion lives in
+# args-completion.sh together with the generators.
 bs_shell_alias bs_args_define args::define
 bs_shell_alias bs_args_level args::level
 bs_shell_alias bs_args_required args::required
@@ -1045,7 +783,6 @@ bs_shell_alias bs_args_has args::has
 bs_shell_alias bs_args_rest args::rest
 bs_shell_alias bs_args_help args::help
 bs_shell_alias bs_args_get args::get
-bs_shell_alias bs_args_completion args::completion
 
 ARGS_LOADED="1"
 

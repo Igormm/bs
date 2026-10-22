@@ -45,7 +45,7 @@ ksh, mksh.
 
 * `@shell posix` — файл валиден как POSIX sh: его подключат dash, ash/busybox,
   bash, zsh, ksh, mksh. Сейчас: `bootstrap/shell.sh`, `trampoline.sh`, `shebang.sh`, `loader.sh`, `base.sh`, `init.sh`, `cli.sh`; `install/*.sh`, `install.sh` и `bs`;
-  `core/prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `var`, `str`, `num`, `msg`. **bash в этом ярусе не
+  `core/prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `config`, `lang`, `args`, `args-completion`, `var`, `str`, `num`, `msg`. **bash в этом ярусе не
   участвует** — это проверяет `.agents/skills/bs-shell-abstraction/scripts/check_posix_tier.sh`
   (разбор в не-bash оболочках, запрет bash-конструкций, запуск в dash без bash в PATH).
   Стиль кода яруса — `documentation/*/code-style-guide.md`, раздел 12.
@@ -96,7 +96,7 @@ namerefs, `mapfile`, `${!x}`, `BASH_REMATCH` — это `@shell bash4` с опи
 модуль доступен через `bs` (hosted) и `bs call`. В POSIX переводят то, что (а) должно
 работать ДО bash — пролог, трамплин, реестр, шебанг; или (б) нужно скриптам на других
 оболочках и не держится на bash-конструкциях — `quiet`, `version`, `const`, `guard`,
-`prereq`; `core/` переведён целиком (19 файлов, последним — `args`); очередь: остальные команды `bs::cli::*` и `bootstrap/bs.sh`. Перевод — по навыку `bs-kernel-code`, отдельный
+`prereq`; `core/` переведён целиком (20 файлов, последним — `args-completion`); очередь: остальные команды `bs::cli::*` и `bootstrap/bs.sh`. Перевод — по навыку `bs-kernel-code`, отдельный
 коммит: код, тест в шести оболочках, `check_posix_tier.sh`, строка в документации.
 
 ## 5. Порядок работы / Workflow
