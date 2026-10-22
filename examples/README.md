@@ -86,6 +86,8 @@ io::streams::print "hello from BS"
 ### Integration modules / Интеграции
 
 - `http_example.sh` — HTTP client demo / демо HTTP-клиента
+- `openbao_wizard.sh` — OpenBao server/client setup wizard /
+  визард установки сервера и клиента OpenBao
 - `llm_example.sh` — LLM client demo / демо LLM-клиента
 - `k8s_example.sh` — Kubernetes client helpers demo / демо Kubernetes-клиента
 - `result_example.sh` — JSON result contract for integrations /

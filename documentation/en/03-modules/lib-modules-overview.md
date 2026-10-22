@@ -36,11 +36,11 @@ Details: [io-streams.md](io-streams.md), [io-files.md](io-files.md), [io-process
 
 ## system — `lib/system/`
 
-The largest group: wrappers around day-to-day Linux system administration. Modules: [devices.sh](../../../lib/system/devices.sh), [display.sh](../../../lib/system/display.sh), [distro.sh](../../../lib/system/distro.sh) (distro detection), [distrologic.sh](../../../lib/system/distrologic.sh) (per-distro package/service logic), [info.sh](../../../lib/system/info.sh), [keyboard.sh](../../../lib/system/keyboard.sh), [locale.sh](../../../lib/system/locale.sh), [logging.sh](../../../lib/system/logging.sh), [network.sh](../../../lib/system/network.sh), [packages.sh](../../../lib/system/packages.sh), [permissions.sh](../../../lib/system/permissions.sh), [platformcheck.sh](../../../lib/system/platformcheck.sh), [processes.sh](../../../lib/system/processes.sh), [routing.sh](../../../lib/system/routing.sh), [gpu.sh](../../../lib/system/gpu.sh) (GPU diagnostics + stress), [sensor.sh](../../../lib/system/sensor.sh) (touch/sensor evdev access + diagnostics), [safety.sh](../../../lib/system/safety.sh) (dry-run / confirmation gate), [schedule.sh](../../../lib/system/schedule.sh) (at/cron helpers), [security.sh](../../../lib/system/security.sh), [services.sh](../../../lib/system/services.sh), [system.sh](../../../lib/system/system.sh), [time.sh](../../../lib/system/time.sh), [users.sh](../../../lib/system/users.sh), [sshd.sh](../../../lib/system/sshd.sh) (server-side sshd config + hardening profiles), [fail2ban.sh](../../../lib/system/fail2ban.sh) (fail2ban jail config + hardening profiles), [utils.sh](../../../lib/system/utils.sh).
+The largest group: wrappers around day-to-day Linux system administration. Modules: [devices.sh](../../../lib/system/devices.sh), [display.sh](../../../lib/system/display.sh), [distro.sh](../../../lib/system/distro.sh) (distro detection), [distrologic.sh](../../../lib/system/distrologic.sh) (per-distro package/service logic), [info.sh](../../../lib/system/info.sh), [keyboard.sh](../../../lib/system/keyboard.sh), [locale.sh](../../../lib/system/locale.sh), [logging.sh](../../../lib/system/logging.sh), [network.sh](../../../lib/system/network.sh), [packages.sh](../../../lib/system/packages.sh), [permissions.sh](../../../lib/system/permissions.sh), [platformcheck.sh](../../../lib/system/platformcheck.sh), [processes.sh](../../../lib/system/processes.sh), [routing.sh](../../../lib/system/routing.sh), [gpu.sh](../../../lib/system/gpu.sh) (GPU diagnostics + stress), [sensor.sh](../../../lib/system/sensor.sh) (touch/sensor evdev access + diagnostics), [safety.sh](../../../lib/system/safety.sh) (dry-run / confirmation gate), [schedule.sh](../../../lib/system/schedule.sh) (at/cron helpers), [security.sh](../../../lib/system/security.sh), [services.sh](../../../lib/system/services.sh), [system.sh](../../../lib/system/system.sh), [time.sh](../../../lib/system/time.sh), [users.sh](../../../lib/system/users.sh), [sshd.sh](../../../lib/system/sshd.sh) (server-side sshd config + hardening profiles), [fail2ban.sh](../../../lib/system/fail2ban.sh) (fail2ban jail config + hardening profiles), [openbao.sh](../../../lib/system/openbao.sh) (OpenBao server install, TLS, systemd, init/unseal), [utils.sh](../../../lib/system/utils.sh).
 
 Key functions: `system::distro::detect`, `system::info::all`, `system::packages::install`, `safety::execute`, `gpu::check`, `gpu::stress`, `sensor::devices`, `sensor::events`, `sensor::diagnose`.
 
-Details: [system-gpu.md](system-gpu.md), [system-sensor.md](system-sensor.md), [system-sshd.md](system-sshd.md), [system-fail2ban.md](system-fail2ban.md)
+Details: [system-gpu.md](system-gpu.md), [system-sensor.md](system-sensor.md), [system-sshd.md](system-sshd.md), [system-fail2ban.md](system-fail2ban.md), [system-openbao.md](system-openbao.md)
 
 ## ui — `lib/ui/`
 
@@ -88,6 +88,7 @@ Details: [data-format.md](data-format.md)
 
 Clients for external services, VPN tooling, LLMs, Kubernetes and connectors to other systems:
 - [http.sh](../../../lib/integration/http.sh) — HTTP client based on `curl`/`wget` with dry-run, timeouts and retries.
+- [openbao.sh](../../../lib/integration/openbao.sh) — OpenBao/Vault API client: KV v2, tokens, policies, mounts, namespaces.
 - [llm.sh](../../../lib/integration/llm.sh) — unified client for OpenAI and Ollama.
 - [k8s.sh](../../../lib/integration/k8s.sh) — `kubectl` wrapper with default namespace and dry-run.
 - [vkapi.sh](../../../lib/integration/vkapi.sh) — VK API wrapper with caching and rate limiting.
@@ -95,9 +96,9 @@ Clients for external services, VPN tooling, LLMs, Kubernetes and connectors to o
 - [wireguard.sh](../../../lib/integration/wireguard.sh) — WireGuard interface and peer management.
 - [result.sh](../../../lib/integration/result.sh) — JSON result contract for integrations with Go backends, HTTP APIs and CI systems.
 
-Key functions: `http::get`, `http::post`, `http::retry`, `llm::chat`, `llm::chat_file`, `k8s::pod::list`, `k8s::deployment::restart`, `k8s::apply`, `vkapi::api_call`, `vkmusic::search_and_download`, `wireguard::create_interface`, `wireguard::add_peer`, `result::run`, `result::wrap`, `result::ok`, `result::error`.
+Key functions: `http::get`, `http::post`, `http::retry`, `openbao::request`, `openbao::kv::put`, `openbao::login`, `llm::chat`, `llm::chat_file`, `k8s::pod::list`, `k8s::deployment::restart`, `k8s::apply`, `vkapi::api_call`, `vkmusic::search_and_download`, `wireguard::create_interface`, `wireguard::add_peer`, `result::run`, `result::wrap`, `result::ok`, `result::error`.
 
-Details: [integration-http.md](integration-http.md), [integration-llm.md](integration-llm.md), [integration-k8s.md](integration-k8s.md), [integration-result.md](integration-result.md)
+Details: [integration-http.md](integration-http.md), [integration-openbao.md](integration-openbao.md), [integration-llm.md](integration-llm.md), [integration-k8s.md](integration-k8s.md), [integration-result.md](integration-result.md)
 
 ## ts — `lib/ts/`
 

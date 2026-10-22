@@ -268,6 +268,22 @@ main() {
 ./bs run examples/sshd_wizard.sh --dry-run
 ```
 
+### 2.2. Визард OpenBao / OpenBao wizard
+
+`examples/openbao_wizard.sh` — TUI-визард установки OpenBao: роль
+`server`/`client`/`both`, профили `dev` (HTTP, root-токен, сервер в
+терминале) и `prod` (TLS, systemd, `operator init` + unseal), клиентский
+адрес/CA/токен, шаговый журнал. Секреты — только в файлы `0600`.
+
+```bash
+sudo ./bs run examples/openbao_wizard.sh --profile prod
+./bs run examples/openbao_wizard.sh --role client
+./bs run examples/openbao_wizard.sh --dry-run
+```
+
+Подробнее: [сервер](documentation/ru/03-modules/system-openbao.md) ·
+[клиент](documentation/ru/03-modules/integration-openbao.md).
+
 ## 3. Пульс машины / Host pulse
 
 Вектор возможностей: тир, userland, пробы `grep -P`/`sed -z`, SHA-цепочка,
@@ -362,6 +378,7 @@ ubuntu, debian:stable, almalinux:9, almalinux:8 — см. `.github/workflows/ci.
 - Идиомы тишины `utils::quiet*` / Silence idioms — [ru](documentation/ru/03-modules/core-utils.md) · [en](documentation/en/03-modules/core-utils.md)
 - JSON-контракт результата / Result contract — [ru](documentation/ru/03-modules/integration-result.md) · [en](documentation/en/03-modules/integration-result.md)
 - HTTP, LLM, Kubernetes / HTTP, LLM, Kubernetes — [ru](documentation/ru/03-modules/integration-http.md) · [en](documentation/en/03-modules/integration-http.md)
+- OpenBao: сервер и клиент / OpenBao server and client — [ru](documentation/ru/03-modules/system-openbao.md) · [en](documentation/en/03-modules/system-openbao.md)
 - Стиль кода / Code style — [ru](documentation/ru/code-style-guide.md) · [en](documentation/en/code-style-guide.md)
 - `examples/` — рабочие примеры с комментариями / working examples with comments
 

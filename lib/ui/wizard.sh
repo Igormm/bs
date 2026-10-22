@@ -24,7 +24,7 @@
 #   load "lib/ui/wizard"
 #   wizard::intro "Что это / WHAT" "строка1" "строка2" ...
 #   wizard::ask_input var "Имя / Name" "default" "пояснение / desc"
-#   wizard::ask_pass var "пояснение / desc"
+#   wizard::ask_pass var "пояснение / desc" ["заголовок / title"]
 #   wizard::menu var "Заголовок / Title" "desc" "Пункт 1" "Пункт 2"
 #   wizard::multi_menu var "Заголовок / Title" "desc" "A" "B"
 #   wizard::yn var "Вопрос / Question" "desc"
@@ -541,9 +541,10 @@ wizard::ask_input() {
 #   Маска ● на каждый символ; q — отмена; пустой пароль = без пароля.
 # @param $1 Output variable / Выходная переменная
 # @param $2 [optional] Explanation row / Строка-пояснение
+# @param $3 [optional] Title (default: server password) / Заголовок
 wizard::ask_pass() {
     local -n __wiz_out="${1:?output variable required}"
-    local -r desc="${2:-}"
+    local -r desc="${2:-}" title="${3:-Пароль сервера / Server password}"
     local -r inner="$(wizard::__box_width)"
     local -i frame_h=8
     is::not_empty "${desc}" && frame_h=$(( frame_h + 1 ))
@@ -563,7 +564,7 @@ wizard::ask_pass() {
 
         wizard::__frame_begin $((inner + 2)) ${frame_h}
         wizard::__rule "${inner}" '╭' '╮'
-        wizard::__title_row "${inner}" "Пароль сервера / Server password"
+        wizard::__title_row "${inner}" "${title}"
         if is::not_empty "${desc}"; then
             wizard::__hint "${inner}" "${desc}"
         fi

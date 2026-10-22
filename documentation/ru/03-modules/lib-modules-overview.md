@@ -36,11 +36,11 @@ load "lib/data/dataprocessor"
 
 ## system — `lib/system/`
 
-Самая большая группа: обёртки над повседневным администрированием Linux. Модули: [devices.sh](../../../lib/system/devices.sh), [display.sh](../../../lib/system/display.sh), [distro.sh](../../../lib/system/distro.sh) (определение дистрибутива), [distrologic.sh](../../../lib/system/distrologic.sh) (логика пакетов и сервисов по дистрибутивам), [info.sh](../../../lib/system/info.sh), [keyboard.sh](../../../lib/system/keyboard.sh), [locale.sh](../../../lib/system/locale.sh), [logging.sh](../../../lib/system/logging.sh), [network.sh](../../../lib/system/network.sh), [packages.sh](../../../lib/system/packages.sh), [permissions.sh](../../../lib/system/permissions.sh), [platformcheck.sh](../../../lib/system/platformcheck.sh), [processes.sh](../../../lib/system/processes.sh), [routing.sh](../../../lib/system/routing.sh), [gpu.sh](../../../lib/system/gpu.sh) (диагностика и стресс GPU), [sensor.sh](../../../lib/system/sensor.sh) (сенсоры evdev + диагностика), [safety.sh](../../../lib/system/safety.sh) (dry-run / подтверждение действий), [schedule.sh](../../../lib/system/schedule.sh) (помощники at/cron), [security.sh](../../../lib/system/security.sh), [services.sh](../../../lib/system/services.sh), [system.sh](../../../lib/system/system.sh), [time.sh](../../../lib/system/time.sh), [users.sh](../../../lib/system/users.sh), [sshd.sh](../../../lib/system/sshd.sh) (серверный конфиг sshd + профили ужесточения), [fail2ban.sh](../../../lib/system/fail2ban.sh) (конфиг джейлов fail2ban + профили), [utils.sh](../../../lib/system/utils.sh).
+Самая большая группа: обёртки над повседневным администрированием Linux. Модули: [devices.sh](../../../lib/system/devices.sh), [display.sh](../../../lib/system/display.sh), [distro.sh](../../../lib/system/distro.sh) (определение дистрибутива), [distrologic.sh](../../../lib/system/distrologic.sh) (логика пакетов и сервисов по дистрибутивам), [info.sh](../../../lib/system/info.sh), [keyboard.sh](../../../lib/system/keyboard.sh), [locale.sh](../../../lib/system/locale.sh), [logging.sh](../../../lib/system/logging.sh), [network.sh](../../../lib/system/network.sh), [packages.sh](../../../lib/system/packages.sh), [permissions.sh](../../../lib/system/permissions.sh), [platformcheck.sh](../../../lib/system/platformcheck.sh), [processes.sh](../../../lib/system/processes.sh), [routing.sh](../../../lib/system/routing.sh), [gpu.sh](../../../lib/system/gpu.sh) (диагностика и стресс GPU), [sensor.sh](../../../lib/system/sensor.sh) (сенсоры evdev + диагностика), [safety.sh](../../../lib/system/safety.sh) (dry-run / подтверждение действий), [schedule.sh](../../../lib/system/schedule.sh) (помощники at/cron), [security.sh](../../../lib/system/security.sh), [services.sh](../../../lib/system/services.sh), [system.sh](../../../lib/system/system.sh), [time.sh](../../../lib/system/time.sh), [users.sh](../../../lib/system/users.sh), [sshd.sh](../../../lib/system/sshd.sh) (серверный конфиг sshd + профили ужесточения), [fail2ban.sh](../../../lib/system/fail2ban.sh) (конфиг джейлов fail2ban + профили), [openbao.sh](../../../lib/system/openbao.sh) (сервер OpenBao: установка, TLS, systemd, init/unseal), [utils.sh](../../../lib/system/utils.sh).
 
 Ключевые функции: `system::distro::detect`, `system::info::all`, `system::packages::install`, `safety::execute`, `gpu::check`, `gpu::stress`, `sensor::devices`, `sensor::events`, `sensor::diagnose`.
 
-Подробнее: [system-gpu.md](system-gpu.md), [system-sensor.md](system-sensor.md), [system-sshd.md](system-sshd.md), [system-fail2ban.md](system-fail2ban.md)
+Подробнее: [system-gpu.md](system-gpu.md), [system-sensor.md](system-sensor.md), [system-sshd.md](system-sshd.md), [system-fail2ban.md](system-fail2ban.md), [system-openbao.md](system-openbao.md)
 
 ## ui — `lib/ui/`
 
@@ -88,6 +88,7 @@ RFC-хелперы: UUID 4/7 ([uuid.sh](../../../lib/rfc/uuid.sh)), URI, CSV.
 
 Клиенты для внешних сервисов, VPN-инструменты, LLM, Kubernetes и коннекторы к другим системам:
 - [http.sh](../../../lib/integration/http.sh) — HTTP-клиент на базе `curl`/`wget` с dry-run, таймаутами и retries.
+- [openbao.sh](../../../lib/integration/openbao.sh) — API-клиент OpenBao/Vault: KV v2, токены, политики, mount, namespace.
 - [llm.sh](../../../lib/integration/llm.sh) — единый клиент для OpenAI и Ollama.
 - [k8s.sh](../../../lib/integration/k8s.sh) — обёртка над `kubectl` с namespace по умолчанию и dry-run.
 - [vkapi.sh](../../../lib/integration/vkapi.sh) — обёртка VK API с кэшированием и ограничением частоты запросов.
@@ -95,9 +96,9 @@ RFC-хелперы: UUID 4/7 ([uuid.sh](../../../lib/rfc/uuid.sh)), URI, CSV.
 - [wireguard.sh](../../../lib/integration/wireguard.sh) — управление интерфейсами и пирами WireGuard.
 - [result.sh](../../../lib/integration/result.sh) — JSON-контракт результата операций для интеграции с Go-backend, HTTP API и CI.
 
-Ключевые функции: `http::get`, `http::post`, `http::retry`, `llm::chat`, `llm::chat_file`, `k8s::pod::list`, `k8s::deployment::restart`, `k8s::apply`, `vkapi::api_call`, `vkmusic::search_and_download`, `wireguard::create_interface`, `wireguard::add_peer`, `result::run`, `result::wrap`, `result::ok`, `result::error`.
+Ключевые функции: `http::get`, `http::post`, `http::retry`, `openbao::request`, `openbao::kv::put`, `openbao::login`, `llm::chat`, `llm::chat_file`, `k8s::pod::list`, `k8s::deployment::restart`, `k8s::apply`, `vkapi::api_call`, `vkmusic::search_and_download`, `wireguard::create_interface`, `wireguard::add_peer`, `result::run`, `result::wrap`, `result::ok`, `result::error`.
 
-Подробнее: [integration-http.md](integration-http.md), [integration-llm.md](integration-llm.md), [integration-k8s.md](integration-k8s.md), [integration-result.md](integration-result.md)
+Подробнее: [integration-http.md](integration-http.md), [integration-openbao.md](integration-openbao.md), [integration-llm.md](integration-llm.md), [integration-k8s.md](integration-k8s.md), [integration-result.md](integration-result.md)
 
 ## ts — `lib/ts/`
 
