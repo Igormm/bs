@@ -26,7 +26,7 @@ load "lib/system/openbao"
 | Profile | Behaviour |
 |---|---|
 | `dev` | install the binary, HTTP on loopback, generated root token, foreground `bao server -dev` |
-| `prod` | system user, file storage, TLS, systemd unit, `operator init`, automatic unseal, health check |
+| `prod` | system user, single-node Raft storage, TLS, systemd unit, `operator init`, automatic unseal, health check |
 
 `prod` is the default for `openbao_server::apply`.
 

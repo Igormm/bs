@@ -454,7 +454,12 @@ openbao::kv::put() {
     path="$(openbao::__key_path "${2:-}")" || return $?
     local -r data="${3:?JSON body required}"
     openbao::__check_json "${data}" || return $?
-    openbao::request POST "${mount}/data/${path}" "${data}"
+    local body
+    body="$(printf '%s' "${data}" | "${BS_OPENBAO_JQ:-jq}" -c '{data: .}')" || {
+        log::error "OpenBao: не удалось собрать KV v2 payload / cannot build KV v2 payload"
+        return "${OPENBAO_ERROR_JSON}"
+    }
+    openbao::request POST "${mount}/data/${path}" "${body}"
 }
 
 # @description Delete a KV v2 secret / Удалить секрет KV v2
@@ -528,10 +533,20 @@ openbao::mount::list() { openbao::request GET sys/mounts; }
 # @description Enable a mount / Включить mount
 # @param $1 Path / Путь
 # @param $2 Type / Тип
+# @param [$3] Options JSON object / JSON-объект options
 openbao::mount::enable() {
     local -r path="${1:?mount path required}" type="${2:?mount type required}"
+    local options="${3-}"
+    openbao::__need_jq || return $?
     local body
-    body="$(printf '%s' "${type}" | "${BS_OPENBAO_JQ}" -Rs '{type: .}')" || return "${OPENBAO_ERROR_JSON}"
+    if [[ -n "${options}" ]]; then
+        openbao::__check_json "${options}" || return $?
+        body="$(printf '%s' "${options}" | "${BS_OPENBAO_JQ}" -c --arg type "${type}"             '{type: $type, options: .}')" || return "${OPENBAO_ERROR_JSON}"
+    elif [[ "${type}" == "kv" ]]; then
+        body="$("${BS_OPENBAO_JQ}" -cn --arg type "${type}"             '{type: $type, options: {version: "2"}}')" || return "${OPENBAO_ERROR_JSON}"
+    else
+        body="$(printf '%s' "${type}" | "${BS_OPENBAO_JQ}" -Rs '{type: .}')" || return "${OPENBAO_ERROR_JSON}"
+    fi
     openbao::request POST "sys/mounts/${path}" "${body}"
 }
 # @description Disable a mount / Отключить mount

@@ -109,8 +109,10 @@ openbao::kv::list secret app
 openbao::kv::metadata secret app/db
 ```
 
-Mount по умолчанию — `secret`; другой mount передаётся первым аргументом. Пути,
-начинающиеся с `/`, содержащие `..` или управляющие символы, отклоняются.
+Mount по умолчанию — `secret`; другой mount передаётся первым аргументом. Третий
+аргумент `openbao::kv::put` — объект полей секрета; helper оборачивает его в
+KV v2-конверт `data`. Пути, начинающиеся с `/`, содержащие `..` или управляющие
+символы, отклоняются.
 
 ### Токены, политики, mount, namespace
 
@@ -125,6 +127,7 @@ openbao::policy::write app ./app-policy.hcl
 
 openbao::mount::list
 openbao::mount::enable kv-custom kv
+openbao::mount::enable pki-custom pki '{"max_lease_ttl":"87600h"}'
 openbao::mount::disable kv-custom
 
 openbao::namespace::list
@@ -133,6 +136,9 @@ openbao::namespace::create team-a
 
 JSON-аргументы проверяются до запроса; файл политики экранируется через
 `jq -Rs` и отправляется как JSON-строка, а не склеивается вручную.
+
+`openbao::mount::enable path kv` по умолчанию включает KV v2; третий
+JSON-объект переопределяет options mount.
 
 ## Коды ошибок
 

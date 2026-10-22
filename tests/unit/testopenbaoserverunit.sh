@@ -179,7 +179,8 @@ main() {
     testframework::section "config and unit / конфиг и юнит"
     local cfg
     cfg="$(openbao_server::render_config prod)"
-    testframework::assert_command "printf '%s' '${cfg}' | grep -qF 'storage \"file\"'" "file storage"
+    testframework::assert_command "printf '%s' '${cfg}' | grep -qF 'storage \"raft\"'" "raft storage"
+    testframework::assert_command "printf '%s' '${cfg}' | grep -qF 'node_id = \"openbao-test\"'" "raft node id"
     testframework::assert_command "printf '%s' '${cfg}' | grep -qF 'tls_disable = 0'" "TLS enabled in prod"
     testframework::assert_command "printf '%s' '${cfg}' | grep -qF 'api_addr = \"https://127.0.0.1:8200\"'" "prod api_addr"
     testframework::assert_command "printf '%s' '${cfg}' | grep -qF 'cluster_addr = \"https://127.0.0.1:8201\"'" "cluster port"
@@ -211,7 +212,7 @@ main() {
     testframework::assert_command "openbao_server::configure prod" "prod configure"
     testframework::assert_file_exists "${BS_OPENBAO_CONFIG}" "config written"
     testframework::assert_equal "640" "$(stat -c %a "${BS_OPENBAO_CONFIG}")" "config mode 0640"
-    testframework::assert_command "grep -qF 'storage \"file\"' '${BS_OPENBAO_CONFIG}'" "config content"
+    testframework::assert_command "grep -qF 'storage \"raft\"' '${BS_OPENBAO_CONFIG}'" "config content"
     testframework::assert_command "compgen -G '${BS_OPENBAO_CONFIG}.bak.*' >/dev/null" "old config backed up"
     testframework::assert_command "[[ -d '${BS_OPENBAO_DATA_DIR}/data' ]]" "data directory"
 

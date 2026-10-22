@@ -110,8 +110,10 @@ openbao::kv::list secret app
 openbao::kv::metadata secret app/db
 ```
 
-The default mount is `secret`; pass another mount as the first argument. Paths
-starting with `/`, containing `..` or control characters are rejected.
+The default mount is `secret`; pass another mount as the first argument. The
+third argument to `openbao::kv::put` is the object of secret fields; the helper
+wraps it in the KV v2 `data` envelope. Paths starting with `/`, containing `..`
+or control characters are rejected.
 
 ### Tokens, policies, mounts, namespaces
 
@@ -126,6 +128,7 @@ openbao::policy::write app ./app-policy.hcl
 
 openbao::mount::list
 openbao::mount::enable kv-custom kv
+openbao::mount::enable pki-custom pki '{"max_lease_ttl":"87600h"}'
 openbao::mount::disable kv-custom
 
 openbao::namespace::list
@@ -134,6 +137,9 @@ openbao::namespace::create team-a
 
 JSON arguments are validated before a request; a policy file is JSON-escaped
 through `jq -Rs`, so it is sent as a JSON string, not concatenated.
+
+`openbao::mount::enable path kv` enables KV v2 by default; pass a third
+JSON object to override the mount options.
 
 ## Error codes
 

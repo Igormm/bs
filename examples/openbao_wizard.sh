@@ -56,7 +56,7 @@ obw::help() {
     printf '  Installs OpenBao and configures a server or a client.\n\n'
     printf 'Профили / Profiles:\n'
     printf '  dev  — HTTP на 127.0.0.1:8200, root token, сервер в этом терминале\n'
-    printf '  prod — file storage, TLS, systemd, operator init + unseal\n\n'
+    printf '  prod — single-node Raft storage, TLS, systemd, operator init + unseal\n\n'
     printf 'Опции / Options:\n'
     printf '  --role server|client|both   роль / role\n'
     printf '  --profile dev|prod          профиль сервера / server profile\n'

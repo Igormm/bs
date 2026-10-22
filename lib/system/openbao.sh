@@ -1,10 +1,10 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
 # @shell bash4 — нужны конструкции bash: double-bracket [[ ]], array, local/declare flags, process substitution / needs bash constructs: double-bracket [[ ]], array, local/declare flags, process substitution
-# lib/system/openbao.sh — OpenBao server: release install, system user, file
-# storage, TLS, HCL config, systemd unit, operator init and unseal
+# lib/system/openbao.sh — OpenBao server: release install, system user,
+# single-node Raft storage, TLS, HCL config, systemd unit, init and unseal
 # lib/system/openbao.sh — сервер OpenBao: установка релиза, системный
-# пользователь, file storage, TLS, HCL-конфиг, systemd-юнит, init и unseal
+# пользователь, single-node Raft storage, TLS, HCL-конфиг, systemd-юнит, init и unseal
 #
 # Usage / Использование:
 #   load "lib/system/openbao"
@@ -468,7 +468,8 @@ openbao_server::tls_selfsigned() {
     chmod 600 "${ca_key}" "${BS_OPENBAO_TLS_KEY}" || return "${LIB_ERROR_FILE_OPERATION}"
     chmod 644 "${ca_crt}" "${BS_OPENBAO_TLS_CERT}" || return "${LIB_ERROR_FILE_OPERATION}"
     if (( EUID == 0 )) && is::command chown; then
-        chown root:"${BS_OPENBAO_GROUP}" "${BS_OPENBAO_TLS_KEY}" "${BS_OPENBAO_TLS_CERT}" 2>/dev/null || true
+        chown root:"${BS_OPENBAO_GROUP}" "${BS_OPENBAO_TLS_DIR}" 2>/dev/null || true
+        chown "${BS_OPENBAO_USER}:${BS_OPENBAO_GROUP}" "${BS_OPENBAO_TLS_KEY}" "${BS_OPENBAO_TLS_CERT}" 2>/dev/null || true
         chown root:root "${ca_key}" 2>/dev/null || true
     fi
     log::info "OpenBao: TLS создан / TLS created: ${BS_OPENBAO_TLS_DIR}"
@@ -492,9 +493,9 @@ openbao_server::render_config() {
     local cluster_port=$(( 10#${port} + 1 ))
     local cluster_addr="${scheme}://${host}:${cluster_port}"
 
-    printf 'ui = true\n'
-    printf 'disable_mlock = true\n\n'
-    printf 'storage "file" {\n  path = "%s/data"\n}\n\n' "${BS_OPENBAO_DATA_DIR}"
+    printf 'ui = true\n\n'
+    printf 'storage "raft" {\n  path = "%s/data"\n  node_id = "%s"\n}\n\n' \
+        "${BS_OPENBAO_DATA_DIR}" "${BS_OPENBAO_SERVICE}"
     printf 'listener "tcp" {\n  address     = "%s"\n  tls_disable = %d\n' \
         "${BS_OPENBAO_LISTEN}" "${tls_disable}"
     if (( tls_disable == 0 )); then
@@ -514,6 +515,9 @@ openbao_server::configure() {
     openbao_server::__dir "${BS_OPENBAO_DATA_DIR}" "0700" || return $?
     openbao_server::__dir "${BS_OPENBAO_DATA_DIR}/data" "0700" || return $?
     openbao_server::__dir "${BS_OPENBAO_CONFIG_DIR}" "0750" || return $?
+    if (( EUID == 0 )) && is::command chown; then
+        chown root:"${BS_OPENBAO_GROUP}" "${BS_OPENBAO_CONFIG_DIR}" 2>/dev/null || true
+    fi
 
     if [[ "${profile}" == "prod" && "${BS_OPENBAO_TLS_MODE}" == "selfsigned" ]]; then
         if [[ ! -f "${BS_OPENBAO_TLS_CERT}" || ! -f "${BS_OPENBAO_TLS_KEY}" ]]; then

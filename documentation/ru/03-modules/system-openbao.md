@@ -26,7 +26,7 @@ load "lib/system/openbao"
 | Профиль | Поведение |
 |---|---|
 | `dev` | установить бинарник, HTTP на loopback, сгенерированный root-токен, `bao server -dev` на переднем плане |
-| `prod` | системный пользователь, file storage, TLS, systemd-юнит, `operator init`, автоматический unseal, health-check |
+| `prod` | системный пользователь, одноузловой Raft storage, TLS, systemd-юнит, `operator init`, автоматический unseal, health-check |
 
 `prod` — профиль по умолчанию для `openbao_server::apply`.
 

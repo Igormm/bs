@@ -11,7 +11,7 @@
 
 - **dev** — быстрый локальный сервер для разработки: бинарник, HTTP на
   loopback, root token, сервер работает в текущем терминале.
-- **prod** — боевая установка: системный пользователь, file storage, TLS,
+- **prod** — боевая установка: системный пользователь, single-node Raft storage, TLS,
   systemd-юнит, `operator init`, автоматический unseal, root token и ключи
   в `0600`-файле, проверка `sys/health`.
 - **client** — адрес, CA, токен, проверка соединения и сохранение токена в
@@ -69,7 +69,7 @@ documentation/{en,ru}/03-modules/integration-openbao.md
 | `BS_OPENBAO_BIN` | `/usr/local/bin/bao` | бинарник |
 | `BS_OPENBAO_CONFIG` | `/etc/openbao/openbao.hcl` | конфиг сервера |
 | `BS_OPENBAO_CONFIG_DIR` | `/etc/openbao` | каталог конфига |
-| `BS_OPENBAO_DATA_DIR` | `/var/lib/openbao` | данные и file storage |
+| `BS_OPENBAO_DATA_DIR` | `/var/lib/openbao` | данные и single-node Raft storage |
 | `BS_OPENBAO_TLS_DIR` | `/etc/openbao/tls` | сертификаты |
 | `BS_OPENBAO_TLS_MODE` | `selfsigned` | `selfsigned` / `files` / `off` (только dev) |
 | `BS_OPENBAO_TLS_CERT` | `${BS_OPENBAO_TLS_DIR}/server.crt` | серверный сертификат |
@@ -144,10 +144,10 @@ dev-сервер запускается командой, см. 5.7):
 
 ```hcl
 ui = true
-disable_mlock = true
 
-storage "file" {
-  path = "/var/lib/openbao/data"
+storage "raft" {
+  path    = "/var/lib/openbao/data"
+  node_id = "openbao"
 }
 
 listener "tcp" {
@@ -166,8 +166,8 @@ cluster_addr = "https://127.0.0.1:8201"
 - `prod`: TLS обязателен; `tls_disable` не выставляется в 1.
 - Адрес из визарда: `127.0.0.1:8200` (по умолчанию) или `0.0.0.0:8200`
   с предупреждением; `api_addr`/`cluster_addr` строятся из него.
-- `storage "file"` — выбранный профиль; путь всегда внутри
-  `BS_OPENBAO_DATA_DIR`, проверяется на выход за каталог.
+- `storage "raft"` — single-node integrated storage; `node_id` = имя
+  systemd-сервиса, путь всегда внутри `BS_OPENBAO_DATA_DIR`.
 - Старый конфиг сохраняется как `openbao.hcl.bak.<timestamp>` через
   `io::files::copy_file`; при ошибке записи возвращается исходный.
 
@@ -177,7 +177,8 @@ cluster_addr = "https://127.0.0.1:8201"
   "$BS_OPENBAO_DATA_DIR" --shell /usr/sbin/nologin`, группа `openbao`.
 - `BS_OPENBAO_DATA_DIR` — `0700 openbao:openbao`; `data/` — `0700`.
 - `BS_OPENBAO_CONFIG_DIR` — `0750 root:openbao`; конфиг `0640 root:openbao`.
-- TLS: CA/серт `0644`, ключ `0600 root:openbao`.
+- TLS: каталог `0750 root:openbao`, CA/серт `0644`, ключ `0600 openbao:openbao`;
+  CA-ключ `0600 root:root`.
 - `BS_OPENBAO_INIT_FILE` — `0600 root:root`; каталог `/root` не меняется.
 - Секреты никогда не передаются аргументами командной строки и не пишутся
   в `log::*`; только пути и имена.
@@ -191,8 +192,6 @@ cluster_addr = "https://127.0.0.1:8201"
 - `Restart=on-failure`, `LimitNOFILE=65536`;
 - `NoNewPrivileges=true`, `PrivateTmp=true`, `ProtectSystem=strict`,
   `ProtectHome=true`, `ReadWritePaths=<data dir>`;
-- `AmbientCapabilities=CAP_IPC_LOCK` и `LimitMEMLOCK=infinity` только если
-  `disable_mlock = false`; по умолчанию mlock выключен, capability не нужна.
 
 `systemd::unit_write` + `daemon_reload` + `enable_now`. Если systemd
 недоступен — `LIB_ERROR_DEPENDENCY_MISSING` с объяснением, а не «успех».
@@ -433,7 +432,7 @@ shellcheck -s bash --severity=error lib/system/openbao.sh \
 2. Серверный модуль + тесты на фейках.
 3. Визард + тесты source/dry-run.
 4. Документация en/ru.
-5. Полная валидация и ручной smoke в контейнере/VM (dev и prod).
+5. Полная валидация и ручной smoke в контейнере/VM (dev и prod) — пройдены на OpenBao 2.7.1.
 
 ## 12. Вне scope
 

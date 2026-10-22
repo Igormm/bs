@@ -125,11 +125,20 @@ main() {
     export FAKE_STDIN="${SANDBOX}/stdin"
     openbao::kv::put secret app/db '{"password":"x"}' >/dev/null
     testframework::assert_command "grep -qF 'secret/data/app/db' '${SANDBOX}/calls'" "kv put path"
-    testframework::assert_equal '{"password":"x"}' "$(cat "${SANDBOX}/stdin")" "kv put body via stdin"
+    testframework::assert_equal '{"data":{"password":"x"}}' "$(cat "${SANDBOX}/stdin")" "kv put body wrapped for KV v2"
     rc=0; openbao::kv::get secret ../etc >/dev/null 2>&1 || rc=$?
     testframework::assert_equal "${LIB_ERROR_INVALID_INPUT}" "${rc}" "traversal rejected"
     rc=0; openbao::kv::put secret app 'not-json' >/dev/null 2>&1 || rc=$?
     testframework::assert_equal "${OPENBAO_ERROR_JSON}" "${rc}" "invalid JSON rejected"
+
+    testframework::section "mounts / mount"
+    : > "${SANDBOX}/stdin"
+    openbao::mount::enable secret kv >/dev/null
+    testframework::assert_command "grep -qF 'sys/mounts/secret' '${SANDBOX}/calls'" "mount path"
+    testframework::assert_equal '{"type":"kv","options":{"version":"2"}}' "$(cat "${SANDBOX}/stdin")" "kv mount defaults to v2"
+    : > "${SANDBOX}/stdin"
+    openbao::mount::enable pki pki '{"max_lease_ttl":"87600h"}' >/dev/null
+    testframework::assert_equal '{"type":"pki","options":{"max_lease_ttl":"87600h"}}' "$(cat "${SANDBOX}/stdin")" "mount options passed"
 
     testframework::section "policy / политика"
     printf 'path "secret/*" {\n  capabilities = ["read"]\n}\n' > "${SANDBOX}/policy.hcl"
