@@ -86,6 +86,7 @@ io::streams::__check_file() {
 # @example
 #   io::streams::print "hello"
 io::streams::print() {
+    local IFS=' '
     printf '%s\n' "$*"
 }
 
@@ -94,6 +95,7 @@ io::streams::print() {
 # @example
 #   io::streams::printn "hello"
 io::streams::printn() {
+    local IFS=' '
     printf '%s' "$*"
 }
 
@@ -113,7 +115,7 @@ io::streams::printf() {
         return "${E_ERROR:-1}"
     fi
     shift
-    printf "${format}" "$@"
+    printf -- "${format}" "$@"
 }
 
 # @description Вывод в stderr / Output to stderr
@@ -121,6 +123,7 @@ io::streams::printf() {
 # @example
 #   io::streams::eprint "error occurred"
 io::streams::eprint() {
+    local IFS=' '
     printf '%s\n' "$*" >&2
 }
 
@@ -133,9 +136,9 @@ io::streams::eprint() {
 # @example
 #   io::streams::tty_print "password prompt"
 io::streams::tty_print() {
-    if is::writable "/dev/tty"; then
-        printf '%s\n' "$*" > /dev/tty
-    else
+    local IFS=' '
+
+    if ! { printf '%s\n' "$*" > /dev/tty; } 2>/dev/null; then
         log::warn "No controlling terminal available (/dev/tty)"
         return "${E_ERROR:-1}"
     fi
@@ -165,8 +168,12 @@ io::streams::read_line() {
         return "${E_ERROR:-1}"
     fi
 
-    local line
+    local line=""
     if ! IFS= read -r -u "${fd}" line; then
+        # Keep a final line that has no trailing newline; read still fills it.
+        if [[ -n "${line}" ]]; then
+            printf -v "${var_name}" '%s' "${line}"
+        fi
         return "${E_ERROR:-1}"
     fi
     printf -v "${var_name}" '%s' "${line}"
@@ -278,16 +285,40 @@ io::streams::save() {
     local result_var="${2:-IO_STREAMS_SAVED_FD}"
     local new_fd
 
+    if [[ ! "${result_var}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+        log::error "Invalid result variable name: '${result_var}'"
+        return "${E_ERROR:-1}"
+    fi
+
     case "${fd}" in
-        "${IO_STREAMS_STDIN}")  exec {new_fd}<&0 ;;
-        "${IO_STREAMS_STDOUT}") exec {new_fd}>&1 ;;
-        "${IO_STREAMS_STDERR}") exec {new_fd}>&2 ;;
+        "${IO_STREAMS_STDIN}")
+            if ! exec {new_fd}<&0; then
+                log::error "Cannot save FD 0: it is closed"
+                return "${E_ERROR:-1}"
+            fi
+            ;;
+        "${IO_STREAMS_STDOUT}")
+            if ! exec {new_fd}>&1; then
+                log::error "Cannot save FD 1: it is closed"
+                return "${E_ERROR:-1}"
+            fi
+            ;;
+        "${IO_STREAMS_STDERR}")
+            if ! exec {new_fd}>&2; then
+                log::error "Cannot save FD 2: it is closed"
+                return "${E_ERROR:-1}"
+            fi
+            ;;
         *)
             log::warn "Only standard FDs 0, 1, 2 can be saved, got: ${fd}"
             return "${E_ERROR:-1}"
             ;;
     esac
-    printf -v "${result_var}" '%s' "${new_fd}"
+    if ! printf -v "${result_var}" '%s' "${new_fd}"; then
+        eval "exec ${new_fd}>&-"
+        log::error "Cannot store saved FD in '${result_var}'"
+        return "${E_ERROR:-1}"
+    fi
 }
 
 # @description Восстановить сохранённый FD и закрыть временный дескриптор (n>&m-)
@@ -367,7 +398,20 @@ io::streams::pipe() {
         return "${E_ERROR:-1}"
     fi
 
-    "${left[@]}" | "${right[@]}"
+    local had_pipefail=0
+    if [[ -o pipefail ]]; then
+        had_pipefail=1
+    fi
+
+    # The contract is the exit code of the second command. pipefail in the
+    # caller would otherwise return a failure of the left command instead.
+    set +o pipefail
+    local rc=0
+    "${left[@]}" | "${right[@]}" || rc=$?
+    if (( had_pipefail )); then
+        set -o pipefail
+    fi
+    return "${rc}"
 }
 
 # @description Запустить команду с построчной буферизацией stdout/stderr (stdbuf -oL -eL)
@@ -528,13 +572,15 @@ io::streams::fd_path() {
     printf '%s\n' "/dev/fd/${fd}"
 }
 
-# @description Список открытых FD текущего процесса (/proc/self/fd)
-# @description List open FDs of the current process (/proc/self/fd)
+# @description Список открытых FD текущего shell (/proc/<pid>/fd)
+# @description List open FDs of the current shell (/proc/<pid>/fd)
 # @example
 #   io::streams::list_fds
 io::streams::list_fds() {
-    if is::dir "/proc/self/fd"; then
-        utils::quiet_err ls -l /proc/self/fd
+    local pid="${BASHPID:-$$}"
+
+    if is::dir "/proc/${pid}/fd"; then
+        utils::quiet_err ls -l "/proc/${pid}/fd"
     elif is::dir "/dev/fd"; then
         utils::quiet_err ls -l /dev/fd
     else

@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- fix(io-streams): `print`, `printn`, `eprint` and `tty_print` join multiple arguments with a space even when the caller runs with `IFS=$'\n\t'` (as `bs run` does); the old `"$*"` joined with a newline, so `print a b` printed two lines. `printf` now passes the format after `--`, so a format that starts with `-` is printed instead of being parsed as an option. `read_line` keeps the final line of a stream that has no trailing newline before returning 1, `save` returns an error instead of a false success when the source FD is closed and closes the duplicated FD when the result name is invalid, `pipe` returns the second command's status even when the caller has `pipefail`, `tty_print` no longer leaks a raw shell redirection error when there is no controlling terminal, and `list_fds` reads `/proc/<pid>/fd` of the current shell instead of the `ls` child. Regression tests: `tests/unit/teststreamsunit.sh` (46 assertions).
+
 ## [0.9.1] - 2026-10-21 "Lingoa"
 
 ### Changed

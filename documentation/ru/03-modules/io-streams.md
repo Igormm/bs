@@ -50,8 +50,9 @@ io::streams::feed "input" grep data   # подать строку на stdin к�
 ```
 
 `read_line` возвращает 1 при EOF, поэтому её удобно использовать в циклах
-`while`. `feed` — обёртка над here-string (`<<<`); возвращает код возврата
-команды.
+`while`. Последняя строка без перевода строки всё равно записывается в
+переменную перед возвратом. `feed` — обёртка над here-string (`<<<`);
+возвращает код возврата команды.
 
 ## Перенаправления и save/restore FD
 
@@ -99,7 +100,7 @@ pipe/файле; stderr не буферизуется вовсе. Хелперы
 io::streams::null_sink noisy_cmd      # cmd >/dev/null 2>&1, код возврата сохраняется
 io::streams::random_bytes 32 | base64 # N байт из /dev/urandom (не блокирует)
 io::streams::fd_path 0                # выводит /dev/fd/0
-io::streams::list_fds                 # открытые FD через /proc/self/fd (или /dev/fd)
+io::streams::list_fds                 # открытые FD через /proc/<pid>/fd (или /dev/fd)
 ```
 
 Для разового подавления вывода вне этого модуля используйте идиомы из

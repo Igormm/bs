@@ -189,6 +189,46 @@ main() {
     testframework::assert_false "io::streams::pipe printf x" "pipe rejects missing separator"
     testframework::assert_false "io::streams::random_bytes 0" "random_bytes rejects zero count"
 
+    # Тест 11: Регрессии сценарного аудита / Scenario audit regressions
+    testframework::section "Scenario Audit Regressions / Регрессии сценарного аудита"
+
+    # bs run sets IFS=$'\n\t'; print* must still join arguments with a space
+    local strict_joined=""
+    strict_joined="$(IFS=$'\n\t'; io::streams::print "a" "b")"
+    testframework::assert_equal "a b" "${strict_joined}" "print joins args under strict IFS"
+    strict_joined="$(IFS=$'\n\t'; io::streams::printn "a" "b")"
+    testframework::assert_equal "a b" "${strict_joined}" "printn joins args under strict IFS"
+    strict_joined="$(IFS=$'\n\t'; io::streams::eprint "a" "b" 2>&1)"
+    testframework::assert_equal "a b" "${strict_joined}" "eprint joins args under strict IFS"
+
+    # A format that starts with '-' is data, not a printf option
+    testframework::assert_equal "-v" "$(io::streams::printf '-v')" "printf accepts a leading-dash format"
+
+    # save must not report success when the source FD is closed
+    testframework::assert_false "( exec 0<&-; io::streams::save 0 _saved_closed )" "save fails on a closed source FD"
+
+    # An invalid result name must not leave the newly duplicated FD open
+    if is::dir "/proc/${BASHPID:-$$}/fd"; then
+        local leak_result=""
+        leak_result="$(
+            before="$(ls "/proc/${BASHPID}/fd" | wc -l)"
+            io::streams::save 1 "bad-name" >/dev/null 2>&1 || true
+            after="$(ls "/proc/${BASHPID}/fd" | wc -l)"
+            printf '%s %s' "${before}" "${after}"
+        )"
+        local leak_before="${leak_result%% *}"
+        local leak_after="${leak_result##* }"
+        testframework::assert_equal "${leak_before}" "${leak_after}" "save closes its FD when the result name is invalid"
+    fi
+
+    # A final line without a newline is still returned (and read_line reports EOF)
+    local partial_line="OLD"
+    testframework::assert_false "io::streams::read_line partial_line < <(printf 'abc')" "read_line reports EOF for a partial line"
+    testframework::assert_equal "abc" "${partial_line}" "read_line keeps a partial line"
+
+    # pipe returns the second command status even when the caller has pipefail
+    testframework::assert_command "set -o pipefail; io::streams::pipe false -- true" "pipe returns the right-hand status"
+
     # Очистка
     rm -rf "${tmp_dir}"
 

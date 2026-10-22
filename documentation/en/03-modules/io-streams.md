@@ -49,7 +49,8 @@ io::streams::read_all < file.txt      # the whole stream until EOF
 io::streams::feed "input" grep data   # feed a string to a command's stdin (<<<)
 ```
 
-`read_line` returns 1 on EOF, which makes it usable in `while` loops.
+`read_line` returns 1 on EOF, which makes it usable in `while` loops. A final
+line without a newline is still stored in the variable before the return.
 `feed` is a here-string (`<<<`) wrapper; it returns the command's exit code.
 
 ## Redirections and FD save/restore
@@ -98,7 +99,7 @@ pipes/files; stderr is not buffered at all. The `run_*` helpers require
 io::streams::null_sink noisy_cmd      # cmd >/dev/null 2>&1, exit code preserved
 io::streams::random_bytes 32 | base64 # N bytes from /dev/urandom (non-blocking)
 io::streams::fd_path 0                # prints /dev/fd/0
-io::streams::list_fds                 # open FDs via /proc/self/fd (or /dev/fd)
+io::streams::list_fds                 # open FDs via /proc/<pid>/fd (or /dev/fd)
 ```
 
 For one-off output suppression outside of this module, prefer the idioms from
