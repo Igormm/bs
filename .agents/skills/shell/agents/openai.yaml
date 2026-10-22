@@ -1,0 +1,8 @@
+# yaml-language-server: $schema=../../../schemas/openai-skill-metadata.schema.json
+interface:
+  display_name: "Shell"
+  short_description: "Pick the right tool, then write safe shell"
+  brand_color: "#2563EB"
+  default_prompt: "Use $shell before writing any shell command, script, or pipeline."
+policy:
+  allow_implicit_invocation: true

@@ -35,9 +35,11 @@ if ! command -v shellcheck >/dev/null 2>&1; then
     exit 0
 fi
 
-# Список файлов: все *.sh + скрипт bs (тоже bash)
-# File list: all *.sh + the bs script (bash as well)
-mapfile -t files < <(find . -name "*.sh" -not -path "./.git/*" | sort)
+# Список файлов: все *.sh + скрипт bs (тоже bash). *.bad.sh — намеренно
+# неправильные примеры импортированных навыков; их проверяет свой CI upstream.
+# File list: all *.sh + the bs script (bash as well). *.bad.sh are intentional
+# counterexamples of imported skills; their own upstream CI checks them.
+mapfile -t files < <(find . -name "*.sh" -not -path "./.git/*" -not -name "*.bad.sh" | sort)
 files+=("./bs")
 
 print_header "ShellCheck Validation / Проверка ShellCheck"

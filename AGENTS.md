@@ -125,6 +125,8 @@ Reusable workflow skills live in `.agents/skills/` (Kimi Code / agents-compatibl
 ### Imported shell-safety skills (external)
 
 - `bash-defensive-patterns` — defensive Bash patterns (strict mode, quoting, traps, temp files, idempotency); [wshobson/agents](https://github.com/wshobson/agents), MIT, verbatim + `UPSTREAM.md` with BS notes (BS rules win: strict mode only in entry points).
+- `posix-shell` — portable POSIX `sh` discipline, multi-shell Docker test helpers and `checkbashisms` workflow; [f-steff/POSIX_Shell_Skill](https://github.com/f-steff/POSIX_Shell_Skill), MIT, verbatim + `UPSTREAM.md` (closest external skill to the `posix` tier; its ASCII-only rule does not apply to bilingual BS comments).
+- `shell` — cited, test-enforced shell rules and reference files (POSIX/Bash/Zsh/Nushell, streams, shebangs); [posidoni/shell-skill](https://github.com/posidoni/shell-skill), MIT, verbatim except link paths + `UPSTREAM.md` (use its POSIX section for `core/`; Bash-only rules do not apply there).
 - `doc-coauthoring` — three-stage doc workflow (context gathering, section-by-section refinement, reader testing); [anthropics/skills](https://github.com/anthropics/skills), verbatim + `UPSTREAM.md` (license: see there).
 - `bs-code-review-security` — security-first review (injection, quoting, paths, temp files, privilege, `@shell` tier, tests, P0–P3 report); adapted from [DataDog/rshell](https://github.com/DataDog/rshell) `code-review`, Apache-2.0; report-only.
 
