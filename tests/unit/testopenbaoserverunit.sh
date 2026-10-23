@@ -24,12 +24,21 @@ sandbox_new() {
     mkdir -p "${SANDBOX}/bin" "${SANDBOX}/tools" "${SANDBOX}/releases/download/v9.9.9" \
         "${SANDBOX}/systemd" "${SANDBOX}/root"
     : > "${SANDBOX}/useradd.calls"
+    : > "${SANDBOX}/groupadd.calls"
     : > "${SANDBOX}/passwd.calls"
     : > "${SANDBOX}/systemctl.calls"
     : > "${SANDBOX}/curl.calls"
 
     cat > "${SANDBOX}/bin/id" <<EOF
 #!/bin/bash
+if [[ "\${1-}" == "-u" && "\${2-}" == "\${FAKE_USER}" && -e "\${FAKE_USER_MARKER}" ]]; then
+    printf '1000\n'
+    exit 0
+fi
+if [[ "\${1-}" == "-gn" && "\${2-}" == "\${FAKE_USER}" && -e "\${FAKE_USER_MARKER}" ]]; then
+    printf '%s\n' "\${FAKE_PRIMARY_GROUP:-\${FAKE_USER}}"
+    exit 0
+fi
 if [[ "\${1-}" == "\${FAKE_USER}" && -e "\${FAKE_USER_MARKER}" ]]; then
     exit 0
 fi
@@ -40,6 +49,20 @@ EOF
 printf '%s\n' "$@" >> "${FAKE_USERADD_CALLS}"
 : > "${FAKE_USER_MARKER}"
 exit 0
+EOF
+    cat > "${SANDBOX}/bin/groupadd" <<'EOF'
+#!/bin/bash
+printf '%s\n' "$@" >> "${FAKE_GROUPADD_CALLS}"
+: > "${FAKE_GROUP_MARKER}"
+exit 0
+EOF
+    cat > "${SANDBOX}/bin/getent" <<'EOF'
+#!/bin/bash
+if [[ "${1-}" == "group" && "${2-}" == "${FAKE_GROUP}" && -e "${FAKE_GROUP_MARKER}" ]]; then
+    printf '%s:x:1000:\n' "${FAKE_GROUP}"
+    exit 0
+fi
+exit 2
 EOF
     cat > "${SANDBOX}/bin/passwd" <<'EOF'
 #!/bin/bash
@@ -71,8 +94,11 @@ EOF
 
     export PATH="${SANDBOX}/bin:${ORIG_PATH}"
     export FAKE_USER="bs-openbao-test-$$"
+    export FAKE_GROUP="${FAKE_USER}"
     export FAKE_USER_MARKER="${SANDBOX}/user.marker"
+    export FAKE_GROUP_MARKER="${SANDBOX}/group.marker"
     export FAKE_USERADD_CALLS="${SANDBOX}/useradd.calls"
+    export FAKE_GROUPADD_CALLS="${SANDBOX}/groupadd.calls"
     export FAKE_PASSWD_CALLS="${SANDBOX}/passwd.calls"
     export FAKE_SYSTEMCTL_CALLS="${SANDBOX}/systemctl.calls"
     export FAKE_CURL_CALLS="${SANDBOX}/curl.calls"
@@ -187,6 +213,16 @@ main() {
     cfg="$(openbao_server::render_config dev)"
     testframework::assert_command "printf '%s' '${cfg}' | grep -qF 'tls_disable = 1'" "dev disables TLS"
     testframework::assert_command "printf '%s' '${cfg}' | grep -qF 'api_addr = \"http://127.0.0.1:8200\"'" "dev api_addr"
+    testframework::assert_false "openbao_server::render_config bad" "bad profile rejected"
+    BS_OPENBAO_TLS_MODE=files
+    cfg="$(openbao_server::render_config prod)"
+    testframework::assert_command "printf '%s' '${cfg}' | grep -qF 'tls_disable = 0'" "files mode keeps TLS"
+    testframework::assert_command "printf '%s' '${cfg}' | grep -qF 'tls_cert_file = \"${BS_OPENBAO_TLS_CERT}\"'" "files mode cert path"
+    BS_OPENBAO_TLS_MODE=off
+    cfg="$(openbao_server::render_config prod)"
+    testframework::assert_command "printf '%s' '${cfg}' | grep -qF 'tls_disable = 1'" "off mode disables TLS"
+    testframework::assert_equal "http://127.0.0.1:8200" "$(openbao_server::local_api_addr prod)" "off mode local address"
+    BS_OPENBAO_TLS_MODE=selfsigned
     testframework::assert_equal "https://127.0.0.1:8200" "$(openbao_server::local_api_addr prod)" "local prod address"
     BS_OPENBAO_LISTEN="0.0.0.0:8200"
     testframework::assert_equal "https://127.0.0.1:8200" "$(openbao_server::local_api_addr prod)" "wildcard normalized"
@@ -206,6 +242,17 @@ main() {
     testframework::assert_equal "600" "$(stat -c %a "${BS_OPENBAO_TLS_KEY}")" "key mode 0600"
     testframework::assert_command "openssl verify -CAfile '${BS_OPENBAO_TLS_CA}' '${BS_OPENBAO_TLS_CERT}' >/dev/null 2>&1" "certificate chains to CA"
 
+    local ca_copy="${SANDBOX}/tls-ca-test.crt"
+    cp "${BS_OPENBAO_TLS_CA}" "${ca_copy}"
+    BS_OPENBAO_TLS_MODE=files
+    BS_OPENBAO_TLS_CA="${ca_copy}"
+    testframework::assert_equal "${ca_copy}" "$(openbao_server::__ca_file)" "files mode uses readable CA"
+    rm -f "${ca_copy}"
+    testframework::assert_equal "" "$(openbao_server::__ca_file)" "missing files CA falls back to system"
+    BS_OPENBAO_TLS_MODE=selfsigned
+    BS_OPENBAO_TLS_CA="${BS_OPENBAO_TLS_DIR}/ca.crt"
+    testframework::assert_equal "${BS_OPENBAO_TLS_CA}" "$(openbao_server::__ca_file)" "self-signed mode uses generated CA"
+
     testframework::section "configure / настройка"
     mkdir -p "${BS_OPENBAO_CONFIG_DIR}"
     printf '%s\n' "old config" > "${BS_OPENBAO_CONFIG}"
@@ -215,6 +262,16 @@ main() {
     testframework::assert_command "grep -qF 'storage \"raft\"' '${BS_OPENBAO_CONFIG}'" "config content"
     testframework::assert_command "compgen -G '${BS_OPENBAO_CONFIG}.bak.*' >/dev/null" "old config backed up"
     testframework::assert_command "[[ -d '${BS_OPENBAO_DATA_DIR}/data' ]]" "data directory"
+    BS_OPENBAO_TLS_MODE=files
+    testframework::assert_command "openbao_server::configure prod" "files configure"
+    mv "${BS_OPENBAO_TLS_KEY}" "${BS_OPENBAO_TLS_KEY}.saved"
+    testframework::assert_false "openbao_server::configure prod" "missing files key rejected"
+    mv "${BS_OPENBAO_TLS_KEY}.saved" "${BS_OPENBAO_TLS_KEY}"
+    BS_OPENBAO_TLS_MODE=selfsigned
+    rm -f "${BS_OPENBAO_CONFIG}".bak.*
+    testframework::assert_command "openbao_server::configure prod" "backup run 1"
+    testframework::assert_command "openbao_server::configure prod" "backup run 2"
+    testframework::assert_equal "2" "$(find "$(dirname -- "${BS_OPENBAO_CONFIG}")" -maxdepth 1 -name "$(basename -- "${BS_OPENBAO_CONFIG}").bak.*" | wc -l | tr -d ' ')" "unique backup names"
 
     testframework::section "system user / системный пользователь"
     testframework::assert_command "openbao_server::ensure_user" "user created"
@@ -225,6 +282,20 @@ main() {
     before="$(wc -l < "${SANDBOX}/useradd.calls")"
     testframework::assert_command "openbao_server::ensure_user" "user already exists"
     testframework::assert_equal "${before}" "$(wc -l < "${SANDBOX}/useradd.calls")" "useradd not repeated"
+
+    testframework::section "custom group / отдельная группа"
+    export FAKE_GROUP="${FAKE_USER}-grp"
+    rm -f "${FAKE_USER_MARKER}" "${FAKE_GROUP_MARKER}"
+    : > "${FAKE_GROUPADD_CALLS}"
+    BS_OPENBAO_GROUP="${FAKE_GROUP}"
+    testframework::assert_command "openbao_server::ensure_user" "user created with custom group"
+    testframework::assert_command "grep -qF -- '--gid' '${SANDBOX}/useradd.calls' && grep -qF -- '${FAKE_GROUP}' '${SANDBOX}/useradd.calls'" "useradd uses custom group"
+    testframework::assert_command "grep -qF '${FAKE_GROUP}' '${SANDBOX}/groupadd.calls'" "custom group created"
+    BS_OPENBAO_GROUP="${FAKE_USER}-other"
+    testframework::assert_false "openbao_server::ensure_user" "existing user with another primary group rejected"
+    BS_OPENBAO_GROUP="${FAKE_USER}"
+    export FAKE_GROUP="${FAKE_USER}"
+    : > "${FAKE_USER_MARKER}" "${FAKE_GROUP_MARKER}"
 
     testframework::section "systemd unit / systemd-юнит"
     testframework::assert_command "openbao_server::install_service" "unit installed"
@@ -244,10 +315,19 @@ main() {
     testframework::assert_equal "9.9.9" "$(openbao_server::version)" "installed version"
     testframework::assert_equal "${BS_OPENBAO_BIN}"$'\t'"9.9.9" "$(openbao_server::detect)" "detect output"
     testframework::assert_command "openbao_server::install" "already installed is a no-op"
+    printf '#!/bin/bash\nexit 1\n' > "${BS_OPENBAO_BIN}"
+    chmod +x "${BS_OPENBAO_BIN}"
+    BS_OPENBAO_VERSION=latest
+    testframework::assert_command "openbao_server::install" "broken latest binary reinstalled"
+    testframework::assert_equal "9.9.9" "$(openbao_server::version)" "broken binary replaced"
+    BS_OPENBAO_VERSION=9.9.9
     testframework::assert_command "openbao_server::status | grep -qF 'sealed'" "server status"
     export BS_OPENBAO_DRY_RUN=1
     testframework::assert_command "openbao_server::dev_start" "dev dry-run"
     testframework::assert_command "openbao_server::apply dev" "apply dev dry-run"
+    unset BS_OPENBAO_DEV_TOKEN
+    testframework::assert_command "openbao_server::apply dev" "apply dev generates a token"
+    testframework::assert_true "-n '${BS_OPENBAO_DEV_TOKEN:-}'" "dev token generated"
     export BS_OPENBAO_DRY_RUN=0
 
     testframework::section "init and unseal / init и unseal"

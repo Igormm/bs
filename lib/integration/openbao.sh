@@ -129,6 +129,13 @@ openbao::__safe_value() {
 openbao::__read_token_file() {
     local -r file="${1-}"
     [[ -n "${file}" && -r "${file}" ]] || return 0
+    if is::command stat; then
+        local mode
+        mode="$(stat -c '%a' "${file}" 2>/dev/null || true)"
+        if [[ "${mode}" =~ ^[0-7]+$ ]] && (( (8#${mode} & 077) != 0 )); then
+            log::warn "OpenBao: файл токена доступен группе/остальным / token file has mode ${mode}, expected 0600: ${file}"
+        fi
+    fi
     local token
     token="$(<"${file}")" || return 0
     openbao::__trim "${token}"

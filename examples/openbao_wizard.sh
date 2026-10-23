@@ -218,6 +218,7 @@ obw::check_server_tools() {
     for tool in tar sha256sum gzip; do
         is::command "${tool}" || missing+=("${tool}")
     done
+    is::command "${BS_OPENBAO_JQ:-jq}" || missing+=("jq")
     if ! is::command curl && ! is::command wget; then
         missing+=("curl|wget")
     fi
@@ -226,9 +227,6 @@ obw::check_server_tools() {
         for t in systemctl useradd; do
             is::command "${t}" || missing+=("${t}")
         done
-    fi
-    if [[ "${OBW_PROFILE}" == "dev" && "${BS_OPENBAO_TLS_MODE}" != "off" ]]; then
-        is::command openssl || missing+=("openssl")
     fi
     if (( ${#missing[@]} > 0 )); then
         obw::fail "Отсутствуют зависимости / Missing dependencies:
@@ -314,11 +312,21 @@ obw::ask_server() {
                 [[ "${key}" == "q" ]] && obw::cancel "TLS / key"
                 BS_OPENBAO_TLS_CERT="${cert}"
                 BS_OPENBAO_TLS_KEY="${key}"
-                if [[ ! -r "${cert}" || ! -r "${key}" ]]; then
-                    obw::fail "TLS-файлы не найдены / TLS files not found:
+                if ! openbao_server::__service_readable "${cert}" \
+                    || ! openbao_server::__service_readable "${key}"; then
+                    obw::fail "TLS-файлы не найдены или недоступны пользователю ${BS_OPENBAO_USER} / TLS files are missing or not readable by ${BS_OPENBAO_USER}:
   ${cert}
   ${key}"
                 fi
+                local ca="${BS_OPENBAO_TLS_CA}"
+                [[ -r "${ca}" ]] || ca=""
+                wizard::ask_input ca "CA-сертификат / CA bundle" "${ca}" \
+                    "пусто для системного CA / empty for the system CA"
+                [[ "${ca}" == "q" ]] && obw::cancel "CA / certificate"
+                if [[ -n "${ca}" && ! -r "${ca}" ]]; then
+                    obw::fail "CA-сертификат не найден / CA bundle not found: ${ca}"
+                fi
+                BS_OPENBAO_TLS_CA="${ca}"
                 ;;
             2)
                 BS_OPENBAO_TLS_MODE="off"
@@ -342,6 +350,8 @@ obw::ask_client() {
         def_addr="$(openbao_server::local_api_addr "${OBW_PROFILE:-prod}")"
         if [[ "${BS_OPENBAO_TLS_MODE}" == "selfsigned" ]]; then
             def_ca="${BS_OPENBAO_TLS_DIR}/ca.crt"
+        elif [[ "${BS_OPENBAO_TLS_MODE}" == "files" && -r "${BS_OPENBAO_TLS_CA}" ]]; then
+            def_ca="${BS_OPENBAO_TLS_CA}"
         fi
     fi
 
@@ -453,7 +463,15 @@ obw::final_server() {
     printf '\n'
     presentation::info "Проверка / Check:"
     presentation::info "  sudo systemctl status ${BS_OPENBAO_SERVICE}"
-    presentation::info "  sudo ${BS_OPENBAO_BIN} status"
+    local api ca check
+    api="$(openbao_server::local_api_addr prod)"
+    ca="$(openbao_server::__ca_file)"
+    if [[ -n "${ca}" ]]; then
+        check="sudo env BAO_ADDR=$(printf '%q' "${api}") BAO_CACERT=$(printf '%q' "${ca}") $(printf '%q' "${BS_OPENBAO_BIN}") status"
+    else
+        check="sudo env BAO_ADDR=$(printf '%q' "${api}") $(printf '%q' "${BS_OPENBAO_BIN}") status"
+    fi
+    presentation::info "  ${check}"
     presentation::info "Файлы / Files:"
     presentation::info "  ${BS_OPENBAO_CONFIG}"
     presentation::info "  ${BS_OPENBAO_DATA_DIR}"

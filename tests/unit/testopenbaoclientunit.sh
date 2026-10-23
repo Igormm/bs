@@ -71,6 +71,9 @@ main() {
     unset BAO_TOKEN
     openbao::init
     testframework::assert_equal "file-token" "${OPENBAO_TOKEN}" "token file fallback"
+    chmod 644 "${BS_OPENBAO_TOKEN_FILE}"
+    testframework::assert_command "openbao::init 2>&1 | grep -qF 'mode 644'" "wide token file warns"
+    chmod 600 "${BS_OPENBAO_TOKEN_FILE}"
 
     testframework::section "generic request / универсальный запрос"
     export BS_OPENBAO_TOKEN="sekret-token"

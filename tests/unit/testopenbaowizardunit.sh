@@ -120,6 +120,13 @@ main() {
     testframework::assert_command "printf '%s' '${summary}' | grep -qF '${BS_OPENBAO_TOKEN_FILE}'" "client summary shows token path"
     testframework::assert_command "! printf '%s' '${summary}' | grep -qF 'super-secret-token'" "summary never prints the token"
 
+    testframework::section "server dependencies / зависимости сервера"
+    OBW_PROFILE="prod"
+    local real_jq="${BS_OPENBAO_JQ}"
+    BS_OPENBAO_JQ="/nonexistent/jq"
+    testframework::assert_false "( obw::check_server_tools ) >/dev/null 2>&1" "missing jq rejected"
+    BS_OPENBAO_JQ="${real_jq}"
+
     testframework::section "client apply / применение клиента"
     OBW_ADDR="https://bao.test:8200"
     OBW_CA=""

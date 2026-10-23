@@ -37,9 +37,11 @@ fi
 
 # Список файлов: все *.sh + скрипт bs (тоже bash). *.bad.sh — намеренно
 # неправильные примеры импортированных навыков; их проверяет свой CI upstream.
+# .claude/worktrees — локальные рабочие копии агентов, не часть дерева проекта.
 # File list: all *.sh + the bs script (bash as well). *.bad.sh are intentional
 # counterexamples of imported skills; their own upstream CI checks them.
-mapfile -t files < <(find . -name "*.sh" -not -path "./.git/*" -not -name "*.bad.sh" | sort)
+# .claude/worktrees are local agent checkouts, not part of the project tree.
+mapfile -t files < <(find . -name "*.sh" -not -path "./.git/*" -not -path "./.claude/*" -not -name "*.bad.sh" | sort)
 files+=("./bs")
 
 print_header "ShellCheck Validation / Проверка ShellCheck"

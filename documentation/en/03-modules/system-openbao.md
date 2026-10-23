@@ -58,13 +58,15 @@ load "lib/system/openbao"
 | `BS_OPENBAO_TIMEOUT` | `30` | readiness timeout, seconds |
 
 All paths used inside HCL or the unit are checked for newlines and quotes.
+A custom `BS_OPENBAO_GROUP` may differ from the user on first installation;
+for an existing user it must already be that user's primary group.
 
 ## Lifecycle
 
 ```bash
 openbao_server::init          # validate hooks and platform
 openbao_server::install       # download, sha256-verify, atomic install
-openbao_server::ensure_user   # useradd --system + lock password
+openbao_server::ensure_user   # system user/group + lock password
 openbao_server::tls_selfsigned localhost 127.0.0.1
 openbao_server::configure prod
 openbao_server::install_service
@@ -79,16 +81,22 @@ openbao_server::status
 extracts the executable `bao` and replaces the target atomically. An installed
 matching version is a no-op.
 
-`openbao_server::tls_selfsigned` creates a 4096-bit CA and server key,
-signs the server certificate with SANs for the supplied hosts plus
+`openbao_server::tls_selfsigned` creates a 4096-bit CA and server key under
+`umask 077`, signs the server certificate with SANs for the supplied hosts plus
 `localhost`, `127.0.0.1` and `::1`, and sets the key mode to `0600`.
 
 `openbao_server::configure` creates the data and config directories, backs up
-an existing config and writes the new HCL with mode `0640`. TLS modes:
+an existing config and writes the new HCL with mode `0640`; backups include
+the PID and a counter, so repeated runs in the same second do not
+overwrite each other. TLS modes:
 
 - `selfsigned` — generate a CA and server certificate if missing.
-- `files` — require readable `BS_OPENBAO_TLS_CERT` and `BS_OPENBAO_TLS_KEY`.
+- `files` — require `BS_OPENBAO_TLS_CERT` and `BS_OPENBAO_TLS_KEY`, both readable by the service user. Set `BS_OPENBAO_TLS_CA` to the private CA bundle; leave it empty to use the system trust store. Missing CA files are ignored.
 - `off` — HTTP; intended for dev and explicitly warned about in the wizard.
+
+`openbao_server::init_cluster`, `status` and the internal client use
+`BS_OPENBAO_TLS_CA` only when the file is readable, so the same hooks work with
+a public CA.
 
 `openbao_server::init_cluster` runs `bao operator init -format=json`, validates
 the JSON and writes the keys plus root token to `BS_OPENBAO_INIT_FILE` with
@@ -117,7 +125,9 @@ unseals and waits for a healthy answer again.
 - The systemd unit runs as the unprivileged service user with
   `NoNewPrivileges`, `PrivateTmp`, `ProtectSystem=strict` and
   `ProtectHome`; only `BS_OPENBAO_DATA_DIR` is writable.
-- The client token is written through `openbao::login` with mode `0600`.
+- The client token is written through `openbao::login` with mode `0600`; a
+  token file readable by group or others produces a warning.
+- `apply dev` generates a root token when `BS_OPENBAO_DEV_TOKEN` is empty.
 - Tokens are sent through a temporary curl config file, not curl argv.
 
 ## Error codes
@@ -146,5 +156,6 @@ bs run examples/openbao_wizard.sh --dry-run
 - `core/const`, `core/logger`, `core/utils`, `lib/io/files`,
   `lib/system/systemd`, `lib/system/user`, `lib/integration/http`,
   `lib/integration/openbao`.
-- `curl` or `wget` (release download), `sha256sum`, `tar`, `gzip`,
-  `openssl` for self-signed TLS, `systemctl`, `useradd`.
+- `curl` or `wget` (release download), `sha256sum`, `tar`, `gzip`, `jq`,
+  `openssl` for self-signed TLS, `systemctl`, `useradd`, `groupadd` for a
+  custom group.

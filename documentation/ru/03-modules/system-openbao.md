@@ -58,13 +58,15 @@ load "lib/system/openbao"
 | `BS_OPENBAO_TIMEOUT` | `30` | таймаут готовности, секунды |
 
 Все пути, попадающие в HCL или юнит, проверяются на переводы строк и кавычки.
+Своя `BS_OPENBAO_GROUP` может отличаться от пользователя при первой установке;
+у уже существующего пользователя она должна быть его основной группой.
 
 ## Жизненный цикл
 
 ```bash
 openbao_server::init          # проверить хуки и платформу
 openbao_server::install       # скачать, проверить sha256, атомарно установить
-openbao_server::ensure_user   # useradd --system + блокировка пароля
+openbao_server::ensure_user   # системный пользователь/группа + блокировка пароля
 openbao_server::tls_selfsigned localhost 127.0.0.1
 openbao_server::configure prod
 openbao_server::install_service
@@ -79,16 +81,22 @@ openbao_server::status
 извлекает исполняемый `bao` и атомарно заменяет цель. Уже установленная
 подходящая версия — no-op.
 
-`openbao_server::tls_selfsigned` создаёт 4096-битные CA и ключ сервера,
-подписывает серверный сертификат с SAN для переданных хостов плюс
-`localhost`, `127.0.0.1` и `::1`, и ставит ключу права `0600`.
+`openbao_server::tls_selfsigned` создаёт 4096-битные CA и ключ сервера под
+`umask 077`, подписывает серверный сертификат с SAN для переданных хостов
+плюс `localhost`, `127.0.0.1` и `::1`, и ставит ключу права `0600`.
 
 `openbao_server::configure` создаёт каталоги данных и конфига, делает backup
-существующего конфига и пишет новый HCL с правами `0640`. Режимы TLS:
+существующего конфига и пишет новый HCL с правами `0640`; backup содержит
+PID и счётчик, поэтому повторные запуски в одну секунду не перезаписывают
+друг друга. Режимы TLS:
 
 - `selfsigned` — сгенерировать CA и сертификат сервера, если их нет.
-- `files` — требовать читаемые `BS_OPENBAO_TLS_CERT` и `BS_OPENBAO_TLS_KEY`.
+- `files` — требовать `BS_OPENBAO_TLS_CERT` и `BS_OPENBAO_TLS_KEY`, читаемые сервисным пользователем. `BS_OPENBAO_TLS_CA` задаёт приватный CA-бандл; пустое значение означает системное доверие. Отсутствующий CA игнорируется.
 - `off` — HTTP; для dev, визард явно предупреждает.
+
+`openbao_server::init_cluster`, `status` и внутренний клиент используют
+`BS_OPENBAO_TLS_CA` только если файл читаем, поэтому одни и те же хуки
+работают и с публичным CA.
 
 `openbao_server::init_cluster` запускает `bao operator init -format=json`,
 проверяет JSON и пишет ключи и root-токен в `BS_OPENBAO_INIT_FILE` с правами
@@ -116,7 +124,9 @@ openbao_server::dev_start    # exec dev-сервера в этом термин�
 - systemd-юнит работает от непривилегированного пользователя с
   `NoNewPrivileges`, `PrivateTmp`, `ProtectSystem=strict` и `ProtectHome`;
   запись разрешена только в `BS_OPENBAO_DATA_DIR`.
-- Токен клиента пишется через `openbao::login` с правами `0600`.
+- Токен клиента пишется через `openbao::login` с правами `0600`; файл,
+  читаемый группой или остальными, даёт предупреждение.
+- `apply dev` генерирует root-токен, если `BS_OPENBAO_DEV_TOKEN` пуст.
 - Токены уходят через временный config-файл curl, а не в argv.
 
 ## Коды ошибок
@@ -145,5 +155,6 @@ bs run examples/openbao_wizard.sh --dry-run
 - `core/const`, `core/logger`, `core/utils`, `lib/io/files`,
   `lib/system/systemd`, `lib/system/user`, `lib/integration/http`,
   `lib/integration/openbao`.
-- `curl` или `wget` (скачивание релиза), `sha256sum`, `tar`, `gzip`,
-  `openssl` для self-signed TLS, `systemctl`, `useradd`.
+- `curl` или `wget` (скачивание релиза), `sha256sum`, `tar`, `gzip`, `jq`,
+  `openssl` для self-signed TLS, `systemctl`, `useradd`, `groupadd` для
+  своей группы.

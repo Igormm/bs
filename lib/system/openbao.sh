@@ -18,7 +18,7 @@
 # @depends core/const, core/logger, core/utils, lib/io/files,
 #   lib/system/systemd, lib/system/user, lib/integration/http,
 #   lib/integration/openbao
-# @optdeps curl, wget, sha256sum, tar, gzip, openssl, systemctl, useradd
+# @optdeps curl, wget, sha256sum, tar, gzip, openssl, systemctl, useradd, jq
 
 # Source Guard / Защита от повторной загрузки
 bs::guard "LIB_SYSTEM_OPENBAO" || return 0
@@ -106,6 +106,38 @@ openbao_server::__dry() {
     [[ "${BS_OPENBAO_DRY_RUN}" == "1" || "${FRAMEWORK_DRY_RUN:-false}" == "true" ]]
 }
 
+# @private CA bundle usable by a client of this server /
+# CA-бандл, пригодный для клиента этого сервера
+# @stdout CA path or empty / путь к CA или пусто
+openbao_server::__ca_file() {
+    case "${BS_OPENBAO_TLS_MODE}" in
+        selfsigned|files) ;;
+        *) return 0 ;;
+    esac
+    if [[ -f "${BS_OPENBAO_TLS_CA}" && -r "${BS_OPENBAO_TLS_CA}" ]]; then
+        printf '%s' "${BS_OPENBAO_TLS_CA}"
+    fi
+}
+
+# @private Whether the service user can read a TLS file /
+# Может ли сервисный пользователь прочитать TLS-файл
+# @param $1 Path / Путь
+openbao_server::__service_readable() {
+    local -r path="${1-}"
+    [[ -f "${path}" && -r "${path}" ]] || return 1
+    (( EUID == 0 )) || return 0
+    id -u "${BS_OPENBAO_USER}" >/dev/null 2>&1 || return 0
+    if is::command runuser; then
+        runuser -u "${BS_OPENBAO_USER}" -- test -r "${path}" 2>/dev/null
+        return $?
+    fi
+    if is::command su; then
+        su -s /bin/sh -c "test -r $(printf '%q' "${path}")" "${BS_OPENBAO_USER}" >/dev/null 2>&1
+        return $?
+    fi
+    return 0
+}
+
 # @private Reject newlines/quotes in a path used inside HCL/systemd /
 # Отклонить переводы строк и кавычки в пути для HCL/systemd
 # @param $1 Path / Путь
@@ -176,7 +208,12 @@ openbao_server::__backup() {
     local -r path="${1:?path required}"
     is::file "${path}" || return 0
     openbao_server::__dry && { log::warn "[DRY-RUN] backup ${path}"; return 0; }
-    local -r backup="${path}.bak.$(date +%Y%m%d%H%M%S)"
+    local backup="${path}.bak.$(date +%Y%m%d%H%M%S).$$"
+    local n=0
+    while [[ -e "${backup}" ]]; do
+        n=$((n + 1))
+        backup="${path}.bak.$(date +%Y%m%d%H%M%S).$$.${n}"
+    done
     io::files::copy_file "${path}" "${backup}" false || return "${LIB_ERROR_FILE_OPERATION}"
     return 0
 }
@@ -317,7 +354,8 @@ openbao_server::install() {
     local wanted="${1:-${BS_OPENBAO_VERSION}}"
     local current=""
     current="$(openbao_server::version)" || current=""
-    if [[ -x "${BS_OPENBAO_BIN}" ]] && { [[ "${wanted}" == "latest" ]] || [[ "${current}" == "${wanted#v}" ]]; }; then
+    if [[ -x "${BS_OPENBAO_BIN}" && -n "${current}" ]] \
+        && { [[ "${wanted}" == "latest" ]] || [[ "${current}" == "${wanted#v}" ]]; }; then
         log::info "OpenBao уже установлен / already installed: ${BS_OPENBAO_BIN} (${current:-unknown})"
         return 0
     fi
@@ -380,30 +418,67 @@ openbao_server::install() {
     return 0
 }
 
+# @private Whether a group exists / Существует ли группа
+# @param $1 Group / Группа
+openbao_server::__group_exists() {
+    local -r group="${1:?group required}"
+    if is::command getent; then
+        getent group "${group}" >/dev/null 2>&1
+        return $?
+    fi
+    grep -q "^${group}:" /etc/group 2>/dev/null
+}
+
 # @description Create the system user / Создать системного пользователя
 openbao_server::ensure_user() {
     openbao_server::init || return $?
-    if id "${BS_OPENBAO_USER}" >/dev/null 2>&1; then
-        log::info "OpenBao: пользователь уже есть / user exists: ${BS_OPENBAO_USER}"
+    local -r user="${BS_OPENBAO_USER}" group="${BS_OPENBAO_GROUP}"
+    if id -u "${user}" >/dev/null 2>&1; then
+        if [[ "${group}" != "${user}" ]]; then
+            local primary
+            primary="$(id -gn "${user}" 2>/dev/null || true)"
+            if [[ "${primary}" != "${group}" ]]; then
+                log::error "OpenBao: пользователь ${user} уже в другой группе / user ${user} has primary group ${primary}, expected ${group}"
+                return "${LIB_ERROR_CONFLICT}"
+            fi
+        fi
+        log::info "OpenBao: пользователь уже есть / user exists: ${user}"
         return 0
     fi
     if openbao_server::__dry; then
-        log::warn "[DRY-RUN] useradd --system ${BS_OPENBAO_USER}"
+        log::warn "[DRY-RUN] groupadd --system ${group}; useradd --system ${user}"
         return 0
+    fi
+    if [[ "${group}" != "${user}" ]]; then
+        if ! openbao_server::__group_exists "${group}"; then
+            is::command groupadd || {
+                log::error "OpenBao: нужен groupadd / groupadd is required"
+                return "${LIB_ERROR_DEPENDENCY_MISSING}"
+            }
+            if ! groupadd --system "${group}"; then
+                log::error "OpenBao: не удалось создать группу / cannot create group: ${group}"
+                return "${LIB_ERROR_FILE_OPERATION}"
+            fi
+        fi
     fi
     is::command useradd || {
         log::error "OpenBao: нужен useradd / useradd is required"
         return "${LIB_ERROR_DEPENDENCY_MISSING}"
     }
-    if ! useradd --system --home-dir "${BS_OPENBAO_DATA_DIR}" --shell /usr/sbin/nologin \
-        --user-group "${BS_OPENBAO_USER}"; then
-        log::error "OpenBao: не удалось создать пользователя / cannot create user: ${BS_OPENBAO_USER}"
+    local -a args=(--system --home-dir "${BS_OPENBAO_DATA_DIR}" --shell /usr/sbin/nologin)
+    if [[ "${group}" == "${user}" ]]; then
+        args+=(--user-group)
+    else
+        args+=(--gid "${group}")
+    fi
+    if ! useradd "${args[@]}" "${user}"; then
+        log::error "OpenBao: не удалось создать пользователя / cannot create user: ${user}"
         return "${LIB_ERROR_FILE_OPERATION}"
     fi
     if is::command passwd; then
-        passwd -l "${BS_OPENBAO_USER}" >/dev/null 2>&1 || log::warn "OpenBao: не удалось заблокировать пароль / cannot lock password"
+        passwd -l "${user}" >/dev/null 2>&1 || log::warn "OpenBao: не удалось заблокировать пароль / cannot lock password"
     fi
-    log::info "OpenBao: создан пользователь / user created: ${BS_OPENBAO_USER}"
+    log::info "OpenBao: создан пользователь / user created: ${user}"
 }
 
 # @private Build subjectAltName list / Собрать список subjectAltName
@@ -449,11 +524,16 @@ openbao_server::tls_selfsigned() {
     local san rc=0
     san="$(openbao_server::__san "$@")" || rc=$?
     (( rc == 0 )) || return "${rc}"
-    if ! openssl genrsa -out "${ca_key}" 4096 >/dev/null 2>&1 \
-        || ! openssl req -x509 -new -nodes -key "${ca_key}" -sha256 -days 3650 \
-            -subj "/CN=BS OpenBao CA" -out "${ca_crt}" >/dev/null 2>&1 \
-        || ! openssl genrsa -out "${BS_OPENBAO_TLS_KEY}" 4096 >/dev/null 2>&1 \
-        || ! openssl req -new -key "${BS_OPENBAO_TLS_KEY}" -subj "/CN=openbao" -out "${csr}" >/dev/null 2>&1; then
+    # umask 077: ключи не должны быть доступны даже на мгновение между
+    # созданием и chmod 600 / keys must not be exposed between creation and chmod 600
+    if ! (
+        umask 077
+        openssl genrsa -out "${ca_key}" 4096 >/dev/null 2>&1 &&
+            openssl req -x509 -new -nodes -key "${ca_key}" -sha256 -days 3650 \
+                -subj "/CN=BS OpenBao CA" -out "${ca_crt}" >/dev/null 2>&1 &&
+            openssl genrsa -out "${BS_OPENBAO_TLS_KEY}" 4096 >/dev/null 2>&1 &&
+            openssl req -new -key "${BS_OPENBAO_TLS_KEY}" -subj "/CN=openbao" -out "${csr}" >/dev/null 2>&1
+    ); then
         log::error "OpenBao: не удалось создать ключи/CSR / cannot create keys/CSR"
         return "${LIB_ERROR_FILE_OPERATION}"
     fi
@@ -481,6 +561,13 @@ openbao_server::tls_selfsigned() {
 openbao_server::render_config() {
     local -r profile="${1:-prod}"
     openbao_server::init || return $?
+    case "${profile}" in
+        dev|prod) ;;
+        *)
+            log::error "OpenBao: профиль должен быть dev|prod / profile must be dev|prod"
+            return "${LIB_ERROR_INVALID_INPUT}"
+            ;;
+    esac
     local tls_disable=0
     if [[ "${profile}" == "dev" || "${BS_OPENBAO_TLS_MODE}" == "off" ]]; then
         tls_disable=1
@@ -523,9 +610,11 @@ openbao_server::configure() {
         if [[ ! -f "${BS_OPENBAO_TLS_CERT}" || ! -f "${BS_OPENBAO_TLS_KEY}" ]]; then
             openbao_server::tls_selfsigned "localhost" "127.0.0.1" || return $?
         fi
-    elif [[ "${profile}" == "prod" && "${BS_OPENBAO_TLS_MODE}" == "files" ]]; then
-        if [[ ! -r "${BS_OPENBAO_TLS_CERT}" || ! -r "${BS_OPENBAO_TLS_KEY}" ]]; then
-            log::error "OpenBao: TLS-файлы не найдены / TLS files not found"
+    fi
+    if [[ "${profile}" == "prod" && "${BS_OPENBAO_TLS_MODE}" != "off" ]]; then
+        if ! openbao_server::__service_readable "${BS_OPENBAO_TLS_CERT}" \
+            || ! openbao_server::__service_readable "${BS_OPENBAO_TLS_KEY}"; then
+            log::error "OpenBao: TLS-файлы не найдены или недоступны пользователю ${BS_OPENBAO_USER} / TLS files are missing or not readable by ${BS_OPENBAO_USER}"
             return "${LIB_ERROR_FILE_NOT_FOUND}"
         fi
     fi
@@ -589,12 +678,7 @@ openbao_server::local_api_addr() {
 # @private Point the client module at this server / Направить клиент на этот сервер
 openbao_server::__client_init() {
     BS_OPENBAO_ADDR="$(openbao_server::local_api_addr prod)"
-    BS_OPENBAO_CACERT=""
-    if [[ "${BS_OPENBAO_TLS_MODE}" == "selfsigned" ]]; then
-        BS_OPENBAO_CACERT="${BS_OPENBAO_TLS_DIR}/ca.crt"
-    elif [[ "${BS_OPENBAO_TLS_MODE}" == "files" ]]; then
-        BS_OPENBAO_CACERT="${BS_OPENBAO_TLS_CA}"
-    fi
+    BS_OPENBAO_CACERT="$(openbao_server::__ca_file)"
     BS_OPENBAO_TOKEN=""
     BS_OPENBAO_TOKEN_FILE="/dev/null"
     openbao::init
@@ -617,8 +701,7 @@ openbao_server::init_cluster() {
     fi
     local api ca out
     api="$(openbao_server::local_api_addr prod)"
-    ca=""
-    [[ "${BS_OPENBAO_TLS_MODE}" == "selfsigned" ]] && ca="${BS_OPENBAO_TLS_DIR}/ca.crt"
+    ca="$(openbao_server::__ca_file)"
     local -a env_args=("BAO_ADDR=${api}")
     [[ -n "${ca}" ]] && env_args+=("BAO_CACERT=${ca}")
     out="$(env "${env_args[@]}" "${BS_OPENBAO_BIN}" operator init \
@@ -692,8 +775,7 @@ openbao_server::status() {
     openbao_server::init || return $?
     local api ca
     api="$(openbao_server::local_api_addr prod)"
-    ca=""
-    [[ "${BS_OPENBAO_TLS_MODE}" == "selfsigned" ]] && ca="${BS_OPENBAO_TLS_DIR}/ca.crt"
+    ca="$(openbao_server::__ca_file)"
     if is::executable "${BS_OPENBAO_BIN}"; then
         local -a env_args=("BAO_ADDR=${api}")
         [[ -n "${ca}" ]] && env_args+=("BAO_CACERT=${ca}")
@@ -718,11 +800,17 @@ openbao_server::wait_ready() {
     return "${LIB_ERROR_TIMEOUT}"
 }
 
+# @private Generate a dev root token / Сгенерировать dev root-токен
+# @stdout token / токен
+openbao_server::__dev_token() {
+    head -c 24 /dev/urandom | base64 | tr '+/' '_-' | tr -d '\n'
+}
+
 # @description Print the dev server command / Напечатать команду dev-сервера
 # @stdout command / команда
 openbao_server::dev_command() {
     printf 'env BAO_DEV_ROOT_TOKEN_ID=%q BAO_ADDR=%q %q server -dev -dev-listen-address=%q' \
-        "${BS_OPENBAO_DEV_TOKEN}" "http://${BS_OPENBAO_DEV_LISTEN}" \
+        "${BS_OPENBAO_DEV_TOKEN:-}" "http://${BS_OPENBAO_DEV_LISTEN}" \
         "${BS_OPENBAO_BIN}" "${BS_OPENBAO_DEV_LISTEN}"
 }
 
@@ -734,13 +822,13 @@ openbao_server::dev_start() {
         log::error "OpenBao: бинарник не найден / binary not found: ${BS_OPENBAO_BIN}"
         return "${LIB_ERROR_FILE_NOT_FOUND}"
     }
-    [[ -n "${BS_OPENBAO_DEV_TOKEN}" ]] || BS_OPENBAO_DEV_TOKEN="$(head -c 24 /dev/urandom | base64 | tr '+/' '_-' | tr -d '\n')"
+    [[ -n "${BS_OPENBAO_DEV_TOKEN:-}" ]] || BS_OPENBAO_DEV_TOKEN="$(openbao_server::__dev_token)"
     if openbao_server::__dry; then
         log::warn "[DRY-RUN] $(openbao_server::dev_command)"
         return 0
     fi
     log::info "OpenBao dev: остановить / stop — Ctrl-C"
-    exec env "BAO_DEV_ROOT_TOKEN_ID=${BS_OPENBAO_DEV_TOKEN}" \
+    exec env "BAO_DEV_ROOT_TOKEN_ID=${BS_OPENBAO_DEV_TOKEN:-}" \
         "BAO_ADDR=http://${BS_OPENBAO_DEV_LISTEN}" \
         "${BS_OPENBAO_BIN}" server -dev -dev-listen-address="${BS_OPENBAO_DEV_LISTEN}"
 }
@@ -753,6 +841,7 @@ openbao_server::apply() {
     case "${profile}" in
         dev)
             openbao_server::install || return $?
+            [[ -n "${BS_OPENBAO_DEV_TOKEN:-}" ]] || BS_OPENBAO_DEV_TOKEN="$(openbao_server::__dev_token)"
             log::info "OpenBao dev готов / ready: $(openbao_server::dev_command)"
             return 0
             ;;
