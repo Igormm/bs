@@ -230,6 +230,22 @@ test_version_env_odd() {
     OUT="$(cd "${T}" && env -u BS_ROOT -u BS_HOME -u BS_INITIALIZED HOME="${T}/home" PATH="/usr/bin:/bin" ${TEST_BASH} "${bsx}" version --full 2>&1 </dev/null)" && RC=0 || RC=$?
     eq "y" "$(has "${OUT}" "no manifest")" "13: version --full without a manifest says so"
 
+    # path, цвет вида установки и коммитов / path, coloured install kind and commits
+    printf '%s\n' 'mode=local' 'installed_at=2026-01-01' 'installed_by=me' \
+        'source=/src' 'source_commit=abc1234' 'updated_at=2026-01-02' \
+        'updated_from=/src' 'updated_commit=def5678' > "${T}/real/lib/bs/.install"
+    OUT="$(cd "${T}" && env -u BS_ROOT -u BS_HOME -u BS_INITIALIZED -u NO_COLOR HOME="${T}/home" PATH="/usr/bin:/bin" BS_LOG_COLOR=always ${TEST_BASH} "${bsx}" version --full 2>&1 </dev/null)" && RC=0 || RC=$?
+    eq "0" "${RC}" "13: version --full with a manifest exits 0"
+    eq "y" "$(has "${OUT}" "path:")" "13: version --full uses the path label"
+    eq "n" "$(has "${OUT}" "root:")" "13: version --full no longer uses the root label"
+    eq "y" "$(has "${OUT}" $'\033[1;32mlocal\033[0m')" "13: local install kind is green"
+    eq "y" "$(has "${OUT}" $'\033[1;36mabc1234\033[0m')" "13: source commit is coloured"
+    eq "y" "$(has "${OUT}" $'\033[1;33mdef5678\033[0m')" "13: differing updated commit is yellow"
+    eq "y" "$(has "${OUT}" "differs / отличается")" "13: differing commits are marked"
+    OUT="$(cd "${T}" && env -u BS_ROOT -u BS_HOME -u BS_INITIALIZED -u BS_LOG_COLOR -u NO_COLOR HOME="${T}/home" PATH="/usr/bin:/bin" ${TEST_BASH} "${bsx}" version --full 2>&1 </dev/null)" && RC=0 || RC=$?
+    eq "n" "$(has "${OUT}" $'\033')" "13: version --full is colourless when not a terminal"
+    rm -f "${T}/real/lib/bs/.install"
+
     # Исходный репозиторий без git в PATH / a checkout with no git in PATH
     mkdir -p "${T}/tools"
     local f n

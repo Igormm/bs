@@ -498,7 +498,7 @@ test_running_info() {
     # Первая строка-подробность — первая с отступом (над ней могут быть Codename и т. п.)
     # The first detail line is the first indented one (Codename etc. may come above it)
     full="$(${TEST_BASH} "${BS_PROJECT_ROOT}/bs" version --full | awk '/^  / && !f { print; f = 1 }')"
-    eq "y" "$(has "${OUT}" "  root:      ${BS_PROJECT_ROOT}")" "info: the run header has the root row of version --full"
+    eq "y" "$(has "${OUT}" "  path:      ${BS_PROJECT_ROOT}")" "info: the run header has the path row of version --full"
     eq "y" "$(has "${OUT}" "  install:")" "info: the run header has the install row of version --full"
     eq "y" "$(has "${OUT}" "${full%%$'\n'*}")" "info: the first detail line equals the one of version --full"
 

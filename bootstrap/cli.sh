@@ -184,7 +184,7 @@ bs_cli_help_cmd() {
     help|-h|--help)
       # встроенная справка bash, если она есть, иначе эта / the bash built-in help when there is one, else this one
       if command -v help >/dev/null 2>&1; then help; else bs_cli_help; fi ;;
-    version)        printf 'Usage: bs version [--full]\n\nPrint the framework version; --full adds the root, install kind, source and last update.\n' ;;
+    version)        printf 'Usage: bs version [--full]\n\nPrint the framework version; --full adds the path, install kind, source and last update.\n' ;;
     env)            printf 'Usage: bs env\n\nShow BS_ROOT, PATH and the install manifest.\n' ;;
     list)           bs_cli_list_cmd --help ;;
     lang-doc)       bs_cli_delegate lang-doc bs::cli::lang_doc_cmd --help ;;
@@ -248,19 +248,58 @@ bs_cli_update_manifest_valid() {
   [ "${__bs_cli_mh}" -eq 1 ]
 }
 
+# @private Colour only when the output is a terminal and the colour gate is on.
+# @private Цвет только для терминала и при включённом гейте цвета.
+bs_cli_color_on() {
+  if [ -n "${BS_CLI_INFO_NO_COLOR:-}" ]; then return 1; fi
+  if [ -n "${NO_COLOR:-}" ]; then return 1; fi
+  case "${BS_LOG_COLOR:-auto}" in
+    always) return 0 ;;
+    never) return 1 ;;
+  esac
+  [ -t "${1:-1}" ]
+}
+
+# @private Wrap text in the colour of an install kind; no-op without a terminal.
+# @private Окрасить текст цветом вида установки; без терминала — без изменений.
+# @param $1 kind: local|system|custom|checkout|bad|warn / вид установки
+# @param $2 text / текст
+bs_cli_paint() {
+  if ! bs_cli_color_on; then
+    printf '%s' "$2"
+    return 0
+  fi
+  case "$1" in
+    local)    __bs_cli_pc='1;32' ;;
+    system)   __bs_cli_pc='1;33' ;;
+    custom)   __bs_cli_pc='1;35' ;;
+    checkout) __bs_cli_pc='1;36' ;;
+    path)     __bs_cli_pc='1;34' ;;
+    commit)   __bs_cli_pc='1;36' ;;
+    commit_same) __bs_cli_pc='1;32' ;;
+    commit_diff) __bs_cli_pc='1;33' ;;
+    bad)      __bs_cli_pc='1;31' ;;
+    warn)     __bs_cli_pc='1;33' ;;
+    *)        __bs_cli_pc='0' ;;
+  esac
+  printf '\033[%sm%s\033[0m' "${__bs_cli_pc}" "$2"
+}
+
 # @private Строки сведений о запущенной копии — ровно то, что `bs version --full`
-# печатает после строки версии: root, вид установки, источник, последнее
-# обновление. Читает манифест и git, чужой код не запускает. Те же строки идут
-# в начале и в каждой рамке `bs update` / `bs uninstall`.
+# печатает после строки версии: path, вид установки, источник, последнее
+# обновление. Вид установки выделен цветом в терминале. Читает манифест и git,
+# чужой код не запускает. Те же строки идут в начале и в каждой рамке
+# `bs update` / `bs uninstall`.
 # @private The detail lines about the running copy — exactly what
-# `bs version --full` prints after the version line: root, install kind,
-# source, last update. Reads the manifest and git, runs no foreign code. The
-# same lines open every `bs update` / `bs uninstall` run and notice box.
+# `bs version --full` prints after the version line: path, install kind,
+# source, last update. The install kind is coloured in a terminal. Reads the
+# manifest and git, runs no foreign code. The same lines open every
+# `bs update` / `bs uninstall` run and notice box.
 bs_cli_bs_full_info_lines() {
-  printf '  %-10s %s\n' "root:" "${BS_ROOT}"
+  printf '  %-10s %s\n' "path:" "${BS_ROOT}"
   if [ -e "${BS_ROOT}/.install" ] && ! bs_cli_update_manifest_valid "${BS_ROOT}/.install"; then
     printf '  %-10s %s\n' "install:" \
-      "manifest unreadable or corrupt / манифест повреждён: ${BS_ROOT}/.install (bs update recreates it)"
+      "$(bs_cli_paint bad "manifest unreadable or corrupt / манифест повреждён: ${BS_ROOT}/.install (bs update recreates it)")"
   elif [ -f "${BS_ROOT}/.install" ]; then
     __bs_cli_imode=$(bs_cli_install_info_get "${BS_ROOT}" mode)
     __bs_cli_iat=$(bs_cli_install_info_get "${BS_ROOT}" installed_at)
@@ -270,24 +309,45 @@ bs_cli_bs_full_info_lines() {
     __bs_cli_uat=$(bs_cli_install_info_get "${BS_ROOT}" updated_at)
     __bs_cli_ufrom=$(bs_cli_install_info_get "${BS_ROOT}" updated_from)
     __bs_cli_ucom=$(bs_cli_install_info_get "${BS_ROOT}" updated_commit)
+    case "${__bs_cli_imode:-}" in
+      local)  __bs_cli_ikind=local ;;
+      system) __bs_cli_ikind=system ;;
+      *)      __bs_cli_ikind=custom ;;
+    esac
     printf '  %-10s %s, installed %s by %s\n' "install:" \
-      "${__bs_cli_imode:-?}" "${__bs_cli_iat:-?}" "${__bs_cli_iby:-?}"
+      "$(bs_cli_paint "${__bs_cli_ikind}" "${__bs_cli_imode:-?}")" \
+      "${__bs_cli_iat:-?}" "${__bs_cli_iby:-?}"
     printf '  %-10s %s @ %s\n' "source:" \
-      "${__bs_cli_isrc:-?}" "$(bs_cli_short_sha "${__bs_cli_isc:-}")"
+      "$(bs_cli_paint path "${__bs_cli_isrc:-?}")" \
+      "$(bs_cli_paint commit "$(bs_cli_short_sha "${__bs_cli_isc:-}")")"
     if [ -n "${__bs_cli_uat}" ]; then
-      printf '  %-10s %s from %s @ %s\n' "updated:" "${__bs_cli_uat}" \
-        "${__bs_cli_ufrom:-?}" "$(bs_cli_short_sha "${__bs_cli_ucom:-}")"
+      __bs_cli_ucom_short="$(bs_cli_short_sha "${__bs_cli_ucom:-}")"
+      if [ -n "${__bs_cli_isc}" ] && [ -n "${__bs_cli_ucom}" ] && [ "${__bs_cli_isc}" != "${__bs_cli_ucom}" ]; then
+        __bs_cli_ucolour=commit_diff
+        __bs_cli_udiff=' (differs / отличается)'
+      elif [ -n "${__bs_cli_isc}" ] && [ -n "${__bs_cli_ucom}" ]; then
+        __bs_cli_ucolour=commit_same
+        __bs_cli_udiff=''
+      else
+        __bs_cli_ucolour=commit
+        __bs_cli_udiff=''
+      fi
+      printf '  %-10s %s from %s @ %s%s\n' "updated:" "${__bs_cli_uat}" \
+        "$(bs_cli_paint path "${__bs_cli_ufrom:-?}")" \
+        "$(bs_cli_paint "${__bs_cli_ucolour}" "${__bs_cli_ucom_short}")" "${__bs_cli_udiff}"
     fi
   elif [ -e "${BS_ROOT}/.git" ] && bs_utils_has git; then
-    printf '  %-10s source checkout, commit %s (%s)%s\n' "install:" \
-      "$(git -C "${BS_ROOT}" rev-parse --short=7 HEAD 2>/dev/null || printf '?')" \
+    printf '  %-10s %s, commit %s (%s)%s\n' "install:" \
+      "$(bs_cli_paint checkout 'source checkout')" \
+      "$(bs_cli_paint commit "$(git -C "${BS_ROOT}" rev-parse --short=7 HEAD 2>/dev/null || printf '?')")" \
       "$(git -C "${BS_ROOT}" log -1 --format=%cd --date=short 2>/dev/null || printf '?')" \
       "$(if [ -n "$(git -C "${BS_ROOT}" status --porcelain 2>/dev/null)" ]; then printf ', with uncommitted changes'; fi)"
   elif [ -e "${BS_ROOT}/.git" ] || [ -d "${BS_ROOT}/tests" ]; then
-    printf '  %-10s source checkout (git not available, commit unknown / git недоступен)\n' "install:"
+    printf '  %-10s %s (git not available, commit unknown / git недоступен)\n' "install:" \
+      "$(bs_cli_paint checkout 'source checkout')"
   else
     printf '  %-10s %s\n' "install:" \
-      "no manifest (installed by an older installer)"
+      "$(bs_cli_paint warn "no manifest (installed by an older installer)")"
   fi
 }
 
@@ -830,7 +890,7 @@ bs_cli_bs_running_info() {
 bs_cli_update_ctx() {
   if [ -n "${UPDATE_RUN_INFO:-}" ]; then return 0; fi
   UPDATE_RUN_INFO="$(bs_cli_bs_running_info)"
-  UPDATE_RUN_BLOCK="$(bs_cli_bs_running_block)"
+  UPDATE_RUN_BLOCK="$(BS_CLI_INFO_NO_COLOR=1 bs_cli_bs_running_block)"
   UPDATE_RUN_SHORT="Запущен / Running: ${UPDATE_RUN_INFO}"
   return 0
 }
