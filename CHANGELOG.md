@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- test(perf): `tests/perf/bench.sh` measures `bs version`, `env`, `list`, `doctor` and `run` with `hyperfine` (bash-timer fallback, `--shell`, `--json`); `tests/perf/profile.sh` shows wall time, `strace -f -c` fork/exec totals and the largest timestamped bash xtrace gaps for a command or `--all`; both are development tools, are not part of `runalltests.sh`, and skip missing `hyperfine`/`strace` honestly.
 - feat(openbao): `lib/system/openbao.sh` installs and runs an OpenBao server on Linux — release download with `checksums.txt` verification, system user, self-signed or supplied TLS, single-node Raft HCL config, systemd unit, `operator init` with keys and root token in a `0600` file, unseal, health wait, dev command and `apply dev|prod`. `lib/integration/openbao.sh` is the bash4+curl client: address/token/namespace resolution (`BS_OPENBAO_*` → `BAO_*` → token file), generic request with headers in a temporary `0600` curl config (no token in argv), seal/health, KV v2, token, auth, policy, mount and namespace helpers. `examples/openbao_wizard.sh` is a TUI wizard for server/client/both in dev/prod; `lib/ui/wizard.sh` `ask_pass` takes an optional title. Unit tests: 38 client, 93 server (fake curl/bao/systemd/useradd), 32 wizard; en/ru module docs and overview links.
 
 ### Fixed

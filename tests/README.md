@@ -12,6 +12,7 @@ tests/
 ├── runalltests.sh                 # Main test runner / Основной запуск тестов
 ├── validatesyntax.sh              # Syntax validation / Проверка синтаксиса
 ├── testframework.sh               # Test framework utilities / Утилиты тестового фреймворка
+├── perf/                          # Benchmarks and profiles / Бенчмарки и профили
 ├── unit/                          # Unit tests / Модульные тесты
 │   ├── testconstunit.sh           # core/const: коды ошибок, const::error_description
 │   ├── testerrorhandlerunit.sh    # core/errorhandler: errorhandler::throw, cleanup-стек
@@ -86,6 +87,28 @@ bash tests/validatesyntax.sh
 отсутствующие обязательные файлы.
 Runs `bash -n` over `bs`, `boot.sh`, `install.sh`, `bootstrap/`, `core/`, `lib/`,
 `install/`, `tests/`. Exit 1 on syntax errors or missing required files.
+
+### Performance / Производительность
+
+`tests/perf/` is a development harness, not part of `tests/runalltests.sh`.
+`tests/perf/` — инструмент разработчика, а не часть `tests/runalltests.sh`.
+
+```bash
+bash tests/perf/bench.sh                      # version, env, list, doctor, run
+bash tests/perf/bench.sh --runs 10 --warmup 3
+bash tests/perf/bench.sh --no-hyperfine       # принудительный bash-таймер
+bash tests/perf/profile.sh version            # wall + strace + xtrace gaps
+bash tests/perf/profile.sh --all --top 20
+```
+
+`bench.sh` prefers `hyperfine` and falls back to a bash timer; `--shell dash`
+runs the entry point under another shell. `profile.sh` uses `strace -f -c` for
+fork/exec cost and a timestamped `bash -x` for the slowest lines; both tools
+are optional and their sections are skipped honestly when absent.
+`bench.sh` предпочитает `hyperfine` и откатывается на bash-таймер; `--shell dash`
+запускает точку входа другой оболочкой. `profile.sh` использует `strace -f -c`
+для цены fork/exec и `bash -x` с таймстампами для самых медленных строк; оба
+инструмента необязательны, и их секции честно пропускаются при отсутствии.
 
 ### Run a Single Test / Запуск одного теста
 ```bash
