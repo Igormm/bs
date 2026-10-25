@@ -37,6 +37,15 @@ case "${__BS_CLI_SOURCED:-}" in
 esac
 __BS_CLI_SOURCED=1
 
+# Терминал ли вывод — решаем один раз при загрузке файла: bs_cli_paint зовут
+# внутри "$(...)", где stdout уже труба и `-t 1` всегда ложно. Запоминаем
+# состояние настоящего stdout процесса до всех подстановок.
+# Whether the output is a terminal is decided once when the file is loaded:
+# bs_cli_paint is called inside "$(...)", where stdout is already a pipe and
+# `-t 1` is always false. Remember the real stdout of the process before any
+# substitution.
+if [ -t 1 ]; then __bs_cli_color_tty=1; else __bs_cli_color_tty=0; fi
+
 # @description Завершить с сообщением об ошибке и очисткой / Exit with an error message and the cleanup
 # @param $@ message / сообщение
 bs_cli_die() {
@@ -257,6 +266,14 @@ bs_cli_color_on() {
     always) return 0 ;;
     never) return 1 ;;
   esac
+  # bs_cli_paint is called inside "$(...)", where stdout is a pipe: use the
+  # terminal state saved when this file was loaded.
+  # bs_cli_paint вызывается внутри "$(...)", где stdout — труба: берём
+  # состояние терминала, сохранённое при загрузке файла.
+  if [ "$#" -eq 0 ] && [ -n "${__bs_cli_color_tty:-}" ]; then
+    [ "${__bs_cli_color_tty}" = 1 ]
+    return
+  fi
   [ -t "${1:-1}" ]
 }
 

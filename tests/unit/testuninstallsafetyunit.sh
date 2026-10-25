@@ -242,6 +242,10 @@ test_version_env_odd() {
     eq "y" "$(has "${OUT}" $'\033[1;36mabc1234\033[0m')" "13: source commit is coloured"
     eq "y" "$(has "${OUT}" $'\033[1;33mdef5678\033[0m')" "13: differing updated commit is yellow"
     eq "y" "$(has "${OUT}" "differs / отличается")" "13: differing commits are marked"
+    if command -v script >/dev/null 2>&1 && script -q -c true /dev/null >/dev/null 2>&1; then
+        OUT="$(cd "${T}" && script -q -c "env -u BS_ROOT -u BS_HOME -u BS_INITIALIZED -u NO_COLOR HOME='${T}/home' PATH='/usr/bin:/bin' BS_LOG_COLOR=auto ${TEST_BASH} '${bsx}' version --full" /dev/null 2>&1)" && RC=0 || RC=$?
+        eq "y" "$(has "${OUT}" $'\033[1;32mlocal\033[0m')" "13: auto colour works on a terminal"
+    fi
     OUT="$(cd "${T}" && env -u BS_ROOT -u BS_HOME -u BS_INITIALIZED -u BS_LOG_COLOR -u NO_COLOR HOME="${T}/home" PATH="/usr/bin:/bin" ${TEST_BASH} "${bsx}" version --full 2>&1 </dev/null)" && RC=0 || RC=$?
     eq "n" "$(has "${OUT}" $'\033')" "13: version --full is colourless when not a terminal"
     rm -f "${T}/real/lib/bs/.install"
