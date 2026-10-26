@@ -218,6 +218,10 @@ Notes:
 - CI runs the test suite in containers covering bash 5.x (ubuntu, debian,
   almalinux 9) and bash 4.4 (almalinux 8) — the framework minimum. Do not use
   features newer than bash 4.4 in modules.
+- Colouring user-facing output: find the sites with
+  `scripts/check_output_color.sh` and apply the rules in
+  [Colouring CLI output](cli-output-colour.md) — colour the value, keep the
+  gate in one place, and remember that `$(...)` is a pipe.
 
 ## REPL — interactive BS shell
 

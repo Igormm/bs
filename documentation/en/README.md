@@ -29,6 +29,7 @@ an I/O streams abstraction and a set of system modules.
 ## For developers
 
 - [Developer guide](08-development/README.md) — writing modules, `# @depends`, pre-commit checks.
+- [Colouring CLI output](08-development/cli-output-colour.md) — finding output sites and colouring the right values.
 - [Code style guide](code-style-guide.md) — project conventions.
 - [Best practices](best-practices.md) — high-level guidelines for contributors.
 - [Migration BOSA → BS](09-migration-bosa-to-bs.md) — renaming tables for those who knew the old version.
