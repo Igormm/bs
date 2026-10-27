@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.10.0] - 2026-10-27 "Lingoa"
 
 ### Added
 - feat(core): `core/var.sh` gains a metadata layer — `bs_var_declare` registers an advisory schema (`type`, `ops`, `scope`, `visibility`, `default`, `range`, `unit`, `on_invalid`, `on_change`, `secret`, …), `bs_var_schema`/`bs_var_describe`/`bs_var_list` introspect it, `bs_var_validate` checks a value against the pseudo-types `int`, `uint`, `bool`, `name`, `enum:a|b|c`, `port` (`string`/`any`), and `bs_var_get/set/unset/append/default` now honour `@ops` (status 3) and `@on_invalid` (status 4). `BS_VAR_AUDIT=1` and `on_change=hook:fn` emit `name`/`op`/`result` without the value. The schema is a contract and an audit, not enforcement — a direct `$name` cannot be intercepted. 216 checks in six shells (`unit/testvarmetadataunit.sh`); `testvarportableunit.sh` still 147/147.
