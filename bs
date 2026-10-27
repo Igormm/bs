@@ -16,11 +16,20 @@
 #              already (bootstrap/cli.sh) do, the others say they need bash.
 #
 
-# Точка входа умеет работать без bash: трамплин перезапускает её в bash 4.2+, если он есть,
-# иначе она остаётся в текущей оболочке (BS_KERNEL_MODE=posix).
-# The entry point can run without bash: the trampoline re-runs it in a bash 4.2+ when there is
-# one and otherwise it stays in the current shell (BS_KERNEL_MODE=posix).
+# Точка входа умеет работать без bash: команду, которой нужен bash, трамплин перезапускает в
+# bash 4.2+, если он есть; POSIX-команда остаётся в текущей оболочке. Совсем без bash остаётся
+# POSIX-часть ядра (BS_KERNEL_MODE=posix).
+# The entry point can run without bash: a command that needs bash is re-run by the trampoline in a
+# bash 4.2+ when there is one; a POSIX command stays in the current shell. With no bash at all the
+# POSIX part of the kernel is used (BS_KERNEL_MODE=posix).
 BS_POSIX_ENTRY=1
+# Команды, которые уже есть в bootstrap/cli.sh, не перезапускаются в bash вовсе:
+# трамплин видит BS_POSIX_CMDS и bs_shell_posix_command. install.sh этот флаг не
+# ставит — установщик по-прежнему целиком уходит в bash.
+# Commands already served by bootstrap/cli.sh are not re-run in bash at all: the
+# trampoline sees BS_POSIX_CMDS and bs_shell_posix_command. install.sh does not
+# set this flag — the installer still goes to bash as a whole.
+BS_POSIX_CMDS=1
 
 # --- POSIX-пролог (валиден в sh/dash/ash/zsh/bash) / POSIX prologue ---------
 # Если запущены не bash 4+ (sh install.sh, zsh ./bs, bash 3.2, bash как sh),
@@ -47,7 +56,7 @@ if ! bs_shell_host_ok; then
 fi
 unset __BS_TRAMPOLINE __bs_p __bs_r __bs_s
 # --- конец пролога / end of the prologue ------------------------------------
-unset BS_POSIX_ENTRY
+unset BS_POSIX_ENTRY BS_POSIX_CMDS
 
 # PATH вызвавшей оболочки. Загрузка ядра дописывает ~/.local/bin в PATH
 # ЭТОГО процесса (bs_append_local_bin_to_path), поэтому `bs where` сверяется
@@ -68,20 +77,29 @@ BS_DIR="${BS_ENTRY_DIR}"
 if [ -f "${BS_DIR}/bootstrap/base.sh" ]; then
   # shellcheck disable=SC1090,SC1091
   . "${BS_DIR}/bootstrap/base.sh"
-  case "$(bs_shell_family)" in
-    bash)
-      if [ -f "${BS_DIR}/bootstrap/bs.sh" ]; then
+  if [ "${BS_POSIX_MODE:-0}" = 1 ]; then
+    # Трамплин решил, что этой команде хватает POSIX-части: даже bash как sh
+    # не должен тянуть bash-слой.
+    # The trampoline decided the POSIX part is enough for this command: even
+    # bash as sh must not pull the bash layer.
+    # shellcheck disable=SC1090,SC1091
+    . "${BS_DIR}/bootstrap/cli.sh"
+  else
+    case "$(bs_shell_family)" in
+      bash)
+        if [ -f "${BS_DIR}/bootstrap/bs.sh" ]; then
+          # shellcheck disable=SC1090,SC1091
+          . "${BS_DIR}/bootstrap/bs.sh"
+        else
+          printf 'ERROR: bootstrap/bs.sh not found in %s\n' "$BS_DIR" >&2
+          exit 2
+        fi ;;
+      *)
+        # POSIX-часть команд: в bash её подключает bs.sh / the POSIX part of the commands: in bash bs.sh sources it
         # shellcheck disable=SC1090,SC1091
-        . "${BS_DIR}/bootstrap/bs.sh"
-      else
-        printf 'ERROR: bootstrap/bs.sh not found in %s\n' "$BS_DIR" >&2
-        exit 2
-      fi ;;
-    *)
-      # POSIX-часть команд: в bash её подключает bs.sh / the POSIX part of the commands: in bash bs.sh sources it
-      # shellcheck disable=SC1090,SC1091
-      . "${BS_DIR}/bootstrap/cli.sh" ;;
-  esac
+        . "${BS_DIR}/bootstrap/cli.sh" ;;
+    esac
+  fi
   bs_strict
   # Версию bash уже проверил POSIX-пролог (bs_shell_host_ok) — повторять нечего
   # The POSIX prologue (bs_shell_host_ok) has already checked the bash version
@@ -227,7 +245,7 @@ fi
 # 8. Обычный CLI-диспетчер
 case "${1:-help}" in
   help|-h|--help)
-    shift || true
+    [ $# -gt 0 ] && shift
     if [ $# -ge 1 ]; then
       bs_cli_help_cmd "$1"
     else
@@ -248,7 +266,7 @@ case "${1:-help}" in
   api)            shift; bs_cli_delegate api bs::cli::api_cmd "$@" ;;
   ts)             shift; bs_cli_delegate ts bs::cli::ts_cmd "$@" ;;
   audit)          shift; bs_cli_delegate audit bs::cli::audit_cmd "$@" ;;
-  doctor)         shift || true; bs_cli_doctor_cmd "$@" ;;
+  doctor)         shift; bs_cli_doctor_cmd "$@" ;;
   run)            shift; bs_cli_delegate run bs::cli::run_cmd "$@" ;;
   build)          shift; bs_cli_delegate build bs::cli::build_cmd "$@" ;;
   repl)           shift

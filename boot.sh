@@ -14,11 +14,18 @@
 #    2 – не найден BS_ROOT или отсутствует bs.
 #
 
-# Точка входа умеет работать без bash: трамплин перезапускает её в bash 4.2+, если он есть,
-# иначе она остаётся в текущей оболочке — bs сам решит, что ему можно выполнить.
-# The entry point can run without bash: the trampoline re-runs it in a bash 4.2+ when there is
-# one and otherwise it stays in the current shell — bs itself decides what it can run there.
+# Точка входа умеет работать без bash: команду, которой нужен bash, трамплин перезапускает в
+# bash 4.2+, если он есть; POSIX-команда остаётся в текущей оболочке — bs сам решит, что ему
+# можно выполнить.
+# The entry point can run without bash: a command that needs bash is re-run by the trampoline in a
+# bash 4.2+ when there is one; a POSIX command stays in the current shell — bs itself decides what
+# it can run there.
 BS_POSIX_ENTRY=1
+# boot.sh только передаёт управление bs: если bs обслуживает команду без bash,
+# незачем перезапускать в bash и boot.sh.
+# boot.sh only hands over to bs: when bs serves the command without bash, there
+# is no reason to re-run boot.sh in bash either.
+BS_POSIX_CMDS=1
 
 # --- POSIX-пролог (валиден в sh/dash/ash/zsh/bash) / POSIX prologue ---------
 # Если запущены не bash 4+ (sh install.sh, zsh ./bs, bash 3.2, bash как sh),
@@ -45,7 +52,7 @@ if ! bs_shell_host_ok; then
 fi
 unset __BS_TRAMPOLINE __bs_p __bs_r __bs_s
 # --- конец пролога / end of the prologue ------------------------------------
-unset BS_POSIX_ENTRY
+unset BS_POSIX_ENTRY BS_POSIX_CMDS
 
 # 1. Определяем каталог, где лежит boot.sh
 BOOT_DIR="${BS_ENTRY_DIR}"

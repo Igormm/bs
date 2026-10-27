@@ -5,10 +5,14 @@
 #
 # `sh install.sh`, `dash ./bs`, `zsh ./bs`, bash started as `sh` (POSIX mode):
 # bootstrap/trampoline.sh must re-run the entry point in a capable bash with the
-# same arguments, or explain what to install. Every case runs under env -i.
+# same arguments, or explain what to install. The `bs` commands that already live
+# in bootstrap/cli.sh are the exception: they stay in the current shell and never
+# start bash. Every case runs under env -i.
 # `sh install.sh`, `dash ./bs`, `zsh ./bs`, bash, запущенный как `sh` (режим
 # POSIX): bootstrap/trampoline.sh обязан перезапустить точку входа в подходящем
-# bash с теми же аргументами либо объяснить, что установить.
+# bash с теми же аргументами либо объяснить, что установить. Исключение —
+# команды `bs`, которые уже есть в bootstrap/cli.sh: они остаются в текущей
+# оболочке и bash не запускают.
 
 set -euo pipefail
 
@@ -112,6 +116,174 @@ test_symlink() {
     has "BS Framework version:" "a symlinked entry point is resolved (readlink -f)"
 }
 
+# POSIX-команда не ищет bash и не перезапускается в нём, даже когда bash есть.
+# Обёртка bash в PATH оставляет след при каждом запуске: пустой след — bash не звали.
+# A POSIX command neither searches for bash nor re-runs in it, even when bash is
+# installed. A bash wrapper on PATH leaves a trace on every start: an empty trace
+# means bash was not called.
+test_posix_commands_stay_native() {
+    local dash_bin zsh_bin real_bash
+    dash_bin="$(shell_bin dash)"
+    real_bash="$(shell_bin bash)"
+    [[ -n "${dash_bin}" && -n "${real_bash}" ]] || return 0
+
+    local wrap="${T}/bash-wrap" calls="${T}/bash-calls"
+    mkdir -p "${wrap}"
+    cat > "${wrap}/bash" <<EOF
+#!/bin/sh
+printf '%s\n' called >> '${calls}'
+exec '${real_bash}' "\$@"
+EOF
+    chmod +x "${wrap}/bash"
+
+    call_entry() {
+        local interp=$1 entry=$2; shift 2
+        : > "${calls}"
+        RC=0
+        OUT="$(cd "${BS_PROJECT_ROOT}" && env -i HOME="${T}/home" \
+            PATH="${wrap}:/usr/bin:/bin" "${interp}" "${entry}" "$@" 2>&1 </dev/null)" || RC=$?
+    }
+    no_bash() {
+        if [[ -s "${calls}" ]]; then
+            testframework::assert_true "false" "$1" || true
+            printf '    bash was called / bash вызван: %s\n' "$(head -n 1 "${calls}")"
+        else
+            testframework::assert_true "true" "$1" || true
+        fi
+    }
+    bash_used() {
+        if [[ -s "${calls}" ]]; then
+            testframework::assert_true "true" "$1" || true
+        else
+            testframework::assert_true "false" "$1" || true
+            printf '    bash was not called / bash не вызван\n'
+        fi
+    }
+
+    call_entry "${dash_bin}" ./bs version
+    eq "0" "${RC}" "dash: bs version exit 0"
+    has "BS Framework version:" "dash: bs version prints the version"
+    no_bash "dash: bs version does not start bash"
+
+    call_entry "${dash_bin}" ./bs version --full
+    eq "0" "${RC}" "dash: bs version --full exit 0"
+    no_bash "dash: bs version --full does not start bash"
+
+    call_entry "${dash_bin}" ./bs help
+    eq "0" "${RC}" "dash: bs help exit 0"
+    has "BS Framework" "dash: bs help prints the usage"
+    no_bash "dash: bs help does not start bash"
+
+    call_entry "${dash_bin}" ./bs help version
+    eq "0" "${RC}" "dash: bs help version exit 0"
+    no_bash "dash: help of a POSIX command does not start bash"
+
+    call_entry "${dash_bin}" ./bs
+    eq "0" "${RC}" "dash: bs with no arguments exit 0"
+    has "BS Framework" "dash: bs with no arguments prints the usage"
+    no_bash "dash: bs with no arguments does not start bash"
+
+    call_entry "${dash_bin}" ./bs list
+    eq "0" "${RC}" "dash: bs list exit 0"
+    has "Available modules:" "dash: bs list prints modules"
+    no_bash "dash: bs list does not start bash"
+
+    call_entry "${dash_bin}" ./bs calc '2 3 + 4 *'
+    eq "0" "${RC}" "dash: bs calc exit 0"
+    eq "20" "${OUT}" "dash: bs calc computes in the POSIX kernel"
+    no_bash "dash: bs calc does not start bash"
+
+    call_entry "${dash_bin}" ./bs call bs_utils_human_size 1536000
+    eq "0" "${RC}" "dash: bs call with no --load exit 0"
+    eq "1.5 MiB" "${OUT}" "dash: bs call with no --load works"
+    bash_used "dash: bs call with no --load keeps the full kernel (bash)"
+
+    call_entry "${dash_bin}" ./bs call --load core/fmt bs_utils_human_size 1536000
+    eq "0" "${RC}" "dash: bs call --load core/... exit 0"
+    eq "1.5 MiB" "${OUT}" "dash: bs call --load core/... works"
+    no_bash "dash: bs call --load core/... does not start bash"
+
+    call_entry "${dash_bin}" ./bs call --load core/fmt utils::human_size 1536000
+    eq "0" "${RC}" "dash: bs call of a :: alias exit 0"
+    eq "1.5 MiB" "${OUT}" "dash: bs call of a :: alias works"
+    bash_used "dash: a :: alias reaches bash where the shell cannot define it"
+
+    call_entry "${dash_bin}" ./bs where --help
+    eq "0" "${RC}" "dash: bs where --help exit 0"
+    no_bash "dash: bs where --help does not start bash"
+
+    call_entry "${dash_bin}" ./bs uninstall --help
+    eq "0" "${RC}" "dash: bs uninstall --help exit 0"
+    no_bash "dash: bs uninstall --help does not start bash"
+
+    call_entry "${dash_bin}" ./bs update --help
+    eq "0" "${RC}" "dash: bs update --help exit 0"
+    no_bash "dash: bs update --help does not start bash"
+
+    call_entry "${dash_bin}" ./boot.sh version
+    eq "0" "${RC}" "dash: boot.sh version exit 0"
+    has "BS Framework version:" "dash: boot.sh version hands over to bs"
+    no_bash "dash: boot.sh version does not start bash"
+
+    # bash-слой по-прежнему получает управление: lib/ и run/build
+    # The bash layer still gets control: lib/ and run/build
+    call_entry "${dash_bin}" ./bs build --help
+    eq "0" "${RC}" "dash: bs build --help exit 0"
+    has "Usage: bs build" "dash: bs build --help prints the usage"
+    bash_used "dash: bs build reaches bash"
+
+    call_entry "${dash_bin}" ./bs help build
+    eq "0" "${RC}" "dash: bs help build exit 0"
+    has "Usage: bs build" "dash: bs help build prints the usage"
+    bash_used "dash: help of a bash-layer command reaches bash"
+
+    call_entry "${dash_bin}" ./bs doctor --capabilities
+    eq "0" "${RC}" "dash: bs doctor --capabilities exit 0"
+    bash_used "dash: bs doctor --capabilities reaches bash"
+
+    call_entry "${dash_bin}" ./bs call --load lib/io/streams io::streams::print hi
+    eq "0" "${RC}" "dash: bs call --load lib/... exit 0"
+    eq "hi" "${OUT}" "dash: bs call --load lib/... works"
+    bash_used "dash: bs call --load lib/... reaches bash"
+
+    call_entry "${dash_bin}" ./bs run /nonexistent
+    eq "2" "${RC}" "dash: bs run of a missing script exits 2"
+    bash_used "dash: bs run reaches bash"
+
+    call_entry "${dash_bin}" ./install.sh --help
+    eq "0" "${RC}" "dash: install.sh --help exit 0"
+    has "BS installer" "dash: install.sh --help prints the usage"
+    bash_used "dash: install.sh still re-runs in bash"
+
+    # Явный BS_HOST_BASH главнее оптимизации: он по-прежнему уводит в bash.
+    # An explicit BS_HOST_BASH wins over the optimisation: it still goes to bash.
+    : > "${calls}"
+    RC=0
+    OUT="$(cd "${BS_PROJECT_ROOT}" && env -i HOME="${T}/home" BS_HOST_BASH="${wrap}/bash" \
+        PATH="${wrap}:/usr/bin:/bin" "${dash_bin}" ./bs version 2>&1 </dev/null)" || RC=$?
+    eq "0" "${RC}" "explicit BS_HOST_BASH: bs version exit 0"
+    bash_used "explicit BS_HOST_BASH still reaches bash"
+
+    # bash, запущенный как sh: POSIX-команда остаётся здесь, install.sh — нет.
+    # bash started as sh: a POSIX command stays here, install.sh does not.
+    ln -sf "${real_bash}" "${T}/sh"
+    call_entry "${T}/sh" ./bs version
+    eq "0" "${RC}" "bash-as-sh: bs version exit 0"
+    has "BS Framework version:" "bash-as-sh: bs version works in POSIX mode"
+    no_bash "bash-as-sh: bs version does not re-run in bash"
+
+    call_entry "${T}/sh" ./install.sh --help
+    eq "0" "${RC}" "bash-as-sh: install.sh --help exit 0"
+    bash_used "bash-as-sh: install.sh still re-runs in bash"
+
+    zsh_bin="$(shell_bin zsh)"
+    if [[ -n "${zsh_bin}" ]]; then
+        call_entry "${zsh_bin}" ./bs version
+        eq "0" "${RC}" "zsh: bs version exit 0"
+        no_bash "zsh: bs version does not start bash"
+    fi
+}
+
 test_no_host() {
     local dash_bin; dash_bin="$(shell_bin dash)"
     [[ -n "${dash_bin}" ]] || return 0
@@ -175,6 +347,9 @@ main() {
     test_bash_as_sh
     test_arguments_survive
     test_symlink
+
+    testframework::section "POSIX commands stay native / POSIX-команды остаются в своей оболочке"
+    test_posix_commands_stay_native
 
     testframework::section "No bash, guards / Нет bash, защиты"
     test_no_host
