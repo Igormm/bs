@@ -3,11 +3,13 @@
 # Переносимость между оболочками
 
 **BS требует bash 4.2+.** На bash написаны вся `lib/` (87 модулей, ни один не POSIX) и команды
-`bootstrap/bs.sh`, которые её запускают; от bash не зависят только 20 небольших файлов ядра `@shell posix` (весь `core/`) и пролог точек
-входа. «Работает из большинства оболочек» значит: `bs` можно запустить из любой оболочки (он
-перезапускается в bash), а `install.sh` работает даже без bash вообще (dash, ash, ksh, mksh, zsh; см.
-«Установщик и `init.sh` без bash» ниже); функции ядра вызываются из любой оболочки через `bs call`, а
-POSIX-файлы подключаются напрямую. Эта
+`bootstrap/bs.sh`, которые её запускают. От bash не зависят 22 небольших файлов ядра `@shell posix`
+(весь `core/`), пролог точек входа и набор команд в `bootstrap/cli.sh`. «Работает из большинства
+оболочек» значит: `bs` можно запустить из любой оболочки — команды, которым нужен bash,
+перезапускаются в нём, а POSIX-команды остаются в текущей оболочке; `install.sh` работает даже без
+bash вообще (dash, ash, ksh, mksh, zsh; см. «Установщик и `init.sh` без bash» ниже); функции ядра
+вызываются из любой оболочки через `bs call` (функции `core/` — в POSIX-ядре, модули `lib/` —
+через bash), а POSIX-файлы подключаются напрямую. Эта
 страница — дизайн ветки `fix/kernel-security-p0`; рабочие правила для авторов
 — в скилле `.agents/skills/bs-shell-portability/SKILL.md`.
 
@@ -15,7 +17,7 @@ POSIX-файлы подключаются напрямую. Эта
 
 | Роль | Смысл | Кто определяет |
 |---|---|---|
-| **host** | интерпретатор, исполняющий код BS | всегда bash ≥ 4.2 (находит трамплин) |
+| **host** | интерпретатор, исполняющий команду, которой нужен bash | всегда bash ≥ 4.2 (находит трамплин); POSIX-команда выполняется в текущей оболочке |
 | **оболочка пользователя** | где человек набирает команды; чей rc-файл получает PATH | `--shell`, `BS_USER_SHELL`, родительский процесс, логин-оболочка |
 | **оболочка скрипта** | шебанг пользовательского скрипта (`#!/usr/bin/env bs`) | скрипт |
 
@@ -26,21 +28,29 @@ PATH, проверки, удаление, `bs where`.
 ## Режимы доступа
 
 - **exec** — `bs ...` из любой оболочки. Точка входа начинается с
-  POSIX-пролога; если интерпретатор — не bash ≥ 4 (или bash в режиме POSIX),
-  подключается `bootstrap/trampoline.sh`: он находит подходящий bash и делает
-  `exec` того же файла с теми же аргументами.
+  POSIX-пролога. Команда, которую уже обслуживает `bootstrap/cli.sh` (`help`,
+  `version`, `env`, `list`, `calc`, `init-shell`, `shebang`, `call` функции
+  ядра, `doctor`, `uninstall`, `where`, `update`, `sync`), остаётся в текущей
+  оболочке. Для остальных трамплин находит подходящий bash и делает `exec`
+  того же файла с теми же аргументами.
 - **source** — `source bootstrap/init.sh`. Только bash 4.2+. В других
   оболочках — двуязычное сообщение вместо `Bad substitution`.
 - **call** — `bs call [--load МОДУЛЬ] ФУНКЦИЯ [АРГУМЕНТЫ]`: мост для оболочек с
-  другим синтаксисом (fish, nushell, dash, ash, ksh). Функция ядра или модуля
-  исполняется в bash, который запускает `bs`; её stdout и stderr — ваши, код
-  выхода функции становится кодом `bs call`. Исполняется только существующая
-  функция с допустимым именем (`rm`, `a;b`, `$(id)` отвергаются), путь модуля —
-  только `core/...` или `lib/...` без `..`. Пример: `bs call utils::human_size
-  1536000`; из fish: `set size (bs call utils::human_size 1536000)`.
+  другим синтаксисом (fish, nushell, dash, ash, ksh). Функция `core/`,
+  загруженная через `--load core/...`, исполняется в POSIX-ядре текущей оболочки
+  под настоящим именем; псевдониму `::` нужна оболочка, которая его принимает,
+  а без `--load` (полный ярус) или с `--load lib/...` нужен bash, и вызов
+  перезапускается в нём. Её stdout и stderr — ваши, код выхода функции
+  становится кодом `bs call`. Исполняется только существующая функция с
+  допустимым именем (`rm`, `a;b`, `$(id)` отвергаются), путь модуля — только
+  `core/...` или `lib/...` без `..`. Пример: `bs call --load core/fmt
+  bs_utils_human_size 1536000`; из fish: `set size (bs call --load core/fmt
+  bs_utils_human_size 1536000)`.
 - **trampoline** — механизм первого режима. `BS_HOST_BASH=/path`
-  переопределяет поиск (невалидное значение — ошибка, без тихого fallback).
-  Если bash 4.2+ нет — подсказки по установке (apk/apt/dnf/brew) и код 1.
+  переопределяет поиск (невалидное значение — ошибка, без тихого fallback) и
+  отключает сокращение для POSIX-команд. Если bash 4.2+ нет, bash-команда
+  получает подсказки по установке (apk/apt/dnf/brew) и код 1, а POSIX-команда
+  всё равно выполняется в текущей оболочке.
 
 ## Tier-ы
 
@@ -84,11 +94,13 @@ nushell: если `env.nu` нет, установщик его не создаё
 
 ## Строгий режим — `bs --strict-shell`
 
-По умолчанию трамплин даёт любой оболочке любой модуль (код всегда исполняется
-в bash). `--strict-shell` (или `BS_SHELL_STRICT=1`, нужен для shebang-режима)
-делает tier `@shell` обязательным: модуль `lib/` загружается, только если его
-tier подходит оболочке, из которой BS **запущен** (`BS_ORIGIN_SHELL`, её
-экспортирует трамплин; bash, дошедший до трамплина, считается `sh`).
+По умолчанию команда, которой нужен bash, даёт любой оболочке любой модуль
+(bash-слой всё равно исполняет код); POSIX-команды не грузят `lib/` и в
+трамплин не идут. `--strict-shell` (или `BS_SHELL_STRICT=1`, нужен для
+shebang-режима) делает tier `@shell` обязательным: модуль `lib/` загружается,
+только если его tier подходит оболочке, из которой BS **запущен**
+(`BS_ORIGIN_SHELL`, её экспортирует трамплин или нативный POSIX-путь; bash,
+дошедший до трамплина, считается `sh`).
 
 | tier модуля | разрешён из |
 |---|---|
@@ -163,9 +175,11 @@ nushell (не установлен), oksh, osh. Для fish проверен т�
 
 Три способа добраться до ядра из других оболочек. Полная картина — в [Начале работы](../01-getting-started/README.md).
 
-### Запуск из dash: перезапуск в bash
+### Запуск из dash: bash-команда перезапускается в bash
 
-![Сценарий 2: запуск из dash — перезапуск в bash](../../assets/uml/scenario-2-ru.svg)
+POSIX-команда (`bs version`, `bs help`, …) остаётся в dash и сюда не попадает.
+
+![Сценарий 2: запуск из dash — bash-команда перезапускается в bash](../../assets/uml/scenario-2-ru.svg)
 
 ### Вызов из fish и nushell: `bs call`
 
@@ -236,6 +250,7 @@ busybox ash, ksh93 и mksh (`unit/testquietportableunit.sh`).
 
 `core/var.sh`, `core/str.sh`, `core/num.sh`, `core/msg.sh` (`@shell posix`) — базовые абстракции ядра: то, что копировалось из файла в файл, теперь живёт в одном месте, у каждой группы своё пространство и свой переносимый тест. Грузятся сразу после `core/const`, кроме оболочки ничего не используют; прежних имён с `::` у них нет, поэтому псевдонимов нет.
 - `bs_var_*` — переменные по имени: `is_name`, `is_set`, `is_readonly` (проба в подоболочке: присваивание readonly-переменной завершает неинтерактивную оболочку во всех оболочках, которые мы запускали), `get` (в stdout или в переменную), `set`, `unset`, `default`, `append`. Имя проверяется до каждого `eval`; имена на `__bs_var_` зарезервированы. 147 проверок в шести оболочках (`unit/testvarportableunit.sh`).
+- `bs_var_*` метаданные — контрактно-советующий слой поверх тех же accessors: `bs_var_declare` регистрирует схему (`type`, `ops`, `scope`, `visibility`, `default`, `range`, `unit`, `on_invalid`, `on_change`, `secret`, …), `bs_var_schema`/`bs_var_describe`/`bs_var_list` её читают, `bs_var_validate` проверяет значение по псевдотипу (`int`, `uint`, `bool`, `name`, `enum:a|b|c`, `port`; `string`/`any`), а `bs_var_get/set/unset/append/default` соблюдают `@ops` (статус 3) и `@on_invalid` (статус 4). Схема лежит в `__bs_vm_spec_<имя>`, реестр — в `__bs_vm_reg`; `BS_VAR_AUDIT=1` и `on_change=hook:fn` сообщают `имя`/`операцию`/`результат` без значения. Это контракт и аудит, а не защита — прямой `$имя` не перехватить. 216 проверок в шести оболочках (`unit/testvarmetadataunit.sh`).
 - `bs_str_*` — `upper`, `lower`, `trim`, `ltrim`, `rtrim`, `replace` (ДОСЛОВНАЯ подстрока), `contains`, `starts_with`, `ends_with`, `repeat`, `join` (не зависит от `IFS`), `before`, `after`. Имена `str::upper` … `str::repeat` принадлежат `lib/compat/lang.sh` (bash, шаблон замены — glob) и остаются как есть: псевдонимы не создаются, тест проверяет, что `str::replace` не подменён. Длины и дополнения до ширины намеренно нет: `${#s}` считает байты в dash и mksh и символы в остальных. 238 проверок (`unit/teststrportableunit.sh`).
 - `bs_num_*` — целые до 15 цифр через `awk`, а не `$(( ))`: `is_uint`, `is_int`, `dec` (`007` → `7`), `add`, `sub`, `mul`, `div`, `mod`, `cmp`. Вход или результат за пределом — статус 1, деление на ноль — 2. Совпадает с `$(( ))` bash на 300 случайных парах в dash, ksh, zsh, bash и ash (и на 120 в mksh: первый прогон испортил его собственный 32-битный генератор — та самая ловушка, ради которой модуль и нужен). 117 проверок (`unit/testnumportableunit.sh`).
 - `bs_msg_*` — сообщения модулей: `error`, `warn`, `info` через логгер, если он загружен, иначе `УРОВЕНЬ: текст` в stderr (info — в stdout); `fail` возвращает `E_ERROR`, `invalid ФУНКЦИЯ текст` — `E_INVALID`; ни одна не завершает скрипт. 93 проверки (`unit/testmsgportableunit.sh`).
@@ -247,7 +262,7 @@ busybox ash, ksh93 и mksh (`unit/testquietportableunit.sh`).
 
 `bootstrap/base.sh` (`@shell posix`) — POSIX-половина прежнего `bootstrap/bs.sh`: `bs_strict`, `bs_append_local_bin_to_path`, `bs_shell_name/host/version/ok` и `bs_shell_ensure_version` (прежние `bs::strict`, `bs::shell::*` остаются псевдонимами bash/zsh). Что читает стек вызовов, `BASH_REMATCH` и `BASH_SOURCE`, осталось в `bootstrap/bs.sh` (bash) вместе с командами `bs::cli::*`. 83 проверки в шести оболочках (`unit/testbaseportableunit.sh`).
 
-`bootstrap/init.sh` (`@shell posix`) грузит ядро в двух режимах, `BS_KERNEL_MODE`: `full` в bash 4.2+ (17 модулей и мосты `lib/compat/deps`, `lib/compat/lang` и `lib/compat/args`; `calc` подключается по запросу) и `posix` в dash, ash, ksh, mksh и zsh (те же 17 модулей и генераторы `args-completion`, которые подключает `args`, без мостов: `prereq`, `lang`, `const`, `var`, `str`, `num`, `msg`, `logger`, `quiet`, `fmt`, `data`, `errorhandler`, `version`, `utils`, `config`, `deps`, `args`); `bs_config_load` работает в обоих; bash старше 4.2 отклоняется. Свой каталог init.sh находит так: bash читает путь файла, zsh — `%x`, остальные берут `BS_BOOTSTRAP_DIR`, `BS_ENTRY_DIR` (его ставит пролог точек входа) или `BS_ROOT`. Отличить «подключён» от «исполнен» умеет только bash, поэтому прямой запуск отклоняет только он. 81 проверка в шести оболочках (`unit/testinitportableunit.sh`).
+`bootstrap/init.sh` (`@shell posix`) грузит ядро в двух режимах, `BS_KERNEL_MODE`: `full` в bash 4.2+ (18 модулей и мосты `lib/compat/deps`, `lib/compat/lang` и `lib/compat/args`; `calc` подключается по запросу) и `posix` в dash, ash, ksh, mksh и zsh (те же 18 модулей и генераторы `args-completion`, которые подключает `args`, без мостов: `prereq`, `lang`, `const`, `var`, `store`, `str`, `num`, `msg`, `logger`, `quiet`, `fmt`, `data`, `errorhandler`, `version`, `utils`, `config`, `deps`, `args`); `bs_config_load` работает в обоих; bash старше 4.2 отклоняется. Свой каталог init.sh находит так: bash читает путь файла, zsh — `%x`, остальные берут `BS_BOOTSTRAP_DIR`, `BS_ENTRY_DIR` (его ставит пролог точек входа) или `BS_ROOT`. Отличить «подключён» от «исполнен» умеет только bash, поэтому прямой запуск отклоняет только он. 81 проверка в шести оболочках (`unit/testinitportableunit.sh`).
 
 `install.sh` и `install/*.sh` — `@shell posix` (`bs_install_*`, `bs_do_install`, `bs_do_uninstall`, `bs_auto_update_path`, …; прежние имена остаются псевдонимами): массивы стали массивами слоя данных, `[[ =~ ]]` и `printf -v` — `case` и подстановками параметров, `local` — временными `__bs_<файл>_`, а рамка уведомления считает символы UTF-8 через `bs_str_width`/`bs_str_head` (голый `${#s}` в dash и mksh считает байты и сломал бы границы с кириллицей). Вывод уведомлений и помощников PATH побайтно равен прежней bash-версии на 19 сценариях (`diff_old_new.sh`), кроме номера строки в одном сообщении оболочки об rc-файле только для чтения. Точка входа, умеющая работать без bash, ставит `BS_POSIX_ENTRY=1` до пролога: трамплин по-прежнему перезапускает её в bash 4.2+, если он есть, а иначе возвращается и даёт продолжить в текущей оболочке (явный, но неподходящий `BS_HOST_BASH` остаётся ошибкой). `unit/testinstallnobashunit.sh` прячет каждый bash в пространстве монтирования (`unshare -Urm`) и гоняет установка → отказ повторной → удаление в ash, dash, ksh, mksh и zsh. Это нашло две вещи: в mksh нет встроенного `printf` (нужен бинарник), а пустой шаблон `"$var"*` в `case` совпадает со всем, поэтому помощник не должен верить переменной, которую пропавшая команда оставила пустой. Не проверено: настоящая машина с Alpine/musl (тест использует апплеты busybox на хосте с glibc).
 
@@ -271,11 +286,11 @@ busybox ash, ksh93 и mksh (`unit/testquietportableunit.sh`).
 
 ## `repl` вне ядра
 
-`bs repl` — интерактивная сессия bash с загруженным ядром, то есть по смыслу не часть ядра. Модуль перенесён из `core/repl.sh` в `lib/ui/repl.sh` (загружается `load "lib/ui/repl"`); в ядре остаётся 20 файлов.
+`bs repl` — интерактивная сессия bash с загруженным ядром, то есть по смыслу не часть ядра. Модуль перенесён из `core/repl.sh` в `lib/ui/repl.sh` (загружается `load "lib/ui/repl"`); в ядре остаётся 22 файла.
 
 ## Курс на независимость от оболочки
 
-Цель — чтобы `bootstrap/`, `core/`, `install/`, `boot.sh`, `bs` и `install.sh` жили в одном пространстве имён `bs_*` и не зависели от оболочки. Состояние: готовы все 20 файлов `core/` (`prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `config`, `lang`, `args`, `args-completion`, `var`, `str`, `num`, `msg`), слой оболочек и шебанга, загрузчик, `base.sh`, `init.sh` и `cli.sh` в `bootstrap/`, `install/*` и точки входа `install.sh`, `bs` и `boot.sh`. Пока на bash 4.2+: `bootstrap/bs.sh` (стек вызовов и `BASH_REMATCH`, с 9 командами `bs::cli::*`, которые запускают `lib/`) и 87 модулей `lib/`; поэтому полному BS по-прежнему нужен bash 4.2+ (см. начало страницы), а без него работает POSIX-часть выше.
+Цель — чтобы `bootstrap/`, `core/`, `install/`, `boot.sh`, `bs` и `install.sh` жили в одном пространстве имён `bs_*` и не зависели от оболочки. Состояние: готовы все 22 файлов `core/` (`prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `config`, `lang`, `args`, `args-completion`, `var`, `str`, `num`, `msg`, `var-schema`, `store`), слой оболочек и шебанга, загрузчик, `base.sh`, `init.sh` и `cli.sh` в `bootstrap/`, `install/*` и точки входа `install.sh`, `bs` и `boot.sh`. Пока на bash 4.2+: `bootstrap/bs.sh` (стек вызовов и `BASH_REMATCH`, с 9 командами `bs::cli::*`, которые запускают `lib/`) и 87 модулей `lib/`; поэтому полному BS по-прежнему нужен bash 4.2+ (см. начало страницы), а без него работает POSIX-часть выше.
 
 ## Не сделано
 

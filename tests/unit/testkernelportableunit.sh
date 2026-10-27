@@ -22,7 +22,7 @@ T=""
 probe() {
     local -r sh_bin="$1" snippet="$2"
     printf '. "%s"\n%s\n' "${KERNEL_SH}" "${snippet}" > "${T}/probe.sh"
-    env -i HOME="${T}/h" PATH="/usr/bin:/bin" BS_ROOT="${BS_PROJECT_ROOT}" BS_LOG_TIMESTAMP=false BS_LOG_COLOR=false "${sh_bin}" "${T}/probe.sh" 2>&1
+    env -i HOME="${T}/h" PATH="/usr/bin:/bin" BS_ROOT="${BS_PROJECT_ROOT}" BS_LOG_TIMESTAMP=false BS_LOG_COLOR=never "${sh_bin}" "${T}/probe.sh" 2>&1
 }
 
 eq() { testframework::assert_equal "$1" "$2" "$3" || true; }
