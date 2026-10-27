@@ -494,6 +494,101 @@ bs_shell_tier() {
   fi
 }
 
+# @description Can bootstrap/cli.sh serve this command in any POSIX shell,
+#   without the bash layer? The trampoline asks this before looking for bash,
+#   so a POSIX command does not pay for a bash re-exec.
+# @description Может ли bootstrap/cli.sh обслужить эту команду в любой
+#   POSIX-оболочке, без bash-слоя? Трамплин спрашивает это до поиска bash,
+#   поэтому POSIX-команда не платит за перезапуск в bash.
+# @param $@ command and its arguments / команда и её аргументы
+# @return 0 yes, 1 no / 0 да, 1 нет
+bs_shell_posix_command() {
+  __bs_pc_cmd=${1:-help}
+  if [ $# -gt 0 ]; then shift; fi
+  case $__bs_pc_cmd in
+    help|-h|--help)
+      # help of a command that bs_cli_help_cmd delegates to the bash layer
+      # справка команды, которую bs_cli_help_cmd отдаёт bash-слою
+      case ${1:-} in
+        lang-doc|lsp|chat|api|ts|audit|build|rfc)
+          unset __bs_pc_cmd
+          return 1 ;;
+      esac
+      unset __bs_pc_cmd
+      return 0 ;;
+    version|env|list|calc|init-shell|shebang|uninstall|where|update|sync)
+      unset __bs_pc_cmd
+      return 0 ;;
+    doctor|call) ;;
+    *)
+      unset __bs_pc_cmd
+      return 1 ;;
+  esac
+
+  # doctor --capabilities loads lib/platform/facts, a bash4 module
+  # doctor --capabilities грузит lib/platform/facts — модуль bash4
+  if [ "$__bs_pc_cmd" = doctor ]; then
+    for __bs_pc_a in "$@"; do
+      case $__bs_pc_a in
+        --capabilities)
+          unset __bs_pc_cmd __bs_pc_a
+          return 1 ;;
+      esac
+    done
+    unset __bs_pc_cmd __bs_pc_a
+    return 0
+  fi
+
+  # call: no --load means the full kernel; core/ modules are POSIX.
+  # A "::" name exists only where the shell supports it, otherwise bash.
+  # call: без --load нужен полный ярус; модули core/ — POSIX.
+  # Имя с "::" есть только там, где оболочка его принимает, иначе bash.
+  __bs_pc_loaded=0
+  __bs_pc_fn=
+  while [ $# -gt 0 ]; do
+    case $1 in
+      --load)
+        [ $# -ge 2 ] || break
+        case $2 in
+          core/*) ;;
+          *)
+            unset __bs_pc_cmd __bs_pc_loaded __bs_pc_fn
+            return 1 ;;
+        esac
+        __bs_pc_loaded=1
+        shift 2 ;;
+      --load=*)
+        case ${1#--load=} in
+          core/*) ;;
+          *)
+            unset __bs_pc_cmd __bs_pc_loaded __bs_pc_fn
+            return 1 ;;
+        esac
+        __bs_pc_loaded=1
+        shift ;;
+      --)     shift
+              [ $# -ge 1 ] && __bs_pc_fn=$1
+              break ;;
+      -*)     shift ;;
+      *)      __bs_pc_fn=$1
+              break ;;
+    esac
+  done
+  # No --load: the bridge may need any core or lib function -> bash.
+  # Без --load мосту может понадобиться любая функция ядра или lib -> bash.
+  if [ "$__bs_pc_loaded" = 0 ]; then
+    unset __bs_pc_cmd __bs_pc_loaded __bs_pc_fn
+    return 1
+  fi
+  case $__bs_pc_fn in
+    *::*)
+      unset __bs_pc_cmd __bs_pc_loaded __bs_pc_fn
+      return 1 ;;
+  esac
+  unset __bs_pc_cmd __bs_pc_loaded __bs_pc_fn
+  return 0
+}
+
 # @description Tier of a file: the first word of its "# @shell" line (default bash4).
 # @description Tier файла: первое слово его строки "# @shell" (по умолчанию bash4).
 # @param $1 file / файл
@@ -677,7 +772,7 @@ fi
 if bs_shell__ns_ok; then
   for __bs_fn in of_name family login parent user rc_file rc_scan all_rc_files \
       path_line reload_hint fresh_flags known host_ok host_find tier tier_desc \
-      login_path can_source rc_create_ok default_login_path version_string version_major version_minor strict self_path file_tier tier_word tier_allows in_subshell; do
+      login_path can_source rc_create_ok default_login_path version_string version_major version_minor strict self_path file_tier tier_word tier_allows in_subshell posix_command; do
     eval "bs::shell::${__bs_fn}() { bs_shell_${__bs_fn} \"\$@\"; }"
   done
 fi

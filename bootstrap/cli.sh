@@ -745,7 +745,7 @@ bs_cli_doctor_cmd() {
   # повторная проверка не нужна.
 
   # Required core files / Обязательные файлы ядра
-  for __bs_cli_df2 in bootstrap/init.sh bootstrap/loader.sh bootstrap/base.sh bootstrap/cli.sh bootstrap/bs.sh bootstrap/shell.sh bootstrap/trampoline.sh core/prereq.sh core/lang.sh core/const.sh core/var.sh core/str.sh core/num.sh core/msg.sh core/logger.sh core/errorhandler.sh core/version.sh core/quiet.sh core/fmt.sh core/data.sh core/utils.sh core/config.sh core/deps.sh core/calc.sh core/args.sh core/args-completion.sh; do
+  for __bs_cli_df2 in bootstrap/init.sh bootstrap/loader.sh bootstrap/base.sh bootstrap/cli.sh bootstrap/bs.sh bootstrap/shell.sh bootstrap/trampoline.sh core/prereq.sh core/lang.sh core/const.sh core/var.sh core/var-schema.sh core/store.sh core/str.sh core/num.sh core/msg.sh core/logger.sh core/errorhandler.sh core/version.sh core/quiet.sh core/fmt.sh core/data.sh core/utils.sh core/config.sh core/deps.sh core/calc.sh core/args.sh core/args-completion.sh; do
     if [ -f "${BS_ROOT}/${__bs_cli_df2}" ]; then
       bs_log_success "$(printf '  %-8s | %-30s | %s' "OK" "${__bs_cli_df2}" "required core file")"
       __bs_cli_dpass=$((__bs_cli_dpass + 1))

@@ -4,8 +4,9 @@
 
 BS is a thin runtime layer **on top of bash 4.2+**: all of the `lib/` library (86
 modules) and the `bootstrap/bs.sh` commands that run it are written in it. The
-exception is the 20 small `@shell posix` kernel files that run in any shell; the other
-shells reach BS through a re-run in bash or `bs call`. It consists of two entry scripts
+exception is the 22 small `@shell posix` kernel files, the entry-point prologue and the
+POSIX command set in `bootstrap/cli.sh`, which run in any shell; other shells reach the
+bash commands through a re-run in bash or `bs call`. It consists of two entry scripts
 (`boot.sh`, `bs`) with a shared POSIX prologue, a shell registry
 (`bootstrap/shell.sh`), a bootstrapper (`bootstrap/init.sh`), a module loader
 (`bootstrap/loader.sh`), the always-loaded `core/` modules and the on-demand
@@ -123,8 +124,8 @@ what was really run is in the priority table of
 
 | Tier | `core/` files | Runs directly in | How the other shells get it |
 |---|---|---|---|
-| `posix` (20) | `prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `config`, `lang`, `args`, `args-completion`, `var`, `str`, `num`, `msg` | bash, zsh, dash, busybox ash, ksh93, mksh (verified by running) | — (they source it themselves) |
-| `bash4` (87) | **all of `lib/`**, every module | bash 4.2+ only (no `lib/` module is POSIX) | the entry point finds bash and re-runs itself in it (trampoline); kernel functions — the `bs call` command |
+| `posix` (22) | `prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `config`, `lang`, `args`, `args-completion`, `var`, `str`, `num`, `msg`, `var-schema`, `store` | bash, zsh, dash, busybox ash, ksh93, mksh (verified by running) | — (they source it themselves) |
+| `bash4` (87) | **all of `lib/`**, every module | bash 4.2+ only (no `lib/` module is POSIX) | for a command that needs it the entry point finds bash and re-runs itself (trampoline); kernel functions — the `bs call` command |
 
 No `core/` file is `bash4` any more: `repl` moved to `lib/ui/repl`, and what needs real bash arrays (the rest of `lang`, `deps::missing_tools`, `ARGS_PARAMS`/`ARGS_FLAGS`/`ARGS_REST` of `args::parse`) lives in the bridges `lib/compat/lang`, `lib/compat/deps` and `lib/compat/args`, outside the kernel.
 
@@ -143,7 +144,7 @@ What the kernel does **not** promise: to run `lib/`, the bridges `lib/compat/*` 
 commands of `bootstrap/bs.sh` (the `bash4` files) in dash, ash, ksh, mksh, fish or nushell. They need
 associative arrays, namerefs and `=~` with `BASH_REMATCH`, which are missing or
 behave differently there. Shells without a real run (nushell, oksh, osh) are
-not considered verified. All 20 `core/` files are `posix` now; they moved one by one (`calc`, `quiet`, `fmt`, `logger`, `data`,
+not considered verified. All 22 `core/` files are `posix` now; they moved one by one (`calc`, `quiet`, `fmt`, `logger`, `data`,
 `utils`, `deps`, `errorhandler`, `config` (its associative array `BS_CONFIG` became the data-layer map `bs_config`), `lang` (the predicates `bs_is_*`), `args` (the tree, the flags and the parse result live in the data layer; the bash arrays `ARGS_PARAMS`, `ARGS_FLAGS`, `ARGS_REST` are filled by `lib/compat/args`) and the new base modules `var`, `str`, `num`, `msg`); the other bash language primitives (`str::*`, `arr::*`, `map::*`, introspection) moved out of `lang` into `lib/compat/lang`; `repl` is outside the kernel.
 
 ## Stage 0: POSIX prologue and the `trampoline`
@@ -156,14 +157,19 @@ before the first useful line.
 | What | Where | Why |
 |---|---|---|
 | `BS_ENTRY_DIR` | prologue | the entry point directory with symlinks resolved; `BS_ROOT` and `bootstrap/` are found from it |
-| `bootstrap/shell.sh` | shell registry | POSIX answers: which shell this is, can it be the host (`bs_shell_host_ok`), where bash 4.2+ is (`bs_shell_host_find`), the tier |
-| `bootstrap/trampoline.sh` | re-run | `exec` into the bash found, same file and arguments; otherwise a message about what to install |
-| `BS_HOST_BASH` | environment | force the bash used for the re-run |
-| `BS_ORIGIN_SHELL` | environment | the shell BS was started from; `--strict-shell` uses it |
+| `bootstrap/shell.sh` | shell registry | POSIX answers: which shell this is, can it be the host (`bs_shell_host_ok`), where bash 4.2+ is (`bs_shell_host_find`), which commands need no bash (`bs_shell_posix_command`), the tier |
+| `bootstrap/trampoline.sh` | re-run or stay | a bash command: `exec` into the bash found, same file and arguments; a POSIX command of `bs`/`boot.sh`: return and stay in the current shell; otherwise a message about what to install |
+| `BS_POSIX_CMDS` | entry point | `bs` and `boot.sh` allow the trampoline to keep POSIX commands native; `install.sh` does not set it and still goes to bash |
+| `BS_POSIX_MODE` | trampoline | internal: the current process must use the POSIX kernel even when the interpreter is bash in POSIX mode |
+| `BS_HOST_BASH` | environment | force the bash used for the re-run; it also disables the POSIX-command shortcut |
+| `BS_ORIGIN_SHELL` | environment | the shell BS was started from; set by the trampoline or by the native POSIX path; `--strict-shell` uses it |
 | `__BS_TRAMPOLINE` | environment | loop guard for the re-run |
 
-In bash 4.2+ in normal mode the prologue is one test and re-runs nothing. More
-on `@shell posix|bash4` tiers and shells: [shell-portability](../08-development/shell-portability.md).
+In bash 4.2+ in normal mode the prologue is one test and re-runs nothing. A
+POSIX command (`bs_shell_posix_command`) also re-runs nothing when bash is
+installed: it stays in dash/zsh/ksh, or uses forced POSIX mode under bash as
+sh. More on `@shell posix|bash4` tiers and shells:
+[shell-portability](../08-development/shell-portability.md).
 
 ## Stage 1: `boot.sh`
 
@@ -172,9 +178,11 @@ the environment and hand control to `bs` as fast as possible:
 
 1. **Pre-kernel namespace.** It sources `bootstrap/base.sh` — a dependency-free
    POSIX file — and enables strict mode (`bs_strict`). The POSIX prologue
-   (`bs_shell_host_ok`) has already looked at the shell: it re-runs in a bash
-   4.2+ when there is one and otherwise lets `boot.sh` carry on in the current
-   shell (`BS_POSIX_ENTRY=1`); `bs` then decides what it can run there.
+   (`bs_shell_host_ok`) has already looked at the shell: a command that needs
+   bash re-runs in bash 4.2+ when there is one; a POSIX command stays in the
+   current shell (`BS_POSIX_ENTRY=1`, `BS_POSIX_CMDS=1`). With no bash at all,
+   `boot.sh` carries on in the current shell; `bs` then decides what it can run
+   there.
 2. **BS_ROOT lookup**, in priority order:
    - already exported `BS_ROOT`;
    - the directory containing `boot.sh` itself, if `bs` and
@@ -196,10 +204,11 @@ prologue (see the diagram), then enables strict mode through `bs::strict` and
 performs the following:
 
 - Takes its own directory from `BS_ENTRY_DIR` (set by the prologue), sources `bootstrap/bs.sh` (pre-kernel namespace)
-  and enables `bs::strict`. The bash 4.2+ gate has already run in the prologue
+  and enables `bs::strict`; in forced POSIX mode (`BS_POSIX_MODE=1`) it sources
+  `bootstrap/cli.sh` instead. The bash 4.2+ gate has already run in the prologue
   (`bs_shell_host_ok`), before anything else is loaded. It belongs to the `bash4` tier (that is how the
-  kernel starts); `@shell posix` modules and the `bs call` bridge do not
-  require it.
+  kernel starts); `@shell posix` modules, the POSIX command set and the `bs call`
+  bridge do not require it.
 - Pulls in `BS_VERSION` from `core/version.sh` (currently `0.9.1`); `const.sh` has no number of its own.
 - Resolves `BS_ROOT` if it is not already set: first the script's own
   directory (when it contains `bootstrap/init.sh`), then

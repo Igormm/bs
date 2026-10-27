@@ -42,7 +42,7 @@ test_parses_and_lints() {
         testframework::assert_command "shellcheck -s sh '${MODULE_SH}'" "shellcheck -s sh is clean for core/var.sh" || true
     fi
     testframework::assert_command "grep -q '^# @shell posix' '${MODULE_SH}'" "core/var.sh is declared @shell posix" || true
-    testframework::assert_command "! grep -v '^#' '${MODULE_SH}' | grep -E 'BASH_|ZSH_|FUNCNAME|declare| \\[\\[ |printf -v'" "no shell-specific constructs in core/var.sh" || true
+    testframework::assert_command "! grep -v '^#' '${MODULE_SH}' | grep -E 'BASH_|ZSH_|FUNCNAME|(^|[^A-Za-z_])declare([[:space:]-]|\$)| \\[\\[ |printf -v'" "no shell-specific constructs in core/var.sh" || true
 }
 
 test_names() {

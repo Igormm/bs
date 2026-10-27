@@ -17,24 +17,30 @@
 #   parse them: the user sees "Bad substitution" or "[[: not found". Every
 #   entry point starts with a short POSIX prologue that sources this file when
 #   the interpreter is not bash 4+ in normal mode. Here a capable bash is
-#   searched and the entry point is re-run with the same arguments.
+#   searched and the entry point is re-run with the same arguments — except a
+#   command that bootstrap/cli.sh already serves: it stays in the current shell.
 #   `sh install.sh`, `dash ./bs version`, `zsh ./install.sh`, bash 3.2 или
 #   bash, запущенный как `sh` (режим POSIX), исполняют точки входа BS в
 #   оболочке, которая их не разберёт: пользователь видит «Bad substitution»
 #   или «[[: not found». Каждая точка входа начинается с короткого
 #   POSIX-пролога, который подключает этот файл, если интерпретатор — не
 #   bash 4+ в обычном режиме. Здесь ищется подходящий bash, и точка входа
-#   запускается заново с теми же аргументами.
+#   запускается заново с теми же аргументами — кроме команды, которую уже
+#   обслуживает bootstrap/cli.sh: она остаётся в текущей оболочке.
 #
 # CONTRACT / КОНТРАКТ
 #   Input: the caller is a script FILE (${__bs_s} is its path: zsh changes $0
 #   inside a sourced file), the positional parameters are the caller's,
 #   ${__bs_p} is the directory of the entry point (it holds bootstrap/).
-#   Output: exec into bash (does not return) or exit 1.
+#   Output: a bash command — exec into bash (does not return) or exit 1;
+#   a POSIX command of an entry point that sets BS_POSIX_CMDS — return 0 and
+#   let the entry point run in the current shell.
 #   Вход: вызывающий — ФАЙЛ-скрипт (${__bs_s} — его путь: zsh меняет $0
 #   внутри подключаемого файла), позиционные параметры — вызывающего,
-#   ${__bs_p} — каталог точки входа (в нём bootstrap/). Выход: exec в bash
-#   (не возвращается) либо exit 1.
+#   ${__bs_p} — каталог точки входа (в нём bootstrap/). Выход: bash-команда —
+#   exec в bash (не возвращается) либо exit 1; POSIX-команда точки входа,
+#   которая ставит BS_POSIX_CMDS, — return 0, точка входа остаётся в текущей
+#   оболочке.
 #   Override / Переопределение: BS_HOST_BASH=/path/to/bash
 
 __bs_t_self=${__bs_s:-$0}
@@ -71,6 +77,43 @@ else
   printf '%s\n' "BS: не найден ${__bs_p:-.}/bootstrap/shell.sh — повреждённая копия BS?" \
     "BS: ${__bs_p:-.}/bootstrap/shell.sh is missing — a damaged BS copy?" >&2
   exit 1
+fi
+
+# POSIX-команда точки входа, которой bash не нужен: не ищем хозяина и не платим
+# за перезапуск, даже если bash на машине есть. Явный BS_HOST_BASH не трогаем:
+# он по-прежнему главнее и, если не подходит, остаётся ошибкой (тест).
+# A POSIX command of an entry point needs no bash: do not search for a host and
+# do not pay for a re-run even when bash is installed. An explicit BS_HOST_BASH
+# is left alone: it still wins and, if it does not fit, stays an error (test).
+if [ -n "${BS_POSIX_CMDS:-}" ] && [ -z "${BS_HOST_BASH:-}" ] \
+    && bs_shell_posix_command "$@"; then
+  __bs_t_fam=$(bs_shell_family)
+  __bs_t_skip=1
+  # bash 4.2+ в режиме POSIX (bash как sh) — тоже POSIX-оболочка: команду можно
+  # выполнить здесь, принудительно выбрав POSIX-часть ядра. Старый bash (<4.2)
+  # по-прежнему перезапускаем: полное ядро ему недоступно.
+  # bash 4.2+ in POSIX mode (bash as sh) is a POSIX shell too: the command can run
+  # here with the POSIX part of the kernel forced. An old bash (<4.2) is still
+  # re-run: it cannot host the full kernel.
+  if [ "$__bs_t_fam" = bash ]; then
+    __bs_t_maj=$(bs_shell_version_major)
+    __bs_t_min=$(bs_shell_version_minor)
+    if [ "$__bs_t_maj" -lt 4 ] \
+        || { [ "$__bs_t_maj" -eq 4 ] && [ "$__bs_t_min" -lt 2 ]; }; then
+      __bs_t_skip=0
+    fi
+  fi
+  if [ "$__bs_t_skip" = 1 ]; then
+    # shellcheck disable=SC2034  # читают bs и init.sh в этом же процессе; не export, чтобы не течь в детей / read by bs and init.sh in this process; not exported, so it does not leak into children
+    BS_POSIX_MODE=1
+    BS_ORIGIN_SHELL=$__bs_t_fam
+    [ "$BS_ORIGIN_SHELL" = bash ] && BS_ORIGIN_SHELL="sh"
+    export BS_ORIGIN_SHELL
+    unset __bs_t_self __bs_t_first __bs_t_host __bs_t_fam __bs_t_skip \
+      __bs_t_maj __bs_t_min
+    return 0
+  fi
+  unset __bs_t_fam __bs_t_skip __bs_t_maj __bs_t_min
 fi
 
 __bs_t_host=$(bs_shell_host_find 2>/dev/null) || __bs_t_host=''

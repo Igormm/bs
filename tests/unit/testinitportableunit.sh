@@ -42,8 +42,8 @@ test_modes() {
     local sh_bin sh_name want_mode want_count want_bridge
     while IFS= read -r sh_bin; do
         sh_name="${sh_bin##*/}"
-        want_mode=posix; want_count=17; want_bridge=no-bridge
-        if [[ "${sh_name}" == bash ]]; then want_mode=full; want_count=20; want_bridge=bridge; fi
+        want_mode=posix; want_count=18; want_bridge=no-bridge
+        if [[ "${sh_name}" == bash ]]; then want_mode=full; want_count=21; want_bridge=bridge; fi
         eq "mode=${want_mode} modules=${want_count}" "$(probe "${sh_bin}" 'printf "mode=%s modules=%s" "$BS_KERNEL_MODE" "$(printf %s "$__bs_ld_loaded" | grep -c .)"')" "${sh_name}: the kernel mode and the number of loaded modules"
         eq "ok" "$(probe "${sh_bin}" 'bs_load_is_loaded core/logger && bs_load_is_loaded core/deps && bs_load_is_loaded core/num && echo ok')" "${sh_name}: logger, deps and num are loaded"
         eq "ok|false" "$(probe "${sh_bin}" 'bs_load_is_loaded core/config && printf "ok|"; bs_config_get BS_FILES_ATOMIC')" "${sh_name}: config is loaded and bs_config_load ran, in both kernel modes"
@@ -62,6 +62,16 @@ test_usable() {
         eq "[INFO ] hello" "$(probe "${sh_bin}" 'BS_LOG_TIMESTAMP=false BS_LOG_COLOR=never bs_log_info hello')" "${sh_name}: the logger works after init"
         eq "rc=0 rc=0" "$(probe "${sh_bin}" '. "'"${MODULE_SH}"'"; printf "rc=%s " "$?"; bs_load core/const; printf "rc=%s" "$?"')" "${sh_name}: init twice is a no-op and bs_load works"
         eq "ok" "$(probe "${sh_bin}" '[ "$BS_ROOT" = "'"${BS_PROJECT_ROOT}"'" ] && [ "$BS_INITIALIZED" = 1 ] && [ "$BS_HOME" = "$BS_ROOT" ] && echo ok')" "${sh_name}: BS_ROOT, BS_HOME and BS_INITIALIZED"
+    done < <(testframework::posix_shells)
+}
+
+test_tier2_warns() {
+    local sh_bin sh_name out
+    while IFS= read -r sh_bin; do
+        sh_name="${sh_bin##*/}"
+        printf 'BS_ENTRY_DIR="%s"\nBS_SILENT=1\nBS_LOG_COLOR=wat\n. "%s"\n' "${BS_PROJECT_ROOT}" "${MODULE_SH}" > "${T}/probe.sh"
+        out="$(env -i HOME="${T}/h" PATH="/usr/bin:/bin" "${sh_bin}" "${T}/probe.sh" 2>&1)"
+        eq "1" "$(printf '%s\n' "${out}" | grep -c 'not a valid value')" "${sh_name}: a bad env setting warns at load"
     done < <(testframework::posix_shells)
 }
 
@@ -96,6 +106,7 @@ main() {
     testframework::section "Parse and lint / Разбор и линт"; test_parses_and_lints
     testframework::section "Kernel modes / Режимы ядра"; test_modes
     testframework::section "The kernel after init / Ядро после init"; test_usable
+    testframework::section "Tier-2 validation / Валидация тир 2"; test_tier2_warns
     testframework::section "Directory and direct run / Каталог и прямой запуск"; test_directory
     testframework::section "Aliases / Псевдонимы"; test_aliases
     rm -rf "${T:?}"

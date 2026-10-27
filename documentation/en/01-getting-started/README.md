@@ -20,7 +20,7 @@ your shell is allowed to load is decided by the tier mechanism; see
   the `bootstrap/bs.sh` commands that run it are written in bash, so BS does not run without it.
   Versions 4.2 and 4.3 are accepted by the code, but CI checks from **4.4**
   (nearly every platform ships 4.4 or newer).
-- The exception is the 20 kernel files labelled `@shell posix` (all of `core/`): they do not depend
+- The exception is the 22 kernel files labelled `@shell posix` (all of `core/`): they do not depend
   on bash and can be sourced from dash, ash, ksh, mksh, zsh and bash (see "How the
   kernel works"). That is a small set of helpers (constants, the version,
   `bs_utils_has`, `bs_log_info`, `calc`, …), not the whole of BS.
@@ -41,7 +41,7 @@ tools only.
 
 **Heading for shell independence.** The goal is a kernel (`bootstrap/`, `core/`,
 `install/`, `boot.sh`, `bs`, `install.sh`) in one namespace `bs_*` that does not
-depend on the shell (dash, ash, ksh, mksh, zsh, bash). Already done: all 20
+depend on the shell (dash, ash, ksh, mksh, zsh, bash). Already done: all 22
 `core/` files (including the array and map layer `core/data.sh`) and the shell
 layer in `bootstrap/`; the rest moves by plan (see
 [shell-portability](../08-development/shell-portability.md#heading-for-shell-independence)).
@@ -173,18 +173,22 @@ CLI with `core/args` (auto-help, validation) is in the
 
 ## Running from any shell
 
-The kernel and `lib/` are written in bash 4.2+ (arrays, `[[ ]]`, `local -r`),
-but BS can be started from any shell. The code is always run by a bash found
-on the machine; the shell you come from only affects the `PATH` setup, the
-hints and, in strict mode, which modules are allowed.
+BS requires bash 4.2+: `lib/` (arrays, `[[ ]]`, `local -r`) and the commands
+that run it are written in bash. BS can still be started from any shell. The
+command set already served by `bootstrap/cli.sh` — `help`, `version`, `env`,
+`list`, `calc`, `init-shell`, `shebang`, `call` (a `core/` function loaded with `--load`, under its real name), `doctor`,
+`uninstall`, `where`, `update`, `sync` — runs in the current shell and does not
+start bash. The remaining commands are re-run in a bash 4.2+ found on the
+machine. The shell you come from also affects the `PATH` setup, the hints and,
+in strict mode, which modules are allowed.
 
 ### Three shells
 
 | Role | What it is | Decided by |
 |---|---|---|
-| **host** | the interpreter that runs the BS code | always bash 4.2+: the one that started `bs`, or the one the trampoline finds (`BS_HOST_BASH` wins over the search) |
+| **host** | the interpreter that runs a command that needs bash | always bash 4.2+: the one that started `bs`, or the one the trampoline finds (`BS_HOST_BASH` wins over the search). A POSIX command runs in the shell that started `bs` and has no separate host |
 | **your shell** | where you type commands; its rc file gets `PATH` | `BS_USER_SHELL`, else the parent process, else the login shell |
-| **origin shell** | the shell that first read the `bs` file | exported by the trampoline as `BS_ORIGIN_SHELL`; without the trampoline it is `bash` |
+| **origin shell** | the shell that first read the `bs` file | exported as `BS_ORIGIN_SHELL` by the trampoline; when a POSIX command stays in the current shell, its family is used |
 
 ### Start-up diagram
 
@@ -198,7 +202,9 @@ flowchart TD
     SRC -->|no| SRCX["bilingual message<br/>instead of Bad substitution"]
     E["bs entry point<br/>POSIX prologue"] --> OK{"bs_shell_host_ok<br/>bash 4.2+ in normal mode?"}
     OK -->|yes| K
-    OK -->|"no: dash, zsh, sh,<br/>bash 3.2, bash as sh"| T["bootstrap/trampoline.sh"]
+    OK -->|no| P{"POSIX command?<br/>bs_shell_posix_command"}
+    P -->|"yes: dash, zsh, sh,<br/>bash as sh (forced POSIX)"| PK["bootstrap/cli.sh<br/>stays in this shell"]
+    P -->|"no: bash command<br/>or bash 3.2"| T["bootstrap/trampoline.sh"]
     T --> F{"bs_shell_host_find<br/>BS_HOST_BASH → PATH →<br/>/usr/local/bin, /opt/homebrew/bin, …"}
     F -->|found| X["exec the found bash<br/>with the same file and arguments<br/>BS_ORIGIN_SHELL = origin shell"]
     F -->|none| N["tier unsupported:<br/>what to install, exit 1"]
@@ -211,9 +217,11 @@ flowchart TD
     A -->|no| D["refusal: module, tier, shell<br/>exit 1"]
 ```
 
-In bash 4.2+ the prologue is one test and re-runs nothing. Coming back to the
-trampoline after the `exec` counts as a failure and stops, so start-up cannot
-loop. These paths step by step, plus `bs call`, the POSIX tier without bash,
+In bash 4.2+ the prologue is one test and re-runs nothing. A POSIX command
+skips the trampoline even when bash is installed; bash as sh is used in forced
+POSIX mode, with `bootstrap/cli.sh` instead of the bash layer. Coming back to
+the trampoline after the `exec` counts as a failure and stops, so start-up
+cannot loop. These paths step by step, plus `bs call`, the POSIX tier without bash,
 install and update, are in
 [How the kernel works: UML diagrams](#how-the-kernel-works-uml-diagrams).
 
@@ -224,7 +232,7 @@ The answer to "how does BS work for me":
 | tier | meaning |
 |---|---|
 | `native` | your shell is bash 4.2+: both the `bs` commands and sourcing the library work |
-| `hosted` | another shell: BS works as the `bs` command, run by a bash 4.2+ found on the machine; `PATH` and the rc file fit your shell |
+| `hosted` | another shell: POSIX commands run in your shell; commands that need bash are run by a bash 4.2+ found on the machine; `PATH` and the rc file fit your shell |
 | `unsupported` | no bash 4.2+ on the machine: BS does not start and says what to install |
 
 Where to see it:
@@ -260,9 +268,10 @@ userland (tools) a module needs; `@shell` describes the language of the file.
 
 ### Strict shell selection
 
-By default the trampoline gives any shell any module: bash runs the code
-anyway. To guarantee that a script uses only modules written for the shell it
-was started from, turn on strict mode:
+By default a command that needs bash gives any shell any module: bash runs the
+code anyway. POSIX commands do not go through the trampoline at all. To
+guarantee that a script uses only modules written for the shell it was started
+from, turn on strict mode:
 
 ```bash
 dash ./bs --strict-shell run script.sh   # the flag goes BEFORE the command
@@ -290,17 +299,23 @@ Strict-mode rules:
 ### Calling from fish and nushell: `bs call`
 
 fish and nushell have a different syntax, so they cannot source the kernel. A
-kernel or module function can be called as a command instead: it runs in bash,
-and its stdout, stderr and exit code are yours.
+kernel or module function can be called as a command instead; its stdout,
+stderr and exit code are yours. A core function loaded with `--load core/...`
+runs in the POSIX kernel of the current shell under its real name
+(`bs_utils_human_size`); a `module::function` alias runs where the shell accepts
+`::` (bash, zsh) and otherwise in bash. Without `--load` the full kernel is used,
+and `--load lib/...` needs the bash layer, so both are re-run in bash 4.2+ (or
+report that they need bash when there is none).
 
 ```bash
-bs call utils::human_size 1536000                  # 1.5 MiB
-bs call --load lib/system/info system::info::os     # loading a module first
+bs call --load core/fmt bs_utils_human_size 1536000  # 1.5 MiB, POSIX kernel
+bs call utils::human_size 1536000                    # alias: bash or zsh
+bs call --load lib/system/info system::info::os       # lib/: bash 4.2+
 ```
 
-From fish: `set size (bs call utils::human_size 1536000)`. Only an existing
-function with a valid name runs (otherwise exit 2 or 127); a module path may
-only be `core/...` or `lib/...`.
+From fish: `set size (bs call --load core/fmt bs_utils_human_size 1536000)`.
+Only an existing function with a valid name runs (otherwise exit 2 or 127); a
+module path may only be `core/...` or `lib/...`.
 
 ### Variables that set the shell explicitly
 
@@ -437,9 +452,11 @@ sequenceDiagram
 
 </details>
 
-#### 2. Start from dash, ash or another shell: re-run in bash
+#### 2. Start from dash, ash or another shell: a bash command re-runs in bash
 
-![Scenario 2: start from dash — re-run in bash](../../assets/uml/scenario-2-en.svg)
+The POSIX commands (`bs version`, `bs help`, …) do not reach this path: they stay in the current shell.
+
+![Scenario 2: start from dash — a bash command re-runs in bash](../../assets/uml/scenario-2-en.svg)
 
 <details>
 <summary>Diagram source (Mermaid)</summary>
@@ -452,10 +469,11 @@ sequenceDiagram
   participant sh as shell.sh
   participant tr as trampoline.sh
   participant b as bash 4.2+
-  U->>d: dash ./bs version
+  U->>d: dash ./bs run script.sh
   d->>sh: bs_shell_host_ok
   sh-->>d: no: this is dash
-  d->>tr: source
+  d->>sh: bs_shell_posix_command (version, help, …: stay native)
+  d->>tr: source (run/build/lib: needs bash)
   tr->>sh: bs_shell_host_find (looks for bash 4.2+: BS_HOST_BASH, PATH, usual paths)
   alt bash 4.2+
     tr->>b: found: exec bash, same file and arguments

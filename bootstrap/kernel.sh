@@ -79,7 +79,33 @@ if [ "${BS_KERNEL_MINIMAL:-0}" = 1 ]; then
     prereq const version str var num logger quiet data errorhandler utils
 else
   bs_kernel_load_modules \
-    prereq lang const var str num msg logger quiet fmt data errorhandler version utils config deps args
+    prereq lang const var store str num msg logger quiet fmt data errorhandler version utils config deps args
   # Конфигурация из файлов и окружения / Configuration from files and environment
   bs_config_load
+fi
+
+# Метаданные переменных ядра: сгенерированный манифест объявляет схемы
+# (bs_var_declare) для аннотированных переменных. Чистые вызовы, без кода.
+# The kernel-variable metadata: the generated manifest declares the schemas
+# (bs_var_declare) of the annotated variables. Pure calls, no code.
+if [ -f "${BS_ROOT}/core/var-schema.sh" ]; then
+  BS_CURRENT_FILE="${BS_ROOT}/core/var-schema.sh"
+  # shellcheck disable=SC1091
+  . "${BS_ROOT}/core/var-schema.sh"
+fi
+
+# Тиру 2 — живая валидация env-настроек один раз при загрузке: неверное значение
+# не ломает работу (логгер уже терпит его через case), но предупреждает. Только в
+# полном режиме, чтобы help/version/env оставались без лишнего вывода.
+# Tier 2 — validate the env-driven settings once at load: a bad value does not
+# break anything (the logger already tolerates it via case), but it warns. Full
+# mode only, so help/version/env stay quiet.
+if [ "${BS_KERNEL_MINIMAL:-0}" != 1 ]; then
+  # shellcheck disable=SC2154  # __bs_k_val присваивает bs_var_get через eval / __bs_k_val is assigned by bs_var_get through eval
+  for __bs_k_v in BS_LOG_LEVEL BS_LOG_COLOR BS_LOG_FORMAT BS_LOG_TIMESTAMP FRAMEWORK_DEBUG FRAMEWORK_DRY_RUN; do
+    if bs_var_get "$__bs_k_v" __bs_k_val 2>/dev/null && ! bs_var_validate "$__bs_k_v" "$__bs_k_val"; then
+      bs_log_warn "$__bs_k_v=$__bs_k_val is not a valid value (kept as is) / недопустимое значение (оставлено как есть)"
+    fi
+  done
+  unset __bs_k_v __bs_k_val
 fi

@@ -76,20 +76,22 @@ if [ ! -f "${BS_BOOTSTRAP_DIR}/base.sh" ]; then
 fi
 # shellcheck disable=SC1090,SC1091
 . "${BS_BOOTSTRAP_DIR}/base.sh"
-case "$(bs_shell_family)" in
-  bash)
-    if [ -f "${BS_BOOTSTRAP_DIR}/bs.sh" ]; then
-      # shellcheck disable=SC1090,SC1091
-      . "${BS_BOOTSTRAP_DIR}/bs.sh"
-    fi
-    # При прямом исполнении — предупредить и выйти (отличить source от исполнения умеет только bash)
-    # If executed directly, warn and exit (only bash can tell source from execution)
-    if ! bs::shell::is_sourced; then
-      printf 'ERROR: This script must be sourced, not executed.\n' >&2
-      bs_init_usage
-      exit 1
-    fi ;;
-esac
+if [ "${BS_POSIX_MODE:-0}" != 1 ]; then
+  case "$(bs_shell_family)" in
+    bash)
+      if [ -f "${BS_BOOTSTRAP_DIR}/bs.sh" ]; then
+        # shellcheck disable=SC1090,SC1091
+        . "${BS_BOOTSTRAP_DIR}/bs.sh"
+      fi
+      # При прямом исполнении — предупредить и выйти (отличить source от исполнения умеет только bash)
+      # If executed directly, warn and exit (only bash can tell source from execution)
+      if ! bs::shell::is_sourced; then
+        printf 'ERROR: This script must be sourced, not executed.\n' >&2
+        bs_init_usage
+        exit 1
+      fi ;;
+  esac
+fi
 
 # Idempotency: skip if already initialized. The marker is exported, so a child
 # process inherits it without the functions; trust it only where the kernel is
@@ -127,7 +129,13 @@ fi
 # Режим ядра: полное — только в bash 4.2+; bash старше — отказ; остальным оболочкам — POSIX-часть.
 # The kernel mode: the whole kernel only in bash 4.2+; an older bash is refused; other shells get
 # the POSIX part.
-if bs_shell_host_ok; then
+if [ "${BS_POSIX_MODE:-0}" = 1 ]; then
+  # Трамплин уже выбрал POSIX-часть для этой команды, даже если интерпретатор —
+  # bash в режиме POSIX.
+  # The trampoline already chose the POSIX part for this command, even when the
+  # interpreter is bash in POSIX mode.
+  BS_KERNEL_MODE=posix
+elif bs_shell_host_ok; then
   BS_KERNEL_MODE=full
 elif [ "$(bs_shell_family)" = bash ]; then
   bs_shell_ensure_version 4 || return 1

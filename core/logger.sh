@@ -46,15 +46,35 @@ bs_source_relative "const.sh" "str.sh"
 
 # @global BS_LOG_LEVEL — Env: log level (DEBUG/INFO/WARN/ERROR) (category: env)
 # @global BS_LOG_LEVEL — Env: уровень логирования (DEBUG/INFO/WARN/ERROR) (категория: env)
+# @var BS_LOG_LEVEL
+# @type enum:TRACE|DEBUG|INFO|WARN|ERROR|SUCCESS|NONE
+# @ops read,write
+# @default INFO
+# @on_invalid warn
 : "${BS_LOG_LEVEL:=INFO}"
 # @global BS_LOG_COLOR — Env: log color mode: auto/always/never (category: env)
 # @global BS_LOG_COLOR — Env: режим цвета лога: auto/always/never (категория: env)
+# @var BS_LOG_COLOR
+# @type enum:auto|always|never
+# @ops read,write
+# @default auto
+# @on_invalid warn
 : "${BS_LOG_COLOR:=auto}"
 # @global BS_LOG_FORMAT — Env: log format: text/raw (category: env)
 # @global BS_LOG_FORMAT — Env: формат лога: text/raw (категория: env)
+# @var BS_LOG_FORMAT
+# @type enum:text|json|structured
+# @ops read,write
+# @default text
+# @on_invalid warn
 : "${BS_LOG_FORMAT:=text}"
 # @global BS_LOG_TIMESTAMP — Env: log timestamp: true/false (category: env)
 # @global BS_LOG_TIMESTAMP — Env: временная метка в логе: true/false (категория: env)
+# @var BS_LOG_TIMESTAMP
+# @type bool
+# @ops read,write
+# @default true
+# @on_invalid warn
 : "${BS_LOG_TIMESTAMP:=true}"
 
 # Байт ESC из printf: без $'\033', которого нет в POSIX sh / the ESC byte from printf: no $'\033', it is not POSIX sh
