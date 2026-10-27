@@ -355,6 +355,60 @@ system::users::unlock() {
     fi
 }
 
+# @description Modify a user attribute via usermod / Изменить атрибут пользователя через usermod
+# @param $1 Username / Имя пользователя
+# @param $2 Field: name|home|shell|gecos|group / Поле: name|home|shell|gecos|group
+# @param $3 New value / Новое значение
+# @example
+#   system::users::modify "bob" "shell" "/bin/bash"
+#   system::users::modify "bob" "group" "sudo"
+system::users::modify() {
+    local username="${1:-}"
+    local field="${2:-}"
+    local value="${3:-}"
+
+    if is::empty "${username}" || is::empty "${field}" || is::empty "${value}"; then
+        log::warn "Username, field and value must be specified"
+        return "${E_INVALID}"
+    fi
+
+    if ! utils::quiet id "${username}"; then
+        log::warn "User ${username} does not exist"
+        return "${E_ERROR}"
+    fi
+
+    local flag=""
+    case "${field}" in
+        name)  flag="-l" ;;
+        home)  flag="-d" ;;
+        shell) flag="-s" ;;
+        gecos) flag="-c" ;;
+        group) flag="-g" ;;
+        *)
+            log::warn "Unknown field: ${field} (name|home|shell|gecos|group)"
+            return "${E_INVALID}" ;;
+    esac
+
+    # при переименовании имя не должно быть занято / a rename target must be free
+    if [[ "${field}" == "name" ]] && utils::quiet id "${value}"; then
+        log::warn "User ${value} already exists"
+        return "${E_ERROR}"
+    fi
+
+    if utils::has usermod; then
+        if utils::quiet_err usermod "${flag}" "${value}" "${username}"; then
+            log::info "User ${username} ${field} set to ${value}"
+            return 0
+        else
+            log::error "Failed to modify user ${username}"
+            return "${E_ERROR}"
+        fi
+    else
+        log::error "usermod command not found"
+        return "${E_ERROR}"
+    fi
+}
+
 # @description Create a new group / Создать новую группу
 # @param $1 Group name / Имя группы
 # @example
@@ -429,5 +483,44 @@ system::users::group_list() {
         log::error "Cannot list groups (getent or /etc/group not available)"
         return "${E_ERROR}"
     fi
+}
+
+# @description Show group info: gid and members / Показать информацию о группе: gid и участников
+# @param $1 Group name / Имя группы
+# @example
+#   system::users::group_info "sudo"
+system::users::group_info() {
+    local groupname="${1:-}"
+
+    if is::empty "${groupname}"; then
+        log::warn "Group name not specified"
+        return "${E_ERROR}"
+    fi
+
+    local entry gid members
+    if utils::has getent; then
+        entry="$(utils::quiet_err getent group "${groupname}")" || {
+            log::warn "Group ${groupname} does not exist"
+            return "${E_ERROR}"
+        }
+    elif is::file /etc/group; then
+        entry="$(awk -F: -v g="${groupname}" '$1 == g { print; exit }' /etc/group)" || {
+            log::warn "Group ${groupname} does not exist"
+            return "${E_ERROR}"
+        }
+    else
+        log::error "Cannot read groups (getent or /etc/group not available)"
+        return "${E_ERROR}"
+    fi
+
+    gid="$(printf '%s' "${entry}" | cut -d: -f3)"
+    members="$(printf '%s' "${entry}" | cut -d: -f4)"
+    printf 'gid: %s\n' "${gid}"
+    if is::not_empty "${members}"; then
+        printf 'members: %s\n' "${members}"
+    else
+        printf 'members:\n'
+    fi
+    return 0
 }
 

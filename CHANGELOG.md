@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.11.0] - 2026-10-27 "Lingoa"
+
+### Added
+- feat(users): `system::users::modify` edits a user field (`name`/`home`/`shell`/`gecos`/`group`) via `usermod` and refuses an empty input, an unknown field or a rename onto an existing name; `system::users::group_info` prints a group's gid and members. `examples/users_edit.sh` is a root-only two-panel TUI (`lib/tui`) that lists users and groups side by side and edits them — create/delete/lock/unlock/password/group membership, and per-user field editing — with a portable build via `bs build`. Tests: `unit/testusersunit.sh` (19 checks).
+
 ## [0.10.0] - 2026-10-27 "Lingoa"
 
 ### Added
