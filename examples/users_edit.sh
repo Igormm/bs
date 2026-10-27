@@ -70,6 +70,7 @@ usersedit::reload() {
     (( SEL_G >= ${#GROUPS[@]} )) && SEL_G=$(( ${#GROUPS[@]} - 1 ))
     (( SEL_U < 0 )) && SEL_U=0
     (( SEL_G < 0 )) && SEL_G=0
+    return 0
 }
 
 usersedit::cur_user() { printf '%s' "${USERS[${SEL_U}]:-}"; }
@@ -80,7 +81,7 @@ usersedit::cur_group() { printf '%s' "${GROUPS[${SEL_G}]:-}"; }
 # ==========================================
 
 usersedit::draw_list() {
-    local -r r="$1" c="$2" w="$3" h="$4" arr="$5" sel="$6"
+    local -r r="$1" c="$2" w="$3" h="$4" arr="$5" sel="$6" active="${7:-0}"
     local -n items="${arr}"
     local -i total=${#items[@]} offset=0 i idx
     if (( total == 0 )); then
@@ -91,7 +92,6 @@ usersedit::draw_list() {
     (( sel >= total )) && sel=$(( total - 1 ))
     (( sel < offset )) && offset="${sel}"
     (( sel >= offset + h )) && offset=$(( sel - h + 1 ))
-    local -i active=$(( PANEL == 0 && arr == "USERS" ? 1 : (PANEL == 1 && arr == "GROUPS" ? 1 : 0) ))
     for (( i = 0; i < h; i++ )); do
         idx=$(( offset + i ))
         (( idx >= total )) && break
@@ -116,8 +116,8 @@ usersedit::draw_panels() {
     (( PANEL == 0 )) && st_g="$(tui::style magenta)" || st_g="$(tui::style bold magenta)"
     tui::box 2 1 "${lw}" "${h}" "Users (${#USERS[@]})" "${st_u}"
     tui::box 2 "${rx}" "${rw}" "${h}" "Groups (${#GROUPS[@]})" "${st_g}"
-    usersedit::draw_list 3 2 $(( lw - 2 )) $(( h - 2 )) "USERS" "${SEL_U}"
-    usersedit::draw_list 3 $(( rx + 1 )) $(( rw - 2 )) $(( h - 2 )) "GROUPS" "${SEL_G}"
+    usersedit::draw_list 3 2 $(( lw - 2 )) $(( h - 2 )) "USERS" "${SEL_U}" $(( PANEL == 0 ? 1 : 0 ))
+    usersedit::draw_list 3 $(( rx + 1 )) $(( rw - 2 )) $(( h - 2 )) "GROUPS" "${SEL_G}" $(( PANEL == 1 ? 1 : 0 ))
 }
 
 usersedit::draw_title() {
@@ -203,10 +203,10 @@ usersedit::open_info() {
 usersedit::apply_input() {
     local -r v="${INPUT_VALUE}"
     case "${INPUT_ACTION}" in
-        add_user)     system::users::create "${v}" ;;
-        add_group)    system::users::group_create "${v}" ;;
-        add_to_group) system::users::add_to_group "$(usersedit::cur_user)" "${v}" ;;
-        edit)         system::users::modify "$(usersedit::cur_user)" "${EDIT_FIELD}" "${v}" ;;
+        add_user)     system::users::create "${v}" || true ;;
+        add_group)    system::users::group_create "${v}" || true ;;
+        add_to_group) system::users::add_to_group "$(usersedit::cur_user)" "${v}" || true ;;
+        edit)         system::users::modify "$(usersedit::cur_user)" "${EDIT_FIELD}" "${v}" || true ;;
     esac
     usersedit::reload
 }
@@ -214,8 +214,8 @@ usersedit::apply_input() {
 usersedit::apply_confirm() {
     local -r a="${CONFIRM_ACTION}"
     case "${a}" in
-        delete_user)  system::users::delete "$(usersedit::cur_user)" ;;
-        delete_group) system::users::group_delete "$(usersedit::cur_group)" ;;
+        delete_user)  system::users::delete "$(usersedit::cur_user)" || true ;;
+        delete_group) system::users::group_delete "$(usersedit::cur_group)" || true ;;
     esac
     usersedit::reload
 }
@@ -225,8 +225,8 @@ usersedit::set_password() {
     [[ -z "${u}" ]] && return 0
     tui::leave_alt
     tui::clear_screen
-    system::users::set_password "${u}"
-    read -r -p "Press Enter to continue / Нажмите Enter…"
+    system::users::set_password "${u}" || true
+    read -r -p "Press Enter to continue / Нажмите Enter…" || true
     tui::enter_alt
 }
 
@@ -303,9 +303,9 @@ main() {
                     p|P|з|З)
                         (( PANEL == 0 )) && usersedit::set_password ;;
                     l|L|д|Д)
-                        (( PANEL == 0 )) && system::users::lock "$(usersedit::cur_user)" ;;
+                        (( PANEL == 0 )) && system::users::lock "$(usersedit::cur_user)" || true ;;
                     u|U|г|Г)
-                        (( PANEL == 0 )) && system::users::unlock "$(usersedit::cur_user)" ;;
+                        (( PANEL == 0 )) && system::users::unlock "$(usersedit::cur_user)" || true ;;
                     g|G|п|П)
                         (( PANEL == 0 )) && [[ -n "$(usersedit::cur_user)" ]] && usersedit::open_input "Add to group" add_to_group ;;
                     d|D|в|В)
