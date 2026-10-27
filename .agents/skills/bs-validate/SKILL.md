@@ -1,8 +1,8 @@
 ---
 name: bs-validate
-description: Run the full BS framework validation cycle (syntax, ShellCheck, all tests) and interpret the results after any code change
+description: Run the full BS framework validation cycle (syntax, ShellCheck, all tests) and the version check, and interpret the results after any code change
 type: prompt
-whenToUse: After any change to project code, before committing, or when the user asks to check/verify/validate the project
+whenToUse: After any change to project code, before committing, or when the user asks to check/verify/validate the project — including checking that the version was bumped with the change
 ---
 
 Run the three mandatory validators from the project root, in this order (AGENTS.md requires all three after ANY change):
@@ -12,6 +12,24 @@ bash tests/validatesyntax.sh
 bash tests/validateshellcheck.sh
 bash tests/runalltests.sh
 ```
+
+## Version (do not skip it)
+
+A user-visible `feat`/`refactor`/`fix`/`perf` change must bump the version in the
+same change, never as a separate "later" step — that is exactly how the release
+heading gets forgotten. The single source is `core/version.sh`; everything else
+just repeats the number.
+
+```bash
+bash .agents/skills/bs-version-bump/scripts/version.sh check   # 0 drift = consistent
+```
+
+- `feat`/`refactor`/`perf` → **minor**; a breaking change → **major**; only
+  `fix`/`docs`/`test`/`chore` → **patch**.
+- If a bump is needed, follow the `bs-version-bump` skill: bump `core/version.sh`,
+  rename the CHANGELOG `## [Unreleased]` heading, update the repeated numbers
+  (en/ru architecture, en/ru core-api, `tests/unit/testbsnobashunit.sh`), run
+  `version.sh check`, then commit as `chore(release): X.Y.Z "Codename"; …`.
 
 ## What each one does
 
