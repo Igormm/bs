@@ -175,6 +175,41 @@ main() {
     check "no tool at all -> non-zero" test "${rc}" -ne 0
     sandbox_drop
 
+    testframework::section "ntp_servers: валидация / validation"
+    sandbox_new
+    rc=0; system::time::ntp_servers >/dev/null 2>&1 || rc=$?
+    check "no args rejected" test "${rc}" -ne 0
+    rc=0; system::time::ntp_servers "a;rm -rf" >/dev/null 2>&1 || rc=$?
+    check "server with shell chars rejected" test "${rc}" -ne 0
+    rc=0; system::time::ntp_servers "has space" >/dev/null 2>&1 || rc=$?
+    check "server with a space rejected" test "${rc}" -ne 0
+    sandbox_drop
+
+    testframework::section "ntp_servers: timesyncd NTP= заменяется, остальное остаётся / replaced"
+    sandbox_new
+    printf '[Time]\nNTP=old.pool.ntp.org\nFallbackNTP=fallback.ntp.org\n' > "${SANDBOX}/ts.conf"
+    BS_NTP_CONF="${SANDBOX}/ts.conf" system::time::ntp_servers "pool.ntp.org" "ru.pool.ntp.org" >/dev/null 2>&1
+    eq "NTP=pool.ntp.org ru.pool.ntp.org" "$(grep '^NTP=' "${SANDBOX}/ts.conf")" "NTP= replaced"
+    eq "FallbackNTP=fallback.ntp.org" "$(grep '^FallbackNTP=' "${SANDBOX}/ts.conf")" "unrelated line kept"
+    sandbox_drop
+
+    testframework::section "ntp_servers: timesyncd без NTP= — вставка после [Time] / inserted"
+    sandbox_new
+    printf '[Time]\n# comment\n' > "${SANDBOX}/ts2.conf"
+    BS_NTP_CONF="${SANDBOX}/ts2.conf" system::time::ntp_servers "pool.ntp.org" >/dev/null 2>&1
+    eq "NTP=pool.ntp.org" "$(grep '^NTP=' "${SANDBOX}/ts2.conf")" "NTP= inserted"
+    eq "1" "$(grep -c '^\[Time\]' "${SANDBOX}/ts2.conf")" "single [Time]"
+    sandbox_drop
+
+    testframework::section "ntp_servers: chrony — server/pool заменяются, остальное остаётся / kept"
+    sandbox_new
+    printf 'server old1.example\npool old2.example\ndriftfile /var/lib/chrony/drift\n' > "${SANDBOX}/chrony.conf"
+    BS_NTP_CONF="${SANDBOX}/chrony.conf" system::time::ntp_servers "pool.ntp.org" "time.cloudflare.com" >/dev/null 2>&1
+    eq "0" "$(grep -c 'old1.example\|old2.example' "${SANDBOX}/chrony.conf")" "old servers gone"
+    eq "1" "$(grep -c '^server pool.ntp.org$' "${SANDBOX}/chrony.conf")" "new server"
+    eq "driftfile /var/lib/chrony/drift" "$(grep '^driftfile' "${SANDBOX}/chrony.conf")" "unrelated line kept"
+    sandbox_drop
+
     testframework::summary
 }
 

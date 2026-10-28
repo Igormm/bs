@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.12.0] - 2026-10-27 "Lingoa"
+
+### Added
+- feat(time): `system::time::ntp_servers` writes the NTP server/pool list to the detected configuration (`/etc/chrony.conf`, `/etc/ntp.conf` or `/etc/systemd/timesyncd.conf`, override `BS_NTP_CONF`), replacing the `server`/`pool` lines (chrony/ntpd) or the `NTP=` line (timesyncd) and validating each server name. `examples/ntp_wizard.sh` is a root-only full-screen TUI (`lib/tui`) to enable/disable NTP, pick a pool (or custom servers) and apply. Tests: `testauditsystemtimelocaleunit.sh` (29 checks).
+
 ## [0.11.0] - 2026-10-27 "Lingoa"
 
 ### Added

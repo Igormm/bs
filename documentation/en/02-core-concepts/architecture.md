@@ -209,7 +209,7 @@ performs the following:
   (`bs_shell_host_ok`), before anything else is loaded. It belongs to the `bash4` tier (that is how the
   kernel starts); `@shell posix` modules, the POSIX command set and the `bs call`
   bridge do not require it.
-- Pulls in `BS_VERSION` from `core/version.sh` (currently `0.11.0`); `const.sh` has no number of its own.
+- Pulls in `BS_VERSION` from `core/version.sh` (currently `0.12.0`); `const.sh` has no number of its own.
 - Resolves `BS_ROOT` if it is not already set: first the script's own
   directory (when it contains `bootstrap/init.sh`), then
   `~/.local/lib/bs` and `/usr/local/lib/bs`.

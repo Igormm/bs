@@ -109,6 +109,67 @@ system::time::ntp() {
     fi
 }
 
+# @description Set the list of NTP servers/pools / Задать список NTP-серверов/пулов
+# @param $@ servers (hostnames or IPs) / серверы (имена или IP)
+# @example
+#   system::time::ntp_servers "pool.ntp.org" "ru.pool.ntp.org"
+system::time::ntp_servers() {
+    if [ $# -eq 0 ]; then
+        log::warn "At least one NTP server required"
+        return "${E_INVALID}"
+    fi
+
+    local server joined=""
+    for server in "$@"; do
+        # hostname / IPv4 / IPv6, no shell metacharacters / имя или IP, без метасимволов
+        if [[ ! "${server}" =~ ^[A-Za-z0-9._:-]+$ ]]; then
+            log::warn "Invalid NTP server: ${server}"
+            return "${E_INVALID}"
+        fi
+        joined="${joined}${joined:+ }${server}"
+    done
+
+    local file=""
+    if [[ -n "${BS_NTP_CONF:-}" ]]; then
+        file="${BS_NTP_CONF}"
+    elif is::file /etc/chrony.conf; then
+        file=/etc/chrony.conf
+    elif is::file /etc/ntp.conf; then
+        file=/etc/ntp.conf
+    elif is::file /etc/systemd/timesyncd.conf; then
+        file=/etc/systemd/timesyncd.conf
+    else
+        log::error "No NTP configuration found (chrony.conf / ntp.conf / timesyncd.conf)"
+        return "${E_ERROR}"
+    fi
+
+    local -r tmp="${file}.tmp.$$"
+    if grep -q '^\[Time\]' "${file}"; then
+        # systemd-timesyncd: NTP= line in the [Time] section / systemd-timesyncd: строка NTP= в секции [Time]
+        if grep -q '^NTP=' "${file}"; then
+            # серверы проверены: только [A-Za-z0-9._:-], безопасно для sed / servers are
+            # validated to [A-Za-z0-9._:-], safe for the sed replacement
+            sed -i "s/^NTP=.*/NTP=${joined}/" "${file}" || { log::error "Cannot edit ${file}"; return "${E_ERROR}"; }
+        elif grep -q '^\[Time\]' "${file}"; then
+            awk -v ntp="NTP=${joined}" '/^\[Time\]/ { print; print ntp; next } { print }' \
+                "${file}" > "${tmp}" || { rm -f "${tmp}"; log::error "Cannot edit ${file}"; return "${E_ERROR}"; }
+            mv -f -- "${tmp}" "${file}" || { rm -f "${tmp}"; log::error "Cannot write ${file}"; return "${E_ERROR}"; }
+        else
+            printf 'NTP=%s\n' "${joined}" >> "${file}" || { log::error "Cannot write ${file}"; return "${E_ERROR}"; }
+        fi
+    else
+        # chrony / ntpd: replace server/pool lines, keep the rest / chrony / ntpd: заменить строки server/pool
+        grep -vE '^[[:space:]]*(server|pool)[[:space:]]' "${file}" > "${tmp}" || true
+        for server in "$@"; do
+            printf 'server %s\n' "${server}" >> "${tmp}"
+        done
+        mv -f -- "${tmp}" "${file}" || { rm -f "${tmp}"; log::error "Cannot write ${file}"; return "${E_ERROR}"; }
+    fi
+
+    log::info "NTP servers set: ${joined}"
+    return 0
+}
+
 # @description Set system date and time (manual) / Установить системную дату и время
 # (вручную)
 # @param $1 Date and time in format "YYYY-MM-DD HH:MM:SS" / Дата и время в формате
