@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.13.0] - 2026-10-27 "Lingoa"
+
+### Added
+- feat(bootloader): `lib/system/bootloader.sh` — GRUB2 configuration with safety: `detect`, `grub_get`/`grub_set` (values validated, written atomically via temp+rename), `grub_backup`/`grub_restore`/`grub_backups`, `regenerate` (`grub2-mkconfig`/`update-grub`) and read-only `bootctl_status`/`efi_entries`. `examples/bootloader_wizard.sh` is a root-only TUI (`lib/tui`) that edits `GRUB_TIMEOUT`/`GRUB_DEFAULT`/`GRUB_CMDLINE_LINUX`/`GRUB_DISABLE_RECOVERY`/`GRUB_TERMINAL_OUTPUT` and, on apply, takes a backup, writes and regenerates, rolling back to the backup automatically if regeneration fails. Tests: `testbootloaderunit.sh` (14 checks).
+
 ## [0.12.0] - 2026-10-27 "Lingoa"
 
 ### Added

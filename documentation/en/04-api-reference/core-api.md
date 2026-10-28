@@ -426,7 +426,7 @@ The keys a project-local `./.bsrc` may set are listed in `BS_CONFIG_LOCAL_KEYS`:
 
 ## Version — `core/version.sh`
 
-- `BS_VERSION` — current version (e.g. `0.12.0`); the single place where the number is written; exported only if empty.
+- `BS_VERSION` — current version (e.g. `0.13.0`); the single place where the number is written; exported only if empty.
 - `BS_NAME="BS (Bash Open Source Architecture) BOSA Framework"`.
 
 #### `bs::version::print`
