@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.14.0] - 2026-10-27 "Lingoa"
+
+### Added
+- feat(http): `lib/integration/webserver.sh` — a minimal HTTP server toolkit: `web::read_request` parses a request into the `__web_*` globals, `web::header`/`web::respond` build a response, and `web::client` does a GET via bash `/dev/tcp` (client only — bash cannot bind/listen). `examples/http_server.sh` is a parameterized server with `socat`/`nc`/`inetd` backends and a `/dev/tcp` client mode. Tests: `testwebserverunit.sh` (6 checks).
+
 ## [0.13.0] - 2026-10-27 "Lingoa"
 
 ### Added
