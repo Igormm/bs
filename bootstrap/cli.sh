@@ -1464,6 +1464,9 @@ bs_cli_where_cmd() {
 
 bs_cli_where_main() {
   __bs_cli_wh_deep=0
+  # извлечение пути из rc-строк — через bs_re_find (grep -oE + awk-fallback)
+  # path extraction from rc lines — via bs_re_find (grep -oE with an awk fallback)
+  bs_load "core/regex" 2>/dev/null || true
   while [ $# -gt 0 ]; do
     case "$1" in
       --deep)    __bs_cli_wh_deep=1; shift ;;
@@ -1563,7 +1566,7 @@ EOF
     __bs_cli_wh_lines=$(grep -E '/bootstrap/init\.sh' "${__bs_cli_wh_f}" 2>/dev/null | grep -vE '^[[:space:]]*#' || true)
     while IFS= read -r __bs_cli_wh_line; do
       if [ -z "${__bs_cli_wh_line}" ]; then continue; fi
-      __bs_cli_wh_m=$(printf '%s\n' "${__bs_cli_wh_line}" | grep -oE '[~/$][^"'"'"' ]*/bootstrap/init\.sh' | head -n 1 || true)
+      __bs_cli_wh_m=$(bs_re_find "${__bs_cli_wh_line}" '[~/$][^"'"'"' ]*/bootstrap/init\.sh' | sed -n '1p' || true)
       if [ -z "${__bs_cli_wh_m}" ]; then continue; fi
       __bs_cli_wh_path=${__bs_cli_wh_m%/bootstrap/init.sh}
       # shellcheck disable=SC2016

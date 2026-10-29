@@ -416,7 +416,7 @@ bs_error_handler_command_not_found() {
       bs_log_info "You might need to install package: ${__bs_eh_pkg}"
     fi
   elif command -v dnf >/dev/null 2>&1; then
-    __bs_eh_pkg=$(dnf search "$__bs_eh_cmd" 2>/dev/null | grep -E '^\w' | head -n 1 | awk '{print $1}')
+    __bs_eh_pkg=$(dnf search "$__bs_eh_cmd" 2>/dev/null | grep -E '^[[:alnum:]_]' | head -n 1 | awk '{print $1}')
     if [ -n "$__bs_eh_pkg" ]; then
       bs_log_info "You might need to install package: ${__bs_eh_pkg}"
     fi
