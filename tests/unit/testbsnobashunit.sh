@@ -49,7 +49,7 @@ echo "call=\$(run call bs_utils_human_size 1536000 2>&1)"
 mkdir -p "\$H/stub/bootstrap"; printf '#!${sb}/bin/dash\necho "stub bs: \$*"\n' > "\$H/stub/bs"; chmod +x "\$H/stub/bs"; : > "\$H/stub/bootstrap/init.sh"
 echo "boot=\$(env -i HOME="\$H" PATH="${sb}/bin" BS_ROOT="\$H/stub" "${sb}/bin/\$S" "${BS_PROJECT_ROOT}/boot.sh" version 2>&1 | head -n 1)"
 run doctor > "\$H/doctor.txt" 2>&1; echo "doctor=\$?"
-grep -o 'doctor: [0-9]* passed, 0 failed' "\$H/doctor.txt" | sed 's/[0-9][0-9]*/N/'
+grep -o 'doctor: все [0-9]* проверок пройдено' "\$H/doctor.txt" | sed 's/[0-9][0-9]*/N/'
 L="\$H/fx/lib/bs"; mkdir -p "\$L/bootstrap" "\$H/fx/bin"; : > "\$L/bs"; : > "\$L/bootstrap/init.sh"
 printf 'export BS_ROOT="%s"\n' "\$L" > "\$H/fx/bin/bs"
 printf 'mode=local\nbin=%s\n' "\$H/fx/bin/bs" > "\$L/.install"
@@ -109,7 +109,7 @@ main() {
         if [[ ! -x "${sb}/bin/${sh_name}" ]]; then echo "skip: ${sh_name} is not installed — NOT verified / не установлен — НЕ проверено" >&2; continue; fi
         H="${T}/home-${sh_name}"; mkdir -p "${H}"
         out="$(timeout 300 unshare -Urm busybox sh "${T}/runner.sh" "${sh_name}" "${H}" 2>&1 | tr '\n' ' ' | sed 's/ $//')" || true
-        testframework::assert_equal "version=BS Framework version: 0.15.0 help=BS Framework 0.15.0 list=N modules calc=35 init-shell=# BS for dash shebang=#! call=1.5 MiB boot=stub bs: version doctor=0 doctor: N passed, 0 failed uninstall=0 lib-gone bin-gone uninstall-none=1 nothing-box where=0 where-summary update=0 update-done new-bs manifest-updated no-leftovers update-bad=1 rolled-back build=1 build-says-bash unknown=1" "${out}" "${sh_name}: version, help, list, calc work; doctor, uninstall, where and update work; the rest and an unknown command fail clearly" || true
+        testframework::assert_equal "version=BS Framework version: 0.15.0 help=BS Framework 0.15.0 list=N modules calc=35 init-shell=# BS for dash shebang=#! call=1.5 MiB boot=stub bs: version doctor=0 doctor: все N проверок пройдено uninstall=0 lib-gone bin-gone uninstall-none=1 nothing-box where=0 where-summary update=0 update-done new-bs manifest-updated no-leftovers update-bad=1 rolled-back build=1 build-says-bash unknown=1" "${out}" "${sh_name}: version, help, list, calc work; doctor, uninstall, where and update work; the rest and an unknown command fail clearly" || true
     done
     rm -rf "${T:?}"
     testframework::summary

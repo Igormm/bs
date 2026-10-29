@@ -146,7 +146,7 @@ export BS_SILENT
 # do not need args/config/deps; in minimal mode kernel.sh loads only their
 # transitive dependencies. run/build/call and the rest get the full kernel.
 case "${1:-help}" in
-  help|-h|--help|version|env|list|init-shell|shebang) BS_KERNEL_MINIMAL=1 ;;
+  help|-h|--help|version|-v|--version|env|list|init-shell|shebang) BS_KERNEL_MINIMAL=1 ;;
 esac
 : "${BS_KERNEL_MINIMAL:=0}"
 export BS_KERNEL_MINIMAL
@@ -252,7 +252,7 @@ case "${1:-help}" in
       bs_cli_help
     fi
     ;;
-  version)        shift; bs_cli_version_cmd "$@" ;;
+  version|-v|--version)  shift; bs_cli_version_cmd "$@" ;;
   env)            bs_cli_env_cmd ;;
   list)           bs_cli_list_cmd ;;
   lang-doc)       shift; bs_cli_delegate lang-doc bs::cli::lang_doc_cmd "$@" ;;

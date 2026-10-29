@@ -817,7 +817,11 @@ bs_cli_doctor_cmd() {
   fi
 
   __bs_cli_dend=$(bs_utils_now_ms)
-  bs_log_info "doctor: ${__bs_cli_dpass} passed, ${__bs_cli_dfail} failed ($(bs_num_sub "${__bs_cli_dend}" "${__bs_cli_dstart}") ms)"
+  if [ "${__bs_cli_dfail}" -eq 0 ]; then
+    bs_log_success "doctor: все ${__bs_cli_dpass} проверок пройдено / all ${__bs_cli_dpass} checks passed ($(bs_num_sub "${__bs_cli_dend}" "${__bs_cli_dstart}") ms)"
+  else
+    bs_log_error "doctor: ${__bs_cli_dpass} пройдено, ${__bs_cli_dfail} ПРОВАЛЕНО / ${__bs_cli_dpass} passed, ${__bs_cli_dfail} FAILED ($(bs_num_sub "${__bs_cli_dend}" "${__bs_cli_dstart}") ms)"
+  fi
 
   return "${__bs_cli_dfail}"
 }

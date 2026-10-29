@@ -409,19 +409,19 @@ bs_error_conditional_warning() {
 # @param $1 command / команда
 bs_error_handler_command_not_found() {
   __bs_eh_cmd=${1-}
-  bs_log_error "Command not found: ${__bs_eh_cmd}"
+  bs_log_error "команда не найдена / command not found: ${__bs_eh_cmd}"
   if command -v apt >/dev/null 2>&1; then
     __bs_eh_pkg=$(apt-cache search "$__bs_eh_cmd" | head -n 1 | awk '{print $1}')
     if [ -n "$__bs_eh_pkg" ]; then
-      bs_log_info "You might need to install package: ${__bs_eh_pkg}"
+      bs_log_info "установите / install it: sudo apt install ${__bs_eh_pkg}"
     fi
   elif command -v dnf >/dev/null 2>&1; then
     __bs_eh_pkg=$(dnf search "$__bs_eh_cmd" 2>/dev/null | grep -E '^[[:alnum:]_]' | head -n 1 | awk '{print $1}')
     if [ -n "$__bs_eh_pkg" ]; then
-      bs_log_info "You might need to install package: ${__bs_eh_pkg}"
+      bs_log_info "установите / install it: sudo dnf install ${__bs_eh_pkg}"
     fi
   fi
-  bs_error_exit "Command '${__bs_eh_cmd}' not found" 127
+  bs_error_exit "команда «${__bs_eh_cmd}» не найдена / command '${__bs_eh_cmd}' not found" 127
 }
 
 bs_shell_alias bs_cleanup_add cleanup::add
