@@ -45,6 +45,22 @@ test_eof() {
     eq "1" "${rc}" "EOF is a clean no-request"
 }
 
+test_respond_injection() {
+    local rc=0 out
+    out="$(web::respond 200 $'OK\r\nX-Injected: yes' "body" "text/plain" 2>/dev/null)" || rc=$?
+    eq "2" "${rc}" "reason with CRLF is rejected"
+    eq "" "${out}" "nothing is written on rejection"
+}
+
+test_body_limit() {
+    local rc=0
+    printf 'POST / HTTP/1.1\r\nContent-Length: 999999999\r\n\r\n' | { web::read_request; } >/dev/null 2>&1 || rc=$?
+    eq "2" "${rc}" "oversized Content-Length is rejected"
+    rc=0
+    printf 'POST / HTTP/1.1\r\nContent-Length: 4\r\n\r\nabcd' | { web::read_request; } >/dev/null 2>&1 || rc=$?
+    eq "0" "${rc}" "a small body is accepted"
+}
+
 main() {
     print_header "Webserver Unit Tests / Модульные тесты webserver"
     testframework::init
@@ -52,6 +68,8 @@ main() {
     testframework::section "Header / Заголовок"; test_header
     testframework::section "Respond / Ответ"; test_respond
     testframework::section "EOF / Конец потока"; test_eof
+    testframework::section "Safety / Безопасность"; test_respond_injection
+    testframework::section "Body limit / Лимит тела"; test_body_limit
     testframework::summary
 }
 
