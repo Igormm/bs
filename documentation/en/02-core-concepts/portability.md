@@ -8,7 +8,7 @@
 ## 1. Why
 
 BS requires **bash 4.2+** for `lib/` and the `bootstrap/bs.sh` commands that run it, and claims
-"ubiquity". The exception is the 22 `@shell posix` kernel files, the entry-point prologue and the
+"ubiquity". The exception is the 23 `@shell posix` kernel files, the entry-point prologue and the
 POSIX command set in `bootstrap/cli.sh`, which run in any shell; the other shells get the bash
 commands through a re-run in bash and the `bs call` bridge (see
 [shell-portability](../08-development/shell-portability.md)). But "everywhere"

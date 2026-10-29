@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.15.0] - 2026-10-27 "Lingoa"
+
+### Added
+- feat(regex): `core/regex.sh` (`@shell posix`) — POSIX ERE helpers with busybox fallbacks and a cached engine probe: `bs_re_match`/`bs_re_fullmatch` (predicates), `bs_re_find`/`bs_re_count` (`grep -oE`, `awk` fallback), `bs_re_replace` (`sed -E`, BRE fallback), `bs_re_split` (`awk`); `lib/data/regex.sh` stays the bash4 ERE+PCRE tier. A new skill `bs-regex` documents the two tiers, the dialect matrix and the handler model. The `@shell posix` core count is now 23. Tests: `testregexportableunit.sh` (68 checks in six shells).
+
 ## [0.14.0] - 2026-10-27 "Lingoa"
 
 ### Added

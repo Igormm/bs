@@ -3,7 +3,7 @@
 # Переносимость между оболочками
 
 **BS требует bash 4.2+.** На bash написаны вся `lib/` (87 модулей, ни один не POSIX) и команды
-`bootstrap/bs.sh`, которые её запускают. От bash не зависят 22 небольших файлов ядра `@shell posix`
+`bootstrap/bs.sh`, которые её запускают. От bash не зависят 23 небольших файлов ядра `@shell posix`
 (весь `core/`), пролог точек входа и набор команд в `bootstrap/cli.sh`. «Работает из большинства
 оболочек» значит: `bs` можно запустить из любой оболочки — команды, которым нужен bash,
 перезапускаются в нём, а POSIX-команды остаются в текущей оболочке; `install.sh` работает даже без
@@ -286,11 +286,11 @@ busybox ash, ksh93 и mksh (`unit/testquietportableunit.sh`).
 
 ## `repl` вне ядра
 
-`bs repl` — интерактивная сессия bash с загруженным ядром, то есть по смыслу не часть ядра. Модуль перенесён из `core/repl.sh` в `lib/ui/repl.sh` (загружается `load "lib/ui/repl"`); в ядре остаётся 22 файла.
+`bs repl` — интерактивная сессия bash с загруженным ядром, то есть по смыслу не часть ядра. Модуль перенесён из `core/repl.sh` в `lib/ui/repl.sh` (загружается `load "lib/ui/repl"`); в ядре остаётся 23 файла.
 
 ## Курс на независимость от оболочки
 
-Цель — чтобы `bootstrap/`, `core/`, `install/`, `boot.sh`, `bs` и `install.sh` жили в одном пространстве имён `bs_*` и не зависели от оболочки. Состояние: готовы все 22 файлов `core/` (`prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `config`, `lang`, `args`, `args-completion`, `var`, `str`, `num`, `msg`, `var-schema`, `store`), слой оболочек и шебанга, загрузчик, `base.sh`, `init.sh` и `cli.sh` в `bootstrap/`, `install/*` и точки входа `install.sh`, `bs` и `boot.sh`. Пока на bash 4.2+: `bootstrap/bs.sh` (стек вызовов и `BASH_REMATCH`, с 9 командами `bs::cli::*`, которые запускают `lib/`) и 87 модулей `lib/`; поэтому полному BS по-прежнему нужен bash 4.2+ (см. начало страницы), а без него работает POSIX-часть выше.
+Цель — чтобы `bootstrap/`, `core/`, `install/`, `boot.sh`, `bs` и `install.sh` жили в одном пространстве имён `bs_*` и не зависели от оболочки. Состояние: готовы все 23 файлов `core/` (`prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `config`, `lang`, `args`, `args-completion`, `var`, `str`, `num`, `msg`, `var-schema`, `store`, `regex`), слой оболочек и шебанга, загрузчик, `base.sh`, `init.sh` и `cli.sh` в `bootstrap/`, `install/*` и точки входа `install.sh`, `bs` и `boot.sh`. Пока на bash 4.2+: `bootstrap/bs.sh` (стек вызовов и `BASH_REMATCH`, с 9 командами `bs::cli::*`, которые запускают `lib/`) и 87 модулей `lib/`; поэтому полному BS по-прежнему нужен bash 4.2+ (см. начало страницы), а без него работает POSIX-часть выше.
 
 ## Не сделано
 

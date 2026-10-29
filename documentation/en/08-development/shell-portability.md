@@ -3,7 +3,7 @@
 # Shell portability
 
 **BS requires bash 4.2+.** All of `lib/` (87 modules, none of them POSIX) and the `bootstrap/bs.sh`
-commands that run it are written in bash. The 22 small `@shell posix` kernel files (all of `core/`),
+commands that run it are written in bash. The 23 small `@shell posix` kernel files (all of `core/`),
 the prologue of the entry points and the command set in `bootstrap/cli.sh` do not depend on it.
 "Usable from most shells" means: `bs` can be started from any shell — commands that need bash
 re-run in it, while the POSIX commands stay in the current shell — and `install.sh` runs even with
@@ -285,11 +285,11 @@ Worth knowing: functions that change state and return a value (`bs_arr_pop`, `bs
 
 ## `repl` outside the kernel
 
-`bs repl` is an interactive bash session with the kernel loaded, so by its nature it is not a kernel part. The module moved from `core/repl.sh` to `lib/ui/repl.sh` (loaded with `load "lib/ui/repl"`); the kernel keeps 22 files.
+`bs repl` is an interactive bash session with the kernel loaded, so by its nature it is not a kernel part. The module moved from `core/repl.sh` to `lib/ui/repl.sh` (loaded with `load "lib/ui/repl"`); the kernel keeps 23 files.
 
 ## Heading for shell independence
 
-The goal is for `bootstrap/`, `core/`, `install/`, `boot.sh`, `bs` and `install.sh` to live in one namespace `bs_*` and be shell-independent. State: all 22 `core/` files are done (`prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `config`, `lang`, `args`, `args-completion`, `var`, `str`, `num`, `msg`, `var-schema`, `store`), plus the shell and shebang layer, the loader, `base.sh`, `init.sh` and `cli.sh` in `bootstrap/`, `install/*`, and the entry points `install.sh`, `bs` and `boot.sh`. Still bash 4.2+: `bootstrap/bs.sh` (the call stack and `BASH_REMATCH`, with the 9 `bs::cli::*` commands that run `lib/`) and the 87 modules of `lib/`; so a full BS still wants bash 4.2+ (see the top of this page), and without it the POSIX part above runs.
+The goal is for `bootstrap/`, `core/`, `install/`, `boot.sh`, `bs` and `install.sh` to live in one namespace `bs_*` and be shell-independent. State: all 23 `core/` files are done (`prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `config`, `lang`, `args`, `args-completion`, `var`, `str`, `num`, `msg`, `var-schema`, `store`, `regex`), plus the shell and shebang layer, the loader, `base.sh`, `init.sh` and `cli.sh` in `bootstrap/`, `install/*`, and the entry points `install.sh`, `bs` and `boot.sh`. Still bash 4.2+: `bootstrap/bs.sh` (the call stack and `BASH_REMATCH`, with the 9 `bs::cli::*` commands that run `lib/`) and the 87 modules of `lib/`; so a full BS still wants bash 4.2+ (see the top of this page), and without it the POSIX part above runs.
 
 ## Not done yet
 

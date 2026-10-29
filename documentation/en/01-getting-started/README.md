@@ -20,7 +20,7 @@ your shell is allowed to load is decided by the tier mechanism; see
   the `bootstrap/bs.sh` commands that run it are written in bash, so BS does not run without it.
   Versions 4.2 and 4.3 are accepted by the code, but CI checks from **4.4**
   (nearly every platform ships 4.4 or newer).
-- The exception is the 22 kernel files labelled `@shell posix` (all of `core/`): they do not depend
+- The exception is the 23 kernel files labelled `@shell posix` (all of `core/`): they do not depend
   on bash and can be sourced from dash, ash, ksh, mksh, zsh and bash (see "How the
   kernel works"). That is a small set of helpers (constants, the version,
   `bs_utils_has`, `bs_log_info`, `calc`, …), not the whole of BS.
@@ -41,7 +41,7 @@ tools only.
 
 **Heading for shell independence.** The goal is a kernel (`bootstrap/`, `core/`,
 `install/`, `boot.sh`, `bs`, `install.sh`) in one namespace `bs_*` that does not
-depend on the shell (dash, ash, ksh, mksh, zsh, bash). Already done: all 22
+depend on the shell (dash, ash, ksh, mksh, zsh, bash). Already done: all 23
 `core/` files (including the array and map layer `core/data.sh`) and the shell
 layer in `bootstrap/`; the rest moves by plan (see
 [shell-portability](../08-development/shell-portability.md#heading-for-shell-independence)).

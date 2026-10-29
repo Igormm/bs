@@ -15,7 +15,7 @@ BS is a modular Bash 4.2+ framework and standard library. It provides:
 - `lib/` — standard library: `io/streams`, `io/files`, `io/process`, `system/*`, `integration/*`, `ui/*`, etc.
 - `tests/` — custom test framework, ShellCheck validation, syntax validation
 
-**BS requires bash 4.2+**: all of `lib/` (87 modules) and the `bootstrap/bs.sh` commands that run it are Bash 4.2+ scripts. Only the 22 `@shell posix` files of `core/` (all of them), `bootstrap/loader.sh`, `base.sh`, `init.sh` (its POSIX mode), `install/*` with `install.sh` (the installer runs without bash), `boot.sh` and the prologue of the entry points are shell-independent; `bs` itself runs `help`, `version`, `env`, `list`, `calc`, `doctor`, `uninstall`, `where`, `update`, `init-shell`, `shebang` and `call` without bash (`bootstrap/cli.sh`); its other commands, `bootstrap/bs.sh` and `lib/` still need bash. No external dependencies are required at runtime.
+**BS requires bash 4.2+**: all of `lib/` (87 modules) and the `bootstrap/bs.sh` commands that run it are Bash 4.2+ scripts. Only the 23 `@shell posix` files of `core/` (all of them), `bootstrap/loader.sh`, `base.sh`, `init.sh` (its POSIX mode), `install/*` with `install.sh` (the installer runs without bash), `boot.sh` and the prologue of the entry points are shell-independent; `bs` itself runs `help`, `version`, `env`, `list`, `calc`, `doctor`, `uninstall`, `where`, `update`, `init-shell`, `shebang` and `call` without bash (`bootstrap/cli.sh`); its other commands, `bootstrap/bs.sh` and `lib/` still need bash. No external dependencies are required at runtime.
 
 ## How AI should work with this framework
 
@@ -96,6 +96,7 @@ Reusable workflow skills live in `.agents/skills/` (Kimi Code / agents-compatibl
 
 - `bs-new-lib-module` — scaffold a new `lib/` module (skeleton, guard, `@depends`, metadata).
 - `bs-new-core-module` — add a `core/` module and register it in `bootstrap/init.sh` + `bs doctor`.
+- `bs-regex` — work with regular expressions across the two tiers: `core/regex.sh` (`bs_re_*`, POSIX ERE) vs `lib/data/regex.sh` (`regex::*`, ERE+PCRE); dialect portability (GNU vs busybox vs BSD) and engine fallbacks.
 - `bs-pre-kernel-namespace` — write/edit functions in `bootstrap/bs.sh` (dependency-free helpers usable before the loader).
 - `bs-pre-kernel-boundary` — check that pre-load code uses no core/lib abstractions; after load they are required.
 - `bs-variable-docs` — check that module-level variables carry a bilingual `# @global` snippet naming their category (code-style-guide §4.2).
