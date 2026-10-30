@@ -42,8 +42,7 @@ ts::toolchain::runtime_version() {
         return "${LIB_ERROR_DEPENDENCY_MISSING}"
     }
     local raw
-    raw="$(utils::quiet_err "${bin}" --version 2>/dev/null)" || raw=""
-    # WRAPPER-CANDIDATE: utils::attempt — this pattern (quiet_err + 2>/dev/null + || raw="") is utils::attempt verbatim / кандидат-обёртка: utils::attempt — этот паттерн есть готовый абстракцией в core
+    raw="$(utils::attempt "${bin}" --version)"
     raw="${raw#v}"
     str::trim "${raw}"
 }
