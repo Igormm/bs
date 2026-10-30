@@ -426,20 +426,20 @@ bs_cli_env_cmd() {
 
 # bs list: модули core/ и lib/ / the modules of core/ and lib/
 bs_cli_list_cmd() {
-  echo 'Available modules:'
+  printf '%s\n' "$(bs_cli_paint head 'Available modules:')"
   __bs_cli_lc=0
   __bs_cli_lfiles=$(find "${BS_ROOT}/core" "${BS_ROOT}/lib" -type f -name '*.sh' 2>/dev/null | sort)
   if [ -n "${__bs_cli_lfiles}" ]; then
     while IFS= read -r __bs_cli_lf; do
       if [ -f "${__bs_cli_lf}" ]; then
-        printf '  %s\n' "${__bs_cli_lf#"${BS_ROOT}"/}"
+        printf '  %s\n' "$(bs_cli_paint path "${__bs_cli_lf#"${BS_ROOT}"/}")"
         __bs_cli_lc=$((__bs_cli_lc + 1))
       fi
     done <<LIST_END
 ${__bs_cli_lfiles}
 LIST_END
   fi
-  printf '%d modules\n' "${__bs_cli_lc}"
+  printf '%s\n' "$(bs_cli_paint head "${__bs_cli_lc} modules")"
 }
 
 # @private Каталог с командой bs для PATH: из манифеста (bin=), иначе рядом с
@@ -2668,10 +2668,10 @@ bs_cli_update_cmd() {
       __bs_cli_uc_dflt="p"
       __bs_cli_uc_why="$(bs_cli_update_pull_blocker "${__bs_cli_uc_checkout}")" || __bs_cli_uc_dflt="g"
       if [ "${__bs_cli_uc_dflt}" = "g" ]; then
-        printf 'Подтянуть репозиторий нельзя (%s) / cannot pull: %s\n' "${__bs_cli_uc_why}" "${__bs_cli_uc_why}"
-        printf 'Источник / Source: [g]ithub (репозиторий не изменится / the repo stays old), [l]ocal, [a]bort? [g] '
+        printf 'Подтянуть репозиторий нельзя: %s / cannot pull: %s\n' "${__bs_cli_uc_why}" "${__bs_cli_uc_why}"
+        printf 'Источник / Source: [g]ithub · [l]ocal · [a]bort? [%s] ' "$(bs_cli_paint cmd "${__bs_cli_uc_dflt}")"
       else
-        printf 'Источник / Source: [p]ull — подтянуть репозиторий и ставить из него (рекомендуется), [g]ithub (репозиторий останется старым), [l]ocal, [a]bort? [p] '
+        printf 'Источник / Source: [p]ull (рекомендуется / recommended) · [g]ithub · [l]ocal · [a]bort? [%s] ' "$(bs_cli_paint cmd "${__bs_cli_uc_dflt}")"
       fi
       read -r __bs_cli_uc_answer || __bs_cli_uc_answer="a"
       if [ -z "${__bs_cli_uc_answer}" ]; then __bs_cli_uc_answer=${__bs_cli_uc_dflt}; fi
