@@ -78,6 +78,16 @@ chat::turn() {
   llm::chat_turn "${__ch_provider}" "${__ch_model}" "${__ch_json}"
 }
 
+# @private Bold "model> " prompt / Жирное приглашение "model> "
+#   The only raw ANSI escape in this module; isolated in one named helper
+#   (the same class-D1 rule as lib/ui/wizard.sh).
+# @private Единственный сырой ANSI-escape модуля; изолирован в одном
+#   именованном помощнике (то же правило class-D1, что в lib/ui/wizard.sh).
+# @param $1 Model name / Имя модели
+chat::__prompt() {
+  printf '\033[1m%s\033[0m> ' "${1}"
+}
+
 # @description Chat REPL help text / Текст справки чата.
 chat::help_text() {
   cat <<HELP
@@ -132,7 +142,7 @@ chat::repl() {
   log::info "Type /help for commands, /quit to exit."
 
   while true; do
-    printf '\033[1m%s\033[0m> ' "${__ch_model}"
+    chat::__prompt "${__ch_model}"
     if ! IFS= read -r __ch_input; then
       printf '\n'
       break

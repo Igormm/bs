@@ -240,7 +240,7 @@ io::process::__run_strace() {
     return "${E_ERROR}"
   fi
 
-  if ! kill -0 "${pid}" 2>/dev/null; then
+  if ! utils::pid_alive "${pid}"; then
     log::debug "Process ${pid} not alive, skipping strace"
     return "${E_ERROR}"
   fi
@@ -336,7 +336,7 @@ io::process::__terminate() {
   local signal="${IO_PROCESS_CONFIG[kill_signal]}"
   local grace="${IO_PROCESS_CONFIG[grace_period]}"
 
-  if ! kill -0 "${pid}" 2>/dev/null; then
+  if ! utils::pid_alive "${pid}"; then
     return
   fi
 
@@ -346,7 +346,7 @@ io::process::__terminate() {
   local deadline_ms
   deadline_ms=$(( $(utils::now_ms) + grace * 1000 ))
 
-  while kill -0 "${pid}" 2>/dev/null; do
+  while utils::pid_alive "${pid}"; do
     local now_ms
     now_ms=$(utils::now_ms)
     if [[ "${now_ms}" -ge "${deadline_ms}" ]]; then
@@ -355,7 +355,7 @@ io::process::__terminate() {
     sleep 0.2
   done
 
-  if kill -0 "${pid}" 2>/dev/null; then
+  if utils::pid_alive "${pid}"; then
     log::warn "Process ${pid} did not exit in ${grace}s, sending KILL"
     utils::ignore kill -KILL "${pid}"
   fi
@@ -366,7 +366,7 @@ io::process::__terminate() {
 # @description Обработчик очистки, зарегистрированный через cleanup::add.
 io::process::__cleanup_handler() {
   local pid="${IO_PROCESS_CURRENT_PID:-}"
-  if is::not_empty "${pid}" && kill -0 "${pid}" 2>/dev/null; then
+  if is::not_empty "${pid}" && utils::pid_alive "${pid}"; then
     utils::ignore kill -KILL "${pid}"
     utils::ignore wait "${pid}"
   fi
@@ -441,7 +441,7 @@ io::process::guard() {
   local cmd_rc=0
 
   while true; do
-    if ! kill -0 "${pid}" 2>/dev/null; then
+    if ! utils::pid_alive "${pid}"; then
       # Process finished naturally / Процесс завершился сам
       break
     fi

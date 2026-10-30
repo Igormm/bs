@@ -4,8 +4,9 @@
 # tests/unit/testquietportableunit.sh — core/quiet.sh как POSIX-код под dash, ash, ksh, mksh, zsh и bash
 #
 # core/quiet.sh is "@shell posix": bs_utils_has / bs_utils_quiet / bs_utils_quiet_err /
-# bs_utils_ignore / bs_utils_attempt must give the same answers in every shell.
-# core/quiet.sh — "@shell posix": эти пять функций обязаны давать одинаковые
+# bs_utils_ignore / bs_utils_attempt / bs_utils_pid_alive must give the same answers in
+# every shell.
+# core/quiet.sh — "@shell posix": эти шесть функций обязаны давать одинаковые
 # ответы в любой оболочке.
 
 set -euo pipefail
@@ -55,6 +56,9 @@ test_behaviour() {
         eq "$(probe "${sh_bin}" -- 'bs_utils_ignore false; echo "rc=$?"')" "rc=0" "${sh_name}: bs_utils_ignore always succeeds"
         out="$(probe "${sh_bin}" -- 'bs_utils_attempt sh -c "echo out; echo err >&2; exit 1"; echo "rc=$?"' | tr '\n' ' ')"
         eq "${out}" "out rc=0 " "${sh_name}: bs_utils_attempt keeps stdout, hides stderr, succeeds"
+        eq "$(probe "${sh_bin}" -- 'bs_utils_pid_alive $$ && echo y')" "y" "${sh_name}: bs_utils_pid_alive finds the live shell"
+        eq "$(probe "${sh_bin}" -- 'bs_utils_pid_alive "" || echo n')" "n" "${sh_name}: bs_utils_pid_alive rejects an empty PID"
+        eq "$(probe "${sh_bin}" -- 'sh -c "exit 0" & p=$!; wait "$p"; bs_utils_pid_alive "$p" || echo dead')" "dead" "${sh_name}: bs_utils_pid_alive misses an exited child"
     done < <(testframework::posix_shells)
 }
 
@@ -65,10 +69,12 @@ test_aliases() {
         [[ -n "${sh_bin}" ]] || continue
         eq "$(probe "${sh_bin}" -- 'utils::has ls && echo y')" "y" "${sh_name}: utils::has is an alias of bs_utils_has"
         eq "$(probe "${sh_bin}" -- 'utils::ignore false; echo "rc=$?"')" "rc=0" "${sh_name}: utils::ignore is an alias of bs_utils_ignore"
+        eq "$(probe "${sh_bin}" -- 'utils::pid_alive $$ && echo y')" "y" "${sh_name}: utils::pid_alive is an alias of bs_utils_pid_alive"
     done
     # kernel in bash: the old names still work after the real load
     eq "$(utils::has ls && echo y)" "y" "kernel: utils::has works"
     eq "$(utils::attempt false; echo "rc=$?")" "rc=0" "kernel: utils::attempt works"
+    eq "$(utils::pid_alive $$ && echo y)" "y" "kernel: utils::pid_alive works"
 }
 
 main() {

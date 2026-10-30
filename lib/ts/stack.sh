@@ -49,7 +49,7 @@ ts::stack::__alive() {
   local -r pid="${1-}"
   is::number "${pid}" || return 1
   (( pid > 1 )) || return 1
-  kill -0 "${pid}" 2>/dev/null
+  utils::pid_alive "${pid}"
 }
 
 # @private

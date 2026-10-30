@@ -299,10 +299,10 @@ gpu::stress() {
         sleep 1
     done
 
-    if ! kill -0 "${pid}" 2>/dev/null; then
+    if ! utils::pid_alive "${pid}"; then
         log::warn "gpu::stress: ${tool} exited before ${seconds}s"
     fi
-    kill "${pid}" 2>/dev/null || true
+    utils::attempt kill "${pid}"
     utils::ignore wait "${pid}"
 
     local avg="n/a"

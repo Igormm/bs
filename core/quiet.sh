@@ -53,6 +53,22 @@ bs_utils_quiet_err() {
   "$@" 2>/dev/null
 }
 
+# Проверяет, жив ли процесс с данным PID.
+# Заменяет идиому: kill -0 PID 2>/dev/null (и utils::quiet_err kill -0 PID).
+# @description Check whether a PID is alive (kill -0, stderr suppressed).
+# @description Проверить, жив ли процесс (kill -0, stderr подавлен).
+# @param $1 {int} PID
+# @returns 0 процесс жив
+# @returns 1 нет такого процесса (или нет прав, или пустой/нечисловой PID)
+# @example
+#   if bs_utils_pid_alive "${pid}"; then ...; fi   # bash/zsh: utils::pid_alive
+bs_utils_pid_alive() {
+  case "${1-}" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  kill -0 "${1}" 2>/dev/null
+}
+
 # Выполняет команду, подавляя вывод и игнорируя результат.
 # Явная замена идиомы: cmd >/dev/null 2>&1 || true
 # Использовать только там, где неудача команды действительно не важна.
@@ -80,3 +96,4 @@ bs_shell_alias bs_utils_quiet utils::quiet
 bs_shell_alias bs_utils_quiet_err utils::quiet_err
 bs_shell_alias bs_utils_ignore utils::ignore
 bs_shell_alias bs_utils_attempt utils::attempt
+bs_shell_alias bs_utils_pid_alive utils::pid_alive

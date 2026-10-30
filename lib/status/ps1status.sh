@@ -349,7 +349,7 @@ ps1status::start_monitoring() {
     if is::file "${pid_file}"; then
         monitor_pid="$(<"${pid_file}")"
     fi
-    if [[ "${monitor_pid}" =~ ^[0-9]+$ ]] && (( monitor_pid > 1 )) && utils::quiet_err kill -0 "${monitor_pid}"; then
+    if [[ "${monitor_pid}" =~ ^[0-9]+$ ]] && (( monitor_pid > 1 )) && utils::pid_alive "${monitor_pid}"; then
         :
     else
         monitor_pid=""
