@@ -13,7 +13,6 @@
 # Usage / Использование:
 #   load "lib/io/process"
 #   io::process::guard --timeout 60 --hang-after 30 -- wget https://example.com/file.iso
-# WRAPPER-CANDIDATE: process::timeout — unify timeout/hang-after semantics used ad-hoc across lib/ / кандидат-обёртка: process::timeout — единая семантика таймаутов вместо разрозненных вызовов
 #
 # @depends core/const, core/logger, core/utils, core/errorhandler
 
