@@ -13,7 +13,7 @@ let cases = [
   [S1 "num add" [bs_num_add 2 3] "5" 0]
   [S1 "num mul" [bs_num_mul 6 7] "42" 0]
   [S1 "num cmp" [bs_num_cmp 1 2] "-1" 0]
-  [S1 "version codename" [bs_version_codename] "Lingoa" 0]
+  [S1 "version codename" [bs_version_codename] "Cooloua" 0]
   [S1 "human size" [bs_utils_human_size 1536] "1.5 KiB" 0]
   [S1 "error description" [bs_const_error_description 2] "Invalid arguments / Неверные аргументы" 0]
   [S1 "is_number" [bs_is_number 42] "" 0]

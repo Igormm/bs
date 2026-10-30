@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.16.0] - 2026-10-30 "Cooloua"
+
+### Added
+- feat(cli): humanized `bs` output — `bs --version`/`-v` aliases, a highlighted `bs doctor` verdict (SUCCESS/ERROR), a human `command not found` hint (`sudo apt/dnf install …`), colourised and aligned `bs help`, a compact `bs update` source prompt with a highlighted default, highlighted `bs list`, framed `bs where` section headers and a new `bs_log_section` framed-header helper; the `bs-cli-style` skill documents these conventions.
+- feat(regex): `core/regex.sh` is used in the kernel — `bs where` extracts paths via `bs_re_find` (`grep -oE` with an `awk` fallback); `core/errorhandler.sh` uses `[[:alnum:]_]` instead of the GNU `\w` extension.
+
+### Changed
+- style: removed 596 `# ====` comment dividers across core/lib/bootstrap/examples; descriptive section comments and blank lines instead.
+
 ## [0.15.0] - 2026-10-27 "Lingoa"
 
 ### Added

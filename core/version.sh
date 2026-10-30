@@ -22,7 +22,7 @@ bs_guard VERSION || return 0
 # Единственный источник BS_VERSION — этот модуль; bs и const.sh только используют
 # Single source of BS_VERSION is this module; bs and const.sh only use it
 if [ -z "${BS_VERSION:-}" ]; then
-  export BS_VERSION="0.15.0"
+  export BS_VERSION="0.16.0"
 fi
 
 # @global BS_NAME — Env: framework full name (category: env)
@@ -31,7 +31,7 @@ export BS_NAME="BS (Bash Open Source Architecture) BOSA Framework"
 
 # @global BS_CODENAME — Env: release code name (category: env)
 # @global BS_CODENAME — Env: кодовое название релиза (категория: env)
-: "${BS_CODENAME:=Lingoa}"
+: "${BS_CODENAME:=Cooloua}"
 export BS_CODENAME
 
 # @description Print version information / Вывести информацию о версии

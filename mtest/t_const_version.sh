@@ -8,7 +8,7 @@ mt_rc "S1 error code 2 valid" 0 bs_const_is_valid_error_code 2
 mt_case "S1 error description" "Invalid arguments / Неверные аргументы" 0 bs_const_error_description 2
 mt_rc "S1 compare equal" 0 bs_version_compare 2.0 2.0
 mt_rc "S1 compare greater" 1 bs_version_compare 3.0 2.9
-mt_case "S1 codename not empty" "Lingoa" 0 bs_version_codename
+mt_case "S1 codename not empty" "Cooloua" 0 bs_version_codename
 
 # S2
 mt_rc "S2 compare less" 2 bs_version_compare 1.2.3 1.10.0
