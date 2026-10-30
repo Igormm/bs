@@ -202,7 +202,6 @@ io::process::__ensure_diagnostic_dir() {
 
   if is::empty "${dir}"; then
     dir="$(utils::tempfile --dir)"
-    # WRAPPER-CANDIDATE: utils::tempfile — auto-register cleanup, current code must rm -rf by hand (7 modules repeat this) / кандидат-обёртка: utils::tempfile — авто-очистка вместо ручного rm (паттерн повторён в 7 модулях)
     if is::empty "${dir}" || ! is::dir "${dir}"; then
       log::error "Failed to create diagnostic directory"
       return "${LIB_ERROR_FILE_OPERATION}"
