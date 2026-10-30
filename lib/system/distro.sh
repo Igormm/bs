@@ -124,7 +124,7 @@ system::distro::info() {
         system::distro::detect
     fi
 
-    echo "=== Distribution Information ==="
+    bs_log_section "Distribution Information"
     echo "Name: ${DISTRO_NAME}"
     echo "ID: ${DISTRO_ID}"
     echo "Version: ${DISTRO_VERSION}"

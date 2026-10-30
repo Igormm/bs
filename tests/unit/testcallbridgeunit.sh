@@ -66,7 +66,7 @@ test_safety() {
 }
 
 test_load() {
-    eq "=== Operating System ===" "$("${BS_BIN}" call --load lib/system/info system::info::os 2>&1 | head -n 1)" "--load brings a library function"
+    eq "1" "$("${BS_BIN}" call --load lib/system/info system::info::os 2>&1 | head -n 2 | grep -c 'Operating System')" "--load brings a library function"
     eq "1.0 KiB" "$("${BS_BIN}" call --load lib/io/streams --load lib/system/info utils::human_size 1024)" "--load can repeat"
 }
 

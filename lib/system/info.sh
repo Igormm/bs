@@ -16,7 +16,7 @@ bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/uti
 # @example
 #   system::info::os
 system::info::os() {
-    echo "=== Operating System ==="
+    bs_log_section "Operating System"
     
     # Try /etc/os-release first (modern standard) / Попробовать /etc/os-release сначала
     # (современный стандарт)
@@ -48,7 +48,7 @@ system::info::os() {
 # @example
 #   system::info::kernel
 system::info::kernel() {
-    echo "=== Kernel Information ==="
+    bs_log_section "Kernel Information"
     
     if utils::has uname; then
         echo "Kernel: $(uname -s)"
@@ -68,7 +68,7 @@ system::info::kernel() {
 # @example
 #   system::info::hostname
 system::info::hostname() {
-    echo "=== Hostname Information ==="
+    bs_log_section "Hostname Information"
     
     if utils::has hostname; then
         echo "Hostname: $(utils::quiet_err hostname)"
@@ -90,7 +90,7 @@ system::info::hostname() {
 # @example
 #   system::info::uptime
 system::info::uptime() {
-    echo "=== System Uptime ==="
+    bs_log_section "System Uptime"
     
     if utils::has uptime; then
         utils::quiet_err uptime
@@ -114,7 +114,7 @@ system::info::uptime() {
 # @example
 #   system::info::cpu
 system::info::cpu() {
-    echo "=== CPU Information ==="
+    bs_log_section "CPU Information"
     
     # Try /proc/cpuinfo / Попробовать /proc/cpuinfo
     if is::readable /proc/cpuinfo; then
@@ -136,7 +136,7 @@ system::info::cpu() {
 # @example
 #   system::info::memory
 system::info::memory() {
-    echo "=== Memory Information ==="
+    bs_log_section "Memory Information"
     
     # Try free command first / Попробовать команду free сначала
     if utils::has free; then
@@ -163,7 +163,7 @@ system::info::memory() {
 # @example
 #   system::info::disk
 system::info::disk() {
-    echo "=== Disk Usage ==="
+    bs_log_section "Disk Usage"
     
     if utils::has df; then
         utils::quiet_err df -h
@@ -223,7 +223,7 @@ system::info::version() {
 # @example
 #   system::info::load
 system::info::load() {
-    echo "=== System Load Average ==="
+    bs_log_section "System Load Average"
     
     if utils::has uptime; then
         utils::quiet_err uptime | awk -F'load average:' '{print $2}'
@@ -244,7 +244,7 @@ system::info::load() {
 # @example
 #   system::info::interfaces
 system::info::interfaces() {
-    echo "=== Network Interfaces ==="
+    bs_log_section "Network Interfaces"
     
     # Try ip command (modern) / Попробовать команду ip (современная)
     if utils::has ip; then

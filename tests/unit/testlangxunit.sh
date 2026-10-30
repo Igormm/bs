@@ -56,7 +56,7 @@ test_parallel() {
 
     local out
     out="$(bs::parallel test_par_a test_par_b)" || true
-    testframework::assert_command "printf '%s' '${out}' | grep -q '=== test_par_a ==='" "bs::parallel prints section header"
+    testframework::assert_command "printf '%s' '${out}' | grep -q 'test_par_a'" "bs::parallel prints section header"
     testframework::assert_command "printf '%s' '${out}' | grep -q '^A$'" "bs::parallel captures first output"
     testframework::assert_command "printf '%s' '${out}' | grep -q '^B$'" "bs::parallel captures second output"
 

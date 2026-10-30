@@ -151,7 +151,7 @@ bs::parallel() {
     else
       __px_failed=1
     fi
-    printf '=== %s ===\n' "${__px_names[__px_i]}"
+    bs_log_section "${__px_names[__px_i]}"
     cat "${__px_tmp}/out.${__px_i}"
     __px_i=$(( __px_i + 1 ))
   done

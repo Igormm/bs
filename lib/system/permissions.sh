@@ -138,7 +138,7 @@ system::permissions::view() {
         return "${E_ERROR}"
     fi
     
-    echo "=== Permissions for ${target} ==="
+    bs_log_section "Permissions for ${target}"
     
     # Use ls -l for detailed view / Использовать ls -l для детального просмотра
     if utils::has ls; then

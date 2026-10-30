@@ -1272,10 +1272,10 @@ systemaudit::generate_text_report() {
     local report_file="${1:-}"
     
     {
-        echo "================================================================================"
+        printf '%s\n' "$(bs_str_repeat '─' 60)"
         echo "SYSTEM AUDIT REPORT"
         echo "Generated: $(date)"
-        echo "================================================================================"
+        printf '%s\n' "$(bs_str_repeat '─' 60)"
         echo ""
         echo "SUMMARY:"
         echo "  Score: ${AUDIT_SCORE}/100"
@@ -1321,7 +1321,7 @@ systemaudit::generate_text_report() {
         echo "  Info: ${info_count}"
         echo ""
         echo "DETAILED FINDINGS:"
-        echo "================================================================================"
+        printf '%s\n' "$(bs_str_repeat '─' 60)"
         
         local index=1
         for finding_json in "${AUDIT_FINDINGS[@]}"; do
@@ -1338,7 +1338,7 @@ systemaudit::generate_text_report() {
         
         echo ""
         echo "END OF REPORT"
-        echo "================================================================================"
+        printf '%s\n' "$(bs_str_repeat '─' 60)"
     } > "${report_file}"
 }
 

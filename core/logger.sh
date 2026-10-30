@@ -348,6 +348,26 @@ bs_log_header() {
   bs_log_info ""
 }
 
+
+# @description Заголовок секции в рамке БЕЗ префикса лога (прямой printf) / A framed
+#   section header WITHOUT the log prefix (direct printf)
+# @param $1 текст заголовка / header text
+bs_log_section() {
+  __bs_log_st=${1-}
+  __bs_log_sw=$(bs_str_width "${__bs_log_st}")
+  __bs_log_sw=$((__bs_log_sw + 2))
+  __bs_log_sr=$(bs_str_repeat '─' "${__bs_log_sw}")
+  __bs_log_sb=''
+  __bs_log_se=''
+  if bs_log_is_color_enabled 1; then
+    __bs_log_sb=$(printf '\033[1;34m')
+    __bs_log_se=$(printf '\033[0m')
+  fi
+  printf '%s╭%s╮%s\n' "${__bs_log_sb}" "${__bs_log_sr}" "${__bs_log_se}"
+  printf '%s│ %s │%s\n' "${__bs_log_sb}" "${__bs_log_st}" "${__bs_log_se}"
+  printf '%s╰%s╯%s\n' "${__bs_log_sb}" "${__bs_log_sr}" "${__bs_log_se}"
+}
+
 # @description Маркированный список / A bulleted list
 # @param $@ items / элементы
 bs_log_list() {

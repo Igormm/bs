@@ -297,7 +297,7 @@ system::processes::info() {
     fi
     
     if utils::has ps; then
-        echo "=== Process Information (PID: ${pid}) ==="
+        bs_log_section "Process Information (PID: ${pid})"
         utils::quiet_err ps -p "${pid}" -o pid,ppid,user,comm,cmd,etime,%cpu,%mem,stat
     fi
     

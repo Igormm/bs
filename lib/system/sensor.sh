@@ -425,7 +425,7 @@ sensor::diagnose() {
 
     name="$(sensor::__name_of "${ev}")"
     path="$(sensor::device_path "${ev}")"
-    printf '=== sensor::diagnose %s ("%s") ===\n' "${ev}" "${name}"
+    bs_log_section "sensor::diagnose ${ev} (\"${name}\")"
     printf '[INFO] device=%s record_size=%sB\n' "${path}" "$(sensor::record_size)"
 
     # 1. существование / presence
@@ -498,7 +498,7 @@ sensor::diagnose() {
         fi
     fi
 
-    printf '=== итог: FAIL=%d WARN=%d ===\n' "${fails}" "${warns}"
+    bs_log_section "итог: FAIL=${fails} WARN=${warns}"
     (( fails == 0 )) && return "${E_SUCCESS}"
     return "${E_ERROR}"
 }

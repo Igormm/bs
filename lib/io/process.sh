@@ -283,40 +283,40 @@ io::process::__diagnose() {
   log::info "Collecting diagnostics for PID ${pid} (reason: ${reason}) into ${dir}"
 
   {
-    echo "=== Process Guard Diagnostic Report ==="
+    bs_log_section "Process Guard Diagnostic Report"
     echo "Timestamp: $(date -Iseconds)"
     echo "Reason: ${reason}"
     echo "PID: ${pid}"
     echo "Command: ${IO_PROCESS_CONFIG[cmd_str]}"
     echo ""
 
-    echo "=== Process status (ps) ==="
+    bs_log_section "Process status (ps)"
     ps -p "${pid}" -o pid,ppid,user,comm,cmd,etime,%cpu,%mem,stat 2>/dev/null || echo "unavailable"
     echo ""
 
     if is::dir "/proc/${pid}"; then
-      echo "=== /proc/${pid}/status ==="
+      bs_log_section "/proc/${pid}/status"
       cat "/proc/${pid}/status" 2>/dev/null || echo "unavailable"
       echo ""
 
-      echo "=== /proc/${pid}/cmdline ==="
+      bs_log_section "/proc/${pid}/cmdline"
       tr '\0' ' ' < "/proc/${pid}/cmdline" 2>/dev/null || echo "unavailable"
       echo ""
       echo ""
 
-      echo "=== /proc/${pid}/stack ==="
+      bs_log_section "/proc/${pid}/stack"
       cat "/proc/${pid}/stack" 2>/dev/null || echo "unavailable"
       echo ""
 
-      echo "=== /proc/${pid}/fd ==="
+      bs_log_section "/proc/${pid}/fd"
       ls -l "/proc/${pid}/fd" 2>/dev/null || echo "unavailable"
       echo ""
 
-      echo "=== /proc/${pid}/wchan ==="
+      bs_log_section "/proc/${pid}/wchan"
       cat "/proc/${pid}/wchan" 2>/dev/null || echo "unavailable"
       echo ""
     else
-      echo "=== /proc/${pid} unavailable ==="
+      bs_log_section "/proc/${pid} unavailable"
     fi
   } > "${report}"
 

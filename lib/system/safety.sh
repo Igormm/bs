@@ -216,7 +216,7 @@ safety::validate_path() {
 # @example
 #   safety::status
 safety::status() {
-    echo "=== Safety Settings ==="
+    bs_log_section "Safety Settings"
     echo "Level: ${SAFETY_LEVEL}"
     echo "Dry-run: ${SAFETY_DRY_RUN}"
     echo ""

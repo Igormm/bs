@@ -266,7 +266,7 @@ ts::toolchain::doctor() {
     local -r dir="${1:-.}"
     local runtime ver name
 
-    printf '=== ts::toolchain::doctor (%s) ===\n' "${dir}"
+    bs_log_section "ts::toolchain::doctor (${dir})"
     if runtime="$(ts::toolchain::detect_runtime)"; then
         ver="$(ts::toolchain::runtime_version "${runtime}")"
         printf 'runtime=%s %s (%s)\n' "${runtime}" "${ver:-?}" "$(command -v "${runtime}")"
