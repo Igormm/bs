@@ -18,6 +18,8 @@ jobs:
         run: bash tests/validatesyntax.sh
       - name: ShellCheck validation
         run: bash tests/validateshellcheck.sh
+      - name: Version consistency
+        run: bash .agents/skills/bs-version-bump/scripts/version.sh check
       - name: Docs code snippet validation
         # 13 known intentional findings (migration docs, BOSA legacy README) —
         # gate after cleanup

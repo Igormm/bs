@@ -138,6 +138,11 @@ check() {
     expect_fixed "no-bash test version" "version=BS Framework version: ${version} " "${TEST_FILE}"
     expect_fixed "no-bash test help" "help=BS Framework ${version} " "${TEST_FILE}"
 
+    if [ -n "${codename}" ]; then
+        expect_fixed "mtest codename (sh)" "\"${codename}\"" "${ROOT}/mtest/t_const_version.sh"
+        expect_fixed "mtest codename (nu)" "\"${codename}\"" "${ROOT}/mtest/t_nu.nu"
+    fi
+
     printf '\n'
     if [ "${FAILS}" -ne 0 ]; then
         printf '%s drift(s) found\n' "${FAILS}" >&2
@@ -184,7 +189,7 @@ bump() {
     else
         printf 'bumped %s -> %s in core/version.sh\n' "${old}" "${new}"
     fi
-    printf 'next: CHANGELOG heading, en/ru docs, tests/unit/testbsnobashunit.sh\n'
+    printf 'next: CHANGELOG heading, en/ru docs, tests/unit/testbsnobashunit.sh, mtest/ codename\n'
     printf 'then: %s check\n' "$0"
 }
 

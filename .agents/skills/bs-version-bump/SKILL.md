@@ -20,7 +20,8 @@ bash .agents/skills/bs-version-bump/scripts/version.sh check
 ```
 
 Exit 0 means the single source, runtime `bs version`, CHANGELOG heading,
-en/ru docs and `tests/unit/testbsnobashunit.sh` all agree. Any drift is printed
+en/ru docs, `tests/unit/testbsnobashunit.sh` and the `mtest/` code-name
+fixtures all agree. Any drift is printed
 as `DRIFT` with the expected and the actual value.
 
 ## Bump
@@ -45,6 +46,8 @@ as `DRIFT` with the expected and the actual value.
    - `documentation/ru/04-api-reference/core-api.md` — `(например, \`X.Y.Z\`)`
    - `tests/unit/testbsnobashunit.sh` — the expected
      `version=BS Framework version: X.Y.Z` and `help=BS Framework X.Y.Z`
+   - `mtest/t_const_version.sh` and `mtest/t_nu.nu` — the code name hardcoded
+     as the expected `bs_version_codename` output (only when the code name changes)
 5. Run `version.sh check`, then the full `bs-validate` cycle.
 6. Commit as `chore(release): X.Y.Z "Codename"; <clarifiers>`.
 
