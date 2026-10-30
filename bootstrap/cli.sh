@@ -132,53 +132,63 @@ bs_cli_maybe_exec_script() {
 
 # @description Справка по командам bs / The help of the bs commands
 bs_cli_help() {
-  cat <<HELP
-BS Framework $(bs_version_get) – command launcher & shebang interpreter
-Usage: bs [command] [args...]
-       bs help <command>   Show detailed help for a command
+  printf 'BS Framework %s – command launcher & shebang interpreter\n' "$(bs_version_get)"
+  printf 'Usage: %s [command] [args...]\n' "$(bs_cli_paint cmd 'bs')"
+  printf '       %s <command>   Show detailed help for a command\n' "$(bs_cli_paint cmd 'bs help')"
 
-Info / Информация:
-  help, -h, --help    Show this help / показать эту справку
-  help <command>      Show detailed help for a command / справка по команде
-  version [--full]    Print framework version (--full: build and install info) / версия (--full: сборка и установка)
-  env                 Show environment (BS_ROOT, PATH, install manifest) / окружение
-  doctor              Check framework integrity / проверка целостности
+  bs_cli_help_head 'Info / Информация:'
+  bs_cli_help_row 'help, -h, --help' 'Show this help / показать эту справку'
+  bs_cli_help_row 'help <command>' 'Show detailed help for a command / справка по команде'
+  bs_cli_help_row 'version [--full]' 'Print framework version (--full: build and install info) / версия (--full: сборка и установка)'
+  bs_cli_help_row 'env' 'Show environment (BS_ROOT, PATH, install manifest) / окружение'
+  bs_cli_help_row 'doctor' 'Check framework integrity / проверка целостности'
 
-Modules / Модули:
-  list                List available modules (core/, lib/) / список модулей
-  lang-doc            JSON index of function docs (LSP metadata) / индекс функций
-  lsp                 Run language server (JSON-RPC over stdin/stdout) / LSP
+  bs_cli_help_head 'Modules / Модули:'
+  bs_cli_help_row 'list' 'List available modules (core/, lib/) / список модулей'
+  bs_cli_help_row 'lang-doc' 'JSON index of function docs (LSP metadata) / индекс функций'
+  bs_cli_help_row 'lsp' 'Run language server (JSON-RPC over stdin/stdout) / LSP'
 
-Development / Разработка:
-  run <script> [args] Execute script inside BS environment / запуск скрипта
-  build <script>      Assemble a standalone self-extracting script / сборка
-  repl                Interactive REPL (BS shell) / интерактивная консоль
-  calc                RPN calculator / калькулятор ОПН
-  rfc [number]        RFC helpers (1925, 3986, 4122, 4180) / RFC
-  api <sub> [args]    OpenAPI 3.x client / OpenAPI-клиент
-  ts <command>        TypeScript toolchain / TS-тулчейн
-  audit [roots]       GNU-only tool audit / аудит GNU-зависимостей
-  chat [opts]         Interactive LLM chat / чат с LLM
+  bs_cli_help_head 'Development / Разработка:'
+  bs_cli_help_row 'run <script> [args]' 'Execute script inside BS environment / запуск скрипта'
+  bs_cli_help_row 'build <script>' 'Assemble a standalone self-extracting script / сборка'
+  bs_cli_help_row 'repl' 'Interactive REPL (BS shell) / интерактивная консоль'
+  bs_cli_help_row 'calc' 'RPN calculator / калькулятор ОПН'
+  bs_cli_help_row 'rfc [number]' 'RFC helpers (1925, 3986, 4122, 4180) / RFC'
+  bs_cli_help_row 'api <sub> [args]' 'OpenAPI 3.x client / OpenAPI-клиент'
+  bs_cli_help_row 'ts <command>' 'TypeScript toolchain / TS-тулчейн'
+  bs_cli_help_row 'audit [roots]' 'GNU-only tool audit / аудит GNU-зависимостей'
+  bs_cli_help_row 'chat [opts]' 'Interactive LLM chat / чат с LLM'
 
-Maintenance / Обслуживание:
-  update [opts]       Update installed copies from a local repo or GitHub / обновление
-  uninstall [opts]    Remove installed BS copies / удаление
-  where [--deep]      Find every trace of BS on this machine / все следы BS на машине
-  init-shell [SHELL]  PATH snippet for your shell: bash zsh ash dash ksh fish nu / snippet для вашей оболочки
-  call FUNC [ARGS]    Call a kernel/library function from any shell (fish, nu, dash...) / вызвать функцию из любой оболочки
-  shebang <cmd>       Check and rewrite #! lines for this machine (Termux: no /usr/bin/env) / проверка и правка #! для этой машины
-  --strict-shell[=SHELL]  (before the command) refuse lib/ modules whose @shell tier does not fit the shell bs was started from, or the NAMED SHELL (--strict-shell=dash: will it work in dash) / отказывать модулям lib/, чей tier @shell не подходит оболочке запуска или УКАЗАННОЙ оболочке
+  bs_cli_help_head 'Maintenance / Обслуживание:'
+  bs_cli_help_row 'update [opts]' 'Update installed copies from a local repo or GitHub / обновление'
+  bs_cli_help_row 'uninstall [opts]' 'Remove installed BS copies / удаление'
+  bs_cli_help_row 'where [--deep]' 'Find every trace of BS on this machine / все следы BS на машине'
+  bs_cli_help_row 'init-shell [SHELL]' 'PATH snippet for your shell: bash zsh ash dash ksh fish nu / snippet для вашей оболочки'
+  bs_cli_help_row 'call FUNC [ARGS]' 'Call a kernel/library function from any shell (fish, nu, dash...) / вызвать функцию из любой оболочки'
+  bs_cli_help_row 'shebang <cmd>' 'Check and rewrite #! lines for this machine (Termux: no /usr/bin/env) / проверка и правка #! для этой машины'
+  bs_cli_help_row '--strict-shell[=SHELL]' '(before the command) refuse lib/ modules whose @shell tier does not fit the shell bs was started from, or the NAMED SHELL (--strict-shell=dash: will it work in dash) / отказывать модулям lib/, чей tier @shell не подходит оболочке запуска или УКАЗАННОЙ оболочке'
 
-Shebang mode:
-  #!/usr/bin/env bs
-  (set BS_SHEBANG=1 internally)
+  bs_cli_help_head 'Shebang mode:'
+  printf '  #!/usr/bin/env %s\n' "$(bs_cli_paint cmd 'bs')"
+  printf '  (set BS_SHEBANG=1 internally)\n'
 
-Examples:
-  bs doctor
-  bs help build
-  bs run ./examples/deploy.sh --prod
-  bs list | grep system
-HELP
+  bs_cli_help_head 'Examples:'
+  printf '  %s\n' "$(bs_cli_paint cmd 'bs doctor')"
+  printf '  %s\n' "$(bs_cli_paint cmd 'bs help build')"
+  printf '  %s\n' "$(bs_cli_paint cmd 'bs run ./examples/deploy.sh --prod')"
+  printf '  %s\n' "$(bs_cli_paint cmd 'bs list | grep system')"
+}
+
+# @private Строка справки: имя команды (подсвечено) + описание / A help row: the
+#   command name (highlighted) + the description
+bs_cli_help_row() {
+  __bs_cli_hn=$(printf '%-20s' "${1-}")
+  printf '  %s %s\n' "$(bs_cli_paint cmd "${__bs_cli_hn}")" "${2-}"
+}
+
+# @private Заголовок раздела справки / A help section header
+bs_cli_help_head() {
+  printf '%s\n' "$(bs_cli_paint head "$1")"
 }
 
 # @description Показать подробную справку по одной команде через её --help / Show detailed help for a single command by calling its --help
@@ -297,6 +307,8 @@ bs_cli_paint() {
     commit_diff) __bs_cli_pc='1;33' ;;
     bad)      __bs_cli_pc='1;31' ;;
     warn)     __bs_cli_pc='1;33' ;;
+    cmd)      __bs_cli_pc='1;36' ;;
+    head)     __bs_cli_pc='1;1' ;;
     *)        __bs_cli_pc='0' ;;
   esac
   printf '\033[%sm%s\033[0m' "${__bs_cli_pc}" "$2"

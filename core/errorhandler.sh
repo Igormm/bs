@@ -45,7 +45,7 @@ bs_source_relative "const.sh" "var.sh" "str.sh" "num.sh" "logger.sh" "data.sh"
 #   cleanup::add my_cleanup_function
 bs_cleanup_add() {
   if [ -z "${1-}" ]; then
-    bs_log_warn "cleanup::add: не указана функция"
+    bs_log_warn "cleanup::add: функция не указана / no function given"
     return "${E_INVALID:-2}"
   fi
   bs_arr_push bs_cleanup_stack "$1"
