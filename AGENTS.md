@@ -111,6 +111,7 @@ Reusable workflow skills live in `.agents/skills/` (Kimi Code / agents-compatibl
 - `bs-check-artifacts` — scan for traces of unfinished AI generation and leakage of request/prompt text into code and docs.
 - `bs-cli-markdown-style` — apply the «markdown simplicity» principle to CLI/interface/output/docs design (7-criteria test, Russian).
 - `bs-cli-style` — style the CLI output and code comments for humans: framed headers (not `==`/`# ====`), highlight the main point, bilingual, tty-aware colour, alternative-action handling and actionable hints.
+- `bs-code-design` — the BS-adapted code-design chain (brainstorm → map → plan → TDD → verify → review → commit) over the imported methodology skills, with the tier/namespace rules, the validation cycle and the honesty principles (verify before abstracting; no lowest-common-denominator abstractions).
 - `bs-audit` — full project audit as a chain of stages: validation cycle, docs-code snippets, AI-artifact scan, en/ru docs sync, skeptical module review, triaged verdict (report first, fix only on request).
 - `bs-check-docs-code` — verify that bash snippets in README, `documentation/` and `examples/*.md` match framework reality (conventions, `load` paths, real module APIs, matching example files); backs `tests/validatedocscode.sh`.
 - `bs-check-ansi` — verify ANSI escape usage across the project: no literal `\033` in `printf %s` arguments, correct `$'\033'` quoting, no fragile `echo -e`.
