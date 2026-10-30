@@ -1499,7 +1499,7 @@ bs_cli_where_main() {
   __bs_cli_wh_n=0
   __bs_cli_wh_first=""
 
-  printf '== Запущено сейчас / Running now ==\n'
+  printf '%s\n' "$(bs_cli_paint head '== Запущено сейчас / Running now ==')"
   bs_cli_bs_running_block
   bs_cli_where_add "${BS_ROOT}"
 
@@ -1507,14 +1507,14 @@ bs_cli_where_main() {
   # The shell: who runs the BS code, whose shell the user has, the tier
   __bs_cli_wh_ushell=$(bs_shell_user)
   __bs_cli_wh_utier=$(bs_shell_tier "${__bs_cli_wh_ushell}")
-  printf '\n== Оболочка / Shell ==\n'
+  printf '\n%s\n' "$(bs_cli_paint head '== Оболочка / Shell ==')"
   bs_cli_where_row "хозяин:" "$(bs_shell_family) $(bs_shell_version_string) (исполняет код BS / runs the BS code)"
   bs_cli_where_row "ваша:" "${__bs_cli_wh_ushell}  (login: $(bs_shell_login), parent: $(bs_shell_parent))"
   bs_cli_where_row "tier:" "${__bs_cli_wh_utier}"
   printf '    %s\n' "$(bs_shell_tier_desc "${__bs_cli_wh_utier}")"
 
   # --- bs в PATH ---
-  printf '\n== Команда bs в PATH / The bs command in PATH ==\n'
+  printf '\n%s\n' "$(bs_cli_paint head '== Команда bs в PATH / The bs command in PATH ==')"
   bs_cli_path_hits bs_cli_wh_hits "${BS_CALLER_PATH:-${PATH}}"
   __bs_cli_wh_nhits=$(bs_arr_len bs_cli_wh_hits)
   if [ "${__bs_cli_wh_nhits}" -eq 0 ]; then
@@ -1625,7 +1625,7 @@ EOF
   done
 
   # --- Установки ---
-  printf '\n== Установки BS / BS installs ==\n'
+  printf '\n%s\n' "$(bs_cli_paint head '== Установки BS / BS installs ==')"
   __bs_cli_wh_ninst=0
   __bs_cli_wh_versions=" "
   eval "$(bs_arr_to_args bs_cli_wh_cands)"
@@ -1727,7 +1727,7 @@ EOF
   if [ "${__bs_cli_wh_ninst}" -eq 0 ]; then printf '  установок не найдено / no installs found\n'; fi
 
   # --- Репозитории ---
-  printf '\n== Репозитории BS / BS source checkouts ==\n'
+  printf '\n%s\n' "$(bs_cli_paint head '== Репозитории BS / BS source checkouts ==')"
   if [ "$(bs_arr_len bs_cli_wh_checkouts)" -eq 0 ]; then
     printf '  не найдено / none found\n'
   fi
@@ -1744,7 +1744,7 @@ EOF
   done
 
   # --- Следы в оболочке ---
-  printf '\n== Следы в оболочке / Shell traces ==\n'
+  printf '\n%s\n' "$(bs_cli_paint head '== Следы в оболочке / Shell traces ==')"
   __bs_cli_wh_hitsn=0
   eval "$(bs_arr_to_args bs_cli_wh_rcfiles)"
   for __bs_cli_wh_f in "$@"; do
@@ -1766,7 +1766,7 @@ EOF
   esac
 
   # --- Данные и кэш ---
-  printf '\n== Данные и кэш / Data and cache ==\n'
+  printf '\n%s\n' "$(bs_cli_paint head '== Данные и кэш / Data and cache ==')"
   __bs_cli_wh_datan=0
   __bs_cli_wh_dseen="|"
   for __bs_cli_wh_d in "${XDG_CONFIG_HOME:-${HOME}/.config}/bs" "${HOME}/.config/bs" \
@@ -1784,7 +1784,7 @@ EOF
   if [ "${__bs_cli_wh_datan}" -eq 0 ]; then printf '  не найдено / none found\n'; fi
 
   # --- Переменные окружения ---
-  printf '\n== Переменные окружения / Environment ==\n'
+  printf '\n%s\n' "$(bs_cli_paint head '== Переменные окружения / Environment ==')"
   __bs_cli_wh_envn=0
   for __bs_cli_wh_v in BS_SYSTEM_PREFIX BS_UPDATE_REPO BS_BUILD_CACHE_DIR PREFIX BIN_DIR LIB_DIR; do
     __bs_cli_wh_val=""
@@ -1799,7 +1799,7 @@ EOF
   fi
 
   # --- Итог ---
-  printf '\n== Итог / Summary ==\n'
+  printf '\n%s\n' "$(bs_cli_paint head '== Итог / Summary ==')"
   printf '  установок / installs: %d,  репозиториев / checkouts: %d,  bs в PATH / bs in PATH: %d\n' \
     "${__bs_cli_wh_ninst}" "$(bs_arr_len bs_cli_wh_checkouts)" "$(bs_arr_len bs_cli_wh_hits)"
   # Разные версии: уникальные, в порядке появления (IFS здесь — пробел)
