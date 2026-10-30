@@ -67,9 +67,7 @@ frameworks::init() {
   log::success "Frameworks Integration module initialized successfully"
 }
 
-# ============================================================================
 # BASH-IT INTEGRATION (Community-driven aliases, plugins, and themes)
-# ============================================================================
 
 # @description Initialize the Bash-it integration state.
 # @description Инициализировать состояние интеграции Bash-it.
@@ -435,9 +433,7 @@ frameworks::bashit::plugins::tmux::load() {
   fi
 }
 
-# ============================================================================
 # BASHINATOR INTEGRATION (Message handling, logging, and modular structure)
-# ============================================================================
 
 # @description Initialize the Bashinator message levels.
 # @description Инициализировать уровни сообщений Bashinator.
@@ -523,9 +519,7 @@ frameworks::bashinator::function_template() {
   echo "${result}"
 }
 
-# ============================================================================
 # BASHLY INTEGRATION (CLI generation from YAML with argument validation)
-# ============================================================================
 
 # @description Initialize the Bashly CLI command state.
 # @description Инициализировать состояние CLI-команд Bashly.
@@ -644,9 +638,7 @@ Examples:
 EOF
 }
 
-# ============================================================================
 # SHELLSPEC INTEGRATION (BDD testing framework for Bash scripts)
-# ============================================================================
 
 # @description Initialize the ShellSpec test state.
 # @description Инициализировать состояние тестов ShellSpec.
@@ -792,9 +784,7 @@ frameworks::shellspec::run() {
   fi
 }
 
-# ============================================================================
 # MBFL INTEGRATION (Marco's Bash Functions Library)
-# ============================================================================
 
 # @description Initialize the mbfl naming convention prefix.
 # @description Инициализировать префикс соглашения об именовании mbfl.
@@ -1022,9 +1012,7 @@ frameworks::mbfl::dir::remove() {
   rm -rf -- "${dir}"
 }
 
-# ============================================================================
 # FRAMEWORKS INTEGRATION UTILITIES
-# ============================================================================
 
 # Get loaded frameworks status
 # @description Show the status of loaded framework integrations.

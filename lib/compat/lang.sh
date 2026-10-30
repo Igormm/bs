@@ -20,9 +20,7 @@ bs::guard "COMPAT_LANG" || return 0
 # @global COMPAT_LANG_VERSION — Версия модуля (категория: module-flag)
 declare -g COMPAT_LANG_VERSION="1.0.0"
 
-# ==========================================
 # Introspection / Интроспекция
-# ==========================================
 
 # @description Name of the calling function (auto-detected).
 # @description Имя вызывающей функции (автоопределение).
@@ -96,9 +94,7 @@ bs::type_of() {
   esac
 }
 
-# ==========================================
 # Strings / Строки
-# ==========================================
 
 # @description Uppercase a string / В верхний регистр. Replaces: ${s^^}
 str::upper() {
@@ -262,9 +258,7 @@ str::format() {
   printf '%s\n' "${__st_result}"
 }
 
-# ==========================================
 # Collections / Коллекции
-# ==========================================
 
 # @description Predicate: array contains an exact element.
 # @description Массив содержит элемент (точное совпадение).
@@ -523,7 +517,6 @@ arr::uniq() {
   done
 }
 
-# ==========================================
 # Slicing / Слайсы
 #
 # Python-style slicing for humans: empty START/END mean "from the beginning"
@@ -543,7 +536,6 @@ arr::uniq() {
 # переменная slice-функции затеняет массив вызывающего с тем же именем.
 # Все локальные переменные слайсов используют зарезервированные префиксы
 # __sl_/__arr_/__map_/__b_ — не называйте свои переменные этими префиксами.
-# ==========================================
 
 # @description Normalize slice bounds to [0, len] / [-1, len-1] ranges.
 # @description Нормализовать границы слайса к диапазонам [0, len] / [-1, len-1].
@@ -1237,7 +1229,6 @@ bs::slice() {
   esac
 }
 
-# ==========================================
 # Iterators / Итераторы
 #
 # Callback-based transformations (Python comprehensions, Rust iterators):
@@ -1248,7 +1239,6 @@ bs::slice() {
 # колбэк передаётся ПО ИМЕНИ, его stdout захватывается как результат.
 # Колбэк должен печатать результат и возвращать 0; ненулевой код прерывает.
 # SRC и OUT должны быть разными массивами.
-# ==========================================
 
 # @description Map each element through a callback (Python: [f(x) for x in a]).
 # @description Преобразовать каждый элемент колбэком (Python: [f(x) for x in a]).
@@ -1547,14 +1537,12 @@ arr::concat() {
   done
 }
 
-# ==========================================
 # Patterns / Паттерны
 #
 # Small conveniences that bring beloved language idioms to BS:
 # decorators (Python @decorator), unwrap/expect (Rust Option/Result).
 # Небольшие удобства, переносящие любимые идиомы языков в BS:
 # декораторы (Python @decorator), unwrap/expect (Rust Option/Result).
-# ==========================================
 
 # @description Wrap a function so it is replaced by wrapper(original, args...).
 # @description Обернуть функцию: она заменяется на wrapper(original, args...).

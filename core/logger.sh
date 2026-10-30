@@ -80,9 +80,7 @@ bs_source_relative "const.sh" "str.sh"
 # Байт ESC из printf: без $'\033', которого нет в POSIX sh / the ESC byte from printf: no $'\033', it is not POSIX sh
 __bs_log_esc=$(printf '\033')
 
-# ==========================================
 # Приватные вспомогательные функции / Private helper functions
-# ==========================================
 
 # @private
 # @description Получить текущую временную метку / Get current timestamp
@@ -256,9 +254,7 @@ bs_log_format_message() {
   esac
 }
 
-# ==========================================
 # Публичный API / Public API
-# ==========================================
 
 # @description Трассировка / Trace message
 # @param $@ message / сообщение
@@ -421,9 +417,7 @@ bs_log_clear_line() {
   printf '\r\033[K'
 }
 
-# ==========================================
 # Инициализация / Initialization
-# ==========================================
 
 # Резервные константы, если const.sh не загружен / Fallback constants if const.sh is not loaded
 if [ -z "${E_SUCCESS:-}" ]; then

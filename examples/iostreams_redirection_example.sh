@@ -30,9 +30,7 @@ main() {
     # tmp_dir is local and already out of scope at EXIT)
     trap "rm -rf -- '${tmp_dir}'" EXIT
 
-    # ==========================================
     # 1. redirect_stdout — stdout в файл / stdout to a file
-    # ==========================================
     log::header "io::streams::redirect_stdout — exec 1>file"
 
     (
@@ -42,9 +40,7 @@ main() {
     )
     io::streams::print "stdout.log contains: $(cat "${tmp_dir}/stdout.log")"
 
-    # ==========================================
     # 2. redirect_stderr — stderr в файл / stderr to a file
-    # ==========================================
     log::header "io::streams::redirect_stderr — exec 2>file"
 
     (
@@ -54,10 +50,8 @@ main() {
     )
     io::streams::print "stderr.log contains: $(cat "${tmp_dir}/stderr.log")"
 
-    # ==========================================
     # 3. redirect_all — stdout+stderr в один файл
     #    redirect_all — stdout+stderr into one file
-    # ==========================================
     log::header "io::streams::redirect_all — exec >file 2>&1"
 
     (
@@ -73,10 +67,8 @@ main() {
     # Order matters: >file 2>&1 ≠ 2>&1 >file
     # In the second case stderr stays on the terminal!
 
-    # ==========================================
     # 4. silence — тихий режим (/dev/null)
     #    silence — silent mode (/dev/null)
-    # ==========================================
     log::header "io::streams::silence — exec >/dev/null 2>&1"
 
     io::streams::print "Before silence you can see this"

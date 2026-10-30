@@ -13,7 +13,6 @@ bs::guard "LIB_TUI" || return 0
 # Dependencies
 bs::source_relative "../../core/lang.sh" "../../core/utils.sh"
 
-# ==========================================
 # TUI framework / TUI-фреймворк
 #
 # Pure bash terminal UI: double-buffered diff renderer, truecolor styles,
@@ -35,11 +34,8 @@ bs::source_relative "../../core/lang.sh" "../../core/utils.sh"
 #
 # Globals / Глобалы: TUI_KEY, TUI_KEY_CHAR, TUI_MOUSE_{X,Y,BUTTON},
 #                   TUI_COLS, TUI_LINES, TUI_BUF, TUI_LAST, TUI_MODAL_STACK
-# ==========================================
 
-# ==========================================
 # Terminal state / Состояние терминала
-# ==========================================
 
 # @global TUI_ACTIVE — Tui: active flag (0/1) (category: state)
 # @global TUI_ACTIVE — Tui: флаг активности (0/1) (категория: state)
@@ -108,9 +104,7 @@ declare -gi TUI_CENTER_X=0
 # @global TUI_CENTER_Y — Tui: строка центрированного блока (категория: state)
 declare -gi TUI_CENTER_Y=0
 
-# ==========================================
 # ANSI primitives / ANSI-примитивы
-# ==========================================
 
 tui::enter_alt() { printf '\e[?1049h'; }
 tui::leave_alt() { printf '\e[?1049l'; }
@@ -205,9 +199,7 @@ tui::handle_resize() {
   fi
 }
 
-# ==========================================
 # Styles / Стили
-# ==========================================
 
 # @description Build an SGR style code.
 # @description Собрать SGR-код стиля.
@@ -293,9 +285,7 @@ tui::style() {
   fi
 }
 
-# ==========================================
 # Screen buffer / Буфер экрана (double-buffer)
-# ==========================================
 
 tui::buf::clear() {
   # Пустой буфер: отсутствующие ячейки рендер трактует как пробелы
@@ -400,9 +390,7 @@ tui::render() {
   printf '%s' "${out}"
 }
 
-# ==========================================
 # Key parsing / Парсер клавиш
-# ==========================================
 
 # @description Read one key (raw mode), fill TUI_KEY/TUI_KEY_CHAR.
 # @description Прочитать клавишу (raw-режим), заполнить TUI_KEY.
@@ -537,13 +525,9 @@ tui::__mouse_sgr() {
   return 0
 }
 
-# ==========================================
 # Primitives / Примитивы
-# ==========================================
 
-# ==========================================
 # Borders / Рамки
-# ==========================================
 
 # @global TUI_BORDER_TL — Tui: top-left corner char (category: state)
 # @global TUI_BORDER_TL — Tui: символ верхнего левого угла (категория: state)
@@ -633,9 +617,7 @@ tui::scrollbar() {
   done
 }
 
-# ==========================================
 # Widgets / Виджеты
-# ==========================================
 
 # @description Selectable list with viewport scrolling.
 # @description Список с выбором и прокруткой.
@@ -757,9 +739,7 @@ tui::menu() {
   done
 }
 
-# ==========================================
 # Modal stack / Стек модальных окон
-# ==========================================
 
 # @description Open a modal (draw fn called after the base frame).
 # @description Открыть модальное окно (draw-функция вызывается после базы).
@@ -808,9 +788,7 @@ tui::modal::draw_all() {
   done
 }
 
-# ==========================================
 # Helpers / Хелперы
-# ==========================================
 
 # @description Centered box coordinates / Центрированные координаты.
 # @param $1 width, $2 height → TUI_CENTER_X, TUI_CENTER_Y

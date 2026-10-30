@@ -21,9 +21,7 @@
 load "lib/io/streams"
 
 main() {
-    # ==========================================
     # 1. read_line — чтение одной строки / read a single line
-    # ==========================================
     log::header "io::streams::read_line — one line / одна строка"
 
     # Интерактивный вариант (закомментирован):
@@ -37,10 +35,8 @@ main() {
     io::streams::read_line user_name <<< "Igor"
     io::streams::print "Read line: ${user_name}"
 
-    # ==========================================
     # 2. read_all — чтение всего потока до EOF
     #    read_all — read the whole stream until EOF
-    # ==========================================
     log::header "io::streams::read_all — until EOF / до EOF"
 
     # Читаем весь stdout другой команды / Read another command's whole stdout
@@ -52,10 +48,8 @@ main() {
     # Можно читать и файл: io::streams::read_all < /etc/hostname
     # A file works too: io::streams::read_all < /etc/hostname
 
-    # ==========================================
     # 3. feed — подать строку на stdin команды (аналог <<<)
     #    feed — give a string to a command's stdin (<<< equivalent)
-    # ==========================================
     log::header "io::streams::feed — here-string to command / here-string команде"
 
     # Ищем слово во входной строке / Search a word in the input string

@@ -4,9 +4,7 @@
 # lib/integration/webserver.sh — minimal HTTP server toolkit for BS
 # lib/integration/webserver.sh — минимальный набор для HTTP-сервера на BS
 #
-# =============================================================================
 # Что это / What it is
-# =============================================================================
 # Набор из трёх примитивов, чтобы собрать HTTP-сервер в стиле CGI/inetd:
 #   1. web::read_request  — разобрать ОДИН запрос из stdin;
 #   2. web::respond       — записать ОДИН ответ в stdout;
@@ -16,9 +14,7 @@
 #   2. web::respond       — write ONE response to stdout;
 #   3. web::client        — do a GET over bash /dev/tcp (for testing).
 #
-# =============================================================================
 # Модель конкурентности / Concurrency model
-# =============================================================================
 # Это НЕ event loop. Одно соединение = один процесс: внешний listener (socat /
 # nc / inetd) принимает соединение и запускает обработчик, у которого stdin —
 # запрос, stdout — ответ. Обработчик читает один запрос, пишет один ответ и
@@ -28,9 +24,7 @@
 # the request and stdout is the response. The handler reads one request, writes
 # one response and exits. Simple and safe (process isolation) but fork-heavy.
 #
-# =============================================================================
 # Контракт обработчика / The handler contract
-# =============================================================================
 # Обработчик (функция) читает глобалы __web_* и отвечает через web::respond:
 #   route() {
 #     case "${__web_path}" in
@@ -40,9 +34,7 @@
 #   }
 # The handler (a function) reads the __web_* globals and replies via web::respond.
 #
-# =============================================================================
 # Ограничения / Limitations
-# =============================================================================
 # * Listener делегируется (socat / nc / inetd): bash не умеет bind/listen/accept,
 #   а /dev/tcp открывает только ИСХОДЯЩЕЕ соединение (клиент), не входящее.
 # * Безопасность: входные данные НЕ санитизируются — путь/заголовки приходят как
@@ -66,9 +58,7 @@ bs::guard "IO_INTEGRATION_WEBSERVER" || return 0
 # Зависимости / Dependencies
 bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh"
 
-# =============================================================================
 # «Объект запроса» / The "request object"
-# =============================================================================
 # web::read_request заполняет эти глобалы; обработчик их читает.
 # web::read_request fills these globals; the handler reads them.
 #

@@ -40,9 +40,7 @@ declare -g PS1_CONFIG_VIRTUALENV_INFO=""
 # @global PS1_CONFIG_TIME_FORMAT — Ps1config: формат времени (категория: constant)
 declare -g PS1_CONFIG_TIME_FORMAT="%H:%M:%S"
 
-# ==========================================
 # Встроенные темы / Built-in themes
-# ==========================================
 
 # Тема по умолчанию / Default theme
 PS1_CONFIG_THEME_DEFAULT="\[\033[01;32m\]\u\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$(ps1config::git_info) \[\033[01;31m\]\$\[\033[00m\] "
@@ -59,9 +57,7 @@ PS1_CONFIG_THEME_WITH_TIME="\[\033[90m\]\$(date '+\$(ps1config::time_format)')\[
 # Тема rainbow / Rainbow theme
 PS1_CONFIG_THEME_RAINBOW="\[\033[38;5;196m\]\u\[\033[38;5;214m\]@\[\033[38;5;226m\]\h\[\033[38;5;082m\]:\[\033[38;5;051m\]\w\[\033[38;5;201m\]\$(ps1config::git_info) \[\033[38;5;196m\]\$\[\033[00m\] "
 
-# ==========================================
 # Инициализация модуля / Module initialization
-# ==========================================
 
 # @description Initialize PS1 configuration module
 # @description Инициализировать модуль конфигурации PS1
@@ -89,9 +85,7 @@ ps1config::init() {
     log::info "PS1 config module initialized"
 }
 
-# ==========================================
 # Темы / Themes
-# ==========================================
 
 # @description Set PS1 theme
 # @description Установить тему PS1
@@ -150,9 +144,7 @@ ps1config::list_themes() {
     done
 }
 
-# ==========================================
 # Git информация / Git information
-# ==========================================
 
 # @description Get git repository information for PS1
 # @description Получить информацию о git репозитории для PS1
@@ -195,9 +187,7 @@ ps1config::set_git_info() {
     fi
 }
 
-# ==========================================
 # SSH информация / SSH information
-# ==========================================
 
 # @description Detect if connected via SSH
 # @description Определить подключение через SSH
@@ -211,9 +201,7 @@ ps1config::detect_ssh() {
     fi
 }
 
-# ==========================================
 # Виртуальное окружение / Virtual environment
-# ==========================================
 
 # @description Detect Python virtual environment
 # @description Определить виртуальное окружение Python
@@ -231,9 +219,7 @@ ps1config::detect_virtualenv() {
     fi
 }
 
-# ==========================================
 # Настройка времени / Time configuration
-# ==========================================
 
 # @description Set time format for PS1
 # @description Установить формат времени для PS1
@@ -246,9 +232,7 @@ ps1config::set_time_format() {
     log::info "Time format set to: $format"
 }
 
-# ==========================================
 # Динамическое обновление / Dynamic updates
-# ==========================================
 
 # @description Setup prompt command for dynamic updates
 # @description Настроить команду промпта для динамического обновления
@@ -292,9 +276,7 @@ ps1config::setup_prompt_command() {
     fi
 }
 
-# ==========================================
 # Служебные функции / Utility functions
-# ==========================================
 
 # @description Get current PS1 theme
 # @description Получить текущую тему PS1
@@ -346,9 +328,7 @@ ps1config::demo() {
     ps1config::set_theme "default"
 }
 
-# ==========================================
 # Функции настройки / Configuration functions
-# ==========================================
 
 # @description Enable advanced PS1 features
 # @description Включить расширенные функции PS1
@@ -387,9 +367,7 @@ ps1config::disable_enhancements() {
     log::info "Улучшения PS1 отключены"
 }
 
-# ==========================================
 # Инициализация при загрузке модуля / Module initialization
-# ==========================================
 
 # Инициализируем модуль при загрузке
 # Initialize module on load

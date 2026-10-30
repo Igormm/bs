@@ -29,9 +29,7 @@ declare -gi ST_MODAL=0
 declare -g  ST_ERR=""
 declare -gi ST_ATTACHED=0
 
-# ==========================================
 # Сенсорный поток / sensor stream
-# ==========================================
 
 # @description Переподключить fd 9 на выбранное устройство / reconnect reader
 st::attach() {
@@ -80,9 +78,7 @@ st::drain_sensor() {
     return 0
 }
 
-# ==========================================
 # Клавиши через фоновый читатель / keys via background reader
-# ==========================================
 
 st::spawn_keys() {
     coproc ST_KEYS {
@@ -140,9 +136,7 @@ st::on_key() {
     esac
 }
 
-# ==========================================
 # Отрисовка / drawing
-# ==========================================
 
 st::draw() {
     local -r ev="${ST_DEVICES[ST_SEL]%%$'\t'*}"
@@ -258,9 +252,7 @@ st::draw_diag() {
     done <<< "${ST_DIAG}"
 }
 
-# ==========================================
 # Main loop
-# ==========================================
 
 main() {
     args::flag device value

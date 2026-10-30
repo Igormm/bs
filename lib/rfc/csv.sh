@@ -13,14 +13,12 @@ bs::guard "LIB_RFC_CSV" || return 0
 # Dependencies
 bs::source_relative "../../core/lang.sh"
 
-# ==========================================
 # RFC 4180 — CSV
 #
 # csv::rows    — split text into records (CRLF/LF; quoted multiline fields)
 # csv::fields  — split one record into fields (quotes, "" escape, commas)
 # csv::rows    — разбить текст на записи (CRLF/LF; многострочные поля)
 # csv::fields  — разбить запись на поля (кавычки, экранирование "", запятые)
-# ==========================================
 
 # @description Split CSV text into records (RFC 4180 §2).
 # @description Разбить текст CSV на записи (RFC 4180 §2).

@@ -50,9 +50,7 @@ bs_source_relative "var.sh"
 
 __bs_dat_depth=0
 
-# ==========================================
 # Служебное / Helpers
-# ==========================================
 
 # @private
 # @description Проверить имя массива или словаря / Check an array or map name
@@ -171,9 +169,7 @@ bs_data_enc() {
   done
 }
 
-# ==========================================
 # Массивы / Arrays
-# ==========================================
 
 # @description Число элементов / Number of elements
 # @param $1 name / имя
@@ -481,9 +477,7 @@ bs_arr_each() {
   __bs_dat_depth=$((__bs_dat_depth - 1))
 }
 
-# ==========================================
 # Словари / Maps
-# ==========================================
 
 # @private
 # @description Имя переменной значения ключа → __bs_dat_var / The variable name of a key's value → __bs_dat_var

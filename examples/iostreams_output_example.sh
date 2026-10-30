@@ -16,9 +16,7 @@
 load "lib/io/streams"
 
 main() {
-    # ==========================================
     # 1. print — безопасный вывод строки / safe line output
-    # ==========================================
     log::header "io::streams::print — safe output / безопасный вывод"
 
     # Обычный вывод с переводом строки / Plain output with trailing newline
@@ -29,9 +27,7 @@ main() {
     io::streams::print "-n"
     io::streams::print "-e"
 
-    # ==========================================
     # 2. printn — вывод без перевода строки / output without newline
-    # ==========================================
     log::header "io::streams::printn — no trailing newline / без перевода строки"
 
     # Собираем строку из частей / Build a line from parts
@@ -39,9 +35,7 @@ main() {
     io::streams::printn "..."
     io::streams::print " done"
 
-    # ==========================================
     # 3. printf — форматированный вывод / formatted output
-    # ==========================================
     log::header "io::streams::printf — formatted output / форматированный вывод"
 
     # Формат — отдельный аргумент, данные не попадают в format string
@@ -49,19 +43,15 @@ main() {
     io::streams::printf 'PID: %04d\n' 7
     io::streams::printf '%-10s | %s\n' "load" "0.50" "users" "12"
 
-    # ==========================================
     # 4. eprint — вывод в stderr / output to stderr
-    # ==========================================
     log::header "io::streams::eprint — stderr"
 
     # Диагностика идёт в stderr и не загрязняет stdout пайплайна
     # Diagnostics go to stderr and do not pollute the pipeline stdout
     io::streams::eprint "warning: this line goes to stderr"
 
-    # ==========================================
     # 5. tty_print — вывод в терминал мимо перенаправлений
     #    tty_print — output to terminal bypassing redirections
-    # ==========================================
     log::header "io::streams::tty_print — /dev/tty"
 
     # Полезно для диагностики, когда stdout уходит в файл или pipe

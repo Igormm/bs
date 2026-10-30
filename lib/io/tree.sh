@@ -36,9 +36,7 @@ declare -g IO_TREE_DRY_RUN=0
 # @global IO_TREE_FORCE — Tree: флаг принудительной перезаписи (0/1) (категория: constant)
 declare -g IO_TREE_FORCE=0
 
-# ==========================================
 # Safety / Безопасность
-# ==========================================
 
 # @private
 # @description Normalize a relative path; reject traversal.
@@ -164,9 +162,7 @@ io::tree::__unquote() {
   printf '%s\n' "${__tr_s}"
 }
 
-# ==========================================
 # Detect / Определение формата
-# ==========================================
 
 # @description Detect spec format from path and content.
 # @description Определить формат спецификации по пути и содержимому.
@@ -213,9 +209,7 @@ io::tree::detect() {
   return 0
 }
 
-# ==========================================
 # Parse / Разбор
-# ==========================================
 
 # @description Clear parsed entries.
 # @description Очистить разобранные записи.
@@ -535,9 +529,7 @@ io::tree::__parse_yaml() {
   return 0
 }
 
-# ==========================================
 # Plan / Apply
-# ==========================================
 
 # @private
 io::tree::__is_dry() {

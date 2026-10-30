@@ -3,9 +3,7 @@
 # examples/http_server.sh — minimal parameterized HTTP server (socat / nc / inetd)
 # examples/http_server.sh — минимальный параметризованный HTTP-сервер (socat / nc / inetd)
 #
-# =============================================================================
 # Как это устроено / How it works
-# =============================================================================
 # Скрипт делится на ДВЕ части:
 #   * ПРИЛОЖЕНИЕ (routing) — функция web::route: смотрит __web_path и отвечает.
 #   * СЕРВЕР (listener)   — web::listen: принимает соединения и на каждое
@@ -15,16 +13,12 @@
 #   * SERVER (listener)     — web::listen accepts connections and, for each,
 #     runs this very script in --serve mode (one request → one response → exit).
 #
-# =============================================================================
 # Режимы / Modes
-# =============================================================================
 #   ./http_server.sh                          # слушать (бэкенд из $BACKEND)
 #   ./http_server.sh --serve                  # обработать ОДИН запрос из stdin
 #   ./http_server.sh --client HOST PORT PATH  # GET через /dev/tcp
 #
-# =============================================================================
 # Запуск / Usage
-# =============================================================================
 #   PORT=8080 BACKEND=socat ./bs run examples/http_server.sh &   # сервер / server
 #   ./bs run examples/http_server.sh --client 127.0.0.1 8080 /   # запрос / request
 #
@@ -33,9 +27,7 @@
 #   BACKEND  — socat | nc | inetd (default socat)
 #   BS_BIN   — путь к bs (для перезапуска обработчика; default: bs из PATH)
 #
-# =============================================================================
 # Ограничение / Limitation
-# =============================================================================
 # Слушать можно только через socat/nc/inetd: bash не умеет bind/listen, а
 # /dev/tcp открывает только исходящие соединения (клиентская часть).
 # Listening needs socat/nc/inetd: bash cannot bind/listen; /dev/tcp only opens
@@ -49,9 +41,7 @@ BACKEND="${BACKEND:-socat}"
 SELF="$(bs::script_dir)/http_server.sh"    # путь к себе, чтобы socat/nc перезапускали
 BS_BIN="${BS_BIN:-$(command -v bs 2>/dev/null || printf '%s/bs' "${BS_ROOT:-.}")}"
 
-# =============================================================================
 # ПРИЛОЖЕНИЕ / APPLICATION
-# =============================================================================
 # Здесь — только маршруты. Обработчик читает __web_path и отвечает через
 # web::respond. Замени web::route на своё, чтобы сделать другое приложение.
 # Here are the routes only. The handler reads __web_path and replies via
@@ -65,9 +55,7 @@ web::route() {
     esac
 }
 
-# =============================================================================
 # СЕРВЕР / SERVER
-# =============================================================================
 
 # Одна итерация: прочитать запрос → маршрут → ответ → выход.
 # One iteration: read a request → route → respond → exit.

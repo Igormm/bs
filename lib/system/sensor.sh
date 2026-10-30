@@ -32,9 +32,7 @@ declare -g SYSTEM_SENSOR_LOADED="1"
 # @global SENSOR_EVENT_SIZE — Хук: размер input-события (пусто = авто по LONG_BIT) (категория: hook)
 : "${SENSOR_EVENT_SIZE:=}"   # пусто — авто-определение по LONG_BIT
 
-# ==========================================
 # Справочники evdev / evdev lookup tables
-# ==========================================
 
 # @description Имя типа события EV_* / Event type name
 # @param $1 Числовой тип / Numeric type
@@ -117,9 +115,7 @@ sensor::code_name() {
     esac
 }
 
-# ==========================================
 # Обслуживание устройств / Device discovery
-# ==========================================
 
 # @description Размер записи input_event в байтах / input_event record size
 #   struct input_event = 2*sizeof(long) + u16 type + u16 code + s32 value
@@ -298,9 +294,7 @@ sensor::abs_range() {
     printf '%s %s %s %s\n' "${min:--1}" "${max:--1}" "${fuzz:-0}" "${flat:-0}"
 }
 
-# ==========================================
 # Чтение событий / Event reading
-# ==========================================
 
 # @description Проверить доступность устройства для чтения / Check readability
 # @param $1 eventN / eventN
@@ -406,9 +400,7 @@ sensor::detect() {
     return "${LIB_ERROR_TIMEOUT}"
 }
 
-# ==========================================
 # Диагностика / Diagnostics
-# ==========================================
 
 # @description Полный отчёт диагностики сенсора / Full sensor diagnostic report
 # @param $1 eventN / eventN

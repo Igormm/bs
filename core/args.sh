@@ -85,9 +85,7 @@ __bs_args_required=0
 # @global __bs_args_variadic — Args: внутренний повторяемый уровень, 0 = нет (категория: private)
 __bs_args_variadic=0
 
-# ==========================================
 # Приватные вспомогательные функции / Private helper functions
-# ==========================================
 
 # @private
 # @description Значение ключа словаря в переменную; нет ключа — пустая строка
@@ -197,9 +195,7 @@ bs_args_flag_value_hint() {
   esac
 }
 
-# ==========================================
 # Объявление дерева / Tree declaration
-# ==========================================
 
 # @description Сбросить объявления и результаты разбора / Reset declarations and parse results
 bs_args_reset() {
@@ -296,9 +292,7 @@ bs_args_describe() {
   bs_map_set bs_args_desc "$__bs_args_ds_name" "${2:-}"
 }
 
-# ==========================================
 # Флаги (--key value) / Flags (--key value)
-# ==========================================
 
 # @description Объявить флаг: bool (по умолчанию) или value; дефолт и валидатор необязательны
 # @description Declare a flag: bool (default) or value; the default and the validator are optional
@@ -383,9 +377,7 @@ bs_args_rest() {
   fi
 }
 
-# ==========================================
 # Help / Справка
-# ==========================================
 
 # @description Напечатать справку по объявленному дереву
 # @description Print help for the declared tree
@@ -505,9 +497,7 @@ bs_args_help_flags() {
   done
 }
 
-# ==========================================
 # Валидация / Validation
-# ==========================================
 
 # @private
 # @description Есть ли в аргументах запрос help / Is there a help request among the arguments
@@ -752,18 +742,14 @@ bs_args_get() {
   printf '%s\n' "$__bs_args_gt_v"
 }
 
-# ==========================================
 # Автодополнение / Completion
-# ==========================================
 # Генераторы вынесены в отдельный файл, чтобы args.sh читался как объявление,
 # разбор и справка. Подключаем в конце: `load "core/args"` даёт весь API.
 # The generators live in a separate file so args.sh reads as declaration, parse
 # and help. Sourced at the end: `load "core/args"` still provides the whole API.
 bs_source_relative "args-completion.sh" || return 1
 
-# ==========================================
 # Псевдонимы / Aliases
-# ==========================================
 
 # args::parse, args::reset и args::require приходят из lib/compat/args.sh (они ещё заполняют
 # массивы bash); остальные имена — простые псевдонимы. args::completion живёт в

@@ -33,9 +33,7 @@ declare -g IO_INTEGRATION_K8S_VERSION="1.0.0"
 # @global K8S_NAMESPACE — Хук: пространство имён k8s по умолчанию (категория: hook)
 : "${K8S_NAMESPACE:=default}"
 
-# ==========================================
 # Private helpers / Приватные вспомогательные функции
-# ==========================================
 
 # @private
 # @description Build kubectl arguments with namespace and dry-run.
@@ -95,9 +93,7 @@ __k8s::kubectl() {
   kubectl "${args[@]}"
 }
 
-# ==========================================
 # Public API / Публичный API
-# ==========================================
 
 # @description Check if kubectl is available.
 # @description Проверить, доступен ли kubectl.

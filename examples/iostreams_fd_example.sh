@@ -27,10 +27,8 @@ main() {
     # The path is expanded now: tmp_dir is local and out of scope at EXIT
     trap "rm -rf -- '${tmp_dir}'" EXIT
 
-    # ==========================================
     # 1. save + restore — классический паттерн логирования
     #    save + restore — the classic logging pattern
-    # ==========================================
     log::header "io::streams::save + io::streams::restore"
 
     # ВАЖНО: номер FD нельзя получить через $(io::streams::save 1) —
@@ -52,9 +50,7 @@ main() {
     )
     io::streams::print "capture.log contains: $(cat "${tmp_dir}/capture.log")"
 
-    # ==========================================
     # 2. close — закрытие FD / closing an FD
-    # ==========================================
     log::header "io::streams::close — exec n>&-"
 
     # Открываем копию stdout на свободном FD, затем закрываем её
@@ -78,9 +74,7 @@ main() {
         fi
     )
 
-    # ==========================================
     # 3. Паттерн: логирование части скрипта / pattern: logging a script section
-    # ==========================================
     log::header "Pattern: log one section to a file / Паттерн: логирование секции"
 
     (

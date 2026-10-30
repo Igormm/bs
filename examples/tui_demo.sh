@@ -20,9 +20,7 @@
 
 load "lib/tui/tui"
 
-# ==========================================
 # State / Состояние
-# ==========================================
 
 readonly DEMO_FILE="${HOME}/.tui_demo.tsv"
 declare -a DEMO_TASKS=()
@@ -37,9 +35,7 @@ declare -g DEMO_MODAL_CURSOR=0
 declare -g DEMO_CONFIRM_SEL=0
 declare -g DEMO_CONFIRM_IDX=0
 
-# ==========================================
 # Data / Данные
-# ==========================================
 
 demo::load() {
   DEMO_TASKS=()
@@ -58,9 +54,7 @@ demo::save() {
   mv -f -- "${tmp}" "${DEMO_FILE}"
 }
 
-# ==========================================
 # Draw / Отрисовка
-# ==========================================
 
 demo::draw_title() {
   local st
@@ -184,9 +178,7 @@ demo::draw_frame() {
   demo::draw_status
 }
 
-# ==========================================
 # Actions / Действия
-# ==========================================
 
 demo::open_input() {
   DEMO_MODAL_INPUT=""
@@ -221,9 +213,7 @@ demo::toggle_task() {
   fi
 }
 
-# ==========================================
 # Main loop / Главный цикл
-# ==========================================
 
 main() {
   demo::load

@@ -36,9 +36,7 @@ declare -g SYSTEM_GPU_LOADED="1"
 # @global GPU_STRESS_TOOL — Хук: принудительный стресс-тул (пусто = авто-выбор) (категория: hook)
 : "${GPU_STRESS_TOOL:=}"
 
-# ==========================================
 # Обнаружение / Discovery (lspci)
-# ==========================================
 
 # @private
 # @description Проверить доступность lspci / Check lspci availability
@@ -133,9 +131,7 @@ gpu::detect() {
     return "${E_SUCCESS}"
 }
 
-# ==========================================
 # Драйвер и память / Driver and VRAM
-# ==========================================
 
 # @description Имя драйвера GPU / GPU driver name
 #   nvidia-smi → nvidia; иначе symlink device/driver в sysfs (amdgpu, i915, xe...)
@@ -183,9 +179,7 @@ gpu::vram() {
     return "${LIB_ERROR_FILE_NOT_FOUND}"
 }
 
-# ==========================================
 # Температура и утилизация / Temperature and utilization
-# ==========================================
 
 # @description Температура GPU в °C / GPU temperature in Celsius
 #   NVIDIA: nvidia-smi; AMD/Intel: hwmon temp1_input (миллиградусы).
@@ -239,9 +233,7 @@ gpu::utilization() {
     return "${LIB_ERROR_FILE_NOT_FOUND}"
 }
 
-# ==========================================
 # Нагрузочный тест / Stress test
-# ==========================================
 
 # @private
 # @description Выбрать стресс-тул / Pick a stress tool
@@ -322,9 +314,7 @@ gpu::stress() {
     return "${E_SUCCESS}"
 }
 
-# ==========================================
 # Каталог инструментов / Tools catalog
-# ==========================================
 
 # @global GPU_TOOLS — Tools catalog: tier|package|description (category: constant)
 # @global GPU_TOOLS — Каталог инструментов: тир|пакет|описание (категория: constant)
@@ -538,9 +528,7 @@ gpu::vulkan_memtest() {
     gpu::run vulkan-memtest
 }
 
-# ==========================================
 # Отчёты / Reports
-# ==========================================
 
 # @description Полная диагностика / Full diagnostics
 #   Строки [PASS]/[WARN]/[FAIL] по каждой проверке.

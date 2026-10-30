@@ -47,9 +47,7 @@ declare -g IO_INTEGRATION_LLM_VERSION="1.0.0"
 # @global LLM_TIMEOUT — Хук: таймаут LLM-запроса (с) (категория: hook)
 : "${LLM_TIMEOUT:=60}"
 
-# ==========================================
 # Private helpers / Приватные вспомогательные функции
-# ==========================================
 
 # @private
 # @description Validate provider name.
@@ -242,9 +240,7 @@ __llm::request() {
   return 0
 }
 
-# ==========================================
 # Public API / Публичный API
-# ==========================================
 
 # @description List supported LLM providers.
 # @description Список поддерживаемых LLM-провайдеров.

@@ -61,9 +61,7 @@ bs_shell_readonly BS_CONFIG_LOCAL_FILE=".bsrc"
 # @global BS_CONFIG_LOCAL_KEYS — Config: ключи, которые может задать локальный ./.bsrc (категория: constant)
 bs_shell_readonly BS_CONFIG_LOCAL_KEYS=" BS_LOG_LEVEL BS_SILENT BS_FRAMEWORK_DRY_RUN BS_FRAMEWORK_DEBUG BS_FILES_ATOMIC BS_FILES_BACKUP_SUFFIX BS_FILES_ATOMIC_FALLBACK BS_LLM_PROVIDER BS_LLM_MODEL "
 
-# ==========================================
 # Private helpers / Приватные вспомогательные функции
-# ==========================================
 
 # @private
 # @description Set default values for built-in configuration keys.
@@ -169,9 +167,7 @@ bs_config_export_to_env() {
   bs_config_export_keys "$@"
 }
 
-# ==========================================
 # Public API / Публичный API
-# ==========================================
 
 # @description Load configuration: defaults, user file, project-local file, environment.
 #   Priority (low → high): defaults, user config, local config, environment variables.

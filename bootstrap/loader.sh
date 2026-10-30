@@ -32,9 +32,7 @@
 # Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points
 
-# ============================================================================
 # ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ / GLOBAL VARIABLES
-# ============================================================================
 
 # @global __bs_ld_loaded — Loader: registry of loaded modules, newline-separated "\na\nb\n" (category: private)
 # @global __bs_ld_loaded — Loader: реестр загруженных модулей через перевод строки "\na\nb\n" (категория: private)
@@ -50,9 +48,7 @@ __bs_ld_stack="${__bs_ld_stack:-}"
 # @global BS_CURRENT_FILE — Loader: файл, подключаемый прямо сейчас; POSIX-модули берут каталог из него (категория: env)
 BS_CURRENT_FILE="${BS_CURRENT_FILE:-}"
 
-# ============================================================================
 # ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ / HELPER FUNCTIONS
-# ============================================================================
 
 # @description Загружен ли модуль / Is the module loaded
 # @param $1 module path / путь модуля
@@ -168,9 +164,7 @@ bs_load_deps() {
   bs_load_dep_list "$1" "$__bs_ld_depends" ""
 }
 
-# ============================================================================
 # ОСНОВНАЯ ФУНКЦИЯ ЗАГРУЗКИ / MAIN LOADING FUNCTION
-# ============================================================================
 
 # @private
 # @description В POSIX-режиме ядра не подключать bash4-модули lib/: иначе на

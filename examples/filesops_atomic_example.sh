@@ -11,10 +11,8 @@ main() {
     work_dir="$(mktemp -d)"
     echo "Working in: ${work_dir}"
 
-    # ==========================================
     # 1. Atomic file copy with backup
     # Атомарное копирование файла с бэкапом
-    # ==========================================
     echo "--- 1. Atomic copy_file with backup ---"
     printf 'old config\n' > "${work_dir}/config.yml"
     printf 'new config\n' > "${work_dir}/config.yml.new"
@@ -26,10 +24,8 @@ main() {
     echo "Backup config:"
     cat "${work_dir}/config.yml.bak"
 
-    # ==========================================
     # 2. Atomic directory copy with backup
     # Атомарное копирование каталога с бэкапом
-    # ==========================================
     echo ""
     echo "--- 2. Atomic copy_dir with backup ---"
     mkdir -p "${work_dir}/release_v2/bin"
@@ -45,10 +41,8 @@ main() {
     echo "Previous app version:"
     cat "${work_dir}/current.previous/bin/app"
 
-    # ==========================================
     # 3. Move with cross-device fallback
     # Move с fallback между разными ФС
-    # ==========================================
     echo ""
     echo "--- 3. Move with atomic fallback ---"
     printf 'log line\n' > "${work_dir}/app.log"
@@ -60,10 +54,8 @@ main() {
         echo "Move succeeded (direct mv or fallback cp+rm)"
     fi
 
-    # ==========================================
     # 4. Env defaults
     # Глобальные настройки через env
-    # ==========================================
     echo ""
     echo "--- 4. Env defaults (BS_FILES_*) ---"
     export BS_FILES_ATOMIC=true
@@ -83,10 +75,8 @@ main() {
 
     unset BS_FILES_ATOMIC BS_FILES_BACKUP_SUFFIX BS_FILES_ATOMIC_FALLBACK
 
-    # ==========================================
     # 5. Dry-run mode
     # Режим сухого прогона
-    # ==========================================
     echo ""
     echo "--- 5. Dry-run mode ---"
     export FRAMEWORK_DRY_RUN=true

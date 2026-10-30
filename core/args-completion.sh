@@ -207,11 +207,9 @@ complete -F ${__bs_args_cp_fn} "${__bs_args_cp_prog}"
 EOF
 }
 
-# ==========================================
 # Автодополнение zsh, fish, nushell / Completion for zsh, fish, nushell
 # Не проверено на реальных fish и nu: проверяется только текст.
 # Not verified on real fish and nu: only the text is tested.
-# ==========================================
 
 # @private
 bs_args_completion_zsh() {

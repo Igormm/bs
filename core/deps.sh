@@ -35,9 +35,7 @@ bs_source_relative "const.sh" "logger.sh" "utils.sh"
 # shellcheck disable=SC2034  # читают другие модули и тесты / read by other modules and tests
 CORE_DEPS_VERSION="1.0.0"
 
-# ==========================================
 # Private helpers / Приватные вспомогательные функции
-# ==========================================
 
 # @private
 # @description Parse optional dependencies from module header.
@@ -56,9 +54,7 @@ bs_deps_parse_optdeps() {
   printf '%s\n' "$__bs_dp_line" | sed 's/.*@optdeps[[:space:]]*//; s/[[:space:]]*$//; s/,[[:space:]]*/ /g; s/[[:space:]]\{1,\}/ /g'
 }
 
-# ==========================================
 # Public API / Публичный API
-# ==========================================
 
 # @description Check whether a command is available.
 # @description Проверить, доступна ли команда.

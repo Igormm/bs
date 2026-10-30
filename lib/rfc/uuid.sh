@@ -13,7 +13,6 @@ bs::guard "LIB_RFC_UUID" || return 0
 # Dependencies
 bs::source_relative "../../core/lang.sh"
 
-# ==========================================
 # RFC 4122 / RFC 9562 — UUID
 #
 # uuid::gen        — version 4 (random) / версия 4 (случайный)
@@ -21,7 +20,6 @@ bs::source_relative "../../core/lang.sh"
 # uuid::validate   — format + version check / проверка формата и версии
 # Randomness: /dev/urandom via od (POSIX); $RANDOM fallback.
 # Случайность: /dev/urandom через od (POSIX); fallback на $RANDOM.
-# ==========================================
 
 # @private
 # @description N hex characters from /dev/urandom.

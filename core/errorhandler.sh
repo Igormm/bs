@@ -35,9 +35,7 @@ bs_guard "ERRORHANDLER" || return 0
 # Зависимости / Dependencies
 bs_source_relative "const.sh" "var.sh" "str.sh" "num.sh" "logger.sh" "data.sh"
 
-# ==========================================
 # Очистка / Cleanup
-# ==========================================
 
 # @description Add cleanup function to stack / Добавить функцию очистки в стек
 # @param $1 Function name to add to cleanup / Имя функции для добавления в очистку
@@ -71,9 +69,7 @@ bs_errorhandler_setup_trap() {
   trap 'bs_on_exit' EXIT
 }
 
-# ==========================================
 # Ошибки / Errors
-# ==========================================
 
 # @description Report an error from a function and return its code / Сообщить об ошибке из функции и вернуть её код
 # @param $1 function name / имя функции
@@ -103,9 +99,7 @@ bs_error_throw() {
   bs_errorhandler_throw "$__bs_eh_who" "$@"
 }
 
-# ==========================================
 # Сигналы / Signals
-# ==========================================
 
 # @description Install a handler function for a signal / Установить функцию-обработчик сигнала
 # @param $1 signal / сигнал
@@ -144,9 +138,7 @@ bs_signal_reset() {
   }
 }
 
-# ==========================================
 # Выход / Exit
-# ==========================================
 
 # @private
 # @description Код по имени: E_<ИМЯ>, затем LIB_ERROR_<ИМЯ>; результат в __bs_eh_val, статус 1 — имени нет / A code by name: E_<NAME>, then LIB_ERROR_<NAME>; the result is in __bs_eh_val, status 1 means no such name
@@ -211,9 +203,7 @@ bs_error_exit_with_backtrace() {
   bs_exit "$__bs_eh_ecd"
 }
 
-# ==========================================
 # Обработчики по коду / Handlers by code
-# ==========================================
 
 # @description Does a function with this name exist? / Существует ли функция с таким именем?
 # @param $1 name / имя
@@ -260,9 +250,7 @@ bs_error_reset_handler() {
   bs_log_debug "Reset handler for error ${1-}"
 }
 
-# ==========================================
 # Выполнение с обработкой / Running with handling
-# ==========================================
 
 # @description Run a command; log and return its code on failure / Выполнить команду; при сбое залогировать и вернуть её код
 # @param $@ command / команда

@@ -42,9 +42,7 @@ if [ -f "${BS_BOOTSTRAP_DIR}/shell.sh" ]; then
   . "${BS_BOOTSTRAP_DIR}/shell.sh"
 fi
 
-# ==========================================
 # Строгий режим / Strict mode
-# ==========================================
 
 # @description Enable strict mode (set -eu, pipefail where it exists) and a safe IFS.
 # @description Включить строгий режим (set -eu, pipefail там, где он есть) и безопасный IFS.
@@ -58,9 +56,7 @@ bs_strict() {
   bs_shell_strict
 }
 
-# ==========================================
 # PATH / Local bin
-# ==========================================
 
 # @description Prepend ~/.local/bin to PATH once (local installs).
 # @description Добавить ~/.local/bin в PATH один раз (локальные установки).
@@ -72,14 +68,12 @@ bs_append_local_bin_to_path() {
   esac
 }
 
-# ==========================================
 # Определение оболочки / Shell detection
 #
 # Определение — в реестре bootstrap/shell.sh (bs_shell_family и версии): это единственное место,
 # знающее BASH_VERSION/ZSH_VERSION; здесь только обёртки.
 # The detection lives in the registry bootstrap/shell.sh (bs_shell_family and the version
 # functions): the only place that knows BASH_VERSION/ZSH_VERSION; only wrappers are here.
-# ==========================================
 
 # @description Current shell name: bash, zsh, dash, ash, ksh, ... or unknown.
 # @description Имя текущей оболочки: bash, zsh, dash, ash, ksh, ... или unknown.

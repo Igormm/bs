@@ -26,9 +26,7 @@ declare -g PLATFORM_CHECK_VERSION="1.0.0"
 # @global PLATFORM_CHECK_RESULTS — Platformcheck: карта результатов проверок возможностей (категория: constant)
 declare -g -A PLATFORM_CHECK_RESULTS
 
-# ==========================================
 # Проверка платформ / Platform checks
-# ==========================================
 
 # @description Check if running on macOS
 # @description Проверить, запущен ли на macOS
@@ -209,9 +207,7 @@ platformcheck::get_report() {
     echo -e "$report"
 }
 
-# ==========================================
 # Проверки зависимостей / Dependency checks
-# ==========================================
 
 # @description Check if required tools are available
 # @description Проверить доступность необходимых инструментов
@@ -297,9 +293,7 @@ platformcheck::check_linux_deps() {
     fi
 }
 
-# ==========================================
 # Установка зависимостей / Dependency installation
-# ==========================================
 
 # @description Install missing dependencies for platform
 # @description Установить недостающие зависимости для платформы
@@ -352,9 +346,7 @@ platformcheck::install_linux_deps() {
     log::success "Linux dependencies installed"
 }
 
-# ==========================================
 # Утилиты / Utilities
-# ==========================================
 
 # @description Show platform compatibility report
 # @description Показать отчет о совместимости платформы
@@ -399,9 +391,7 @@ platformcheck::show_report() {
     platformcheck::is_altlinux && echo -e "  ${ok}✓ ALT Linux support available / Поддержка ALT Linux доступна${reset}" || echo -e "  ${fail}✗ ALT Linux support missing / Поддержка ALT Linux отсутствует${reset}"
 }
 
-# ==========================================
 # Инициализация / Initialization
-# ==========================================
 
 # Инициализируем модуль при загрузке
 # Initialize module on load

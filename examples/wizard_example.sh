@@ -16,9 +16,7 @@ args::flag fast
 args::flag_describe fast "Skip the progress animation / Пропустить анимацию прогресса"
 args::require "$@"
 
-# ==========================================
 # Wizard engine / Движок визарда
-# ==========================================
 
 # @private Show the cursor again on any exit (panic-safe).
 wiz::__restore_cursor() {
@@ -180,9 +178,7 @@ wiz::multi_menu() {
     __wiz_out="${picked_idx[*]:-}"
 }
 
-# ==========================================
 # The wizard itself / Сам визард
-# ==========================================
 
 main() {
     signal::on EXIT wiz::__restore_cursor

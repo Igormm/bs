@@ -13,7 +13,6 @@ bs::guard "LIB_DATA_LANGDOC" || return 0
 # Dependencies
 bs::source_relative "../../core/lang.sh" "../../core/const.sh" "../../core/errorhandler.sh"
 
-# ==========================================
 # Documentation index / Индекс документации
 #
 # Parses `# @description` / `@param` / `@return` / `@stdout` / `@example`
@@ -26,7 +25,6 @@ bs::source_relative "../../core/lang.sh" "../../core/const.sh" "../../core/error
 # функции) и выдаёт по одному JSON-объекту на функцию. Используется в
 # `bs lang-doc` и в будущем LSP-сервере `bs lsp`. Требует jq.
 # Сам парсер — jq-фильтр (langdoc.jq): один процесс jq на файл.
-# ==========================================
 
 # @global LANGDOC_JQ_FILTER — Langdoc: jq filter file path (category: constant)
 # @global LANGDOC_JQ_FILTER — Langdoc: путь к файлу jq-фильтра (категория: constant)

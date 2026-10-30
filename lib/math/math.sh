@@ -13,7 +13,6 @@ bs::guard "LIB_MATH" || return 0
 # Dependencies
 bs::source_relative "../../core/lang.sh" "../../core/const.sh" "../../core/utils.sh"
 
-# ==========================================
 # Math evaluator / Математический вычислитель
 #
 # Bash arithmetic is integers only — useless for real math. This module
@@ -43,7 +42,6 @@ bs::source_relative "../../core/lang.sh" "../../core/const.sh" "../../core/utils
 # только доверенные выражения. Значения переменных проверяются как
 # числовые литералы (инъекция C через значения исключена). Требуется cc
 # (gcc/clang).
-# ==========================================
 
 # @global MATH_CACHE_DIR — Hook: math compile cache directory (category: hook)
 # @global MATH_CACHE_DIR — Хук: каталог кэша компиляции math (категория: hook)

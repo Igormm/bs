@@ -21,10 +21,8 @@
 load "lib/io/streams"
 
 main() {
-    # ==========================================
     # 1. pipe — соединение двух команд (аналог cmd1 | cmd2)
     #    pipe — connecting two commands (cmd1 | cmd2 equivalent)
-    # ==========================================
     log::header "io::streams::pipe — cmd1 | cmd2"
 
     # Под капотом: pipe() + dup2() + fork() в C
@@ -37,10 +35,8 @@ main() {
     count="$(io::streams::pipe seq 1 100 -- wc -l)"
     io::streams::print "seq 1 100 | wc -l → ${count}"
 
-    # ==========================================
     # 2. run_line_buffered — построчная буферизация (stdbuf -oL)
     #    run_line_buffered — line buffering (stdbuf -oL)
-    # ==========================================
     log::header "io::streams::run_line_buffered — stdbuf -oL -eL"
 
     if is::command stdbuf; then
@@ -50,10 +46,8 @@ main() {
         # instead of waiting for the 4-8 KB buffer to fill
         io::streams::run_line_buffered printf 'visible line by line\n'
 
-        # ==========================================
         # 3. run_unbuffered — без буферизации (stdbuf -o0)
         #    run_unbuffered — no buffering (stdbuf -o0)
-        # ==========================================
         log::header "io::streams::run_unbuffered — stdbuf -o0 -e0"
 
         # Максимально «живой» вывод, как у stderr по стандарту

@@ -227,9 +227,7 @@ bs_var_append() {
   return 0
 }
 
-# ==========================================
 # Metadata / Метаданные
-# ==========================================
 
 # @private
 # @description Есть ли схема у переменной (статус) / Whether a variable has a schema (status)

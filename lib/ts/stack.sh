@@ -37,9 +37,7 @@ declare -g TS_STACK_LOADED="1"
 # @global TS_STACK_WEB_PORT — Хук: порт веб-интерфейса (категория: hook)
 : "${TS_STACK_WEB_PORT:=5173}"
 
-# ==========================================
 # Paths / Пути
-# ==========================================
 
 # @private
 ts::stack::__state_root() {
@@ -153,9 +151,7 @@ ts::stack::__web_cmd() {
   return 1
 }
 
-# ==========================================
 # Public API
-# ==========================================
 
 # @description Scaffold a thriller mini-app (ini + api + fixtures).
 # @description Каркас мини-приложения thriller (ini + api + fixtures).

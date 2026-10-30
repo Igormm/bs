@@ -23,9 +23,7 @@ load "lib/system/hw"
 load "lib/ui/presentation"
 load "lib/integration/result"
 
-# ==========================================
 # Helpers / Помощники
-# ==========================================
 
 sysdiag::os_name() {
     if is::file /etc/os-release; then
@@ -55,9 +53,7 @@ sysdiag::load_avg() {
     cut -d' ' -f1-3 /proc/loadavg 2>/dev/null || printf 'n/a'
 }
 
-# ==========================================
 # Отчёты / Reports
-# ==========================================
 
 sysdiag::quick_report() {
     local -a rows
@@ -110,9 +106,7 @@ sysdiag::json_report() {
     result::ok "$(sysdiag::json_payload)" "sysdiag report"
 }
 
-# ==========================================
 # Entry point / Точка входа
-# ==========================================
 
 main() {
     args::level 1 quick full json

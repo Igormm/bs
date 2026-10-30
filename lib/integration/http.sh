@@ -26,9 +26,7 @@ bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/uti
 # @global IO_INTEGRATION_HTTP_VERSION — Версия модуля (категория: module-flag)
 declare -g IO_INTEGRATION_HTTP_VERSION="1.0.0"
 
-# ==========================================
 # Private helpers / Приватные вспомогательные функции
-# ==========================================
 
 # @private
 # @description Detect available HTTP backend (curl or wget).
@@ -190,9 +188,7 @@ __http::wget_request() {
   wget "${args[@]}" -- "${url}" || return "${INTEGRATION_ERROR_HTTP}"
 }
 
-# ==========================================
 # Public API / Публичный API
-# ==========================================
 
 # @description Perform an HTTP request.
 # @description Выполнить HTTP-запрос.

@@ -13,7 +13,6 @@ bs::guard "LIB_DATA_LANGX" || return 0
 # Dependencies
 bs::source_relative "../../core/lang.sh" "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh"
 
-# ==========================================
 # Language extensions / Языковые расширения
 #
 # Contracts (C++26 [[pre:]]/[[post:]]), expected-style capture
@@ -24,7 +23,6 @@ bs::source_relative "../../core/lang.sh" "../../core/const.sh" "../../core/logge
 # (C++23 std::expected), форматирование (C++23 std::print), рефлексия
 # (C++26 std::meta), параллельное выполнение (C++26 std::execution),
 # разбор чисел (C23 разделители цифр / бинарные литералы).
-# ==========================================
 
 # @description Precondition: abort the function if the condition is false.
 # @description Предусловие: прервать функцию, если условие ложно

@@ -21,9 +21,7 @@ load "lib/tui/tui"
 load "lib/system/users"
 load "lib/system/utils"
 
-# ==========================================
 # State / Состояние
-# ==========================================
 
 declare -a USERS=()
 declare -a GROUPS=()
@@ -46,9 +44,7 @@ CONFIRM_SEL=0
 CONFIRM_ACTION=""
 INFO_TITLE=""
 
-# ==========================================
 # Data / Данные
-# ==========================================
 
 usersedit::reload() {
     local u shell
@@ -76,9 +72,7 @@ usersedit::reload() {
 usersedit::cur_user() { printf '%s' "${USERS[${SEL_U}]:-}"; }
 usersedit::cur_group() { printf '%s' "${GROUPS[${SEL_G}]:-}"; }
 
-# ==========================================
 # Draw / Отрисовка
-# ==========================================
 
 usersedit::draw_list() {
     local -r r="$1" c="$2" w="$3" h="$4" arr="$5" sel="$6" active="${7:-0}"
@@ -171,9 +165,7 @@ usersedit::draw_frame() {
     usersedit::draw_status
 }
 
-# ==========================================
 # Modals / Модалки
-# ==========================================
 
 usersedit::open_input() {
     INPUT_LABEL="$1"; INPUT_ACTION="$2"; INPUT_VALUE=""; INPUT_CURSOR=0
@@ -196,9 +188,7 @@ usersedit::open_info() {
     tui::modal::open info usersedit::draw_info
 }
 
-# ==========================================
 # Actions / Действия
-# ==========================================
 
 usersedit::apply_input() {
     local -r v="${INPUT_VALUE}"
@@ -230,9 +220,7 @@ usersedit::set_password() {
     tui::enter_alt
 }
 
-# ==========================================
 # Main loop / Главный цикл
-# ==========================================
 
 main() {
     if ! system::utils::check_root; then

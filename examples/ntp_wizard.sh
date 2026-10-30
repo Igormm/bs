@@ -23,9 +23,7 @@ load "lib/tui/tui"
 load "lib/system/time"
 load "lib/system/utils"
 
-# ==========================================
 # Data / Данные
-# ==========================================
 
 declare -a SECTIONS=("NTP" "Servers" "Review")
 declare -a NTP_OPTIONS=("Enable NTP synchronization" "Disable NTP synchronization")
@@ -49,9 +47,7 @@ declare -a POOL_SERVERS=(
   ""
 )
 
-# ==========================================
 # State / Состояние
-# ==========================================
 
 declare -i SECTION=0
 declare -i SEL=0
@@ -63,9 +59,7 @@ INPUT_VALUE=""
 INPUT_CURSOR=0
 CONFIRM_SEL=0
 
-# ==========================================
 # Helpers / Помощники
-# ==========================================
 
 wiz::sec_len() {
     case "${SECTION}" in
@@ -86,9 +80,7 @@ wiz::split_servers() {
     done
 }
 
-# ==========================================
 # Draw / Отрисовка
-# ==========================================
 
 wiz::draw_sidebar() {
     local -i i
@@ -173,9 +165,7 @@ wiz::draw_confirm() {
     tui::confirm "Apply NTP" "set NTP ${NTP_ENABLE} and servers ${SERVERS[*]}?" "${CONFIRM_SEL}"
 }
 
-# ==========================================
 # Actions / Действия
-# ==========================================
 
 wiz::open_input() {
     INPUT_LABEL="$1"; INPUT_VALUE=""; INPUT_CURSOR=0
@@ -192,9 +182,7 @@ wiz::apply() {
     tui::enter_alt
 }
 
-# ==========================================
 # Main loop / Главный цикл
-# ==========================================
 
 main() {
     if ! system::utils::check_root; then

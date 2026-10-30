@@ -13,7 +13,6 @@ bs::guard "LIB_RFC_URI" || return 0
 # Dependencies
 bs::source_relative "../../core/lang.sh"
 
-# ==========================================
 # RFC 3986 — URI / URI
 #
 # Parses: scheme://user:pass@host:port/path?query#fragment
@@ -24,7 +23,6 @@ bs::source_relative "../../core/lang.sh"
 # (IPv6-хосты в [скобках], процент-кодирование). Устанавливает переменные
 # с префиксом (по умолчанию URI_): URI_SCHEME, URI_USER, URI_PASSWORD,
 # URI_HOST, URI_PORT, URI_PATH, URI_QUERY, URI_FRAGMENT.
-# ==========================================
 
 # @description Parse a URI into variables with the given prefix.
 # @description Разобрать URI в переменные с заданным префиксом.

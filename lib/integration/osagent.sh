@@ -11,7 +11,6 @@ bs::guard "LIB_INTEGRATION_OSAGENT" || return 0
 
 bs::source_relative "../../core/lang.sh" "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../platform/facts.sh" "../system/hw.sh" "../api/openapi.sh" "llm.sh"
 
-# ==========================================
 # OS agent / ОС-агент
 #
 # Model-agnostic tool calling: the tool schema and platform context are put
@@ -23,7 +22,6 @@ bs::source_relative "../../core/lang.sh" "../../core/const.sh" "../../core/logge
 #
 #   osagent::ask "Какая модель процессора и сколько памяти?"
 #   osagent::exec hw.get '{"key": "mb.cpu.model"}'
-# ==========================================
 
 # @global OSAGENT_ALLOW — Hook: comma-separated allowed osagent commands (category: constant)
 # @global OSAGENT_ALLOW — Хук: разрешённые команды osagent через запятую (категория: constant)

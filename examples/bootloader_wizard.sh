@@ -20,9 +20,7 @@ load "lib/tui/tui"
 load "lib/system/bootloader"
 load "lib/system/utils"
 
-# ==========================================
 # Data / Данные
-# ==========================================
 
 declare -a SECTIONS=("Timeout" "Default" "Cmdline" "Recovery" "Terminal" "Review")
 
@@ -31,9 +29,7 @@ declare -a RECOVERY_OPTIONS=("Keep recovery" "Disable recovery")
 declare -a TERMINAL_OPTIONS=("console" "gfxterm" "serial")
 declare -a CMDLINE_TOKENS=("quiet" "rhgb" "splash")
 
-# ==========================================
 # State / Состояние
-# ==========================================
 
 declare -i SECTION=0
 declare -i SEL=0
@@ -50,9 +46,7 @@ INPUT_CURSOR=0
 INPUT_TARGET=""     # timeout | default | cmdline
 CONFIRM_SEL=0
 
-# ==========================================
 # Helpers / Помощники
-# ==========================================
 
 wiz::load() {
     TIMEOUT="$(system::bootloader::grub_get GRUB_TIMEOUT 2>/dev/null || true)"
@@ -94,9 +88,7 @@ wiz::cmdline_toggle() {
     fi
 }
 
-# ==========================================
 # Draw / Отрисовка
-# ==========================================
 
 wiz::draw_sidebar() {
     local -i i
@@ -223,9 +215,7 @@ wiz::draw_confirm() {
     tui::confirm "Apply bootloader" "backup, write and regenerate?" "${CONFIRM_SEL}"
 }
 
-# ==========================================
 # Actions / Действия
-# ==========================================
 
 wiz::open_input() {
     INPUT_LABEL="$1"; INPUT_TARGET="$2"; INPUT_VALUE=""; INPUT_CURSOR=0
@@ -270,9 +260,7 @@ wiz::apply() {
     tui::enter_alt
 }
 
-# ==========================================
 # Main loop / Главный цикл
-# ==========================================
 
 main() {
     if ! system::utils::check_root; then

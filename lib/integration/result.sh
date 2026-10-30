@@ -27,9 +27,7 @@ bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/uti
 # @global IO_INTEGRATION_RESULT_VERSION — Версия модуля (категория: module-flag)
 declare -g IO_INTEGRATION_RESULT_VERSION="1.0.0"
 
-# ==========================================
 # Private helpers / Приватные вспомогательные функции
-# ==========================================
 
 # @private
 # @description Current timestamp in milliseconds.
@@ -284,9 +282,7 @@ __integration_result::capture_wrap() {
   rc_ref="${_rc}"
 }
 
-# ==========================================
 # Public API / Публичный API
-# ==========================================
 
 # @description Build and emit a successful result object.
 # @description Собрать и вывести успешный объект результата.

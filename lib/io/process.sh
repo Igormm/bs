@@ -50,9 +50,7 @@ declare -g IO_PROCESS_CURRENT_PID=""
 # @global IO_PROCESS_CMD — Process: текущая защищаемая команда (argv) (категория: constant)
 declare -ga IO_PROCESS_CMD=()
 
-# ==========================================
 # Private helpers / Приватные вспомогательные функции
-# ==========================================
 
 # @private
 # @description Reset configuration to defaults (env → hardcoded).
@@ -382,9 +380,7 @@ io::process::__cleanup_handler() {
   fi
 }
 
-# ==========================================
 # Public API / Публичный API
-# ==========================================
 
 # @description Run a command under process guard.
 # @description Запустить команду под надзором сторожа.
@@ -541,9 +537,7 @@ io::process::guard() {
   return "${cmd_rc}"
 }
 
-# ==========================================
 # Background execution / Фоновое выполнение
-# ==========================================
 
 # @description Run a command in the background and print its PID.
 # @description Запустить команду в фоне и напечатать её PID.

@@ -24,9 +24,7 @@ load "lib/system/locale"
 load "lib/system/keyboard"
 load "lib/system/utils"
 
-# ==========================================
 # Data / Данные
-# ==========================================
 
 declare -a SECTIONS=("Locale" "Encoding" "Keyboard" "Review")
 
@@ -44,9 +42,7 @@ declare -a KB_MODELS=(pc105 pc104 pc101 macintosh thinkpad "Other…")
 declare -a KB_VARIANTS=("(none)" dvorak colemak "ru-phonetic" "Other…")
 declare -a KB_OPTIONS=("(none)" ctrl:swapcaps caps:escape ctrl:nocaps "Other…")
 
-# ==========================================
 # State / Состояние
-# ==========================================
 
 declare -i SECTION=0
 declare -i SEL=0
@@ -69,9 +65,7 @@ declare -i PICKER_SEL=0
 
 CONFIRM_SEL=0
 
-# ==========================================
 # Helpers / Помощники
-# ==========================================
 
 wiz::sec_len() {
     case "${SECTION}" in
@@ -132,9 +126,7 @@ wiz::picker_values() {
     esac
 }
 
-# ==========================================
 # Draw / Отрисовка
-# ==========================================
 
 wiz::draw_sidebar() {
     local -i i
@@ -253,9 +245,7 @@ wiz::draw_confirm() {
     tui::confirm "Apply changes" "set ${BASE}.${ENCODING} and keyboard ${LAYOUT}?" "${CONFIRM_SEL}"
 }
 
-# ==========================================
 # Actions / Действия
-# ==========================================
 
 wiz::open_input() {
     INPUT_LABEL="$1"; INPUT_TARGET="$2"; INPUT_VALUE=""; INPUT_CURSOR=0
@@ -294,9 +284,7 @@ wiz::apply() {
     tui::enter_alt
 }
 
-# ==========================================
 # Main loop / Главный цикл
-# ==========================================
 
 main() {
     if ! system::utils::check_root; then

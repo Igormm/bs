@@ -13,7 +13,6 @@ bs::guard "LIB_INTEGRATION_CHAT" || return 0
 # Dependencies
 bs::source_relative "../../core/lang.sh" "../../core/utils.sh" "../../core/const.sh" "../../core/logger.sh" "../../core/errorhandler.sh" "llm.sh"
 
-# ==========================================
 # LLM chat REPL / Чат-REPL
 #
 # Interactive multi-turn chat with any OpenAI-compatible or Ollama model.
@@ -26,7 +25,6 @@ bs::source_relative "../../core/lang.sh" "../../core/utils.sh" "../../core/const
 # на каждом ходе (последние N ходов, по умолчанию 20). Конфигурация —
 # через CLI (bs chat) или env (BS_CHAT_*). Своя локальная модель (Phi Pi)
 # подключается как OpenAI-совместимый эндпоинт: bs chat --url http://...
-# ==========================================
 
 # @description Build a {role, content} JSON message.
 # @description Собрать JSON-сообщение {role, content}.

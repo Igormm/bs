@@ -41,9 +41,7 @@ declare -g IO_FILES_VERSION="1.0.0"
 # @global IO_FILES_LOADED — Флаг загрузки модуля (категория: module-flag)
 declare -g IO_FILES_LOADED="1"
 
-# ==========================================
 # Private helpers / Приватные вспомогательные функции
-# ==========================================
 
 # @private
 # @description Build a re-runnable command line with shell-quoted args.
@@ -300,9 +298,7 @@ io::files::__atomic_copy_dir() {
   return 0
 }
 
-# ==========================================
 # Inspection / Проверки
-# ==========================================
 
 # @description Check if path exists.
 # @description Проверить существование пути.
@@ -334,9 +330,7 @@ io::files::is_dir() {
   is::not_empty "${path}" && is::dir "${path}"
 }
 
-# ==========================================
 # Directory creation / Создание каталогов
-# ==========================================
 
 # @description Ensure directory exists; optionally set mode.
 # @description Создать каталог, если его нет; опционально задать права.
@@ -370,9 +364,7 @@ io::files::ensure_dir() {
   return "${E_SUCCESS}"
 }
 
-# ==========================================
 # Content writing / Запись содержимого
-# ==========================================
 
 # @description Append a line of text to a file.
 # @description Дописать строку текста в файл.
@@ -410,9 +402,7 @@ io::files::append() {
   return "${E_SUCCESS}"
 }
 
-# ==========================================
 # Temporary files / Временные файлы
-# ==========================================
 
 # @global IO_FILES_TEMPFILES — Files: temp files registry (category: constant)
 # @global IO_FILES_TEMPFILES — Files: реестр временных файлов (категория: constant)
@@ -490,9 +480,7 @@ io::files::tempdir() {
   fi
 }
 
-# ==========================================
 # Copy / Копирование
-# ==========================================
 
 # @description Copy a single file preserving attributes.
 # @description Скопировать один файл с сохранением атрибутов.
@@ -801,9 +789,7 @@ io::files::copy_matching() {
   return "${E_SUCCESS}"
 }
 
-# ==========================================
 # Move / cut / Перемещение / вырезание
-# ==========================================
 
 # @description Move file or directory to destination.
 # @description Переместить файл или каталог.
@@ -909,9 +895,7 @@ io::files::cut() {
   io::files::move "$@"
 }
 
-# ==========================================
 # Remove / Удаление
-# ==========================================
 
 # @description Remove file or directory. Directories require recursive=true.
 # @description Удалить файл или каталог. Для каталога нужен recursive=true.

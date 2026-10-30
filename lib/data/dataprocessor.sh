@@ -110,10 +110,8 @@ dataprocessor::install_dependencies() {
     log::success "Dependencies installed successfully"
 }
 
-# ============================================================================
 # JSON PROCESSING
 # Обработка JSON
-# ============================================================================
 
 # Validate JSON
 # @description Validate JSON syntax with jq.
@@ -266,10 +264,8 @@ dataprocessor::json::to_csv() {
     fi
 }
 
-# ============================================================================
 # XML PROCESSING
 # Обработка XML
-# ============================================================================
 
 # Validate XML
 # @description Validate XML syntax using xmllint.
@@ -393,10 +389,8 @@ dataprocessor::xml::extract() {
     dataprocessor::xml::xpath "${xml_data}" "//${element_name}"
 }
 
-# ============================================================================
 # CSV PROCESSING
 # Обработка CSV
-# ============================================================================
 
 # Validate CSV
 # @description Validate CSV data by checking consistent column counts.
@@ -573,10 +567,8 @@ dataprocessor::csv::sort() {
     fi
 }
 
-# ============================================================================
 # YAML PROCESSING (BASIC)
 # Обработка YAML (базовая)
-# ============================================================================
 
 # Convert YAML to JSON
 # @description Convert YAML data to JSON format with yq or pyyaml.
@@ -648,10 +640,8 @@ except Exception as e:
     fi
 }
 
-# ============================================================================
 # CROSS-FORMAT CONVERSION
 # Кросс-форматное преобразование
-# ============================================================================
 
 # Auto-detect format and convert
 # @description Auto-detect the input data format and convert it to a target
@@ -747,10 +737,8 @@ dataprocessor::detect_format() {
     return 1
 }
 
-# ============================================================================
 # JPATH PROCESSING (JSONPath)
 # Обработка JPath (JSONPath)
-# ============================================================================
 
 # Query JSON with JSONPath
 # @description Query JSON data using JSONPath syntax converted to jq.
@@ -794,10 +782,8 @@ dataprocessor::jpath::to_jq() {
     echo "${jq_query}"
 }
 
-# ============================================================================
 # XPATH PROCESSING (Advanced)
 # Обработка XPath (расширенная)
-# ============================================================================
 
 # Query with advanced XPath features
 # @description Query XML with advanced XPath features using lxml, falling back
@@ -839,10 +825,8 @@ except Exception as e:
     fi
 }
 
-# ============================================================================
 # UTILITY FUNCTIONS
 # Вспомогательные функции
-# ============================================================================
 
 # Get file info
 # @description Get information about a file: size, type and sample bytes as
@@ -961,10 +945,8 @@ dataprocessor::validate() {
     esac
 }
 
-# ============================================================================
 # MODULE INFO
 # Информация о модуле
-# ============================================================================
 
 # @description Show module info: supported formats, query languages, available
 #   functions and usage.

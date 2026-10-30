@@ -30,9 +30,7 @@ declare -g TS_TOOLCHAIN_LOADED="1"
 # @global TS_PACKAGE_MANAGERS — Хук: пакетные менеджеры для проверки (npm pnpm yarn bun) (категория: hook)
 : "${TS_PACKAGE_MANAGERS:=npm pnpm yarn bun}"
 
-# ==========================================
 # Обнаружение рантаймов / runtime discovery
-# ==========================================
 
 # @description Версия рантайма TS (node/bun/deno), префикс v снят / runtime version
 # @param $1 Имя бинаря / binary name
@@ -112,9 +110,7 @@ ts::toolchain::lockfile_pm() {
     return "${LIB_ERROR_FILE_NOT_FOUND}"
 }
 
-# ==========================================
 # Структура проекта / project layout
-# ==========================================
 
 # @description Есть ли tsconfig в корне проекта / project has tsconfig
 # @param $1 [dir] Каталог / project dir
@@ -166,9 +162,7 @@ ts::toolchain::pkg_field() {
     fi
 }
 
-# ==========================================
 # Гейты валидации / validation gates
-# ==========================================
 
 # @description Прогон гейтов: tsc, eslint, prettier — "name<TAB>status<TAB>hint"
 #   Статусы: PASS, FAIL, SKIP (инструмент/конфиг не найдены).
@@ -255,9 +249,7 @@ ts::toolchain::__has_prettierc() {
     return 1
 }
 
-# ==========================================
 # Диагностика окружения / environment doctor
-# ==========================================
 
 # @description Сводка TS-окружения в стиле bs doctor / environment summary
 # @param $1 [dir] Каталог проекта / project dir

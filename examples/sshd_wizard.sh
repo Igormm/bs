@@ -28,9 +28,7 @@
 load "lib/system/sshd"
 load "lib/tui/tui"
 
-# ==========================================
 # State / Состояние
-# ==========================================
 
 # @global SSHD_WZ_SECTIONS — Sshd wizard: section names (category: state)
 # @global SSHD_WZ_SECTIONS — Визард sshd: имена секций (категория: state)
@@ -282,9 +280,7 @@ sshd_wz::handle_edit_key() {
     return 0
 }
 
-# ==========================================
 # Draw / Отрисовка
-# ==========================================
 
 # @private Cache SGR style strings once per frame / Заполнить стили раз за кадр
 sshd_wz::cache_styles() {
@@ -460,9 +456,7 @@ sshd_wz::draw_help() {
     tui::put $(( by + 10 )) $(( bx + 2 )) "Enter/Esc — закрыть / close" "$(tui::style dim)"
 }
 
-# ==========================================
 # Preview / Apply / Просмотр и применение
-# ==========================================
 
 # @private Render current values as config text / Отрендерить текущие значения
 sshd_wz::render_config() {
@@ -646,9 +640,7 @@ sshd_wz::jump_match() {
     return 0
 }
 
-# ==========================================
 # Keys / Клавиши
-# ==========================================
 
 # @private Repaint the selected rows of both panes (focus style change)
 # @private Перерисовать выбранные строки обеих панелей (смена фокуса)
@@ -717,9 +709,7 @@ sshd_wz::handle_view_key() {
     return 0
 }
 
-# ==========================================
 # Main loop / Главный цикл
-# ==========================================
 
 main() {
     local arg

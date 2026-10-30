@@ -24,9 +24,7 @@
 load "lib/system/fail2ban"
 load "lib/tui/tui"
 
-# ==========================================
 # State / Состояние
-# ==========================================
 
 # @global F2B_WZ_SECTIONS — Fail2ban wizard: section names (category: state)
 # @global F2B_WZ_SECTIONS — Визард fail2ban: имена секций (категория: state)
@@ -97,9 +95,7 @@ declare -gA F2B_WZ_SEC_LEN=()
 declare -gA F2B_WZ_PAR_LEN=()
 declare -gA F2B_WZ_DESC_LEN=()
 
-# ==========================================
 # State helpers / Помощники состояния
-# ==========================================
 
 # @private Param value / значение параметра
 f2b_wz::value() { printf '%s' "${F2B_WZ_VALUES[${1}.${2}]:-}"; }
@@ -210,9 +206,7 @@ f2b_wz::render_config() {
     } | fail2ban::render
 }
 
-# ==========================================
 # Styles / Стили
-# ==========================================
 
 # @global F2B_ST_* — Fail2ban wizard: cached SGR styles (category: state)
 # @global F2B_ST_* — Визард fail2ban: кеш SGR-стилей (категория: state)
@@ -234,9 +228,7 @@ f2b_wz::cache_styles() {
     return 0
 }
 
-# ==========================================
 # Draw / Отрисовка
-# ==========================================
 
 # @private Put a row, erasing a longer previous tail / строка с затиранием хвоста
 f2b_wz::put_row() {
@@ -353,9 +345,7 @@ f2b_wz::paint_all() {
 }
 f2b_wz::draw() { f2b_wz::paint_all; }
 
-# ==========================================
 # Editing / Редактирование
-# ==========================================
 
 f2b_wz::begin_edit() {
     local -r sec="${F2B_WZ_SECTIONS[$F2B_WZ_SECTION]:-}"
@@ -451,9 +441,7 @@ f2b_wz::handle_edit_key() {
     return 0
 }
 
-# ==========================================
 # Jail picker modal / Модалка выбора джейлов
-# ==========================================
 
 f2b_wz::open_jails() { F2B_WZ_JAIL_SEL=0; tui::modal::open jails f2b_wz::modal_jails_draw; }
 
@@ -489,9 +477,7 @@ f2b_wz::handle_jails_key() {
     return 0
 }
 
-# ==========================================
 # Preview / Apply / Просмотр и применение
-# ==========================================
 
 f2b_wz::draw_preview() {
     local text; text="$(f2b_wz::render_config)"
@@ -568,9 +554,7 @@ f2b_wz::cycle_profile() {
     return 0
 }
 
-# ==========================================
 # Help / Справка
-# ==========================================
 
 f2b_wz::draw_help() {
     local -i w=72 h=13
@@ -595,9 +579,7 @@ f2b_wz::draw_help() {
     tui::put $(( by + h - 1 )) $(( bx + 2 )) "Enter/Esc — закрыть / close" "${F2B_ST_DIM}"
 }
 
-# ==========================================
 # Keys / Клавиши
-# ==========================================
 
 f2b_wz::repaint_selection() {
     f2b_wz::paint_section_row "${F2B_WZ_SECTION}"
@@ -656,9 +638,7 @@ f2b_wz::handle_view_key() {
     return 0
 }
 
-# ==========================================
 # Main loop / Главный цикл
-# ==========================================
 
 main() {
     local arg

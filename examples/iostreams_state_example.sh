@@ -16,10 +16,8 @@
 load "lib/io/streams"
 
 main() {
-    # ==========================================
     # 1. is_tty — привязан ли FD к терминалу ([[ -t fd ]])
     #    is_tty — is an FD attached to a terminal ([[ -t fd ]])
-    # ==========================================
     log::header "io::streams::is_tty — [[ -t fd ]]"
 
     # Типичное применение: включать цвета/прогресс-бары только на терминале
@@ -39,10 +37,8 @@ main() {
     fi
     exec {check_fd}<&-
 
-    # ==========================================
     # 2. can_read — неблокирующая проверка готовности (read -t 0)
     #    can_read — non-blocking readiness check (read -t 0)
-    # ==========================================
     log::header "io::streams::can_read — non-blocking check / неблокирующая проверка"
 
     # Аналог O_NONBLOCK + poll из C; данные НЕ извлекаются из потока
@@ -60,10 +56,8 @@ main() {
     fi
     exec {pipe_fd}<&-
 
-    # ==========================================
     # 3. wait_readable — ожидание данных с таймаутом (poll/select)
     #    wait_readable — wait for data with a timeout (poll/select)
-    # ==========================================
     log::header "io::streams::wait_readable — poll/select with timeout / с таймаутом"
 
     # Данные приходят до таймаута / Data arrives before the timeout

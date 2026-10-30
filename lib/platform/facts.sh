@@ -12,7 +12,6 @@ bs::guard "LIB_PLATFORM_FACTS" || return 0
 # Dependencies
 bs::source_relative "../../core/lang.sh" "../../core/utils.sh" "../../core/const.sh"
 
-# ==========================================
 # Capability vector / Вектор возможностей
 #
 # Collects platform facts (kernel, arch, distro, family, repo, userland,
@@ -25,7 +24,6 @@ bs::source_relative "../../core/lang.sh" "../../core/utils.sh" "../../core/const
 # изменении хеша окружения (uname + os-release + версия bash).
 #
 # Test hooks / Тестовые хуки: PLATFORM_CACHE_FILE (путь к кэшу)
-# ==========================================
 
 # @global PLATFORM_CACHE_FILE — Hook: platform facts cache file (category: hook)
 # @global PLATFORM_CACHE_FILE — Хук: файл кэша фактов платформы (категория: hook)

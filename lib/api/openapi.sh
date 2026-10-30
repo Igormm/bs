@@ -11,7 +11,6 @@ bs::guard "LIB_API_OPENAPI" || return 0
 
 bs::source_relative "../../core/lang.sh" "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../rfc/uri.sh" "../integration/http.sh"
 
-# ==========================================
 # OpenAPI client / OpenAPI-клиент
 #
 # Dynamic interpreter of an OpenAPI 3.x document: the spec is parsed on
@@ -26,7 +25,6 @@ bs::source_relative "../../core/lang.sh" "../../core/const.sh" "../../core/logge
 #   api::spec::load petstore --from ./openapi.json
 #   api::paths petstore
 #   api::call petstore GET /pets --limit 10 --json
-# ==========================================
 
 # @global API_SPECS — Openapi: loaded specs map (category: constant)
 # @global API_SPECS — Openapi: карта загруженных спецификаций (категория: constant)

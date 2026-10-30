@@ -29,9 +29,7 @@ load "core/utils"
 load "lib/ui/wizard"
 load "lib/system/utils"
 
-# ==========================================
 # State / Состояние
-# ==========================================
 
 declare -g WZ_IP=""            # итоговый IP / final IP
 declare -g WZ_HOST="0.0.0.0"   # --hostname для opencode / --hostname for opencode
@@ -42,9 +40,7 @@ declare -g WZ_AUTO_IP=""       # автоопределённый IP / auto-dete
 declare -g WZ_IFACE=""         # выбранный интерфейс / chosen interface
 declare -g WZ_SOURCE="auto"    # auto | iface | ip
 
-# ==========================================
 # Steps / Шаги
-# ==========================================
 
 # @private IPv4 format validation / Проверка формата IPv4
 # @param $1 Value to check / Проверяемое значение
@@ -201,9 +197,7 @@ wz::step_confirm() {
     esac
 }
 
-# ==========================================
 # Main / Главная
-# ==========================================
 
 main() {
     # -h/--help: справка без запуска визарда / usage without starting the wizard

@@ -45,9 +45,7 @@ readonly IO_STREAMS_STDOUT=1
 # @global IO_STREAMS_STDERR — Streams: номер fd stderr (2) (категория: constant)
 readonly IO_STREAMS_STDERR=2
 
-# ==========================================
 # Приватные вспомогательные функции / Private helper functions
-# ==========================================
 
 # @private
 # @description Проверить, что аргумент — неотрицательное целое число (номер FD)
@@ -74,9 +72,7 @@ io::streams::__check_file() {
     return "${E_SUCCESS:-0}"
 }
 
-# ==========================================
 # Вывод / Output
-# ==========================================
 
 # @description Безопасный вывод строки с переводом строки
 #   (printf '%s\n' вместо echo — не ломается на '-n', '-e' и '\')
@@ -144,9 +140,7 @@ io::streams::tty_print() {
     fi
 }
 
-# ==========================================
 # Ввод / Input
-# ==========================================
 
 # @description Прочитать одну строку из потока в переменную
 # @description Read a single line from a stream into a variable
@@ -211,9 +205,7 @@ io::streams::feed() {
     "$@" <<< "${input}"
 }
 
-# ==========================================
 # Перенаправления / Redirections
-# ==========================================
 
 # @description Перенаправить stdout в файл для текущего shell (exec 1>file)
 # @description Redirect stdout to a file for the current shell (exec 1>file)
@@ -261,9 +253,7 @@ io::streams::silence() {
     exec >/dev/null 2>&1
 }
 
-# ==========================================
 # Сохранение и восстановление FD / FD save and restore
-# ==========================================
 
 # @description Сохранить FD (0, 1 или 2) в новый свободный дескриптор
 #   Номер нового FD записывается в переменную вызывающего shell.
@@ -364,9 +354,7 @@ io::streams::close() {
     eval "exec ${fd}>&-"
 }
 
-# ==========================================
 # Pipe и буферизация / Pipes and buffering
-# ==========================================
 
 # @description Pipe между двумя командами, разделёнными '--'
 #   Аналог: cmd1 | cmd2 (pipe() + dup2() + fork())
@@ -450,9 +438,7 @@ io::streams::run_unbuffered() {
     stdbuf -o0 -e0 "$@"
 }
 
-# ==========================================
 # Состояние потоков / Stream state
-# ==========================================
 
 # @description Проверить, привязан ли FD к терминалу ([[ -t fd ]])
 # @description Check if an FD is attached to a terminal ([[ -t fd ]])
@@ -517,9 +503,7 @@ io::streams::wait_readable() {
     utils::quiet_err read -r -t "${timeout}" -u "${fd}" -n 1 byte
 }
 
-# ==========================================
 # Специальные файлы /dev / /dev special files
-# ==========================================
 
 # @description Запустить команду, отправив весь вывод в /dev/null
 #   Код возврата команды сохраняется
@@ -589,9 +573,7 @@ io::streams::list_fds() {
     fi
 }
 
-# ==========================================
 # Инициализация модуля / Module initialization
-# ==========================================
 
 # @global IO_STREAMS_LOADED — Module loaded flag (category: module-flag)
 # @global IO_STREAMS_LOADED — Флаг загрузки модуля (категория: module-flag)

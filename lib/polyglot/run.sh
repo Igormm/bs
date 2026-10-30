@@ -12,7 +12,6 @@ bs::guard "LIB_POLYGLOT_RUN" || return 0
 # Dependencies
 bs::source_relative "../../core/lang.sh" "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh"
 
-# ==========================================
 # polyglot::run — a program in another language, two-way data exchange
 # polyglot::run — программа на другом языке, обмен данными в обе стороны
 #
@@ -36,7 +35,6 @@ bs::source_relative "../../core/lang.sh" "../../core/const.sh" "../../core/logge
 #
 # SECURITY: the source is executed with your privileges — feed only code you trust.
 # БЕЗОПАСНОСТЬ: исходник исполняется с вашими правами — подавайте только доверенный код.
-# ==========================================
 
 # @global POLYGLOT_CACHE_DIR — Hook: cache of compiled programs and sources (category: hook)
 # @global POLYGLOT_CACHE_DIR — Хук: кэш скомпилированных программ и исходников (категория: hook)
@@ -88,9 +86,7 @@ declare -ga POLYGLOT_RUN_ENV=()
 # @global POLYGLOT_TOOL_IDS — Кэш: идентичность инструмента (путь + версия) (категория: cache)
 declare -gA POLYGLOT_TOOL_IDS=()
 
-# ==========================================
 # Language table / Таблица языков
-# ==========================================
 
 # @private
 # @description Canonical language name for an alias, or empty.
@@ -192,9 +188,7 @@ polyglot::__valid_name() {
   [[ "${1:-}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]
 }
 
-# ==========================================
 # Build / Сборка
-# ==========================================
 
 # @private
 # @description First tool of a hook list that is installed / Первый установленный инструмент из списка.
@@ -463,9 +457,7 @@ polyglot::__write_atomic() {
   mv -f -- "${tmp}" "${target}"
 }
 
-# ==========================================
 # Public API / Публичный API
-# ==========================================
 
 # @description List the languages and whether their tool is installed.
 # @description Показать языки и установлен ли их инструмент.

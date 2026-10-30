@@ -12,7 +12,6 @@ bs::guard "LIB_DATA_REGEX" || return 0
 # Dependencies
 bs::source_relative "../../core/lang.sh" "../../core/utils.sh" "../../core/errorhandler.sh"
 
-# ==========================================
 # Regular expressions / Регулярные выражения
 #
 # Engines, chosen by the function / Движки по выбору функции:
@@ -35,7 +34,6 @@ bs::source_relative "../../core/lang.sh" "../../core/utils.sh" "../../core/error
 #   regex::matches/find/count принимают флаг `--pcre` в конце; без него —
 #   ERE, работающий с любым grep. regex::groups — POSIX ERE (bash =~).
 #   regex::replace — многострочная цепочка выше.
-# ==========================================
 
 # @global RX_PCRE — Regex: PCRE support flag (grep -P) (category: constant)
 # @global RX_PCRE — Regex: флаг поддержки PCRE (grep -P) (категория: constant)

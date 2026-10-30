@@ -29,9 +29,7 @@ bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/uti
 # @global SYSTEM_HW_VERSION — Версия модуля (категория: module-flag)
 declare -g SYSTEM_HW_VERSION="1.0.0"
 
-# ==========================================
 # Private helpers / Приватные помощники
-# ==========================================
 
 # @private
 # @description Require an external tool or report a readable error.
@@ -88,10 +86,8 @@ hw::__print_label_value() {
   fi
 }
 
-# ==========================================
 # Getters: single machine-readable values
 # Геттеры: одно машиночитаемое значение
-# ==========================================
 
 # @description CPU model name (data) / Модель CPU (данные).
 # @stdout e.g. "Intel(R) Core(TM) i7-8650U CPU @ 1.90GHz"
@@ -164,11 +160,9 @@ system::hw::bios_version() {
   system::hw::__dmi_value bios_version bios-version
 }
 
-# ==========================================
 # Printers: human-readable reports
 # WRAPPER-CANDIDATE: utils::human_size — hw::__human_size is module-local; promote to core (facts.sh, ps1status print sizes too) / кандидат-обёртка: utils::human_size — hw::__human_size локальна, нужна в facts.sh и ps1status
 # Принтеры: человекочитаемые отчёты
-# ==========================================
 
 # @description Show CPU summary (built on the getters).
 # @description Сводка о CPU (построена на геттерах).
@@ -421,7 +415,6 @@ EOF
 # @global SYSTEM_HW_LOADED — Флаг загрузки модуля (категория: module-flag)
 declare -g SYSTEM_HW_LOADED="1"
 
-# ==========================================
 # hw:: — hardware DB layer / слой-база данных
 #
 # The hardware is exposed as a dictionary navigated by semantic paths
@@ -463,7 +456,6 @@ declare -g SYSTEM_HW_LOADED="1"
 #
 # Test hooks (override paths) / Тестовые хуки (переопределение путей):
 #   HW_DMI_PATH, HW_HWMON_PATH, HW_POWER_PATH, HW_NET_PATH, HW_BLOCK_PATH, HW_BUS_PATH
-# ==========================================
 
 # @global HW_DMI_PATH — Hook: DMI sysfs path /sys/class/dmi/id (category: hook)
 # @global HW_DMI_PATH — Хук: путь DMI в sysfs /sys/class/dmi/id (категория: hook)

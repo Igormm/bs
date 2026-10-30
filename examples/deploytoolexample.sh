@@ -36,10 +36,8 @@ deploy_step() {
 }
 
 main() {
-    # ==========================================
     # Дерево параметров и флаги
     # Parameter tree and flags
-    # ==========================================
     args::level 1 deploy rollback status
     args::flag env value
     args::flag dry-run
@@ -63,10 +61,8 @@ main() {
 
     args::require "$@"
 
-    # ==========================================
     # Выполнение команды
     # Command execution
-    # ==========================================
     local action="${ARGS_PARAMS[0]:-status}"
     local env
     env="$(args::flag_get env || printf 'staging')"
@@ -81,12 +77,10 @@ main() {
         log::warn "DRY RUN: ${action} into ${env} — no changes will be made"
     fi
 
-    # ==========================================
     # Фишка: вся секция деплоя пишется в лог-файл,
     # а терминал видит только итог (save/restore FD)
     # The trick: the whole deploy section goes to a log file,
     # the terminal only sees the summary (FD save/restore)
-    # ==========================================
     local log_file
     log_file="$(mktemp --suffix=-${action}-${env}.log)"
     trap "rm -f -- '${log_file}'" EXIT

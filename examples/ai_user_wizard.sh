@@ -57,9 +57,7 @@ load "lib/system/apply"
 load "lib/system/systemd"
 load "lib/system/user"
 
-# ==========================================
 # Application logic / Логика применения
-# ==========================================
 
 # @private Cancel: leave the alt screen and report the step.
 # @private Отмена: выйти из alt-экрана и сообщить, на каком шаге остановились.
@@ -109,10 +107,8 @@ aiw::fail() {
     wizard::fail "${1}"
 }
 
-# ==========================================
 # Progress indicators / Индикаторы прогресса
 #   step_go/step_ok — вывод в терминал + запись в журнал шагов.
-# ==========================================
 
 step_go() {
     printf '  '
@@ -439,11 +435,9 @@ main() {
         aiw::fail "Отменено пользователем / Cancelled by user"
     fi
 
-    # ==========================================
     # ---- применение / apply
     # Каждый шаг: step_go (▶ в терминал + журнал) → действие → step_ok (✓).
     # Every step: step_go (▶ to the terminal + log) → action → step_ok (✓).
-    # ==========================================
     local -r w="$(wizard::__box_width)"
     wizard::box "Применение / APPLYING" "Выполняется… / Running…
 Пароль будет показан один раз в конце / the password is shown once at the end."
@@ -670,14 +664,12 @@ main() {
         step_ok "SELinux не трогаем / SELinux untouched"
     fi
 
-    # ==========================================
     # ---- итог / final summary
     # Рамка «Что дальше / NEXT»: подключение первым, затем управление
     # сервисом и файлы. Пароль — один раз, отдельной строкой (не обрезается
     # рамкой).
     # The "NEXT" frame: connect first, then service control and files. The
     # password — once, on its own line (never clipped by the frame).
-    # ==========================================
     printf '\n\n'
     # реальный IP машины для строки подключения / the machine IP for the connect line
     local -r machine_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"

@@ -161,10 +161,8 @@ systemaudit::init_components() {
     log::debug "All audit components initialized"
 }
 
-# ============================================================================
 # MAIN AUDIT FUNCTION
 # Основная функция аудита
-# ============================================================================
 
 # Run comprehensive system audit
 # @description Run a system audit by type (full, quick, security, users, network, filesystem, services, compliance) and generate a report.
@@ -253,10 +251,8 @@ systemaudit::run_full() {
     systemaudit::calculate_score
 }
 
-# ============================================================================
 # SECURITY AUDIT
 # Аудит безопасности
-# ============================================================================
 
 # @description Initialize the security audit component and its checks.
 # @description Инициализировать компонент аудита безопасности и его проверки.
@@ -547,10 +543,8 @@ systemaudit::security::check_processes() {
     fi
 }
 
-# ============================================================================
 # USERS AUDIT
 # Аудит пользователей
-# ============================================================================
 
 # @description Initialize the users audit component and its permission checks.
 # @description Инициализировать компонент аудита пользователей и его проверки прав.
@@ -678,10 +672,8 @@ systemaudit::users::check_home_permissions() {
     fi
 }
 
-# ============================================================================
 # NETWORK AUDIT
 # Аудит сети
-# ============================================================================
 
 # @description Initialize the network audit component and its security checks.
 # @description Инициализировать компонент аудита сети и его проверки безопасности.
@@ -824,10 +816,8 @@ systemaudit::network::check_icmp_redirects() {
     fi
 }
 
-# ============================================================================
 # FILESYSTEM AUDIT
 # Аудит файловой системы
-# ============================================================================
 
 # @description Initialize the filesystem audit component and its permission checks.
 # @description Инициализировать компонент аудита файловой системы и его проверки прав.
@@ -939,10 +929,8 @@ systemaudit::filesystem::check_dot_files() {
     fi
 }
 
-# ============================================================================
 # SERVICES AUDIT
 # Аудит служб
-# ============================================================================
 
 # @description Initialize the services audit component and its process/service checks.
 # @description Инициализировать компонент аудита служб и его проверки процессов/сервисов.
@@ -1029,10 +1017,8 @@ systemaudit::services::check_service_permissions() {
     fi
 }
 
-# ============================================================================
 # COMPLIANCE AUDIT
 # Аудит соответствия
-# ============================================================================
 
 # @description Initialize the compliance audit component and its best-practice checks.
 # @description Инициализировать компонент аудита соответствия и его проверки лучших практик.
@@ -1145,10 +1131,8 @@ systemaudit::compliance::check_cis_benchmarks() {
     fi
 }
 
-# ============================================================================
 # UTILITY FUNCTIONS
 # Вспомогательные функции
-# ============================================================================
 
 # Create audit finding
 # @description Create an audit finding record with timestamp, title, description, severity, category and recommendation.
@@ -1435,10 +1419,8 @@ systemaudit::generate_xml_report() {
     } > "${report_file}"
 }
 
-# ============================================================================
 # BASELINE MANAGEMENT
 # Управление базовыми показателями
-# ============================================================================
 
 # Create baseline
 # @description Create a security baseline snapshot of the current system state and save it to the baseline file.
@@ -1477,10 +1459,8 @@ systemaudit::compare_baseline() {
     log::info "Baseline comparison would show changes since baseline creation"
 }
 
-# ============================================================================
 # MODULE INFO
 # Информация о модуле
-# ============================================================================
 
 # @description Print module info: available functions, audit types, output formats, severity levels, and usage.
 # @description Вывести информацию о модуле: доступные функции, типы аудита, форматы вывода, уровни серьёзности и использование.

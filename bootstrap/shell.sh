@@ -42,9 +42,7 @@ __BS_SHELL_SOURCED=1
 [ -z "${__BS_SHELL_SH:-}" ] || return 0
 __BS_SHELL_SH=1
 
-# ==========================================
 # Names / Имена
-# ==========================================
 
 # @description Canonical family of a shell name or path.
 # @description Каноническое семейство оболочки по имени или пути.
@@ -90,9 +88,7 @@ bs_shell__proc_family() {
   bs_shell_of_name "$__bs_pn"
 }
 
-# ==========================================
 # Detection / Определение
-# ==========================================
 
 # @description Family of the interpreter that runs THIS code (not $SHELL).
 # @description Семейство интерпретатора, исполняющего ЭТОТ код (не $SHELL).
@@ -178,9 +174,7 @@ bs_shell_user() {
   esac
 }
 
-# ==========================================
 # Registry: rc files, PATH line, reload / Реестр
-# ==========================================
 
 # @description The rc file where the PATH line for a family goes.
 # @description rc-файл, куда идёт строка PATH для семейства.
@@ -304,9 +298,7 @@ bs_shell_known() {
   esac
 }
 
-# ==========================================
 # Host and tier / Хозяин и tier
-# ==========================================
 
 # @description Strict mode for an entry point, in every shell: errexit, nounset, pipefail
 #   where the shell has it (bash, zsh, busybox ash; not dash), IFS = newline + tab.
@@ -700,9 +692,7 @@ bs_shell_in_subshell() {
   fi
 }
 
-# ==========================================
 # Read-only variables / Переменные только для чтения
-# ==========================================
 
 # @description Make variables read-only in the GLOBAL scope (NAME or NAME=value).
 #   Plain `readonly` inside a function is function-local in zsh, so zsh gets its
@@ -720,9 +710,7 @@ bs_shell_readonly() {
   fi
 }
 
-# ==========================================
 # Namespaced aliases / Имена с пространством имён
-# ==========================================
 
 # @description Make NS::name an alias of a POSIX function in bash and zsh (dash and
 #   other shells reject "::" in function names, so there the alias is skipped).
@@ -763,9 +751,7 @@ else
   __bs_sh_ns_ok=0
 fi
 
-# ==========================================
 # bs::shell::* names for bash and zsh / имена bs::shell::* для bash и zsh
-# ==========================================
 
 # eval: dash не должен разбирать "::" в именах даже в непройденной ветке
 # eval: dash must not parse "::" in names even in a branch that is not taken

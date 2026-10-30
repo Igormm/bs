@@ -22,10 +22,8 @@
 load "core/args"
 
 main() {
-    # ==========================================
     # 1. Объявляем дерево параметров один раз
     #    Declare the parameter tree once
-    # ==========================================
 
     # Уровень 1: что делаем; уровень 2: когда
     # Level 1: what to do; level 2: when
@@ -57,10 +55,8 @@ main() {
     # Всё после "--" — сырые аргументы / Everything after "--" is raw
     #   deploy now --server s1 --server s2 -- --any --flags --forwarded
 
-    # ==========================================
     # 2. Валидируем входные параметры
     #    Validate the input parameters
-    # ==========================================
 
     # Скрытый служебный флаг: печать completion для source
     # Hidden utility flag: print completion for sourcing
@@ -87,10 +83,8 @@ main() {
         bs::exit success
     fi
 
-    # ==========================================
     # 3. Работаем с провалидированными параметрами
     #    Work with the validated parameters
-    # ==========================================
 
     local action="${ARGS_PARAMS[0]:-status}"   # действие по умолчанию / default action
     local timing="${ARGS_PARAMS[1]:-now}"      # время по умолчанию / default timing
@@ -113,10 +107,8 @@ main() {
         status)   log::info "Everything in ${env} is running fine" ;;
     esac
 
-    # ==========================================
     # 4. Bash completion из того же дерева
     #    Bash completion from the same tree
-    # ==========================================
     log::header "Bash completion / Автодополнение Bash"
 
     # bs::script_path: под 'bs run' $0 — это "bash", а не путь скрипта
@@ -130,10 +122,8 @@ main() {
     # the pipe early and does not hit SIGPIPE under pipefail
     args::completion "argsparseexample.sh" | sed -n '1,5p'
 
-    # ==========================================
     # 5. Линейный вариант: args::define
     #    Linear variant: args::define
-    # ==========================================
     log::header "Linear chain demo / Демонстрация линейной цепочки"
 
     # Эквивалент parameters("first", "middle", "last"):

@@ -35,9 +35,7 @@ if [[ -f "${BS_BOOTSTRAP_DIR}/base.sh" ]]; then
   source "${BS_BOOTSTRAP_DIR}/base.sh"
 fi
 
-# ==========================================
 # Script directory / Каталог скрипта
-# ==========================================
 
 # @description Print the absolute (physical) directory of the caller's file.
 # @description Вывести абсолютный (физический) каталог файла вызывающего.
@@ -151,14 +149,12 @@ bs::trace_prefix() {
   PS4='+ ${BASH_SOURCE##*/}:${LINENO}: '
 }
 
-# ==========================================
 # Source vs executed / Подключён или исполнен
 #
 # Определение оболочки и гейт версии — в bootstrap/base.sh (POSIX): bs_shell_name, bs_shell_host,
 # bs_shell_version, bs_shell_ok, bs_shell_ensure_version. Здесь осталось только то, что читает BASH_SOURCE.
 # The shell detection and the version gate are in bootstrap/base.sh (POSIX): bs_shell_name,
 # bs_shell_host, bs_shell_version, bs_shell_ok, bs_shell_ensure_version. Only what reads BASH_SOURCE stays here.
-# ==========================================
 
 # @description Sourced vs executed for the DIRECT CALLER: 0 sourced, 1 executed.
 # @description Source vs исполнение ПРЯМОГО ВЫЗЫВАЮЩЕГО: 0 при source, 1 при исполнении.
@@ -183,7 +179,6 @@ bs::is_main() {
   [[ "${BASH_SOURCE[1]:-}" == "$0" || "${BASH_SOURCE[1]:-}" == "${BS_RUN_SCRIPT:-}" ]]
 }
 
-# ==========================================================================
 # CLI-команды bs / bs CLI commands
 #
 # Перенесено из файла bs. Здесь только ОПРЕДЕЛЕНИЯ: тела вызывают log::, utils::
@@ -194,7 +189,6 @@ bs::is_main() {
 # other kernel code but run only after the kernel is loaded (bs calls them from
 # its dispatcher). Names live in bs::cli:: so they do not shadow `help`/`die`
 # in other people's scripts.
-# ==========================================================================
 
 # POSIX-часть команд (die, help, version, env, list, …) — bootstrap/cli.sh; здесь остальные, на bash
 # The POSIX part of the commands (die, help, version, env, list, …) is bootstrap/cli.sh; the rest, in bash, is here

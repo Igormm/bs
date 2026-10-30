@@ -13,7 +13,6 @@ bs::guard "LIB_TUI_APP" || return 0
 # Dependencies
 bs::source_relative "tui.sh"
 
-# ==========================================
 # High-level app layer on top of lib/tui.
 #
 # A beginner-friendly way to build small terminal UIs without writing the
@@ -44,7 +43,6 @@ bs::source_relative "tui.sh"
 #   ENTER        — нажать кнопку под фокусом (если не забиндено)
 #   q            — выйти из приложения (если не забиндено)
 #   ESC          — закрыть открытую модалку
-# ==========================================
 
 # @global TUI_APP_WINDOWS — Tui: window registry (category: state)
 # @global TUI_APP_WINDOWS — Tui: реестр окон (категория: state)

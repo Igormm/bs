@@ -13,7 +13,6 @@ bs::guard "LIB_NETWORK_SSH" || return 0
 # Dependencies
 bs::source_relative "../../core/lang.sh" "../../core/const.sh" "../../core/utils.sh" "../../core/logger.sh"
 
-# ==========================================
 # Remote Linux over SSH / Удалённый Linux по SSH
 #
 # A clean layer over ssh/scp/rsync with exit-code propagation, a reusable
@@ -22,7 +21,6 @@ bs::source_relative "../../core/lang.sh" "../../core/const.sh" "../../core/utils
 # Чистый слой поверх ssh/scp/rsync с пробросом кодов возврата,
 # переиспользуемым соединением (multiplex) и батареей проверок хоста.
 # Тестовый хук: SSH_MOCK=<скрипт> заменяет ssh; RSYNC_MOCK — rsync.
-# ==========================================
 
 # @global BS_SSH_SOCKET_DIR — Hook: SSH agent socket directory (category: env)
 # @global BS_SSH_SOCKET_DIR — Хук: каталог сокетов SSH-agent (категория: env)

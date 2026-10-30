@@ -13,7 +13,6 @@ bs::guard "LIB_DATA_LSP" || return 0
 # Dependencies
 bs::source_relative "../../core/lang.sh" "../../core/const.sh" "../../core/logger.sh" "../../core/errorhandler.sh" "../data/langdoc.sh"
 
-# ==========================================
 # Language Server Protocol / Протокол языкового сервера
 #
 # Implements a minimal LSP server on stdin/stdout (JSON-RPC 2.0 with
@@ -26,7 +25,6 @@ bs::source_relative "../../core/lang.sh" "../../core/const.sh" "../../core/logge
 # Полная синхронизация текста (textDocumentSync: 1). Индекс функций
 # BS_ROOT строится лениво при первом запросе hover/completion
 # (см. bs lang-doc). Требует jq.
-# ==========================================
 
 # @global LSP_INDEX — Lsp: function index JSON (category: constant)
 # @global LSP_INDEX — Lsp: JSON-индекс функций (категория: constant)
@@ -276,9 +274,7 @@ lsp::__fuzzy_items() {
       end'
 }
 
-# ==========================================
 # Handlers / Обработчики
-# ==========================================
 
 lsp::__on_initialize() {
   lsp::__respond "${1}" \

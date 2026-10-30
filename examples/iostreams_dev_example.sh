@@ -18,10 +18,8 @@
 load "lib/io/streams"
 
 main() {
-    # ==========================================
     # 1. null_sink — весь вывод команды в /dev/null
     #    null_sink — send all command output to /dev/null
-    # ==========================================
     log::header "io::streams::null_sink — >/dev/null 2>&1"
 
     # Код возврата сохраняется — можно проверять результат
@@ -35,10 +33,8 @@ main() {
         io::streams::print "expected: ls failed, exit code preserved"
     fi
 
-    # ==========================================
     # 2. random_bytes — псевдослучайные байты из /dev/urandom
     #    random_bytes — pseudo-random bytes from /dev/urandom
-    # ==========================================
     log::header "io::streams::random_bytes — /dev/urandom"
 
     # /dev/urandom не блокируется; подходит для токенов и UUID
@@ -52,10 +48,8 @@ main() {
     # For cryptographically critical values use /dev/random
     # or getrandom(2) directly
 
-    # ==========================================
     # 3. fd_path — путь к FD процесса через /dev/fd
     #    fd_path — process FD path via /dev/fd
-    # ==========================================
     log::header "io::streams::fd_path — /dev/fd/N"
 
     # /dev/fd/N — Linux-аналог /proc/self/fd/N
@@ -69,10 +63,8 @@ main() {
     via_fd="$(printf 'through fd' | cat "$(io::streams::fd_path 0)")"
     io::streams::print "cat /dev/fd/0 → ${via_fd}"
 
-    # ==========================================
     # 4. list_fds — открытые дескрипторы процесса
     #    list_fds — open process descriptors
-    # ==========================================
     log::header "io::streams::list_fds — /proc/self/fd"
 
     # Полезно для поиска утечек FD (EMFILE)
