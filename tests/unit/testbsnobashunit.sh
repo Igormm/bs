@@ -59,7 +59,7 @@ if [ -e "\$H/fx/bin" ]; then echo bin-left; else echo bin-gone; fi
 run uninstall > "\$H/un2.txt" 2>&1; echo "uninstall-none=\$?"
 grep -q 'УДАЛЯТЬ НЕЧЕГО' "\$H/un2.txt" && echo nothing-box
 run where > "\$H/where.txt" 2>&1; echo "where=\$?"
-grep -q '== Итог' "\$H/where.txt" && echo where-summary
+grep -q 'Итог / Summary' "\$H/where.txt" && echo where-summary
 U="\$H/up"; mkdir -p "\$U/src/bootstrap" "\$U/src/core" "\$U/src/lib" "\$U/lib/bs/bootstrap" "\$U/bin"
 for f in bootstrap/init.sh bootstrap/loader.sh bootstrap/shell.sh bootstrap/trampoline.sh bootstrap/shebang.sh bootstrap/bs.sh core/prereq.sh; do : > "\$U/src/\$f"; done
 printf 'export BS_VERSION="9.9.9"\n' > "\$U/src/core/version.sh"

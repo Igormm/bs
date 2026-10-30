@@ -1467,6 +1467,25 @@ bs_cli_where_leftovers() {
 }
 
 # bs where: все следы BS на машине (только чтение) / every trace of BS on this machine (read-only)
+# @private Заголовок секции в рамке (без префиксов логгера — они ломают рамку) /
+#   A framed section header (no logger prefixes — they would break the frame)
+# @param $1 текст заголовка / header text
+bs_cli_section_header() {
+  __bs_cli_sh_text=${1-}
+  __bs_cli_sh_inner=$(bs_str_width "${__bs_cli_sh_text}")
+  __bs_cli_sh_inner=$((__bs_cli_sh_inner + 2))
+  __bs_cli_sh_rule=$(bs_str_repeat '─' "${__bs_cli_sh_inner}")
+  __bs_cli_sh_cb=''
+  __bs_cli_sh_cr=''
+  if bs_log_is_color_enabled 1; then
+    __bs_cli_sh_cb=$(printf '\033[1;34m')
+    __bs_cli_sh_cr=$(printf '\033[0m')
+  fi
+  printf '%s╭%s╮%s\n' "${__bs_cli_sh_cb}" "${__bs_cli_sh_rule}" "${__bs_cli_sh_cr}"
+  printf '%s│ %s │%s\n' "${__bs_cli_sh_cb}" "${__bs_cli_sh_text}" "${__bs_cli_sh_cr}"
+  printf '%s╰%s╯%s\n' "${__bs_cli_sh_cb}" "${__bs_cli_sh_rule}" "${__bs_cli_sh_cr}"
+}
+
 bs_cli_where_cmd() {
   # В строгом режиме bs IFS = перевод строки/табуляция; здесь нужны пробелы
   # In bs strict mode IFS is newline/tab; this function needs spaces
@@ -1499,7 +1518,7 @@ bs_cli_where_main() {
   __bs_cli_wh_n=0
   __bs_cli_wh_first=""
 
-  printf '%s\n' "$(bs_cli_paint head '== Запущено сейчас / Running now ==')"
+  bs_cli_section_header 'Запущено сейчас / Running now'
   bs_cli_bs_running_block
   bs_cli_where_add "${BS_ROOT}"
 
@@ -1507,14 +1526,14 @@ bs_cli_where_main() {
   # The shell: who runs the BS code, whose shell the user has, the tier
   __bs_cli_wh_ushell=$(bs_shell_user)
   __bs_cli_wh_utier=$(bs_shell_tier "${__bs_cli_wh_ushell}")
-  printf '\n%s\n' "$(bs_cli_paint head '== Оболочка / Shell ==')"
+  printf '\n'; bs_cli_section_header 'Оболочка / Shell'
   bs_cli_where_row "хозяин:" "$(bs_shell_family) $(bs_shell_version_string) (исполняет код BS / runs the BS code)"
   bs_cli_where_row "ваша:" "${__bs_cli_wh_ushell}  (login: $(bs_shell_login), parent: $(bs_shell_parent))"
   bs_cli_where_row "tier:" "${__bs_cli_wh_utier}"
   printf '    %s\n' "$(bs_shell_tier_desc "${__bs_cli_wh_utier}")"
 
   # --- bs в PATH ---
-  printf '\n%s\n' "$(bs_cli_paint head '== Команда bs в PATH / The bs command in PATH ==')"
+  printf '\n'; bs_cli_section_header 'Команда bs в PATH / The bs command in PATH'
   bs_cli_path_hits bs_cli_wh_hits "${BS_CALLER_PATH:-${PATH}}"
   __bs_cli_wh_nhits=$(bs_arr_len bs_cli_wh_hits)
   if [ "${__bs_cli_wh_nhits}" -eq 0 ]; then
@@ -1625,7 +1644,7 @@ EOF
   done
 
   # --- Установки ---
-  printf '\n%s\n' "$(bs_cli_paint head '== Установки BS / BS installs ==')"
+  printf '\n'; bs_cli_section_header 'Установки BS / BS installs'
   __bs_cli_wh_ninst=0
   __bs_cli_wh_versions=" "
   eval "$(bs_arr_to_args bs_cli_wh_cands)"
@@ -1727,7 +1746,7 @@ EOF
   if [ "${__bs_cli_wh_ninst}" -eq 0 ]; then printf '  установок не найдено / no installs found\n'; fi
 
   # --- Репозитории ---
-  printf '\n%s\n' "$(bs_cli_paint head '== Репозитории BS / BS source checkouts ==')"
+  printf '\n'; bs_cli_section_header 'Репозитории BS / BS source checkouts'
   if [ "$(bs_arr_len bs_cli_wh_checkouts)" -eq 0 ]; then
     printf '  не найдено / none found\n'
   fi
@@ -1744,7 +1763,7 @@ EOF
   done
 
   # --- Следы в оболочке ---
-  printf '\n%s\n' "$(bs_cli_paint head '== Следы в оболочке / Shell traces ==')"
+  printf '\n'; bs_cli_section_header 'Следы в оболочке / Shell traces'
   __bs_cli_wh_hitsn=0
   eval "$(bs_arr_to_args bs_cli_wh_rcfiles)"
   for __bs_cli_wh_f in "$@"; do
@@ -1766,7 +1785,7 @@ EOF
   esac
 
   # --- Данные и кэш ---
-  printf '\n%s\n' "$(bs_cli_paint head '== Данные и кэш / Data and cache ==')"
+  printf '\n'; bs_cli_section_header 'Данные и кэш / Data and cache'
   __bs_cli_wh_datan=0
   __bs_cli_wh_dseen="|"
   for __bs_cli_wh_d in "${XDG_CONFIG_HOME:-${HOME}/.config}/bs" "${HOME}/.config/bs" \
@@ -1784,7 +1803,7 @@ EOF
   if [ "${__bs_cli_wh_datan}" -eq 0 ]; then printf '  не найдено / none found\n'; fi
 
   # --- Переменные окружения ---
-  printf '\n%s\n' "$(bs_cli_paint head '== Переменные окружения / Environment ==')"
+  printf '\n'; bs_cli_section_header 'Переменные окружения / Environment'
   __bs_cli_wh_envn=0
   for __bs_cli_wh_v in BS_SYSTEM_PREFIX BS_UPDATE_REPO BS_BUILD_CACHE_DIR PREFIX BIN_DIR LIB_DIR; do
     __bs_cli_wh_val=""
@@ -1799,7 +1818,7 @@ EOF
   fi
 
   # --- Итог ---
-  printf '\n%s\n' "$(bs_cli_paint head '== Итог / Summary ==')"
+  printf '\n'; bs_cli_section_header 'Итог / Summary'
   printf '  установок / installs: %d,  репозиториев / checkouts: %d,  bs в PATH / bs in PATH: %d\n' \
     "${__bs_cli_wh_ninst}" "$(bs_arr_len bs_cli_wh_checkouts)" "$(bs_arr_len bs_cli_wh_hits)"
   # Разные версии: уникальные, в порядке появления (IFS здесь — пробел)
@@ -2452,7 +2471,7 @@ bs_cli_update_state_summary() {
   fi
   __bs_cli_ss_cm=""
   if [ -n "${__bs_cli_ss_commit}" ]; then __bs_cli_ss_cm=", commit ${__bs_cli_ss_commit}"; fi
-  printf '\n== Состояние после обновления / State after the update ==\n'
+  printf '\n'; bs_cli_section_header 'Состояние после обновления / State after the update'
   printf '  Установка / Install:   версия / version %s\n' "${__bs_cli_ss_inst:-?}"
   printf '  Репозиторий / Repo:    %s — версия / version %s%s — %s\n' \
     "${__bs_cli_ss_checkout}" "${__bs_cli_ss_repo:-?}" "${__bs_cli_ss_cm}" "${__bs_cli_ss_rel}"
