@@ -346,20 +346,20 @@ bs_cli_bs_full_info_lines() {
     printf '  %-10s %s, installed %s by %s\n' "install:" \
       "$(bs_cli_paint "${__bs_cli_ikind}" "${__bs_cli_imode:-?}")" \
       "${__bs_cli_iat:-?}" "${__bs_cli_iby:-?}"
-    printf '  %-10s %s @ %s\n' "source:" \
+    printf '  %-10s %s @ %s (first install / первая установка)\n' "source:" \
       "$(bs_cli_paint path "${__bs_cli_isrc:-?}")" \
       "$(bs_cli_paint commit "$(bs_cli_short_sha "${__bs_cli_isc:-}")")"
     if [ -n "${__bs_cli_uat}" ]; then
       __bs_cli_ucom_short="$(bs_cli_short_sha "${__bs_cli_ucom:-}")"
       if [ -n "${__bs_cli_isc}" ] && [ -n "${__bs_cli_ucom}" ] && [ "${__bs_cli_isc}" != "${__bs_cli_ucom}" ]; then
         __bs_cli_ucolour=commit_diff
-        __bs_cli_udiff=' (differs / отличается)'
+        __bs_cli_udiff=' (installed now / сейчас стоит; differs / отличается от первой установки)'
       elif [ -n "${__bs_cli_isc}" ] && [ -n "${__bs_cli_ucom}" ]; then
         __bs_cli_ucolour=commit_same
-        __bs_cli_udiff=''
+        __bs_cli_udiff=' (installed now / сейчас стоит; same as first install / как при установке)'
       else
         __bs_cli_ucolour=commit
-        __bs_cli_udiff=''
+        __bs_cli_udiff=' (installed now / сейчас стоит)'
       fi
       printf '  %-10s %s from %s @ %s%s\n' "updated:" "${__bs_cli_uat}" \
         "$(bs_cli_paint path "${__bs_cli_ufrom:-?}")" \
