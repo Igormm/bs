@@ -117,7 +117,13 @@ bs_remove_path_entry() {
     printf "Не удалось создать временный файл для %s\n" "${__bs_pm_rcf}" >&2
     return 1
   fi
-  if ! bs_utils_attempt grep -Fvx "${__bs_pm_ln}" "${__bs_pm_rcf}" > "${__bs_pm_tmp}"; then
+  # grep: 0 — остались строки, 1 — не осталось ни одной (это успех), >1 — сбой чтения;
+  # при сбое rc-файл не трогаем.
+  # grep: 0 — lines remain, 1 — none remain (success), >1 — a read failure;
+  # on failure the rc file is left alone.
+  grep -Fvx -- "${__bs_pm_ln}" "${__bs_pm_rcf}" > "${__bs_pm_tmp}" 2>/dev/null
+  __bs_pm_grc=$?
+  if [ "${__bs_pm_grc}" -gt 1 ]; then
     rm -f "${__bs_pm_tmp}"
     printf "Не удалось прочитать %s\n" "${__bs_pm_rcf}" >&2
     return 1

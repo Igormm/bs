@@ -59,14 +59,19 @@ bs_utils_quiet_err() {
 # @description Проверить, жив ли процесс (kill -0, stderr подавлен).
 # @param $1 {int} PID
 # @returns 0 процесс жив
-# @returns 1 нет такого процесса (или нет прав, или пустой/нечисловой PID)
+# @returns 1 нет такого процесса (или пустой/нечисловой/нулевой PID); процесс другого
+#           пользователя (kill -0 даёт «нет прав») считается живым
 # @example
 #   if bs_utils_pid_alive "${pid}"; then ...; fi   # bash/zsh: utils::pid_alive
 bs_utils_pid_alive() {
   case "${1-}" in
-    ''|*[!0-9]*) return 1 ;;
+    ''|*[!0-9]*|0|00*) return 1 ;;
   esac
-  kill -0 "${1}" 2>/dev/null
+  if kill -0 "${1}" 2>/dev/null; then return 0; fi
+  # kill -0 не прошёл: нет процесса или чужой процесс (EPERM) — различаем по /proc или ps
+  # kill -0 failed: no such process or someone else's process (EPERM) — tell apart via /proc or ps
+  if [ -d "/proc/${1}" ]; then return 0; fi
+  ps -p "${1}" >/dev/null 2>&1
 }
 
 # Выполняет команду, подавляя вывод и игнорируя результат.

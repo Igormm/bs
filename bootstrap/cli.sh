@@ -1198,7 +1198,7 @@ bs_cli_uninstall_cmd() {
         printf '(bs + bootstrap/init.sh) are removed; a source checkout (.git/tests) is\n'
         printf 'refused; a wrapper is deleted only when it points back at the target.\n'
         printf 'Every notice shows which bs copy printed it. Removing the copy bs runs\n'
-        printf 'from is allowed and announced. Exit code 1 if nothing could be removed.\n'
+        printf 'from is allowed and announced. Exit code 1 if nothing could be removed or some targets were skipped.\n'
         printf 'PATH lines in rc files are cleaned by: ./install.sh --local uninstall\n'
         return 0 ;;
       *)
@@ -1344,8 +1344,11 @@ bs_cli_uninstall_cmd() {
     eval "$(bs_arr_to_args bs_cli_un_skipped)"
     bs_cli_update_box "ЧАСТЬ ПРОПУЩЕНА / SOME TARGETS SKIPPED" "$@"
   fi
+  if [ "${__bs_cli_un_nskip}" -ne 0 ]; then
+    bs_log_warn "uninstall: удалено частично, часть целей пропущена / partly done, some targets skipped"
+    exit 1
+  fi
   bs_log_success "uninstall done"
-  if [ "${__bs_cli_un_nskip}" -ne 0 ]; then exit 1; fi
   return 0
 }
 
@@ -2004,11 +2007,11 @@ bs_cli_update_fetch() {
 
   __bs_cli_uf_archive="${__bs_cli_uf_repo}/archive/${__bs_cli_uf_ref}.tar.gz"
   if bs_utils_has curl; then
-    if curl -fsSL -- "${__bs_cli_uf_archive}" 2>/dev/null | bs_utils_quiet tar -xz -C "${__bs_cli_uf_dest}" --strip-components=1; then
+    if curl -fsSL --connect-timeout 15 --max-time 300 -- "${__bs_cli_uf_archive}" 2>/dev/null | bs_utils_quiet tar -xz -C "${__bs_cli_uf_dest}" --strip-components=1; then
       return 0
     fi
   elif bs_utils_has wget; then
-    if wget -qO- -- "${__bs_cli_uf_archive}" 2>/dev/null | bs_utils_quiet tar -xz -C "${__bs_cli_uf_dest}" --strip-components=1; then
+    if wget -qO- --timeout=30 -- "${__bs_cli_uf_archive}" 2>/dev/null | bs_utils_quiet tar -xz -C "${__bs_cli_uf_dest}" --strip-components=1; then
       return 0
     fi
   fi
@@ -2123,7 +2126,7 @@ bs_cli_update_cleanup_stale() {
     case "${__bs_cli_cs_pid}" in
       ''|*[!0-9]*) continue ;;
     esac
-    if kill -0 "${__bs_cli_cs_pid}" 2>/dev/null; then continue; fi
+    if bs_utils_pid_alive "${__bs_cli_cs_pid}"; then continue; fi
     case "${__bs_cli_cs_d}" in
       */.update-old.*)
         if [ ! -e "${__bs_cli_cs_d}/.committed" ]; then
@@ -2160,7 +2163,7 @@ bs_cli_update_lock() {
     case "${__bs_cli_lk_pid}" in
       ''|*[!0-9]*) ;;
       *)
-        if kill -0 "${__bs_cli_lk_pid}" 2>/dev/null; then return 1; fi ;;
+        if bs_utils_pid_alive "${__bs_cli_lk_pid}"; then return 1; fi ;;
     esac
     ${__bs_cli_lk_sudo} rm -rf -- "${__bs_cli_lk_dir}" || return 1
   done

@@ -58,6 +58,8 @@ test_behaviour() {
         eq "${out}" "out rc=0 " "${sh_name}: bs_utils_attempt keeps stdout, hides stderr, succeeds"
         eq "$(probe "${sh_bin}" -- 'bs_utils_pid_alive $$ && echo y')" "y" "${sh_name}: bs_utils_pid_alive finds the live shell"
         eq "$(probe "${sh_bin}" -- 'bs_utils_pid_alive "" || echo n')" "n" "${sh_name}: bs_utils_pid_alive rejects an empty PID"
+        eq "$(probe "${sh_bin}" -- 'bs_utils_pid_alive 0 || bs_utils_pid_alive 00 || echo n')" "n" "${sh_name}: bs_utils_pid_alive rejects PID 0 and 00 (kill -0 0 signals the process group)"
+        eq "$(probe "${sh_bin}" -- 'bs_utils_pid_alive 1 && echo y')" "y" "${sh_name}: bs_utils_pid_alive: someone else's process (PID 1, EPERM) is alive"
         eq "$(probe "${sh_bin}" -- 'sh -c "exit 0" & p=$!; wait "$p"; bs_utils_pid_alive "$p" || echo dead')" "dead" "${sh_name}: bs_utils_pid_alive misses an exited child"
     done < <(testframework::posix_shells)
 }
