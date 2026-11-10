@@ -58,6 +58,9 @@ declare -g TUI_KEY=""
 # @global TUI_KEY_CHAR — Tui: last key character (category: state)
 # @global TUI_KEY_CHAR — Tui: символ последней клавиши (категория: state)
 declare -g TUI_KEY_CHAR=""
+# @global TUI_PASTE — Tui: text of the last bracketed paste (TUI_KEY=PASTE) (category: state)
+# @global TUI_PASTE — Tui: текст последней вставки в скобках (TUI_KEY=PASTE) (категория: state)
+declare -g TUI_PASTE=""
 # @global TUI_MOUSE_X — Tui: mouse X position (category: state)
 # @global TUI_MOUSE_X — Tui: позиция мыши X (категория: state)
 declare -g TUI_MOUSE_X=0
@@ -114,6 +117,10 @@ tui::cursor_to()  { printf '\e[%d;%dH' "$1" "$2"; }
 tui::clear_screen() { printf '\e[2J\e[H'; }
 tui::mouse_on()   { printf '\e[?1000h\e[?1006h'; }
 tui::mouse_off()  { printf '\e[?1000l\e[?1006l'; }
+# bracketed paste: the terminal wraps pasted text in ESC[200~ … ESC[201~
+# bracketed paste: терминал оборачивает вставку в ESC[200~ … ESC[201~
+tui::paste_on()   { printf '\e[?2004h'; }
+tui::paste_off()  { printf '\e[?2004l'; }
 
 # @description Detect truecolor support (COLORTERM).
 # @description Определить поддержку truecolor (COLORTERM).
@@ -459,6 +466,11 @@ tui::key_read() {
                 esac
               elif [[ "${k4}" =~ ^[0-9]$ ]]; then
                 IFS= read -r -s -n1 -t 0.05 k5 || k5=""
+                if [[ "${k3}${k4}${k5}" == '200' ]]; then
+                  IFS= read -r -s -n1 -t 0.05 k5 || k5=""
+                  tui::__paste_read
+                  return 0
+                fi
                 case "${k3}${k4}${k5}" in
                   '15~') TUI_KEY="F5" ;;
                   '17~') TUI_KEY="F6" ;;
@@ -501,6 +513,43 @@ tui::key_read() {
       ;;
   esac
   return 0
+}
+
+# @private
+# @description Read a bracketed paste body up to ESC[201~ into TUI_PASTE,
+#   TUI_KEY=PASTE. Escapes inside the pasted text are kept.
+# @description Прочитать тело вставки до ESC[201~ в TUI_PASTE, TUI_KEY=PASTE.
+#   Escape-последовательности внутри вставки сохраняются.
+tui::__paste_read() {
+  TUI_KEY="PASTE"
+  TUI_PASTE=""
+  local chunk tail c
+  local -i n
+  while :; do
+    # всё до следующего ESC за одно чтение / everything up to the next ESC in one read
+    if ! IFS= read -r -s -d $'\e' chunk; then
+      TUI_PASTE+="${chunk}"
+      return 0
+    fi
+    TUI_PASTE+="${chunk}"
+    # ESC прочитан: это конец вставки или ESC из самого текста
+    # ESC consumed: the end marker or an ESC from the text itself
+    while :; do
+      tail=""
+      for (( n = 0; n < 5; n++ )); do
+        IFS= read -r -s -n1 -d '' -t 1 c || { TUI_PASTE+=$'\e'"${tail}"; return 0; }
+        if [[ "${c}" == $'\e' ]]; then
+          TUI_PASTE+=$'\e'"${tail}"
+          continue 2
+        fi
+        tail+="${c}"
+        [[ '[201~' == "${tail}"* ]] || break
+      done
+      [[ "${tail}" == '[201~' ]] && return 0
+      TUI_PASTE+=$'\e'"${tail}"
+      continue 2
+    done
+  done
 }
 
 # @private

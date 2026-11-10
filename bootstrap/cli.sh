@@ -6,11 +6,11 @@
 # bootstrap/cli.sh — команды bs, которые работают в любой оболочке (POSIX-часть bs::cli::*)
 # bootstrap/cli.sh — the bs commands that run in any shell (the POSIX part of bs::cli::*)
 #
-# Остальные команды (lang-doc, lsp, chat, api, ts, audit, build, rfc, run, repl),
+# Остальные команды (clean, lang-doc, lsp, chat, api, ts, audit, build, rfc, run, repl),
 # запускающие код lib/, пока в bootstrap/bs.sh на bash; в оболочке
 # без bash bs_cli_delegate отвечает, что команде нужен bash. Тела функций вызывают ядро и
 # выполняются только после его загрузки.
-# The other commands (lang-doc, lsp, chat, api, ts, audit, build, rfc, run, repl),
+# The other commands (clean, lang-doc, lsp, chat, api, ts, audit, build, rfc, run, repl),
 # which run lib/ code, are still in bootstrap/bs.sh in bash; in a
 # shell without bash bs_cli_delegate answers that the command needs bash. The function bodies call
 # the kernel and run only after it is loaded.
@@ -107,7 +107,7 @@ bs_cli_maybe_exec_script() {
     '') ;;
     *)
       case "$1" in
-        help|-h|--help|version|env|list|lang-doc|lsp|chat|sync|rfc|api|ts|audit|doctor|build|repl|calc|init-shell|shebang|call|update|uninstall|where) ;;
+        help|-h|--help|version|env|list|clean|lang-doc|lsp|chat|sync|rfc|api|ts|audit|doctor|build|repl|calc|init-shell|shebang|call|update|uninstall|where) ;;
         *)
           if [ -f "$1" ]; then
             __bs_cli_es_script=$1
@@ -158,6 +158,7 @@ bs_cli_help() {
   bs_cli_help_row 'ts <command>' 'TypeScript toolchain / TS-тулчейн'
   bs_cli_help_row 'audit [roots]' 'GNU-only tool audit / аудит GNU-зависимостей'
   bs_cli_help_row 'chat [opts]' 'Interactive LLM chat / чат с LLM'
+  bs_cli_help_row 'clean [opts] [file]' 'Clean pasted text: window or filter / очистка вставленного текста'
 
   bs_cli_help_head 'Maintenance / Обслуживание:'
   bs_cli_help_row 'update [opts]' 'Update installed copies from a local repo or GitHub / обновление'
@@ -208,6 +209,7 @@ bs_cli_help_cmd() {
     list)           bs_cli_list_cmd --help ;;
     lang-doc)       bs_cli_delegate lang-doc bs::cli::lang_doc_cmd --help ;;
     lsp)            bs_cli_delegate lsp bs::cli::lsp_cmd --help ;;
+    clean)          bs_cli_delegate clean bs::cli::clean_cmd --help ;;
     chat)           bs_cli_delegate chat bs::cli::chat_cmd --help ;;
     api)            bs_cli_delegate api bs::cli::api_cmd --help ;;
     ts)             bs_cli_delegate ts bs::cli::ts_cmd --help ;;

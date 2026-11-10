@@ -229,6 +229,13 @@ bs::cli::lang_doc_cmd() {
   fi
 }
 
+# @description `bs clean`: clean pasted text (window or filter), see lib/tui/clean.sh
+# @description `bs clean`: очистка вставленного текста (окно или фильтр), см. lib/tui/clean.sh
+bs::cli::clean_cmd() {
+  load "lib/tui/clean"
+  textclean::cli::main "$@"
+}
+
 bs::cli::lsp_cmd() {
   while [[ $# -gt 0 ]]; do
     case "${1:-}" in

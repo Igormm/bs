@@ -84,6 +84,12 @@ RFC-хелперы: UUID 4/7 ([uuid.sh](../../../lib/rfc/uuid.sh)), URI, CSV.
 
 Подробнее: [data-format.md](data-format.md)
 
+- [textclean.sh](../../../lib/data/textclean.sh) — очистка текста, вставленного из веба и чатов: 13 правил, каждое включается и выключается отдельно (ANSI-коды, невидимые символы, «умные» кавычки, HTML-сущности и теги, шум интерфейса вроде «Copy code», склейка абзацев, снятие отступа, …), и сканер `danger` для опасных команд. Команда `bs clean` ([lib/tui/clean.sh](../../../lib/tui/clean.sh)) — фильтр (`bs clean < file`) или окно для вставки, которое копирует результат через OSC 52.
+
+Ключевые функции: `textclean::enable`, `textclean::disable`, `textclean::only`, `textclean::process`, `textclean::filter`, `textclean::danger::scan`, `textclean::copy`.
+
+Подробнее: [data-textclean.md](data-textclean.md)
+
 ## integration — `lib/integration/`
 
 Клиенты для внешних сервисов, VPN-инструменты, LLM, Kubernetes и коннекторы к другим системам:
