@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- refactor(logger): `bs_log_format_message` (60 lines) is split by the §12.16 readability rule into private helpers with one job each: `bs_log_join_words`, `bs_log_print_json`, `bs_log_print_structured`, `bs_log_print_plain`, `bs_log_print_color`. Output is byte-identical to the old code in dash, busybox ash, ksh93, mksh, zsh and bash for every `BS_LOG_FORMAT` × `BS_LOG_COLOR` × `BS_LOG_TIMESTAMP` combination; no public name changed.
+
 ## [0.17.0] - 2026-11-10 "Purioa"
 
 ### Added
