@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.19.0] - 2026-11-10 "Purioa"
+
+### Changed
+- refactor(cli): `bs_cli_update_cmd` (`bs update`, 471 lines) is split into 20 private helpers with one job each and is now 43 lines that read as the steps of the command: `bs_cli_update_parse_flags` (with `bs_cli_update_set_from`, `_set_repo`, `_set_ref`), `_pick_source`, `_check_checkout` (with `_ask_source`), `_github_warnings`, `_sudo_note`, `_detect_targets`, `_require_targets`, `_prepare_source`, `_sync_all` (per target: `_resolve_target`, `_guard_target`, `_target_ready`, `_sync_target`), `_collect_reasons`, `_count_failures`, `_report`. The code was moved, not rewritten: `continue` in the per-target loop became `return 1` in the helpers, and the `__bs_cli_uc_*` state names are unchanged. `testupdateunit`, `testupdatesafetyunit`, `testupdatepullunit` (192 checks) and `bs update` under dash, busybox ash, ksh93, mksh and zsh in `testbsnobashunit` give the same results as before; no public name changed.
+
 ## [0.18.0] - 2026-11-10 "Purioa"
 
 ### Changed
