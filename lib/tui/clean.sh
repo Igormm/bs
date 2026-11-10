@@ -300,6 +300,8 @@ Rules / правила:
 Options / опции:
   -w, --window        always open the window (stdin text is pre-filled)
   -f, --filter        never open the window
+  -p, --paste         read the system clipboard as input (wl-paste, xclip,
+                      xsel, pbpaste, termux-clipboard-get, powershell.exe)
   -c, --copy          also copy the result in filter mode (OSC 52)
   --no-copy           do not copy in the window
   --tab-width N       tab stop for --tabs (default 4)
@@ -355,7 +357,7 @@ textclean::cli::warn() {
 # @return 0 ok, 1 cancelled window, 2 usage error, 3 danger with --strict
 # shellcheck disable=SC2034 # TEXTCLEAN_* settings are read by lib/data/textclean
 textclean::cli::main() {
-    local mode=auto copy="" quiet=0 strict=0 use_config=1 list=0 arg name
+    local mode=auto copy="" quiet=0 strict=0 use_config=1 list=0 from_clip=0 arg name
     local -a files=() actions=()
     while (( $# > 0 )); do
         arg="$1"; shift
@@ -365,6 +367,7 @@ textclean::cli::main() {
             -w|--window) mode=window ;;
             -f|--filter) mode=filter ;;
             -c|--copy) copy=1 ;;
+            -p|--paste) from_clip=1 ;;
             --no-copy) copy=0 ;;
             -q|--quiet) quiet=1 ;;
             --strict) strict=1 ;;
@@ -426,7 +429,21 @@ textclean::cli::main() {
 
     # input / ввод
     local input="" f chunk have_input=0
-    if (( ${#files[@]} > 0 )); then
+    if (( from_clip )); then
+        local prc=0
+        textclean::paste || prc=$?
+        if (( prc == LIB_ERROR_DEPENDENCY_MISSING )); then
+            printf 'bs clean: --paste: no clipboard reader found (%s).\n' "$(textclean::paste::tools)" >&2
+            printf '  Paste into the window instead: bs clean   or pipe the text in: bs clean < file\n' >&2
+            printf '  Вставьте текст в окно: bs clean   или подайте его на вход: bs clean < file\n' >&2
+            return 2
+        elif (( prc != 0 )); then
+            printf 'bs clean: --paste: cannot read the clipboard with: %s (no display? try the window: bs clean)\n' "${TEXTCLEAN_PASTE_TOOL}" >&2
+            return 2
+        fi
+        input="${REPLY}"
+        have_input=1
+    elif (( ${#files[@]} > 0 )); then
         for f in "${files[@]}"; do
             if [[ "${f}" == - ]]; then
                 IFS= read -r -d '' chunk || true

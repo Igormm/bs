@@ -54,6 +54,7 @@ bs clean --unwrap --no-noise --copy < article.txt
 | `--all`, `--none` | все правила вкл / выкл (можно сочетать: `--none --trailing`) |
 | `-l, --list` | правила с состоянием и описанием |
 | `-w, --window` / `-f, --filter` | задать режим (`--window` подставляет stdin) |
+| `-p, --paste` | взять на вход системный буфер обмена (см. «Буфер обмена») |
 | `-c, --copy` | в режиме фильтра тоже копировать результат |
 | `--no-copy` | не копировать в окне |
 | `--tab-width N` | шаг табуляции для `tabs` (по умолчанию 4) |
@@ -155,6 +156,23 @@ textclean::copy "${text}"         # записать её в /dev/tty
 `set -g set-clipboard on` или `allow-passthrough on`). OSC 52 поддерживают
 kitty, WezTerm, Alacritty, foot, iTerm2, Windows Terminal, свежие xterm и
 GNOME Terminal (VTE 0.76+).
+
+Для чтения буфера (`bs clean --paste`, `textclean::paste`) программа нужна:
+терминалы не отдают буфер через OSC 52. Программы перебираются по порядку
+через `deps::has` фреймворка (они же `@optdeps` модуля): `wl-paste`, `xclip`,
+`xsel`, `pbpaste`, `termux-clipboard-get`, `powershell.exe` (WSL).
+Установленная, но упавшая программа (нет дисплея) пропускается. Если не
+сработала ни одна, `bs clean --paste` выходит с кодом 2 и подсказывает, что
+работает без неё:
+
+```text
+bs clean: --paste: no clipboard reader found (wl-paste xclip xsel pbpaste termux-clipboard-get powershell.exe).
+  Вставьте текст в окно: bs clean   или подайте его на вход: bs clean < file
+```
+
+`textclean::paste` возвращает `LIB_ERROR_DEPENDENCY_MISSING`, если программ нет,
+и `LIB_ERROR_DEPENDENCY`, если все установленные упали; `TEXTCLEAN_PASTE_TOOL` —
+имя сработавшей программы. Список — `TEXTCLEAN_PASTE_TOOLS`.
 
 ## Ограничения
 

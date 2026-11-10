@@ -169,9 +169,36 @@ main() {
     textclean::copy 'hi' "${cfg}/tty"
     testframework::assert_equal $'\e]52;c;aGk=\a' "$(cat "${cfg}/tty")" "copy writes to the tty path"
 
+    testframework::section "paste / чтение буфера"
+    local out
+    local -a saved_tools=("${TEXTCLEAN_PASTE_TOOLS[@]}")
+    TEXTCLEAN_PASTE_TOOLS=($'bs-no-such-xclip\tbs-no-such-xclip -o')
+    rc=0; textclean::paste || rc=$?
+    testframework::assert_equal "${LIB_ERROR_DEPENDENCY_MISSING}" "${rc}" "no reader installed (no xclip)"
+    out="$(textclean::cli::main --paste 2>&1)" && rc=0 || rc=$?
+    testframework::assert_equal "2" "${rc}" "--paste without a reader: usage error"
+    testframework::assert_true '"${out}" == *"no clipboard reader found (bs-no-such-xclip)"*' "--paste names the readers"
+    testframework::assert_true '"${out}" == *"bs clean < file"*' "--paste suggests the fallback"
+    mkdir -p "${cfg}/bin"
+    printf '#!/bin/sh\nprintf "a  \\r\\nb\\n"\n' > "${cfg}/bin/fakeclip"
+    printf '#!/bin/sh\nexit 1\n' > "${cfg}/bin/brokenclip"
+    chmod +x "${cfg}/bin/fakeclip" "${cfg}/bin/brokenclip"
+    local saved_path="${PATH}"
+    PATH="${cfg}/bin:${PATH}"
+    TEXTCLEAN_PASTE_TOOLS=($'brokenclip\tbrokenclip' $'fakeclip\tfakeclip -o')
+    rc=0; textclean::paste || rc=$?
+    testframework::assert_equal "0" "${rc}" "a broken reader is skipped"
+    testframework::assert_equal "fakeclip" "${TEXTCLEAN_PASTE_TOOL}" "the working reader is used"
+    testframework::assert_equal $'a  \nb' "${REPLY}" "CRLF from the clipboard"
+    testframework::assert_equal $'a\nb' "$(textclean::cli::main --paste </dev/null)" "--paste feeds the filter"
+    TEXTCLEAN_PASTE_TOOLS=($'brokenclip\tbrokenclip')
+    rc=0; textclean::paste || rc=$?
+    testframework::assert_equal "${LIB_ERROR_DEPENDENCY}" "${rc}" "only broken readers"
+    PATH="${saved_path}"
+    TEXTCLEAN_PASTE_TOOLS=("${saved_tools[@]}")
+
     testframework::section "cli / bs clean"
     rm -f "${cfg}/rules" "${cfg}/noise"
-    local out
     out="$(printf 'a  \n\n\nb\n' | textclean::cli::main 2>&1)"
     testframework::assert_equal $'a\n\nb' "${out}" "filter from stdin"
     out="$(printf 'a\tb  \n' | textclean::cli::main --rules tabs 2>&1)"

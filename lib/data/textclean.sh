@@ -25,7 +25,8 @@
 # Правила работают по байтам (UTF-8 записан как \x-байты), поэтому ведут себя
 # одинаково в локалях C и UTF-8.
 #
-# @depends core/lang, core/const
+# @depends core/lang, core/const, core/deps
+# @optdeps base64, openssl, wl-paste, xclip, xsel, pbpaste, termux-clipboard-get, powershell.exe
 # @tier lib
 # @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, associative array, regex match / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, associative array, regex match
 
@@ -33,7 +34,7 @@
 bs::guard "LIB_DATA_TEXTCLEAN" || return 0
 
 # Dependencies / Зависимости
-bs::source_relative "../../core/lang.sh" "../../core/const.sh"
+bs::source_relative "../../core/lang.sh" "../../core/const.sh" "../../core/deps.sh"
 
 # Registry / Реестр правил
 
@@ -844,11 +845,11 @@ textclean::filter() {
 # @description Base64 от $1 в REPLY (base64, openssl или запасной вариант на bash)
 textclean::__base64() {
     local -r s="$1"
-    if is::command base64; then
+    if deps::has base64; then
         REPLY="$(printf '%s' "${s}" | base64 | tr -d '\n')"
         return 0
     fi
-    if is::command openssl; then
+    if deps::has openssl; then
         REPLY="$(printf '%s' "${s}" | openssl base64 -A)"
         return 0
     fi
@@ -894,4 +895,64 @@ textclean::copy() {
     local -r tty="${2:-/dev/tty}"
     textclean::osc52 "${1-}"
     { printf '%s' "${REPLY}" > "${tty}"; } 2>/dev/null || return "${LIB_ERROR_FILE_OPERATION}"
+}
+
+# Reading the clipboard / Чтение буфера обмена
+
+# @global TEXTCLEAN_PASTE_TOOLS — Textclean: clipboard readers tried in order, "tool<TAB>command" (category: hook)
+# @global TEXTCLEAN_PASTE_TOOLS — Textclean: программы чтения буфера по порядку, "программа<TAB>команда" (категория: hook)
+declare -ga TEXTCLEAN_PASTE_TOOLS=(
+    $'wl-paste\twl-paste --no-newline'
+    $'xclip\txclip -selection clipboard -o'
+    $'xsel\txsel --clipboard --output'
+    $'pbpaste\tpbpaste'
+    $'termux-clipboard-get\ttermux-clipboard-get'
+    $'powershell.exe\tpowershell.exe -NoProfile -Command Get-Clipboard'
+)
+
+# @global TEXTCLEAN_PASTE_TOOL — Textclean: reader used by the last textclean::paste (category: state)
+# @global TEXTCLEAN_PASTE_TOOL — Textclean: программа последнего textclean::paste (категория: state)
+declare -g TEXTCLEAN_PASTE_TOOL=""
+
+# @description Names of the clipboard readers, space separated / Имена программ чтения буфера через пробел
+# @stdout names / имена
+textclean::paste::tools() {
+    local entry names=""
+    for entry in "${TEXTCLEAN_PASTE_TOOLS[@]}"; do names+="${names:+ }${entry%%$'\t'*}"; done
+    printf '%s\n' "${names}"
+}
+
+# @description Read the system clipboard into REPLY with the first reader that is
+#   installed (deps::has) and works; TEXTCLEAN_PASTE_TOOL names it. A terminal cannot be
+#   asked for its clipboard (OSC 52 read is disabled almost everywhere), so a
+#   reader program is needed here; copying needs none.
+# @description Прочитать системный буфер обмена в REPLY первой установленной
+#   (deps::has) и работающей программой; TEXTCLEAN_PASTE_TOOL — её имя. Спросить буфер у
+#   терминала нельзя (чтение OSC 52 почти везде запрещено), поэтому здесь нужна
+#   программа; для копирования она не нужна.
+# @return 0 ok, LIB_ERROR_DEPENDENCY_MISSING when no reader is installed,
+#   LIB_ERROR_DEPENDENCY when readers exist but all failed (TEXTCLEAN_PASTE_TOOL lists them) /
+#   0 — успех, LIB_ERROR_DEPENDENCY_MISSING — нет ни одной программы,
+#   LIB_ERROR_DEPENDENCY — программы есть, но все упали (TEXTCLEAN_PASTE_TOOL — их список)
+# shellcheck disable=SC2034 # TEXTCLEAN_PASTE_TOOL is read by the caller / читает вызывающий
+textclean::paste() {
+    local entry tool cmd out tried=""
+    local -a argv=()
+    REPLY=""
+    TEXTCLEAN_PASTE_TOOL=""
+    for entry in "${TEXTCLEAN_PASTE_TOOLS[@]}"; do
+        tool="${entry%%$'\t'*}"
+        cmd="${entry#*$'\t'}"
+        deps::has "${tool}" || continue
+        tried+="${tried:+ }${tool}"
+        IFS=' ' read -r -a argv <<< "${cmd}"
+        if out="$("${argv[@]}" 2>/dev/null)"; then
+            REPLY="${out//$'\r\n'/$'\n'}"
+            TEXTCLEAN_PASTE_TOOL="${tool}"
+            return "${E_SUCCESS}"
+        fi
+    done
+    TEXTCLEAN_PASTE_TOOL="${tried}"
+    [[ -z "${tried}" ]] && return "${LIB_ERROR_DEPENDENCY_MISSING}"
+    return "${LIB_ERROR_DEPENDENCY}"
 }

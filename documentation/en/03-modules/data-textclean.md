@@ -54,6 +54,7 @@ In filter mode the result goes to stdout and danger warnings to stderr:
 | `--all`, `--none` | every rule on / off (combine: `--none --trailing`) |
 | `-l, --list` | rules with their state and description |
 | `-w, --window` / `-f, --filter` | force the mode (`--window` pre-fills stdin) |
+| `-p, --paste` | read the system clipboard as input (see Clipboard) |
 | `-c, --copy` | also copy the result in filter mode |
 | `--no-copy` | do not copy in the window |
 | `--tab-width N` | tab stop for `tabs` (default 4) |
@@ -153,6 +154,22 @@ it works over SSH and needs no `xclip`/`pbcopy`. Inside tmux the sequence is
 wrapped for passthrough (tmux needs `set -g set-clipboard on` or
 `allow-passthrough on`). Terminals that support OSC 52: kitty, WezTerm, Alacritty,
 foot, iTerm2, Windows Terminal, recent xterm and GNOME Terminal (VTE 0.76+).
+
+Reading the clipboard (`bs clean --paste`, `textclean::paste`) does need a
+program, because terminals refuse OSC 52 reads. The readers are tried in order
+with the framework's `deps::has` (they are the module's `@optdeps`):
+`wl-paste`, `xclip`, `xsel`, `pbpaste`, `termux-clipboard-get`, `powershell.exe`
+(WSL). An installed reader that fails (no display) is skipped. When none works,
+`bs clean --paste` exits with 2 and points to what works without one:
+
+```text
+bs clean: --paste: no clipboard reader found (wl-paste xclip xsel pbpaste termux-clipboard-get powershell.exe).
+  Paste into the window instead: bs clean   or pipe the text in: bs clean < file
+```
+
+`textclean::paste` returns `LIB_ERROR_DEPENDENCY_MISSING` when no reader is
+installed and `LIB_ERROR_DEPENDENCY` when every installed one failed;
+`TEXTCLEAN_PASTE_TOOL` names the reader used. The list is `TEXTCLEAN_PASTE_TOOLS`.
 
 ## Limits
 
