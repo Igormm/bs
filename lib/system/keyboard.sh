@@ -133,3 +133,104 @@ system::keyboard::options() {
     system::keyboard::__x11_set options "${options}" || return "${E_ERROR}"
     log::info "Keyboard options set to ${options}"
 }
+
+# ============================================================================
+# Driver interface (driver::keyboard::) for lib/system/devicectl
+# Драйверный интерфейс (driver::keyboard::) для lib/system/devicectl
+# ============================================================================
+
+# @private Каталог параметров раскладки / keymap parameter catalogue.
+# @stdout TSV param<TAB>type<TAB>default<TAB>choices<TAB>tip
+driver::keyboard::__catalog() {
+    printf 'layout\tstring\tus\t\tlayout / раскладка (us, ru, de, …)\n'
+    printf 'model\tstring\tpc105\t\tmodel / модель (pc105, pc104, …)\n'
+    printf 'variant\tstring\t\t\tvariant / вариант (dvorak, colemak, …)\n'
+    printf 'options\tstring\t\t\toptions / опции (grp:alt_shift_toggle, ctrl:swapcaps, …)\n'
+}
+
+# @private Значение одного X11-поля из localectl status.
+# @param $1 field: X11Layout|X11Model|X11Variant|X11Options
+# @stdout значение (пусто, если не найдено) / value (empty when absent)
+driver::keyboard::__x11_field() {
+    local -r field="$1"
+    local line key val out=""
+    while IFS= read -r line; do
+        key="${line%%:*}"; key="${key//[[:space:]]/}"
+        val="${line#*:}"; val="${val#"${val%%[![:space:]]*}"}"
+        [[ "${val}" == "n/a" ]] && val=""
+        [[ "${key}" == "${field}" ]] && out="${val}"
+    done < <(utils::attempt localectl status)
+    printf '%s' "${out}"
+}
+
+# @description Список устройств: одна логическая клавиатура (системная раскладка).
+# @stdout TSV handle<TAB>label<TAB>kind
+driver::keyboard::detect() {
+    if utils::has localectl || utils::has setxkbmap; then
+        printf 'default\tKeyboard layout\tkeyboard\n'
+        return 0
+    fi
+    log::warn "keyboard: no localectl/setxkbmap"
+    return "${LIB_ERROR_DEPENDENCY_MISSING}"
+}
+
+# @description Текущее значение поля раскладки / current keymap field value.
+# @param $1 handle; $2 param
+driver::keyboard::get() {
+    local -r handle="$1" param="$2"
+    local field
+    case "${param}" in
+        layout)  field="X11Layout" ;;
+        model)   field="X11Model" ;;
+        variant) field="X11Variant" ;;
+        options) field="X11Options" ;;
+        *) return "${E_INVALID}" ;;
+    esac
+    driver::keyboard::__x11_field "${field}"
+    return 0
+}
+
+# @private Строка параметра с текущим значением / parameter row with current value.
+driver::keyboard::__param_row() {
+    local -r handle="$1" name="$2" type="$3" dflt="$4" choices="$5" tip="$6"
+    local -r cur="$(driver::keyboard::get "${handle}" "${name}")"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' "${name}" "${type}" "${cur}" "${dflt}" "${choices}" "${tip}"
+}
+
+# @description Параметры клавиатуры / keyboard parameters.
+# @param $1 handle
+# @stdout TSV param<TAB>type<TAB>current<TAB>default<TAB>choices<TAB>tip
+driver::keyboard::params() {
+    local -r handle="$1"
+    local name type dflt choices tip
+    while IFS=$'\t' read -r name type dflt choices tip; do
+        driver::keyboard::__param_row "${handle}" "${name}" "${type}" "${dflt}" "${choices}" "${tip}"
+    done < <(driver::keyboard::__catalog)
+    return 0
+}
+
+# @description Живое применение поля раскладки / live apply of a keymap field.
+# @param $1 handle; $2 param; $3 value
+driver::keyboard::set() {
+    local -r handle="$1" param="$2" value="$3"
+    case "${param}" in
+        layout)  system::keyboard::layout "${value}" ;;
+        model)   system::keyboard::model "${value}" ;;
+        variant) system::keyboard::variant "${value}" ;;
+        options) system::keyboard::options "${value}" ;;
+        *) return "${E_INVALID}" ;;
+    esac
+}
+
+# @description Снимок всех полей раскладки / snapshot of all keymap fields.
+# @param $1 handle
+# @stdout TSV param<TAB>value
+driver::keyboard::snapshot() {
+    local -r handle="$1"
+    local name type dflt choices tip cur
+    while IFS=$'\t' read -r name type dflt choices tip; do
+        cur="$(driver::keyboard::get "${handle}" "${name}" 2>/dev/null)" || cur=""
+        printf '%s\t%s\n' "${name}" "${cur}"
+    done < <(driver::keyboard::__catalog)
+    return 0
+}

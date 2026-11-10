@@ -33,7 +33,7 @@ bs::source_relative "../../core/lang.sh" "../../core/const.sh" \
 
 # @global DEVICECTL_DRIVERS — Driver registry: source names (category: state)
 # @global DEVICECTL_DRIVERS — Реестр драйверов: имена для загрузки (категория: state)
-declare -ga DEVICECTL_DRIVERS=(pointers)
+declare -ga DEVICECTL_DRIVERS=(pointers keyboard locale)
 # @global DEVICECTL_BACKEND — Detected display backend x11|wayland|none (category: hook)
 # @global DEVICECTL_BACKEND — Обнаруженный бэкенд x11|wayland|none (категория: hook)
 : "${DEVICECTL_BACKEND:=}"

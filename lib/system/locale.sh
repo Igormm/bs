@@ -90,3 +90,88 @@ system::locale::language() {
     export LANGUAGE="${lang}"
     log::info "Session language set to ${lang}"
 }
+
+# ============================================================================
+# Driver interface (driver::locale::) for lib/system/devicectl
+# Драйверный интерфейс (driver::locale::) для lib/system/devicectl
+# ============================================================================
+
+# @private Каталог параметров локали / locale parameter catalogue.
+# @stdout TSV param<TAB>type<TAB>default<TAB>choices<TAB>tip
+driver::locale::__catalog() {
+    printf 'lang\tstring\t\t\tlocale / локаль (en_US.UTF-8, ru_RU.UTF-8, …)\n'
+}
+
+# @private Текущая системная локаль: localectl status «System Locale: LANG=…» или $LANG.
+driver::locale::__current() {
+    local -r val="$(utils::attempt localectl status | sed -n 's/.*System Locale:[[:space:]]*LANG=\([A-Za-z0-9_.@-]*\).*/\1/p')"
+    if [[ -n "${val}" ]]; then
+        printf '%s' "${val}"
+    else
+        printf '%s' "${LANG:-}"
+    fi
+}
+
+# @description Список устройств: одна логическая локаль системы.
+# @stdout TSV handle<TAB>label<TAB>kind
+driver::locale::detect() {
+    if utils::has localectl || [[ -f /etc/locale.gen ]] || [[ -f /etc/default/locale ]]; then
+        printf 'default\tSystem locale\tlocale\n'
+        return 0
+    fi
+    log::warn "locale: no localectl or locale.gen"
+    return "${LIB_ERROR_DEPENDENCY_MISSING}"
+}
+
+# @description Текущая локаль / current locale.
+# @param $1 handle; $2 param
+driver::locale::get() {
+    local -r handle="$1" param="$2"
+    case "${param}" in
+        lang) driver::locale::__current ;;
+        *) return "${E_INVALID}" ;;
+    esac
+    return 0
+}
+
+# @private Строка параметра с текущим значением / parameter row with current value.
+driver::locale::__param_row() {
+    local -r handle="$1" name="$2" type="$3" dflt="$4" choices="$5" tip="$6"
+    local -r cur="$(driver::locale::get "${handle}" "${name}")"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' "${name}" "${type}" "${cur}" "${dflt}" "${choices}" "${tip}"
+}
+
+# @description Параметры локали / locale parameters.
+# @param $1 handle
+# @stdout TSV param<TAB>type<TAB>current<TAB>default<TAB>choices<TAB>tip
+driver::locale::params() {
+    local -r handle="$1"
+    local name type dflt choices tip
+    while IFS=$'\t' read -r name type dflt choices tip; do
+        driver::locale::__param_row "${handle}" "${name}" "${type}" "${dflt}" "${choices}" "${tip}"
+    done < <(driver::locale::__catalog)
+    return 0
+}
+
+# @description Живое применение локали / live apply of the locale.
+# @param $1 handle; $2 param; $3 value
+driver::locale::set() {
+    local -r handle="$1" param="$2" value="$3"
+    case "${param}" in
+        lang) system::locale::set "${value}" ;;
+        *) return "${E_INVALID}" ;;
+    esac
+}
+
+# @description Снимок параметров локали / snapshot of locale params.
+# @param $1 handle
+# @stdout TSV param<TAB>value
+driver::locale::snapshot() {
+    local -r handle="$1"
+    local name type dflt choices tip cur
+    while IFS=$'\t' read -r name type dflt choices tip; do
+        cur="$(driver::locale::get "${handle}" "${name}" 2>/dev/null)" || cur=""
+        printf '%s\t%s\n' "${name}" "${cur}"
+    done < <(driver::locale::__catalog)
+    return 0
+}

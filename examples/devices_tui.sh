@@ -252,6 +252,92 @@ dtui::apply_profile() {
     dtui::open_input "profile apply" "${ACTIVE_PROFILE}"
 }
 
+# Key dispatch / Диспетчер клавиш
+#
+# Обрабатывает одну клавишу (модалки, экраны, действия) и сигнализирует о
+# выходе кодом 1. Вынесено из цикла main, чтобы логику можно было тестировать
+# напрямую, как tui::app::key в lib/tui/app.
+# Handles one key (modals, screens, actions) and signals quit with status 1.
+# Extracted from the main loop so the logic is directly testable, mirroring
+# tui::app::key in lib/tui/app.
+# @param $1 key name (as produced by tui::key_read) / имя клавиши
+# @return 0 continue, 1 quit / 0 продолжить, 1 выход
+dtui::key() {
+    TUI_KEY="${1:-}"
+    if [[ -n "${MODAL}" ]]; then
+        case "${MODAL}" in
+            input)
+                case "${TUI_KEY}" in
+                    ENTER) MODAL=""
+                           case "${MO_TARGET}" in
+                               "profile save")  devprofile::save "${MO_VALUE}" < <(dtui::collect) && { STATUS="сохранён профиль / profile saved: ${MO_VALUE}"; ACTIVE_PROFILE="${MO_VALUE}"; } ;;
+                               "profile apply") devprofile::apply "${MO_VALUE}" && STATUS="применён профиль / profile applied: ${MO_VALUE}" ;;
+                               *) dtui::apply_edit "${MO_VALUE}"; dtui::load_params ;;
+                           esac ;;
+                    ESC) MODAL="" ;;
+                    BACKSPACE)
+                        if (( MO_CURSOR > 0 )); then
+                            MO_VALUE="${MO_VALUE:0:${MO_CURSOR}-1}${MO_VALUE:${MO_CURSOR}}"
+                            MO_CURSOR=$(( MO_CURSOR - 1 ))
+                        else
+                            # Прежняя вставка `(( ... )) || break` выходила из всего цикла
+                            # The old inline `(( ... )) || break` exited the whole loop
+                            return 1
+                        fi ;;
+                    LEFT)  (( MO_CURSOR > 0 )) && MO_CURSOR=$(( MO_CURSOR - 1 )) ;;
+                    RIGHT) (( MO_CURSOR < ${#MO_VALUE} )) && MO_CURSOR=$(( MO_CURSOR + 1 )) ;;
+                    *) MO_VALUE="${MO_VALUE:0:${MO_CURSOR}}${TUI_KEY}${MO_VALUE:${MO_CURSOR}}"
+                       MO_CURSOR=$(( MO_CURSOR + 1 )) ;;
+                esac
+                ;;
+            picker)
+                case "${TUI_KEY}" in
+                    ENTER) MODAL=""; dtui::apply_edit "${MO_VALS[${MO_SEL}]}"; dtui::load_params ;;
+                    ESC) MODAL="" ;;
+                    UP|k|K) (( MO_SEL > 0 )) && MO_SEL=$(( MO_SEL - 1 )) ;;
+                    DOWN|j|J) (( MO_SEL < ${#MO_VALS[@]} - 1 )) && MO_SEL=$(( MO_SEL + 1 )) ;;
+                esac
+                ;;
+        esac
+        return 0
+    fi
+
+    case "${SCR}" in
+        0)
+            case "${TUI_KEY}" in
+                q|Q|й|Й) return 1 ;;
+                r|R) dtui::reload; STATUS="перечитано / re-detected" ;;
+                UP|k|K) (( SEL > 0 )) && SEL=$(( SEL - 1 )) ;;
+                DOWN|j|J) (( SEL < ${#DEVICES[@]} - 1 )) && SEL=$(( SEL + 1 )) ;;
+                ENTER|RIGHT|TAB)
+                    if dtui::selected; then
+                        SCR=1; PSEL=0; dtui::load_params
+                    fi ;;
+            esac
+            ;;
+        1)
+            case "${TUI_KEY}" in
+                q|Q|й|Й) return 1 ;;
+                LEFT|TAB) SCR=0 ;;
+                o|O) dtui::open_input "${EDIT_PARAM:-param}" "${EDIT_DEFAULT:-}" ;;
+                ENTER) dtui::start_edit ;;
+                UP|k|K) (( PSEL > 0 )) && PSEL=$(( PSEL - 1 )) ;;
+                DOWN|j|J) (( PSEL < ${#PARAMS[@]} - 1 )) && PSEL=$(( PSEL + 1 )) ;;
+                RIGHT) SCR=2 ;;
+            esac
+            ;;
+        2)
+            case "${TUI_KEY}" in
+                q|Q|й|Й) return 1 ;;
+                LEFT|TAB) SCR=1 ;;
+                s|S) dtui::save_profile ;;
+                a|A) dtui::apply_profile ;;
+            esac
+            ;;
+    esac
+    return 0
+}
+
 # Main loop / Главный цикл
 
 main() {
@@ -267,73 +353,7 @@ main() {
         [[ "${MODAL}" == "picker" ]] && dtui::draw_picker
         tui::render
         tui::key_read
-
-        if [[ -n "${MODAL}" ]]; then
-            case "${MODAL}" in
-                input)
-                    case "${TUI_KEY}" in
-                        ENTER) MODAL=""
-                               case "${MO_TARGET}" in
-                                   "profile save")  devprofile::save "${MO_VALUE}" < <(dtui::collect) && { STATUS="сохранён профиль / profile saved: ${MO_VALUE}"; ACTIVE_PROFILE="${MO_VALUE}"; } ;;
-                                   "profile apply") devprofile::apply "${MO_VALUE}" && STATUS="применён профиль / profile applied: ${MO_VALUE}" ;;
-                                   *) dtui::apply_edit "${MO_VALUE}"; dtui::load_params ;;
-                               esac ;;
-                        ESC) MODAL="" ;;
-                        BACKSPACE)
-                            (( MO_CURSOR > 0 )) || break
-                            MO_VALUE="${MO_VALUE:0:${MO_CURSOR}-1}${MO_VALUE:${MO_CURSOR}}"
-                            MO_CURSOR=$(( MO_CURSOR - 1 )) ;;
-                        LEFT)  (( MO_CURSOR > 0 )) && MO_CURSOR=$(( MO_CURSOR - 1 )) ;;
-                        RIGHT) (( MO_CURSOR < ${#MO_VALUE} )) && MO_CURSOR=$(( MO_CURSOR + 1 )) ;;
-                        *) MO_VALUE="${MO_VALUE:0:${MO_CURSOR}}${TUI_KEY}${MO_VALUE:${MO_CURSOR}}"
-                           MO_CURSOR=$(( MO_CURSOR + 1 )) ;;
-                    esac
-                    ;;
-                picker)
-                    case "${TUI_KEY}" in
-                        ENTER) MODAL=""; dtui::apply_edit "${MO_VALS[${MO_SEL}]}"; dtui::load_params ;;
-                        ESC) MODAL="" ;;
-                        UP|k|K) (( MO_SEL > 0 )) && MO_SEL=$(( MO_SEL - 1 )) ;;
-                        DOWN|j|J) (( MO_SEL < ${#MO_VALS[@]} - 1 )) && MO_SEL=$(( MO_SEL + 1 )) ;;
-                    esac
-                    ;;
-            esac
-            continue
-        fi
-
-        case "${SCR}" in
-            0)
-                case "${TUI_KEY}" in
-                    q|Q|й|Й) break ;;
-                    r|R) dtui::reload; STATUS="перечитано / re-detected" ;;
-                    UP|k|K) (( SEL > 0 )) && SEL=$(( SEL - 1 )) ;;
-                    DOWN|j|J) (( SEL < ${#DEVICES[@]} - 1 )) && SEL=$(( SEL + 1 )) ;;
-                    ENTER|RIGHT|TAB)
-                        if dtui::selected; then
-                            SCR=1; PSEL=0; dtui::load_params
-                        fi ;;
-                esac
-                ;;
-            1)
-                case "${TUI_KEY}" in
-                    q|Q|й|Й) break ;;
-                    LEFT|TAB) SCR=0 ;;
-                    o|O) dtui::open_input "${EDIT_PARAM:-param}" "${EDIT_DEFAULT:-}" ;;
-                    ENTER) dtui::start_edit ;;
-                    UP|k|K) (( PSEL > 0 )) && PSEL=$(( PSEL - 1 )) ;;
-                    DOWN|j|J) (( PSEL < ${#PARAMS[@]} - 1 )) && PSEL=$(( PSEL + 1 )) ;;
-                    RIGHT) SCR=2 ;;
-                esac
-                ;;
-            2)
-                case "${TUI_KEY}" in
-                    q|Q|й|Й) break ;;
-                    LEFT|TAB) SCR=1 ;;
-                    s|S) dtui::save_profile ;;
-                    a|A) dtui::apply_profile ;;
-                esac
-                ;;
-        esac
+        dtui::key "${TUI_KEY}" || break
     done
 
     tui::quit

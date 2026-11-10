@@ -1,13 +1,13 @@
 [↑ Documentation index](../README.md)
 
-# Module `devicectl` + `devprofile` + `pointers`
+# Module `devicectl` + `devprofile` + `pointers` + `keyboard` + `locale`
 
-A device-configuration engine and its first driver. `devicectl` registers
-drivers behind a uniform contract and dispatches device lists, parameters and
-live get/set. `devprofile` saves a set of devices as a reusable BS profile
-(INI with managed markers) and re-applies it. `pointers` is the reference
-driver: touchpads, trackballs and the Lenovo TrackPoint (the red stick) with
-sensitivity, speed, scrolling and tap-to-click.
+A device-configuration engine and its drivers. `devicectl` registers drivers
+behind a uniform contract and dispatches device lists, parameters and live
+get/set. `devprofile` saves a set of devices as a reusable BS profile (INI
+with managed markers) and re-applies it. The reference drivers are `pointers`
+(touchpads, trackballs and the Lenovo TrackPoint), `keyboard` (the keymap:
+layout/model/variant/options) and `locale` (the system locale).
 
 Tier: **Linux, X11 and Wayland with graceful degradation**
 (`DEVICECTL_BACKEND` = `x11`/`wayland`/`none`). Lookups and setters that lack
@@ -18,7 +18,9 @@ its current parameters, applies changes live and saves/loads profiles.
 
 Sources: [lib/system/devicectl.sh](../../../lib/system/devicectl.sh),
 [lib/system/devprofile.sh](../../../lib/system/devprofile.sh),
-[lib/system/pointers.sh](../../../lib/system/pointers.sh)
+[lib/system/pointers.sh](../../../lib/system/pointers.sh),
+[lib/system/keyboard.sh](../../../lib/system/keyboard.sh),
+[lib/system/locale.sh](../../../lib/system/locale.sh)
 
 ## Driver contract
 
@@ -35,6 +37,14 @@ namespace and implements:
 
 Parameter types: `bool`, `enum:a,b,c`, `int`, `range:min:max:step`, `string`,
 `keys`. Adding a driver means registering it — the TUI needs no change.
+
+The default registry is `DEVICECTL_DRIVERS=(pointers keyboard locale)`.
+
+| Driver | Device | Parameters |
+|---|---|---|
+| `pointers` | touchpad / trackball / trackpoint | `speed`, `tap_to_click`, `natural_scroll`, `profile`, `sens` |
+| `keyboard` | `Keyboard layout` | `layout`, `model`, `variant`, `options` (X11 keymap via `localectl`) |
+| `locale` | `System locale` | `lang` (`localectl set-locale` or `/etc/locale.gen`) |
 
 ## Loading
 

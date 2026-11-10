@@ -1,13 +1,13 @@
 [↑ Указатель документации](../README.md)
 
-# Модуль `devicectl` + `devprofile` + `pointers`
+# Модуль `devicectl` + `devprofile` + `pointers` + `keyboard` + `locale`
 
-Движок конфигурации устройств и его первый драйвер. `devicectl` регистрирует
+Движок конфигурации устройств и его драйверы. `devicectl` регистрирует
 драйверы за единым контрактом и диспетчеризует списки устройств, параметры и
 живые get/set. `devprofile` сохраняет набор устройств как переиспользуемый
-BS-профиль (INI с управляемыми маркерами) и применяет его заново. `pointers`
-— эталонный драйвер: тачпады, трекболы и трекпоинт Lenovo («красная пипка»)
-с чувствительностью, скоростью, прокруткой и tap-to-click.
+BS-профиль (INI с управляемыми маркерами) и применяет его заново. Эталонные
+драйверы: `pointers` (тачпады, трекболы и трекпоинт Lenovo), `keyboard`
+(раскладка: layout/model/variant/options) и `locale` (системная локаль).
 
 Ярус: **Linux, X11 и Wayland с честной деградацией**
 (`DEVICECTL_BACKEND` = `x11`/`wayland`/`none`). Чтение и установка без
@@ -19,7 +19,9 @@ BS-профиль (INI с управляемыми маркерами) и при
 
 Источники: [lib/system/devicectl.sh](../../../lib/system/devicectl.sh),
 [lib/system/devprofile.sh](../../../lib/system/devprofile.sh),
-[lib/system/pointers.sh](../../../lib/system/pointers.sh)
+[lib/system/pointers.sh](../../../lib/system/pointers.sh),
+[lib/system/keyboard.sh](../../../lib/system/keyboard.sh),
+[lib/system/locale.sh](../../../lib/system/locale.sh)
 
 ## Контракт драйвера
 
@@ -37,6 +39,14 @@ BS-профиль (INI с управляемыми маркерами) и при
 Типы параметров: `bool`, `enum:a,b,c`, `int`, `range:min:max:step`,
 `string`, `keys`. Добавить драйвер — значит зарегистрировать его; TUI менять
 не нужно.
+
+Реестр по умолчанию: `DEVICECTL_DRIVERS=(pointers keyboard locale)`.
+
+| Драйвер | Устройство | Параметры |
+|---|---|---|
+| `pointers` | тачпад / трекбол / трекпоинт | `speed`, `tap_to_click`, `natural_scroll`, `profile`, `sens` |
+| `keyboard` | `Keyboard layout` | `layout`, `model`, `variant`, `options` (X11-раскладка через `localectl`) |
+| `locale` | `System locale` | `lang` (`localectl set-locale` или `/etc/locale.gen`) |
 
 ## Подключение
 

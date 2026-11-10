@@ -27,6 +27,17 @@ main() {
     print_header "devicectl Unit Tests / Юнит-тесты devicectl"
     testframework::init
 
+    testframework::section "default registry / реестр по умолчанию"
+    local has_ptr=0 has_kb=0 has_loc=0 d
+    for d in "${DEVICECTL_DRIVERS[@]}"; do
+        [[ "$d" == "pointers" ]] && has_ptr=1
+        [[ "$d" == "keyboard" ]] && has_kb=1
+        [[ "$d" == "locale" ]] && has_loc=1
+    done
+    testframework::assert_equal "1" "${has_ptr}" "pointers registered by default"
+    testframework::assert_equal "1" "${has_kb}" "keyboard registered by default"
+    testframework::assert_equal "1" "${has_loc}" "locale registered by default"
+
     testframework::section "backend / бэкенд"
     local out
     out="$( ( DEVICECTL_BACKEND= DISPLAY= XDG_SESSION_TYPE=wayland; device::backend ) )"
