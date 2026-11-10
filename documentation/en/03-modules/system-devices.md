@@ -17,6 +17,7 @@ a backend return defined codes (`LIB_ERROR_DEPENDENCY_MISSING`,
 its current parameters, applies changes live and saves/loads profiles.
 
 Sources: [lib/system/devicectl.sh](../../../lib/system/devicectl.sh),
+[lib/system/devdriver.sh](../../../lib/system/devdriver.sh),
 [lib/system/devprofile.sh](../../../lib/system/devprofile.sh),
 [lib/system/pointers.sh](../../../lib/system/pointers.sh),
 [lib/system/keyboard.sh](../../../lib/system/keyboard.sh),
@@ -37,6 +38,21 @@ namespace and implements:
 
 Parameter types: `bool`, `enum:a,b,c`, `int`, `range:min:max:step`, `string`,
 `keys`. Adding a driver means registering it — the TUI needs no change.
+
+A driver with a fixed parameter catalogue does not have to write `params` and
+`snapshot` by hand. It defines `driver::<name>::__catalog [args…]` (rows
+`param<TAB>type<TAB>default<TAB>choices<TAB>tip`) plus `get`, and delegates to
+[lib/system/devdriver.sh](../../../lib/system/devdriver.sh):
+
+```bash
+driver::<name>::params()   { devdriver::params   <name> "$1" "" ; }
+driver::<name>::snapshot() { devdriver::snapshot <name> "$1" "" ; }
+```
+
+The third argument is the value used when `get` fails (`pointers` passes
+`unknown`); any further arguments go to `__catalog` (`pointers` passes the
+device kind). The helpers keep empty catalogue fields in place, so an empty
+`choices` or `default` never shifts the columns. All three built-in drivers use them.
 
 The default registry is `DEVICECTL_DRIVERS=(pointers keyboard locale)`.
 

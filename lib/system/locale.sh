@@ -3,13 +3,14 @@
 # @shell bash4 — нужны конструкции bash: double-bracket [[ ]], local/declare flags, case/replace expansion, regex =~ / needs bash constructs: double-bracket [[ ]], local/declare flags, case/replace expansion, regex =~
 # locale.sh — Localization configuration for system setup / Конфигурация локализации для
 # настройки системы
-# @depends core/const, core/logger, core/utils
+# @depends core/const, core/logger, core/utils, lib/system/devdriver
 
 # Source Guard / Защита от повторной загрузки
 bs::guard "SYSTEM_LOCALE" || return 0
 
 # Зависимости / Dependencies
-bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" \
+    "./devdriver.sh"
 
 # @description Set system locale / Установить системную локаль
 # @param $1 Locale (e.g., "en_US.UTF-8", "ru_RU.UTF-8") / Локаль (например, "en_US.UTF-8",
@@ -134,23 +135,12 @@ driver::locale::get() {
     return 0
 }
 
-# @private Строка параметра с текущим значением / parameter row with current value.
-driver::locale::__param_row() {
-    local -r handle="$1" name="$2" type="$3" dflt="$4" choices="$5" tip="$6"
-    local -r cur="$(driver::locale::get "${handle}" "${name}")"
-    printf '%s\t%s\t%s\t%s\t%s\t%s\n' "${name}" "${type}" "${cur}" "${dflt}" "${choices}" "${tip}"
-}
-
 # @description Параметры локали / locale parameters.
 # @param $1 handle
 # @stdout TSV param<TAB>type<TAB>current<TAB>default<TAB>choices<TAB>tip
 driver::locale::params() {
     local -r handle="$1"
-    local name type dflt choices tip
-    while IFS=$'\t' read -r name type dflt choices tip; do
-        driver::locale::__param_row "${handle}" "${name}" "${type}" "${dflt}" "${choices}" "${tip}"
-    done < <(driver::locale::__catalog)
-    return 0
+    devdriver::params locale "${handle}" ""
 }
 
 # @description Живое применение локали / live apply of the locale.
@@ -168,10 +158,5 @@ driver::locale::set() {
 # @stdout TSV param<TAB>value
 driver::locale::snapshot() {
     local -r handle="$1"
-    local name type dflt choices tip cur
-    while IFS=$'\t' read -r name type dflt choices tip; do
-        cur="$(driver::locale::get "${handle}" "${name}" 2>/dev/null)" || cur=""
-        printf '%s\t%s\n' "${name}" "${cur}"
-    done < <(driver::locale::__catalog)
-    return 0
+    devdriver::snapshot locale "${handle}" ""
 }
