@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- feat(clean): `bs clean` — clean text pasted from web pages and chats. `lib/data/textclean.sh` holds 13 rules, each switched on or off on its own (`ansi`, `tags`, `entities`, `invisible`, `markdown`, `typography`, `tabs`, `noise`, `trailing`, `dedent`, `unwrap`, `blank`, `danger`); `lib/tui/clean.sh` is the CLI: a filter (`bs clean < file`, `--rules`, `--RULE`/`--no-RULE`, `--strict`) and a paste window on `lib/tui` with live preview, rule hotkeys `1`-`9` `a`-`d`, a danger confirmation, and OSC 52 copy plus stdout on Enter. Defaults can be saved to `~/.config/bs/clean/rules`, extra noise patterns go to `~/.config/bs/clean/noise`. Docs: `documentation/{en,ru}/03-modules/data-textclean.md`. Tests: `testtextcleanunit.sh` (83 checks).
+- feat(tui): bracketed paste — `tui::paste_on`/`tui::paste_off`, and `tui::key_read` returns `TUI_KEY=PASTE` with the pasted text in `TUI_PASTE` instead of a stream of keys.
+
 ## [0.16.0] - 2026-10-30 "Cooloua"
 
 ### Added

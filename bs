@@ -232,7 +232,7 @@ esac
 # первый аргумент — путь к существующему скрипту, а не команда.
 if [ $# -ge 1 ] && [ -f "$1" ]; then
   case "$1" in
-    help|-h|--help|version|env|list|lang-doc|lsp|chat|sync|rfc|api|ts|audit|doctor|run|build|repl|calc|init-shell|shebang|call|update|uninstall|where) : ;;
+    help|-h|--help|version|env|list|clean|lang-doc|lsp|chat|sync|rfc|api|ts|audit|doctor|run|build|repl|calc|init-shell|shebang|call|update|uninstall|where) : ;;
     *) BS_SHEBANG=1 ;;
   esac
 fi
@@ -257,6 +257,7 @@ case "${1:-help}" in
   list)           bs_cli_list_cmd ;;
   lang-doc)       shift; bs_cli_delegate lang-doc bs::cli::lang_doc_cmd "$@" ;;
   lsp)            shift; bs_cli_delegate lsp bs::cli::lsp_cmd "$@" ;;
+  clean)          shift; bs_cli_delegate clean bs::cli::clean_cmd "$@" ;;
   chat)           shift; bs_cli_delegate chat bs::cli::chat_cmd "$@" ;;
   update)         shift; bs_cli_update_cmd "$@" ;;
   uninstall)      shift; bs_cli_uninstall_cmd "$@" ;;

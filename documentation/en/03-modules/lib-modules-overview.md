@@ -84,6 +84,12 @@ Key functions: `dataprocessor::json::query`, `dataprocessor::xml::to_json`, `dat
 
 Details: [data-format.md](data-format.md)
 
+- [textclean.sh](../../../lib/data/textclean.sh) — clean text pasted from web pages and chats with 13 rules that switch on and off one by one (ANSI codes, invisible characters, smart quotes, HTML entities and tags, UI noise such as "Copy code", unwrap, dedent, …) and a `danger` scan for risky shell commands. The `bs clean` command ([lib/tui/clean.sh](../../../lib/tui/clean.sh)) is a filter (`bs clean < file`) or a paste window that copies the result via OSC 52.
+
+Key functions: `textclean::enable`, `textclean::disable`, `textclean::only`, `textclean::process`, `textclean::filter`, `textclean::danger::scan`, `textclean::copy`.
+
+Details: [data-textclean.md](data-textclean.md)
+
 ## integration — `lib/integration/`
 
 Clients for external services, VPN tooling, LLMs, Kubernetes and connectors to other systems:

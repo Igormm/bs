@@ -502,7 +502,7 @@ bs_shell_posix_command() {
       # help of a command that bs_cli_help_cmd delegates to the bash layer
       # справка команды, которую bs_cli_help_cmd отдаёт bash-слою
       case ${1:-} in
-        lang-doc|lsp|chat|api|ts|audit|build|rfc)
+        clean|lang-doc|lsp|chat|api|ts|audit|build|rfc)
           unset __bs_pc_cmd
           return 1 ;;
       esac
