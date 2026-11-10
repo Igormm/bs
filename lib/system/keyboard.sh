@@ -3,14 +3,13 @@
 # @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), local/declare flags, process substitution / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), local/declare flags, process substitution
 # keyboard.sh — Keyboard layout configuration for system setup / Конфигурация раскладки
 # клавиатуры для настройки системы
-# @depends core/const, core/logger, core/utils, lib/system/devdriver
+# @depends core/const, core/logger, core/utils
 
 # Source Guard / Защита от повторной загрузки
 bs::guard "SYSTEM_KEYBOARD" || return 0
 
 # Зависимости / Dependencies
-bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" \
-    "./devdriver.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh"
 
 # @description Change one X11 keymap field, keeping the others (localectl
 # set-x11-keymap takes layout, model, variant, options together) / Изменить одно поле
@@ -191,12 +190,25 @@ driver::keyboard::get() {
     return 0
 }
 
+# @private Строка параметра с текущим значением / parameter row with current value.
+driver::keyboard::__param_row() {
+    local -r handle="$1" name="$2" type="$3" dflt="$4" choices="$5" tip="$6"
+    local -r cur="$(driver::keyboard::get "${handle}" "${name}")"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' "${name}" "${type}" "${cur}" "${dflt}" "${choices}" "${tip}"
+}
+
 # @description Параметры клавиатуры / keyboard parameters.
 # @param $1 handle
 # @stdout TSV param<TAB>type<TAB>current<TAB>default<TAB>choices<TAB>tip
 driver::keyboard::params() {
     local -r handle="$1"
-    devdriver::params keyboard "${handle}" ""
+    local name type dflt choices tip
+    # Поля разделены \037, не табом: IFS=$'\t' склеивает пустые поля и сдвигает колонки.
+    # Fields split on \037, not tab: IFS=$'\t' merges empty fields and shifts columns.
+    while IFS=$'\037' read -r name type dflt choices tip; do
+        driver::keyboard::__param_row "${handle}" "${name}" "${type}" "${dflt}" "${choices}" "${tip}"
+    done < <(driver::keyboard::__catalog | tr '\t' '\037')
+    return 0
 }
 
 # @description Живое применение поля раскладки / live apply of a keymap field.
@@ -217,5 +229,10 @@ driver::keyboard::set() {
 # @stdout TSV param<TAB>value
 driver::keyboard::snapshot() {
     local -r handle="$1"
-    devdriver::snapshot keyboard "${handle}" ""
+    local name type dflt choices tip cur
+    while IFS=$'\t' read -r name type dflt choices tip; do
+        cur="$(driver::keyboard::get "${handle}" "${name}" 2>/dev/null)" || cur=""
+        printf '%s\t%s\n' "${name}" "${cur}"
+    done < <(driver::keyboard::__catalog)
+    return 0
 }

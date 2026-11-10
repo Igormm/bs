@@ -19,7 +19,7 @@ bs::guard "LIB_SYSTEM_POINTERS" || return 0
 
 # Dependencies / Зависимости
 bs::source_relative "../../core/lang.sh" "../../core/const.sh" \
-    "../../core/logger.sh" "../../core/utils.sh" "./devdriver.sh"
+    "../../core/logger.sh" "../../core/utils.sh"
 
 # @global DRIVER_POINTERS_XINPUT — Hook: xinput binary or test shim (category: hook)
 # @global DRIVER_POINTERS_XINPUT — Хук: бинарь xinput или шим для тестов (категория: hook)
@@ -111,13 +111,27 @@ driver::pointers::__catalog() {
     esac
 }
 
+# @private Строка параметра с текущим значением / parameter row with current value.
+driver::pointers::__param_row() {
+    local -r kind="$1" handle="$2" name="$3" type="$4" dflt="$5" choices="$6" tip="$7"
+    local cur
+    cur="$(driver::pointers::get "${handle}" "${name}")" || cur="unknown"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' "${name}" "${type}" "${cur}" "${dflt}" "${choices}" "${tip}"
+}
+
 # @description Параметры устройства / device parameters.
 # @param $1 handle
 # @stdout TSV param<TAB>type<TAB>current<TAB>default<TAB>choices<TAB>tip
 driver::pointers::params() {
     local -r handle="$1"
     local -r kind="$(driver::pointers::__kind "${handle}")"
-    devdriver::params pointers "${handle}" "unknown" "${kind}"
+    local name type dflt choices tip
+    # Поля разделены \037, не табом: IFS=$'\t' склеивает пустые поля и сдвигает колонки.
+    # Fields split on \037, not tab: IFS=$'\t' merges empty fields and shifts columns.
+    while IFS=$'\037' read -r name type dflt choices tip; do
+        driver::pointers::__param_row "${kind}" "${handle}" "${name}" "${type}" "${dflt}" "${choices}" "${tip}"
+    done < <(driver::pointers::__catalog "${kind}" | tr '\t' '\037')
+    return 0
 }
 
 # @private Сопоставить имя libinput-свойства по параметру / libinput property per param.
@@ -288,5 +302,10 @@ driver::pointers::set() {
 driver::pointers::snapshot() {
     local -r handle="$1"
     local -r kind="$(driver::pointers::__kind "${handle}")"
-    devdriver::snapshot pointers "${handle}" "unknown" "${kind}"
+    local name type dflt choices tip cur
+    while IFS=$'\t' read -r name type dflt choices tip; do
+        cur="$(driver::pointers::get "${handle}" "${name}" 2>/dev/null)" || cur="unknown"
+        printf '%s\t%s\n' "${name}" "${cur}"
+    done < <(driver::pointers::__catalog "${kind}")
+    return 0
 }

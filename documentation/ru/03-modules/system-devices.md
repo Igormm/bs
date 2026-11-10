@@ -18,7 +18,6 @@ BS-профиль (INI с управляемыми маркерами) и при
 сохраняет/загружает профили.
 
 Источники: [lib/system/devicectl.sh](../../../lib/system/devicectl.sh),
-[lib/system/devdriver.sh](../../../lib/system/devdriver.sh),
 [lib/system/devprofile.sh](../../../lib/system/devprofile.sh),
 [lib/system/pointers.sh](../../../lib/system/pointers.sh),
 [lib/system/keyboard.sh](../../../lib/system/keyboard.sh),
@@ -40,22 +39,6 @@ BS-профиль (INI с управляемыми маркерами) и при
 Типы параметров: `bool`, `enum:a,b,c`, `int`, `range:min:max:step`,
 `string`, `keys`. Добавить драйвер — значит зарегистрировать его; TUI менять
 не нужно.
-
-Драйверу с фиксированным каталогом параметров не нужно писать `params` и
-`snapshot` вручную. Достаточно `driver::<name>::__catalog [args…]` (строки
-`param<TAB>type<TAB>default<TAB>choices<TAB>tip`) и `get`, а остальное
-делегировать в [lib/system/devdriver.sh](../../../lib/system/devdriver.sh):
-
-```bash
-driver::<name>::params()   { devdriver::params   <name> "$1" "" ; }
-driver::<name>::snapshot() { devdriver::snapshot <name> "$1" "" ; }
-```
-
-Третий аргумент — значение на случай, если `get` упал (`pointers` передаёт
-`unknown`); остальные аргументы уходят в `__catalog` (`pointers` передаёт тип
-устройства). Помощники сохраняют пустые поля каталога, поэтому пустые
-`choices` или `default` не сдвигают колонки. Все три встроенных драйвера
-используют их.
 
 Реестр по умолчанию: `DEVICECTL_DRIVERS=(pointers keyboard locale)`.
 
