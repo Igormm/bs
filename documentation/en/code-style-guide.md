@@ -112,6 +112,12 @@ See [section 8](#8-module-metadata-and-source-guard) for more on module metadata
 | Mutable globals                   | lower_snake_case    | Not recommended; prefer getter functions or associative arrays | (avoid)                       |
 | Global associative arrays         | SCREAMING_SNAKE_MAP | `declare -gA` at module scope                                  | `declare -gA CONFIG_MAP`      |
 
+**`posix` tier:** the table above describes `lib/` and `bash4` code. In the
+kernel the real function is `bs_<namespace>_<name>` without `::`, and
+`module::function` is an alias for bash and zsh; there are no associative
+arrays and no `local -r` there, see [12.2](#122-names-one-namespace-bs_) and
+[12.6](#126-variables).
+
 Key points: the framework uses the Source Guard pattern (`__*_SOURCED`),
 namespaces public functions with a `module::` prefix, and declares
 configuration in associative arrays — all of which is required for complex
@@ -221,6 +227,8 @@ validate_input() {
 ### 4.1 Declaration and scope
 
 - Always use `local` for variables inside functions.
+  **`posix` tier:** there is no `local` at all; temporaries are global and
+  carry the `__bs_<module>_` prefix, see [12.6](#126-variables).
 - Use `local -r` for parameters and function-local constants.
 - For integers and arrays: `local -i`, `local -a`.
 - Global associative arrays are a powerful configuration tool. Use them
@@ -307,6 +315,12 @@ module ([core/errorhandler.sh](../../core/errorhandler.sh)):
   runs registered cleanup functions and exits. Note that `log::fatal` does
   **not** exit by itself; it returns an error code and leaves the exit
   decision to the caller.
+- **`posix` tier:** the same functions are called by their real names
+  (`bs_log_error`, `bs_error_exit`, `bs_exit`); modules loaded before the
+  logger write `printf '%s\n' "…" >&2`. The message names the function,
+  because there is no call stack, see
+  [12.9](#129-errors-exit-and-messages) and
+  [12.16](#1216-readability-and-debugging).
 
 ```bash
 #!/usr/bin/env bs
@@ -337,6 +351,10 @@ preserve the exit code:
 | `cmd 2>/dev/null`               | `utils::quiet_err cmd` | run, suppress stderr only             |
 | `cmd >/dev/null 2>&1 \|\| true` | `utils::ignore cmd` | run and ignore the result (always returns 0) |
 | `cmd 2>/dev/null \|\| true`     | `utils::attempt cmd` | best-effort run, keep stdout, ignore failure |
+
+**`posix` tier:** the idioms are the same, the names are the real ones:
+`bs_utils_has`, `bs_utils_quiet`, `bs_utils_quiet_err`, `bs_utils_ignore`,
+`bs_utils_attempt` ([core/quiet.sh](../../core/quiet.sh)).
 
 For conditions, use the `is::*` predicates from [core/lang.sh](../../core/lang.sh)
 instead of test flags — `is::empty "${var}"` instead of `[[ -z "${var}" ]]`,
@@ -887,4 +905,65 @@ bash tests/validatesyntax.sh && bash tests/validateshellcheck.sh && bash tests/v
 - [ ] Every `eval` has a checked name and values by reference; there is a test for a "bad name"
 - [ ] Works with and without `set -eu`; no `[ ] && cmd` as the last line; no `exit`
 - [ ] Messages go through `bs_log_*` (or stderr before the logger); bilingual doc comments
+- [ ] The function fits on a screen; temporary names are words; the error message names the function (§12.16)
 - [ ] The `portableunit` test in every shell, a differential run against the old implementation, `check_posix_tier.sh` OK
+
+### 12.16 Readability and debugging
+
+The `posix` tier has no `local`, `FUNCNAME`, `BASH_SOURCE` or call stack, so the only things that help a person read and debug the code are names, function size and a few techniques that work the same in every shell. Everything below was run in dash 0.5.12, busybox ash 1.36, ksh93u+m 1.0.8, mksh R59, zsh 5.9 and bash 5.2.
+
+**Readability.**
+
+* **One function does one thing and fits on a screen** (aim for 40 lines and at most five or six temporaries). Every temporary is global (§12.6): the fewer there are, the fewer names you must compare before calling a helper. Split a long function into private helpers whose contract is in the doc comment.
+* **After the module code, a temporary name carries a word, not a letter:** `__bs_dat_name`, `__bs_dat_index`, `__bs_log_text`, not `__bs_dat_nn`. A name is read more often than it is written, and in a `set -x` trace it is the only thing that explains the line. Existing short names are not renamed in bulk; change them when you edit the function itself.
+* **A variable has one meaning for the whole function.** Do not use `__bs_x_tmp` for a path first and a counter later: in a trace and in a variable snapshot (below) it looks like clobbering.
+* **Refusals first, the main path after.** Argument checks and `return 2` come at the top, and the main logic runs without nested `if`.
+* **A lookup table is a `case` with one branch per line** and aligned actions (the sample is `bs_shell_of_name` in `bootstrap/shell.sh`).
+* **A shell workaround names the shell and the symptom** in a comment next to it: "zsh does not split `$v` into words", "mksh: `$(( ))` is 32-bit". Without it the next reader will "simplify" the line back.
+
+**Debugging.**
+
+1. **Reproduce in the shell where it breaks.** A whole command: `dash ./bs version`, `busybox ash ./bs doctor`. One module: a probe in a fresh process (the `bs_guard` mark is read-only, a second `.` in the same process does nothing, §12.4):
+
+   ```sh
+   # probe.sh; run: env -i PATH="$PATH" dash probe.sh
+   . ./bootstrap/shell.sh
+   BS_CURRENT_FILE=$PWD/core/prereq.sh; . ./core/prereq.sh
+   BS_CURRENT_FILE=$PWD/core/quiet.sh;  . ./core/quiet.sh
+   bs_utils_has ls; printf 'has ls: %s\n' "$?"
+   ```
+
+   To find a difference between shells, run the same probe in a loop: `for sh in dash 'busybox ash' ksh93 mksh zsh bash; do env -i PATH="$PATH" $sh probe.sh; done`, and compare the output.
+
+2. **A `set -x` trace with file and line.** The prefix comes from `PS4` in the environment:
+
+   ```sh
+   PS4='+ ${BS_CURRENT_FILE-}:${LINENO-}: ' dash -x ./bs version 2>trace.log
+   ```
+
+   | Shell | What this `PS4` prints |
+   |---|---|
+   | busybox ash, ksh93, mksh | the file and the line in the file |
+   | dash 0.5.12 (the Ubuntu build) | the file only: `LINENO` is empty |
+   | zsh | **do not set `PS4`**: zsh does not expand parameters in it and prints the text literally; its own prefix already has `file:line>` and `function:line>` |
+   | bash | as root, `PS4` from the environment is ignored; in bash the prefix is set by `bs::trace_prefix` (`bootstrap/bs.sh`) |
+
+   * Write exactly `${BS_CURRENT_FILE-}` and `${LINENO-}`: entry points turn `set -u` on, and with `${BS_CURRENT_FILE}` mksh stops with "parameter not set" while ksh93 stops expanding `PS4`.
+   * **The file name is right only while files are being loaded.** The loader sets `BS_CURRENT_FILE` for the duration of `.` (§12.5); once functions run, it still holds the last loaded file. Find where a function is defined by its name: `grep -rn '^bs_utils_has()' bootstrap core install`; an old `::` name is found in the alias block at the end of the file (§12.2).
+
+3. **A trace of one call.** A temporary insert, removed before the commit: `{ set -x; bs_arr_push name value; set +x; } 2>trace.log`. It works the same in all six shells.
+
+4. **Who clobbered a temporary.** The main class of errors of the tier (§12.6) is caught with a snapshot of the variables before and after the suspect call:
+
+   ```sh
+   set | grep '^__bs_' > before.txt
+   bs_arr_copy source target
+   set | grep '^__bs_' > after.txt
+   diff before.txt after.txt
+   ```
+
+   `diff` shows every name the call wrote to; if one of them is a name the caller reads after the call, that is the cause.
+
+5. **Messages instead of a trace.** `BS_LOG_LEVEL=TRACE` turns `bs_log_trace` and `bs_log_debug` on; `BS_DEBUG=1` shows the steps of `bootstrap/init.sh`. Remember §12.8: `bs_log_debug` writes to stdout, so inside a function whose stdout is the result a debug line is written with `printf '%s\n' "…" >&2`.
+
+6. **There is no call stack anywhere but bash** (`bs_error_exit_with_backtrace` prints "no call stack in this shell" in the other shells). The message format of §12.9 replaces it: `function_name: what is wrong: value`. In the `posix` tier an error message without the function name is a defect.
