@@ -31,7 +31,7 @@ export BS_NAME="BS (Bash Open Source Architecture) BOSA Framework"
 
 # @global BS_CODENAME — Env: release code name (category: env)
 # @global BS_CODENAME — Env: кодовое название релиза (категория: env)
-: "${BS_CODENAME:=Cooloua}"
+: "${BS_CODENAME:=Purioa}"
 export BS_CODENAME
 
 # @description Print version information / Вывести информацию о версии
