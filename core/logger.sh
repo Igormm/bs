@@ -30,7 +30,8 @@
 #   Real functions: bs_log_trace, bs_log_debug, bs_log_info, bs_log_success, bs_log_warn, bs_log_error, bs_log_fatal,
 #   bs_log_print, bs_log_header, bs_log_list, bs_log_table, bs_log_progress, bs_log_clear_line and the private
 #   bs_log_timestamp, bs_log_is_color_enabled, bs_log_level_to_number, bs_log_is_level_allowed,
-#   bs_log_get_level_color, bs_log_json_escape, bs_log_format_message; in bash and zsh also log::*
+#   bs_log_get_level_color, bs_log_json_escape, bs_log_join_words, bs_log_print_json,
+#   bs_log_print_structured, bs_log_print_plain, bs_log_print_color, bs_log_format_message; in bash and zsh also log::*
 #   (the old names, used by the whole framework) and log::__* for the private ones.
 #   Настоящие функции: bs_log_trace … bs_log_clear_line и приватные bs_log_timestamp …
 #   bs_log_format_message; в bash и zsh — ещё и log::* (прежние имена, их зовёт весь фреймворк)
@@ -189,15 +190,10 @@ bs_log_json_escape() {
 }
 
 # @private
-# @description Форматировать и напечатать сообщение / Format and print a message
-# @param $1 level (upper-case) / уровень (заглавными)
-# @param $2 file descriptor / дескриптор
+# @description Склеить слова пробелом в __bs_log_text, независимо от IFS вызывающего /
+#   Join the words with one space into __bs_log_text, whatever the caller's IFS
 # @param $@ message words / слова сообщения
-bs_log_format_message() {
-  __bs_log_level=${1:-INFO}
-  __bs_log_fd=${2:-1}
-  shift 2
-  # слова склеиваются пробелом независимо от IFS вызывающего / words are joined with a space whatever the caller's IFS
+bs_log_join_words() {
   __bs_log_text=''
   __bs_log_first=1
   for __bs_log_word in "$@"; do
@@ -208,47 +204,89 @@ bs_log_format_message() {
       __bs_log_text="$__bs_log_text $__bs_log_word"
     fi
   done
+}
+
+# @private
+# @description Напечатать строку JSON / Print a JSON line
+# @param $1 timestamp, may be empty / время, может быть пустым
+# @param $2 level / уровень
+# @param $3 message / сообщение
+bs_log_print_json() {
+  __bs_log_esc_text=$(bs_log_json_escape "$3")
+  if [ -n "$1" ]; then
+    printf '{"timestamp":"%s","level":"%s","message":"%s"}\n' "$1" "$2" "$__bs_log_esc_text"
+  else
+    printf '{"level":"%s","message":"%s"}\n' "$2" "$__bs_log_esc_text"
+  fi
+}
+
+# @private
+# @description Напечатать строку «[время] УРОВЕНЬ | текст» / Print a "[time] LEVEL | text" line
+# @param $1 timestamp, may be empty / время, может быть пустым
+# @param $2 level / уровень
+# @param $3 message / сообщение
+bs_log_print_structured() {
+  if [ -n "$1" ]; then
+    printf '[%s] %-5s | %s\n' "$1" "$2" "$3"
+  else
+    printf '[%-5s] %s\n' "$2" "$3"
+  fi
+}
+
+# @private
+# @description Напечатать текстовую строку без цвета / Print a plain text line without colour
+# @param $1 timestamp, may be empty / время, может быть пустым
+# @param $2 level / уровень
+# @param $3 message / сообщение
+bs_log_print_plain() {
+  if [ -n "$1" ]; then
+    printf '[%s] %-5s %s\n' "$1" "$2" "$3"
+  else
+    printf '[%-5s] %s\n' "$2" "$3"
+  fi
+}
+
+# @private
+# @description Напечатать цветную текстовую строку; ERROR и FATAL — жирным /
+#   Print a coloured text line; ERROR and FATAL in bold
+# @param $1 timestamp, may be empty / время, может быть пустым
+# @param $2 level / уровень
+# @param $3 message / сообщение
+bs_log_print_color() {
+  __bs_log_reset="${__bs_log_esc}[0m"
+  __bs_log_color=$(bs_log_get_level_color "$2")
+  case "$2" in
+    ERROR|FATAL) __bs_log_color="${__bs_log_color}${__bs_log_esc}[1m" ;;
+  esac
+  if [ -n "$1" ]; then
+    printf '%s[%s]%s %s%-5s%s %s\n' \
+      "${__bs_log_esc}[90m" "$1" "$__bs_log_reset" \
+      "$__bs_log_color" "$2" "$__bs_log_reset" "$3"
+  else
+    printf '%s%-5s%s %s\n' "$__bs_log_color" "$2" "$__bs_log_reset" "$3"
+  fi
+}
+
+# @private
+# @description Форматировать и напечатать сообщение в формате BS_LOG_FORMAT /
+#   Format and print a message in the BS_LOG_FORMAT format
+# @param $1 level (upper-case) / уровень (заглавными)
+# @param $2 file descriptor / дескриптор
+# @param $@ message words / слова сообщения
+bs_log_format_message() {
+  __bs_log_level=${1:-INFO}
+  __bs_log_fd=${2:-1}
+  shift 2
+  bs_log_join_words "$@"
   __bs_log_ts=$(bs_log_timestamp)
   case "${BS_LOG_FORMAT}" in
-    json)
-      __bs_log_esc_text=$(bs_log_json_escape "$__bs_log_text")
-      if [ -n "$__bs_log_ts" ]; then
-        printf '{"timestamp":"%s","level":"%s","message":"%s"}\n' \
-          "$__bs_log_ts" "$__bs_log_level" "$__bs_log_esc_text"
-      else
-        printf '{"level":"%s","message":"%s"}\n' "$__bs_log_level" "$__bs_log_esc_text"
-      fi
-      ;;
-    structured)
-      if [ -n "$__bs_log_ts" ]; then
-        printf '[%s] %-5s | %s\n' "$__bs_log_ts" "$__bs_log_level" "$__bs_log_text"
-      else
-        printf '[%-5s] %s\n' "$__bs_log_level" "$__bs_log_text"
-      fi
-      ;;
+    json)       bs_log_print_json       "$__bs_log_ts" "$__bs_log_level" "$__bs_log_text" ;;
+    structured) bs_log_print_structured "$__bs_log_ts" "$__bs_log_level" "$__bs_log_text" ;;
     *)
       if bs_log_is_color_enabled "$__bs_log_fd"; then
-        __bs_log_reset="${__bs_log_esc}[0m"
-        __bs_log_color=$(bs_log_get_level_color "$__bs_log_level")
-        if [ "$__bs_log_level" = "ERROR" ] || [ "$__bs_log_level" = "FATAL" ]; then
-          __bs_log_color="${__bs_log_color}${__bs_log_esc}[1m"
-        fi
-        if [ -n "$__bs_log_ts" ]; then
-          printf '%s[%s]%s %s%-5s%s %s\n' \
-            "${__bs_log_esc}[90m" "$__bs_log_ts" "$__bs_log_reset" \
-            "$__bs_log_color" "$__bs_log_level" "$__bs_log_reset" \
-            "$__bs_log_text"
-        else
-          printf '%s%-5s%s %s\n' \
-            "$__bs_log_color" "$__bs_log_level" "$__bs_log_reset" \
-            "$__bs_log_text"
-        fi
+        bs_log_print_color "$__bs_log_ts" "$__bs_log_level" "$__bs_log_text"
       else
-        if [ -n "$__bs_log_ts" ]; then
-          printf '[%s] %-5s %s\n' "$__bs_log_ts" "$__bs_log_level" "$__bs_log_text"
-        else
-          printf '[%-5s] %s\n' "$__bs_log_level" "$__bs_log_text"
-        fi
+        bs_log_print_plain "$__bs_log_ts" "$__bs_log_level" "$__bs_log_text"
       fi
       ;;
   esac
