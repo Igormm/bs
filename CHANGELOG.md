@@ -4,6 +4,7 @@
 
 ### Changed
 - refactor(logger): `bs_log_format_message` (60 lines) is split by the §12.16 readability rule into private helpers with one job each: `bs_log_join_words`, `bs_log_print_json`, `bs_log_print_structured`, `bs_log_print_plain`, `bs_log_print_color`. Output is byte-identical to the old code in dash, busybox ash, ksh93, mksh, zsh and bash for every `BS_LOG_FORMAT` × `BS_LOG_COLOR` × `BS_LOG_TIMESTAMP` combination; no public name changed.
+- refactor(args): `bs_args_parse` (135 lines) is split into private helpers: `bs_args_parse_flag` (with `bs_args_parse_flag_spec` and `bs_args_parse_value_flag`) for `--name`, `--name value`, `--name=value`; `bs_args_parse_positional` for tree levels and the variadic level; `bs_args_parse_refuse` prints the reason and the help once instead of seven copies. The main loop is now one `case` over `--`, `--*` and a positional argument (45 lines). A differential run of 24 argument lines (flags, enum/number values, `--`, help, wrong levels, too many parameters) gives byte-identical output, return codes and parsed state in dash, busybox ash, ksh93, mksh, zsh and bash; no public name changed.
 
 ## [0.17.0] - 2026-11-10 "Purioa"
 

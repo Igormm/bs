@@ -552,6 +552,126 @@ bs_args_parse_required() {
   return "${E_SUCCESS:-0}"
 }
 
+# @private
+# @description Отказ разбора: причина и справка в stderr. Код возврата ставит вызывающий /
+#   Parse refusal: the reason and the help to stderr. The caller sets the return code
+# @param $1 message / сообщение
+bs_args_parse_refuse() {
+  bs_log_error "$1"
+  bs_args_help >&2
+}
+
+# @private
+# @description Разобрать «--имя[=значение]» / Split "--name[=value]"
+# @param $1 argument starting with -- / аргумент, начинающийся с --
+# Scratch globals: __bs_args_ps_spec, __bs_args_ps_name, __bs_args_ps_inline,
+#   __bs_args_ps_has_inline (written)
+bs_args_parse_flag_spec() {
+  __bs_args_ps_spec=${1#--}
+  __bs_args_ps_name=${__bs_args_ps_spec%%=*}
+  __bs_args_ps_inline=""
+  __bs_args_ps_has_inline=0
+  case "$__bs_args_ps_spec" in
+    *=*)
+      __bs_args_ps_inline=${__bs_args_ps_spec#*=}
+      __bs_args_ps_has_inline=1
+      ;;
+  esac
+}
+
+# @private
+# @description Флаг со значением: --name=value или --name value; проверка значения /
+#   Value flag: --name=value or --name value; the value is validated
+# @param $@ arguments after the flag / аргументы после флага
+# @returns 0 stored, E_INVALID missing or invalid value / 0 — записано, E_INVALID — нет значения или оно неверно
+# Scratch globals: __bs_args_ps_name, __bs_args_ps_inline, __bs_args_ps_has_inline (read);
+#   __bs_args_ps_used (written: 1 when the next argument was taken), __bs_args_ps_val (written)
+bs_args_parse_value_flag() {
+  if [ "$__bs_args_ps_has_inline" -eq 1 ]; then
+    bs_map_set bs_args_parsed "$__bs_args_ps_name" "$__bs_args_ps_inline"
+  elif [ $# -eq 0 ]; then
+    bs_args_parse_refuse "flag \"--${__bs_args_ps_name}\" requires a value"
+    return "${E_INVALID:-2}"
+  elif [ "$1" = "--" ]; then
+    # Разделитель "--" не съедаем: значение отсутствует (пустое);
+    # "--" обработает ветка разделителя на следующем шаге
+    # Do not eat the "--" separator: the value is missing (empty);
+    # the separator branch handles "--" on the next step
+    bs_map_set bs_args_parsed "$__bs_args_ps_name" ""
+  else
+    bs_map_set bs_args_parsed "$__bs_args_ps_name" "$1"
+    __bs_args_ps_used=1
+  fi
+  bs_args_mget bs_args_parsed "$__bs_args_ps_name" __bs_args_ps_val
+  if ! bs_args_validate_flag_value "$__bs_args_ps_name" "$__bs_args_ps_val"; then
+    bs_args_parse_refuse "flag \"--${__bs_args_ps_name}\" has an invalid value: \"${__bs_args_ps_val}\" (expected $(bs_args_flag_value_hint "$__bs_args_ps_name"))"
+    return "${E_INVALID:-2}"
+  fi
+  return "${E_SUCCESS:-0}"
+}
+
+# @private
+# @description Разобрать один флаг: --name, --name value, --name=value /
+#   Parse one flag: --name, --name value, --name=value
+# @param $1 the flag argument / аргумент-флаг
+# @param $@ the arguments after it / аргументы после него
+# @returns 0 parsed, E_INVALID unknown flag or bad value / 0 — разобран, E_INVALID — неизвестный флаг или неверное значение
+# Scratch globals: __bs_args_ps_used (written: 1 when the caller must shift one more argument),
+#   __bs_args_ps_kind and the bs_args_parse_flag_spec globals (written)
+bs_args_parse_flag() {
+  __bs_args_ps_used=0
+  bs_args_parse_flag_spec "$1"
+  shift
+  bs_args_mget bs_args_flags "$__bs_args_ps_name" __bs_args_ps_kind
+  if [ -z "$__bs_args_ps_kind" ]; then
+    bs_args_parse_refuse "unknown flag: \"--${__bs_args_ps_name}\""
+    return "${E_INVALID:-2}"
+  fi
+  if [ "$__bs_args_ps_kind" = "value" ]; then
+    bs_args_parse_value_flag "$@"
+    return $?
+  fi
+  # bool-флаг не принимает значение / bool flag takes no value
+  if [ "$__bs_args_ps_has_inline" -eq 1 ]; then
+    bs_args_parse_refuse "flag \"--${__bs_args_ps_name}\" does not take a value"
+    return "${E_INVALID:-2}"
+  fi
+  bs_map_set bs_args_parsed "$__bs_args_ps_name" 1
+  return "${E_SUCCESS:-0}"
+}
+
+# @private
+# @description Принять позиционный параметр на уровне __bs_args_ps_pos /
+#   Accept a positional parameter at level __bs_args_ps_pos
+# @param $1 parameter / параметр
+# @returns 0 accepted, E_INVALID wrong level, unknown or too many / 0 — принят, E_INVALID — не тот уровень, неизвестен или лишний
+# Scratch globals: __bs_args_ps_pos, __bs_args_ps_max, __bs_args_variadic (read);
+#   __bs_args_ps_real (written)
+bs_args_parse_positional() {
+  # Параметров больше, чем уровней в дереве: годится только повторяемый уровень
+  # More parameters than tree levels: only the variadic level fits
+  if [ "$__bs_args_ps_pos" -gt "$__bs_args_ps_max" ]; then
+    if [ "$__bs_args_variadic" -gt 0 ] && bs_args_is_allowed_at "$__bs_args_variadic" "$1"; then
+      bs_arr_push bs_args_params "$1"
+      return "${E_SUCCESS:-0}"
+    fi
+    bs_args_parse_refuse "too many parameters: \"$1\" is beyond level ${__bs_args_ps_max}"
+    return "${E_INVALID:-2}"
+  fi
+  if bs_args_is_allowed_at "$__bs_args_ps_pos" "$1"; then
+    bs_arr_push bs_args_params "$1"
+    return "${E_SUCCESS:-0}"
+  fi
+  # Параметр есть в дереве, но на другом уровне / Parameter exists in the tree but at another level
+  __bs_args_ps_real=$(bs_args_level_of "$1")
+  if [ -n "$__bs_args_ps_real" ]; then
+    bs_args_parse_refuse "parameter \"$1\" belongs to level ${__bs_args_ps_real}, but was used at level ${__bs_args_ps_pos}"
+  else
+    bs_args_parse_refuse "unknown parameter: \"$1\""
+  fi
+  return "${E_INVALID:-2}"
+}
+
 # @description Проверить аргументы по объявленному дереву
 # @description Validate arguments against the declared tree
 #   Успех: заполняет массив bs_args_params, возвращает 0
@@ -584,111 +704,21 @@ bs_args_parse() {
   while [ $# -gt 0 ]; do
     __bs_args_ps_param=$1
     shift
-
-    # Разделитель "--": всё после — сырые аргументы (bs_args_rest)
-    # The "--" separator: everything after — raw arguments (bs_args_rest)
-    if [ "$__bs_args_ps_param" = "--" ]; then
-      if [ $# -gt 0 ]; then bs_arr_push bs_args_rest "$@"; fi
-      break
-    fi
-
-    # Флаги: --name, --name value, --name=value
-    # Flags: --name, --name value, --name=value
     case "$__bs_args_ps_param" in
+      --)
+        # Всё после "--" — сырые аргументы / Everything after "--" is raw arguments
+        if [ $# -gt 0 ]; then bs_arr_push bs_args_rest "$@"; fi
+        break
+        ;;
       --*)
-        __bs_args_ps_spec=${__bs_args_ps_param#--}
-        __bs_args_ps_name=${__bs_args_ps_spec%%=*}
-        __bs_args_ps_inline=""
-        __bs_args_ps_has_inline=0
-        case "$__bs_args_ps_spec" in
-          *=*)
-            __bs_args_ps_inline=${__bs_args_ps_spec#*=}
-            __bs_args_ps_has_inline=1
-            ;;
-        esac
-
-        # Неизвестный флаг / Unknown flag
-        bs_args_mget bs_args_flags "$__bs_args_ps_name" __bs_args_ps_kind
-        if [ -z "$__bs_args_ps_kind" ]; then
-          bs_log_error "unknown flag: \"--${__bs_args_ps_name}\""
-          bs_args_help >&2
-          return "${E_INVALID:-2}"
-        fi
-
-        if [ "$__bs_args_ps_kind" = "value" ]; then
-          # Флаг со значением: --name=value или --name value
-          # Value flag: --name=value or --name value
-          if [ "$__bs_args_ps_has_inline" -eq 1 ]; then
-            bs_map_set bs_args_parsed "$__bs_args_ps_name" "$__bs_args_ps_inline"
-          else
-            if [ $# -eq 0 ]; then
-              bs_log_error "flag \"--${__bs_args_ps_name}\" requires a value"
-              bs_args_help >&2
-              return "${E_INVALID:-2}"
-            fi
-            if [ "$1" = "--" ]; then
-              # Разделитель "--" не съедаем: значение отсутствует (пустое);
-              # "--" обработает ветка разделителя на следующем шаге
-              # Do not eat the "--" separator: the value is missing (empty);
-              # the separator branch handles "--" on the next step
-              bs_map_set bs_args_parsed "$__bs_args_ps_name" ""
-            else
-              bs_map_set bs_args_parsed "$__bs_args_ps_name" "$1"
-              shift
-            fi
-          fi
-          # Валидация значения / Value validation
-          bs_args_mget bs_args_parsed "$__bs_args_ps_name" __bs_args_ps_val
-          if ! bs_args_validate_flag_value "$__bs_args_ps_name" "$__bs_args_ps_val"; then
-            bs_log_error "flag \"--${__bs_args_ps_name}\" has an invalid value: \"${__bs_args_ps_val}\" (expected $(bs_args_flag_value_hint "$__bs_args_ps_name"))"
-            bs_args_help >&2
-            return "${E_INVALID:-2}"
-          fi
-        else
-          # bool-флаг не принимает значение / bool flag takes no value
-          if [ "$__bs_args_ps_has_inline" -eq 1 ]; then
-            bs_log_error "flag \"--${__bs_args_ps_name}\" does not take a value"
-            bs_args_help >&2
-            return "${E_INVALID:-2}"
-          fi
-          bs_map_set bs_args_parsed "$__bs_args_ps_name" 1
-        fi
-        continue
+        bs_args_parse_flag "$__bs_args_ps_param" "$@" || return $?
+        if [ "$__bs_args_ps_used" -eq 1 ]; then shift; fi
+        ;;
+      *)
+        __bs_args_ps_pos=$((__bs_args_ps_pos + 1))
+        bs_args_parse_positional "$__bs_args_ps_param" || return $?
         ;;
     esac
-
-    # Позиционный параметр / Positional parameter
-    __bs_args_ps_pos=$((__bs_args_ps_pos + 1))
-
-    # Параметров больше, чем уровней в дереве
-    # More parameters than tree levels
-    if [ "$__bs_args_ps_pos" -gt "$__bs_args_ps_max" ]; then
-      # Повторяемый уровень / Variadic level
-      if [ "$__bs_args_variadic" -gt 0 ] && bs_args_is_allowed_at "$__bs_args_variadic" "$__bs_args_ps_param"; then
-        bs_arr_push bs_args_params "$__bs_args_ps_param"
-        continue
-      fi
-      bs_log_error "too many parameters: \"${__bs_args_ps_param}\" is beyond level ${__bs_args_ps_max}"
-      bs_args_help >&2
-      return "${E_INVALID:-2}"
-    fi
-
-    # Параметр допустим на этом уровне / Parameter allowed at this level
-    if bs_args_is_allowed_at "$__bs_args_ps_pos" "$__bs_args_ps_param"; then
-      bs_arr_push bs_args_params "$__bs_args_ps_param"
-      continue
-    fi
-
-    # Параметр есть в дереве, но на другом уровне
-    # Parameter exists in the tree but at another level
-    __bs_args_ps_real=$(bs_args_level_of "$__bs_args_ps_param")
-    if [ -n "$__bs_args_ps_real" ]; then
-      bs_log_error "parameter \"${__bs_args_ps_param}\" belongs to level ${__bs_args_ps_real}, but was used at level ${__bs_args_ps_pos}"
-    else
-      bs_log_error "unknown parameter: \"${__bs_args_ps_param}\""
-    fi
-    bs_args_help >&2
-    return "${E_INVALID:-2}"
   done
 
   # Минимальное количество позиционных параметров / Minimum positional count
