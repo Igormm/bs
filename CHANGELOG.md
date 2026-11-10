@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.17.0] - 2026-11-10 "Cooloua"
 
 ### Added
 - feat(clean): `bs clean` — clean text pasted from web pages and chats. `lib/data/textclean.sh` holds 13 rules, each switched on or off on its own (`ansi`, `tags`, `entities`, `invisible`, `markdown`, `typography`, `tabs`, `noise`, `trailing`, `dedent`, `unwrap`, `blank`, `danger`); `lib/tui/clean.sh` is the CLI: a filter (`bs clean < file`, `--rules`, `--RULE`/`--no-RULE`, `--strict`) and a paste window on `lib/tui` with live preview, rule hotkeys `1`-`9` `a`-`d`, a danger confirmation, and OSC 52 copy plus stdout on Enter. Defaults can be saved to `~/.config/bs/clean/rules`, extra noise patterns go to `~/.config/bs/clean/noise`. Docs: `documentation/{en,ru}/03-modules/data-textclean.md`. `bs clean --paste` reads the system clipboard with the first working reader found by `deps::has` (`wl-paste`, `xclip`, `xsel`, `pbpaste`, `termux-clipboard-get`, `powershell.exe`) and, when there is none, says so and points to the window or stdin. Tests: `testtextcleanunit.sh` (92 checks).
