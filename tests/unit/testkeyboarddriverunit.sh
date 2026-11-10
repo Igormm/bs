@@ -74,6 +74,10 @@ main() {
     done <<< "${params}"
     testframework::assert_equal "4" "${n}" "4 keymap fields"
     testframework::assert_command "grep -q $'^layout\tstring\tus,ru' <<< '${params}'" "layout carries current value"
+    local vrow
+    vrow="$(grep $'^variant\t' <<< "${params}")"
+    testframework::assert_equal "" "$(awk -F'\t' '{print $4}' <<< "${vrow}")" "empty default stays empty (columns not shifted)"
+    testframework::assert_command "awk -F'\t' '{print \$6}' <<< \"${vrow}\" | grep -q dvorak" "tip stays in column 6"
 
     testframework::section "get / чтение"
     testframework::assert_equal "us,ru" "$(driver::keyboard::get default layout)" "get layout"

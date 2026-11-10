@@ -126,9 +126,11 @@ driver::pointers::params() {
     local -r handle="$1"
     local -r kind="$(driver::pointers::__kind "${handle}")"
     local name type dflt choices tip
-    while IFS=$'\t' read -r name type dflt choices tip; do
+    # Поля разделены \037, не табом: IFS=$'\t' склеивает пустые поля и сдвигает колонки.
+    # Fields split on \037, not tab: IFS=$'\t' merges empty fields and shifts columns.
+    while IFS=$'\037' read -r name type dflt choices tip; do
         driver::pointers::__param_row "${kind}" "${handle}" "${name}" "${type}" "${dflt}" "${choices}" "${tip}"
-    done < <(driver::pointers::__catalog "${kind}")
+    done < <(driver::pointers::__catalog "${kind}" | tr '\t' '\037')
     return 0
 }
 

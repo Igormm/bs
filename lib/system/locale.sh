@@ -147,9 +147,11 @@ driver::locale::__param_row() {
 driver::locale::params() {
     local -r handle="$1"
     local name type dflt choices tip
-    while IFS=$'\t' read -r name type dflt choices tip; do
+    # Поля разделены \037, не табом: IFS=$'\t' склеивает пустые поля и сдвигает колонки.
+    # Fields split on \037, not tab: IFS=$'\t' merges empty fields and shifts columns.
+    while IFS=$'\037' read -r name type dflt choices tip; do
         driver::locale::__param_row "${handle}" "${name}" "${type}" "${dflt}" "${choices}" "${tip}"
-    done < <(driver::locale::__catalog)
+    done < <(driver::locale::__catalog | tr '\t' '\037')
     return 0
 }
 
