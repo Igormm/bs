@@ -284,6 +284,21 @@ sudo ./bs run examples/openbao_wizard.sh --profile prod
 Подробнее: [сервер](documentation/ru/03-modules/system-openbao.md) ·
 [клиент](documentation/ru/03-modules/integration-openbao.md).
 
+### 2.3. VPN-клиент / VPN client (sing-box)
+
+`examples/vpn.sh` — клиент на готовом ядре sing-box: VLESS (REALITY), VMess,
+Trojan, Shadowsocks, Hysteria2, Hysteria, TUIC, AnyTLS, SOCKS; импорт ссылок
+и подписок, режимы proxy и TUN, пресеты маршрутов (`bypass-ru` и др.),
+смена сервера без разрыва, замер задержки, полноэкранный TUI.
+
+```bash
+./bs run examples/vpn.sh core install
+./bs run examples/vpn.sh import 'vless://…'
+./bs run examples/vpn.sh            # TUI
+```
+
+Подробнее: [network-vpn.md](documentation/ru/03-modules/network-vpn.md).
+
 ## 3. Пульс машины / Host pulse
 
 Вектор возможностей: тир, userland, пробы `grep -P`/`sed -z`, SHA-цепочка,
