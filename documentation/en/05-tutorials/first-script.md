@@ -103,11 +103,11 @@ Note: `args::help` defaults to the `$0` basename, and under `bs run` `$0` is `ba
 
 ## Step 4: Validated values and error handling
 
-After `args::parse` succeeds, positionals are in the `ARGS_PARAMS` array and flag values are read with `args::flag_get`:
+After `args::parse` succeeds, read values by meaning, not by array index: `args::get N [default]` returns the parameter at tree level N (counting from 1), and `args::flag_get NAME` returns a flag value or its declared default. (The raw bash arrays `ARGS_PARAMS` and `ARGS_FLAGS` are still filled, but scripts read better without them.)
 
 ```bash
-    local action="${ARGS_PARAMS[0]:-status}"
-    local env
+    local action env
+    action="$(args::get 1 status)"
     env="$(args::flag_get env || printf 'staging')"
 
     case "${env}" in
@@ -216,8 +216,8 @@ main() {
     args::require "$@"
 
     # 3. Work with validated values
-    local action="${ARGS_PARAMS[0]:-status}"
-    local env
+    local action env
+    action="$(args::get 1 status)"
     env="$(args::flag_get env || printf 'staging')"
 
     # Runtime validation: only two environments exist

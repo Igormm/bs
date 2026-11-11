@@ -103,11 +103,11 @@ Flags / Флаги:
 
 ## Шаг 4: Провалидированные значения и обработка ошибок
 
-После успешного `args::parse` позиционные параметры лежат в массиве `ARGS_PARAMS`, а значения флагов читаются через `args::flag_get`:
+После успешного `args::parse` значения читаются по смыслу, а не по индексу массива: `args::get N [дефолт]` возвращает параметр уровня N дерева (считая с 1), а `args::flag_get ИМЯ` возвращает значение флага или его объявленный дефолт. (Сырые массивы bash `ARGS_PARAMS` и `ARGS_FLAGS` по-прежнему заполняются, но без них скрипт читается проще.)
 
 ```bash
-    local action="${ARGS_PARAMS[0]:-status}"
-    local env
+    local action env
+    action="$(args::get 1 status)"
     env="$(args::flag_get env || printf 'staging')"
 
     case "${env}" in
@@ -216,8 +216,8 @@ main() {
     args::require "$@"
 
     # 3. Work with validated values
-    local action="${ARGS_PARAMS[0]:-status}"
-    local env
+    local action env
+    action="$(args::get 1 status)"
     env="$(args::flag_get env || printf 'staging')"
 
     # Runtime validation: only two environments exist

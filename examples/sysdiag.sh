@@ -125,7 +125,7 @@ main() {
     fi
 
     local action
-    action="${ARGS_PARAMS[0]:-quick}"
+    action="$(args::get 1 quick)"
     local out_file
     out_file="$(args::flag_get output || true)"
 

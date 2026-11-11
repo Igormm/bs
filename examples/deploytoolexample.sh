@@ -63,7 +63,8 @@ main() {
 
     # Выполнение команды
     # Command execution
-    local action="${ARGS_PARAMS[0]:-status}"
+    local action
+    action="$(args::get 1 status)"   # первый параметр, по умолчанию status / first parameter, default status
     local env
     env="$(args::flag_get env || printf 'staging')"
 
