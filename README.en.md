@@ -51,7 +51,7 @@ io::streams::print "hello from BS $(bs::version::get)"
 
 ```console
 $ bs run examples/hello.sh
-hello from BS 0.19.0
+hello from BS 0.20.0
 ```
 
 ### 📝 Logging without boilerplate
