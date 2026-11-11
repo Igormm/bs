@@ -63,9 +63,10 @@ main() {
 
     # Выполнение команды
     # Command execution
-    local action="${ARGS_PARAMS[0]:-status}"
+    local action
+    action="$(args::param 1 status)"   # первый параметр, по умолчанию status / first parameter, default status
     local env
-    env="$(args::flag_get env || printf 'staging')"
+    env="$(args::flag_get env staging)"
 
     if [[ "${action}" == "status" ]]; then
         io::streams::printf '  %-12s %s\n' "environment" "${env}" "release" "v1.4.2" "health" "green"
