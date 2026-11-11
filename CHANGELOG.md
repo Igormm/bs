@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.22.0] - 2026-11-11 "Purioa"
+
+### Changed
+- refactor(install): `bs_install_main` (`install/main.sh`, 175 lines) is split into six private helpers and is now 32 lines: `bs_install_parse_args` (with `bs_install_strict_shell` and `bs_install_pick_shell` for `--strict-shell`/`--shell`), `bs_install_autodetect_mode`, `bs_install_resolve_paths`, `bs_install_path_flags`. The code was moved, not rewritten; `--strict-shell` reports how many arguments to shift in `__bs_mn_used`. Eighteen `./install.sh` runs (help, unknown and missing arguments, `--shell`/`--strict-shell` in all forms, `--path`/`--update-path` rules, local install and uninstall, autodetected uninstall, custom `PREFIX`, system install, `remove`) give identical output, exit codes and files in dash, busybox ash, ksh93, mksh, zsh and bash; the installer still runs without bash; no public name changed.
+
 ## [0.21.0] - 2026-11-11 "Purioa"
 
 ### Changed
