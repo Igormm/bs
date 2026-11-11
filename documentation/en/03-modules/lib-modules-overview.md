@@ -70,6 +70,7 @@ Key functions: `uuid::gen`, `uuid::gen_v7`, `uuid::validate`.
 
 ## network — `lib/network/`
 
+- [conn/core.sh](../../../lib/network/conn/core.sh), [conn/tui.sh](../../../lib/network/conn/tui.sh) — network connections: interfaces, addresses, routes, NetworkManager profiles and Wi-Fi, with a full-screen TUI ([network-conn.md](network-conn.md)).
 - [sshnetwork.sh](../../../lib/network/sshnetwork.sh) — SSH-based operations across the local network: device discovery, remote command execution, file transfer and tunnels.
 
 Key functions: `sshnetwork::discover_devices`, `sshnetwork::execute_remote`, `sshnetwork::transfer_file`, `sshnetwork::create_tunnel`.
