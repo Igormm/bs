@@ -103,12 +103,13 @@ Note: `args::help` defaults to the `$0` basename, and under `bs run` `$0` is `ba
 
 ## Step 4: Validated values and error handling
 
-After `args::parse` succeeds, positionals are in the `ARGS_PARAMS` array and flag values are read with `args::flag_get`:
+After `args::parse` succeeds, read positionals with `args::param N [default]` (counted from 1, like `$1`) and flag values with `args::flag_get NAME [fallback]`:
 
 ```bash
-    local action="${ARGS_PARAMS[0]:-status}"
+    local action
+    action="$(args::param 1 status)"
     local env
-    env="$(args::flag_get env || printf 'staging')"
+    env="$(args::flag_get env staging)"
 
     case "${env}" in
         staging|production) ;;
@@ -216,9 +217,10 @@ main() {
     args::require "$@"
 
     # 3. Work with validated values
-    local action="${ARGS_PARAMS[0]:-status}"
+    local action
+    action="$(args::param 1 status)"
     local env
-    env="$(args::flag_get env || printf 'staging')"
+    env="$(args::flag_get env staging)"
 
     # Runtime validation: only two environments exist
     case "${env}" in

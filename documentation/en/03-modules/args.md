@@ -61,8 +61,8 @@ args::flag dry-run                  # bool flag
 args::flag env value                # value flag
 args::flag_describe env "Target environment (staging, production)"
 
-# After args::parse — value with a default:
-env="$(args::flag_get env || printf 'staging')"
+# After args::parse — value with a fallback:
+env="$(args::flag_get env staging)"
 
 # Checking a bool flag:
 if args::flag_get dry-run >/dev/null; then
@@ -70,8 +70,10 @@ if args::flag_get dry-run >/dev/null; then
 fi
 ```
 
-`args::flag_get` prints the value and returns 0 if the flag was set;
-otherwise it prints nothing and returns `E_ERROR` (1).
+`args::flag_get` prints the value and returns 0 if the flag was set. If it
+was not, it prints the default declared in `args::flag`, or else the second
+argument (the fallback); with neither it prints nothing and returns
+`E_ERROR` (1).
 
 With `core/utils` loaded, the last check can be written with the silence
 idiom instead of a raw redirect:
@@ -118,6 +120,32 @@ fi
 `args::get N` prints the validated positional parameter at the 1-based
 position N, or returns `E_ERROR` (1) if that position was not given.
 
+## Reading the arguments: `args::param`, `args::flag_get`
+
+After `args::require` the script needs two things: which words were given
+and what the flags hold. Read them with functions, not with the internal
+arrays — the code then says what it does:
+
+```bash
+# ./greet.sh hello --name Bob
+command="$(args::param 1)"        # hello  — the 1st word after the script name
+name="$(args::flag_get name)"     # Bob    — the value of --name
+port="$(args::flag_get port 8080)" # 8080  — no --port given, so the fallback
+```
+
+| Instead of | Write | Why |
+|---|---|---|
+| `${ARGS_PARAMS[0]}` | `$(args::param 1)` | counted from 1, like `$1`; works in any shell |
+| `${ARGS_FLAGS["name"]:-world}` | `$(args::flag_get name world)` | the flag name is plain text, the default is the second word |
+
+`args::param N [default]` is a readable name for `args::get N [default]`:
+both stay. `args::flag_get NAME [fallback]` picks the first that exists:
+the value from the command line, the default from `args::flag`, the
+fallback. A bool flag that was given reads as `1`; to test it, use
+`args::flag_is_set NAME`.
+
+The arrays `ARGS_PARAMS` and `ARGS_FLAGS` keep working for old scripts.
+
 ## Help: `args::help`
 
 Prints a help generated from the same tree that drives validation — the two
@@ -163,9 +191,11 @@ args::define first middle last
 | `args::describe name "text"` | parameter description for the help |
 | `args::flag name [bool\|value]` | declare a flag (`bool` is the default) |
 | `args::flag_describe name "text"` | flag description for the help |
-| `args::flag_get name` | flag value after `args::parse`; 1 if not set |
+| `args::flag_get name [fallback]` | flag value after `args::parse`, else its default, else the fallback; 1 if none |
+| `args::flag_is_set name` | 0 if the flag was given on the command line |
 | `args::parse "$@"` | validate input parameters against the tree |
-| `args::get N` | validated positional parameter N (1-based) |
+| `args::param N [default]` | positional parameter N (1-based); readable name for `args::get` |
+| `args::get N [default]` | validated positional parameter N (1-based) |
 | `args::help [prog]` | generated help |
 | `args::completion [prog]` | generate a bash completion function |
 | `args::reset` | reset the tree, flags and parsed state |

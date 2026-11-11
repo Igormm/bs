@@ -394,6 +394,13 @@ tui::render() {
     done
     TUI_DIRTY=()
   fi
+  # Кадр заканчивается сбросом стиля: следующий рендер начинает с cur_style="",
+  # и без сброса клетки без стиля унаследовали бы, например, инверсию курсора.
+  # The frame ends with a style reset: the next render starts with cur_style="",
+  # and without it unstyled cells would inherit, say, the cursor's reverse video.
+  if [[ -n "${cur_style}" ]]; then
+    out+=$'\e[0m'
+  fi
   printf '%s' "${out}"
 }
 

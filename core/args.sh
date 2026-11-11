@@ -42,7 +42,7 @@
 # ИМЕНА / NAMES
 #   Real functions: bs_args_define, bs_args_level, bs_args_required, bs_args_describe,
 #   bs_args_flag, bs_args_flag_describe, bs_args_flag_get, bs_args_flag_is_set, bs_args_has,
-#   bs_args_rest, bs_args_help, bs_args_parse, bs_args_reset, bs_args_require, bs_args_get,
+#   bs_args_rest, bs_args_help, bs_args_parse, bs_args_reset, bs_args_require, bs_args_get, bs_args_param,
 #   bs_args_completion; in bash and zsh also args::* (the old names, aliases). args::parse,
 #   args::reset and args::require come from lib/compat/args.sh: they also fill the bash arrays
 #   ARGS_PARAMS, ARGS_FLAGS and ARGS_REST that scripts read after parsing. The completion
@@ -334,7 +334,13 @@ bs_args_flag_describe() {
 
 # @description Значение флага после разбора или его дефолт; 1, если нет ни того, ни другого
 # @description The flag value after parsing, or its default; 1 if neither exists
-# @param $1 name
+#   Порядок: значение из командной строки → дефолт из args::flag → второй аргумент.
+#   Order: the value from the command line → the default from args::flag → the second argument.
+# @param $1 name (with or without --)  $2 [optional] fallback value / запасное значение
+# @stdout the value / значение
+# @example
+#   name="$(args::flag_get name)"         # --name Bob → Bob
+#   port="$(args::flag_get port 8080)"    # без --port → 8080 / no --port → 8080
 bs_args_flag_get() {
   __bs_args_fg_name=${1:-}
   __bs_args_fg_name=${__bs_args_fg_name#--}
@@ -343,6 +349,11 @@ bs_args_flag_get() {
     # Объявленный дефолт / Declared default
     if bs_map_has bs_args_flag_def "$__bs_args_fg_name"; then
       bs_map_get bs_args_flag_def "$__bs_args_fg_name"
+      return "${E_SUCCESS:-0}"
+    fi
+    # Запасное значение из вызова / Fallback given by the caller
+    if [ $# -ge 2 ]; then
+      printf '%s\n' "$2"
       return "${E_SUCCESS:-0}"
     fi
     return "${E_ERROR:-1}"
@@ -772,6 +783,19 @@ bs_args_get() {
   printf '%s\n' "$__bs_args_gt_v"
 }
 
+# @description Позиционный параметр по номеру (с 1) — понятное имя для args::get
+# @description A positional parameter by number (from 1) — a readable name for args::get
+#   Заменяет чтение массива ${ARGS_PARAMS[0]}: номер считается с 1, как в $1.
+#   Replaces reading the array ${ARGS_PARAMS[0]}: numbering starts at 1, as in $1.
+# @param $1 position  $2 [optional] default
+# @stdout the value / значение
+# @example
+#   command="$(args::param 1)"           # myscript hello → hello
+#   target="$(args::param 2 world)"      # без второго параметра → world / no second one → world
+bs_args_param() {
+  bs_args_get "$@"
+}
+
 # Автодополнение / Completion
 # Генераторы вынесены в отдельный файл, чтобы args.sh читался как объявление,
 # разбор и справка. Подключаем в конце: `load "core/args"` даёт весь API.
@@ -799,6 +823,7 @@ bs_shell_alias bs_args_has args::has
 bs_shell_alias bs_args_rest args::rest
 bs_shell_alias bs_args_help args::help
 bs_shell_alias bs_args_get args::get
+bs_shell_alias bs_args_param args::param
 
 ARGS_LOADED="1"
 
