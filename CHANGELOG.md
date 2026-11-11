@@ -9,7 +9,6 @@
 ### Fixed
 - fix(tui): `tui::render` ends a frame with a style reset when it left a style on. The next frame starts from "no style", so unstyled cells used to inherit the last style of the previous frame: typing in an input modal left reverse-video blocks on every other letter, and closing a modal left white bars behind.
 - fix(examples): `examples/todo.sh` sizes its window from the real terminal (`tui::size` before `tui::app::window`; it used the default 80x24, so on a shorter terminal the border ran over the status line) and refreshes the task count in the status line on every frame (it stayed at the count at start-up).
-
 ## [0.20.0] - 2026-11-11 "Purioa"
 
 ### Changed
