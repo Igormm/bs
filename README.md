@@ -284,6 +284,24 @@ sudo ./bs run examples/openbao_wizard.sh --profile prod
 Подробнее: [сервер](documentation/ru/03-modules/system-openbao.md) ·
 [клиент](documentation/ru/03-modules/integration-openbao.md).
 
+### 2.3. VPN-клиент / VPN client (sing-box, Xray)
+
+`examples/vpn.sh` — клиент на готовых ядрах sing-box и Xray: VLESS (REALITY,
+XHTTP, шифрование VLESS), VMess, Trojan, Shadowsocks, Hysteria2, Hysteria,
+TUIC, AnyTLS, WireGuard (ссылки и `.conf`), NaiveProxy, SOCKS; ядро для
+профиля выбирается само. Импорт ссылок и подписок, режимы proxy и TUN,
+пресеты маршрутов (`bypass-ru` и др.), смена сервера без разрыва, замер
+задержки, полноэкранный TUI.
+
+```bash
+./bs run examples/vpn.sh core install
+./bs run examples/vpn.sh core install xray   # для XHTTP и шифрования VLESS
+./bs run examples/vpn.sh import 'vless://…'
+./bs run examples/vpn.sh            # TUI
+```
+
+Подробнее: [network-vpn.md](documentation/ru/03-modules/network-vpn.md).
+
 ## 3. Пульс машины / Host pulse
 
 Вектор возможностей: тир, userland, пробы `grep -P`/`sed -z`, SHA-цепочка,
