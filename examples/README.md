@@ -82,6 +82,8 @@ io::streams::print "hello from BS"
   диагностика сенсорных устройств
 - `sensor_tui.sh` — touch sensor real-time monitor TUI /
   TUI-монитор сенсорного устройства
+- `netconn.sh` — network connections: interfaces, NetworkManager profiles, Wi-Fi; CLI and TUI /
+  сетевые подключения: интерфейсы, профили NetworkManager, Wi-Fi; CLI и TUI
 
 ### Integration modules / Интеграции
 

@@ -625,7 +625,9 @@ tui::box() {
   else
     shown_title=""
   fi
-  local -i fill=$(( w - ${#shown_title} - 5 ))
+  # с заголовком в линии ещё два пробела вокруг него / a title adds two spaces around it
+  local -i fill=$(( w - 3 ))
+  is::not_empty "${shown_title}" && fill=$(( w - ${#shown_title} - 5 ))
   (( fill < 0 )) && fill=0
   top+="$(str::repeat "${TUI_BORDER_H}" "${fill}")${TUI_BORDER_TR}"
   tui::put "${r}" "${c}" "${top}" "${style}"

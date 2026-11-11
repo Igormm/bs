@@ -44,3 +44,6 @@ PROMO_DRAFT.md
 # Локальные справочники / Local reference books
 *.pdf
 review/
+
+# Модули lib/*/core.sh — код, а не дампы ядра / lib/*/core.sh modules are code, not core dumps
+!lib/**/core.sh
