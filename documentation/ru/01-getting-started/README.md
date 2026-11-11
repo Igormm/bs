@@ -56,15 +56,15 @@ BS работает прямо из репозитория — установк�
 ### Запуск из репозитория
 
 ```bash
-git clone <repo-url> bs
-cd bs
-./bs doctor
+git clone <repo-url> bs  # скачать репозиторий в каталог bs
+cd bs                    # перейти в него
+./bs doctor              # проверить, что все файлы фреймворка на месте
 ```
 
 ### Локальная установка (`~/.local`, без sudo)
 
 ```bash
-./install.sh --local
+./install.sh --local  # установить для себя в ~/.local, без sudo
 ```
 
 Копирует фреймворк в `~/.local/lib/bs`, создаёт обёртку `~/.local/bin/bs` и
@@ -81,7 +81,7 @@ cd bs
 ### Системная установка (`/usr/local`, нужен root)
 
 ```bash
-sudo ./install.sh
+sudo ./install.sh  # установить для всех пользователей в /usr/local
 ```
 
 Файлы попадают в `/usr/local/lib/bs`, обёртка — в `/usr/local/bin/bs`.
@@ -132,11 +132,12 @@ sudo ./install.sh uninstall      # system
 
 ```bash
 #!/usr/bin/env bs
+# ↑ шебанг: скрипт запускает интерпретатор bs
 # shellcheck shell=bash
 
-load "lib/io/streams"
+load "lib/io/streams"                                   # подключить модуль вывода
 
-io::streams::print "hello from BS $(bs::version::get)"
+io::streams::print "hello from BS $(bs::version::get)"  # напечатать строку с версией BS
 ```
 
 - `#!/usr/bin/env bs` — запускает скрипт через интерпретатор `bs`; ядро
@@ -155,7 +156,7 @@ io::streams::print "hello from BS $(bs::version::get)"
 ## Запуск скриптов
 
 ```bash
-./bs run examples/hello.sh
+./bs run examples/hello.sh  # запустить скрипт через bs
 ./examples/hello.sh          # когда bs в PATH
 ```
 
@@ -275,7 +276,7 @@ bash-слой всё равно исполняет код. POSIX-команды 
 
 ```bash
 dash ./bs --strict-shell run script.sh   # флаг ставится ДО команды
-BS_SHELL_STRICT=1 dash ./bs run script.sh
+BS_SHELL_STRICT=1 dash ./bs run script.sh  # то же через переменную окружения
 ```
 
 Тогда модуль `lib/` загружается, только если его `@shell` разрешён для

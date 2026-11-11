@@ -13,6 +13,8 @@ reload, с откатом). Плюс каталог джейлов с реком
 `fail2ban-client`). Без клиента или прав на запись — чистая деградация с
 определёнными кодами `LIB_ERROR_*`, никогда не молчаливый успех.
 
+![Мастер fail2ban (`examples/fail2ban_wizard.sh --dry-run`)](../../assets/tui-fail2ban.png)
+
 Источник: [lib/system/fail2ban.sh](../../../lib/system/fail2ban.sh)
 
 ## Подключение

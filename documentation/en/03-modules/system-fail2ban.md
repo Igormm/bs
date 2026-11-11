@@ -13,6 +13,8 @@ Tier: **Linux-only** (writes under `/etc/fail2ban`, reloads via
 `fail2ban-client`). Without the client or write access it degrades with
 defined `LIB_ERROR_*` codes — never a silent success.
 
+![The fail2ban wizard (`examples/fail2ban_wizard.sh --dry-run`)](../../assets/tui-fail2ban.png)
+
 Source: [lib/system/fail2ban.sh](../../../lib/system/fail2ban.sh)
 
 ## Loading

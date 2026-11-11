@@ -12,7 +12,7 @@ Write your script, `load` the modules you need, and the framework does
 the rest.
 
 <p align="center">
-  <img src="documentation/assets/tui-netconn.png" alt="A network TUI built with BS: interfaces, details and traffic" width="760">
+  <img src="documentation/assets/tui-demo.gif" alt="A BS TUI: rounded frames, tasks, an input modal and progress" width="760">
 </p>
 
 ## ✨ Why BS
@@ -29,17 +29,17 @@ the rest.
 ## 🚀 Quick start
 
 ```bash
-git clone https://github.com/Igormm/bs.git && cd bs
+git clone https://github.com/Igormm/bs.git && cd bs   # download the repo and enter it
 
-./bs run examples/hello.sh     # your first script
-./bs repl                      # interactive console
-./bs doctor                    # check that everything is in place
+./bs run examples/hello.sh     # run your first script
+./bs repl                      # open the interactive console
+./bs doctor                    # check that all framework files are in place
 ```
 
 Like it? Put the `bs` command in your `PATH`:
 
 ```bash
-./install.sh --local           # into ~/.local, no sudo
+./install.sh --local           # install into ~/.local, no root needed
 ```
 
 ## 👋 Examples
@@ -48,10 +48,11 @@ Like it? Put the `bs` command in your `PATH`:
 
 ```bash
 #!/usr/bin/env bs
+# ↑ shebang: the bs interpreter runs the script, not bare bash
 
-load "lib/io/streams"
+load "lib/io/streams"          # load the output module (its dependencies come along)
 
-io::streams::print "hello from BS $(bs::version::get)"
+io::streams::print "hello from BS $(bs::version::get)"   # print a line with the BS version
 ```
 
 ```console
@@ -65,13 +66,14 @@ The logger and checks like `is::file` are available right away, no `load` needed
 
 ```bash
 #!/usr/bin/env bs
+# ↑ shebang: the logger and is::* are already loaded, no load needed
 
-log::info "Starting the backup"
-if is::file "/etc/hostname"; then
-    log::success "The file is there, ready to copy"
-else
-    log::warn "No such file, skipping"
-fi
+log::info "Starting the backup"                      # a plain message with a timestamp
+if is::file "/etc/hostname"; then                     # is there such a regular file?
+    log::success "The file is there, ready to copy"   # yes: a green success message
+else                                                  # otherwise
+    log::warn "No such file, skipping"                # no: a yellow warning
+fi                                                    # end of the condition
 ```
 
 ```console
@@ -87,59 +89,60 @@ and `args::flag_get name` (the value of `--name`).
 
 ```bash
 #!/usr/bin/env bs
+# ↑ shebang: run through the bs interpreter
 
-load "core/args"
-load "lib/io/streams"
+load "core/args"                       # the command-line parsing module
+load "lib/io/streams"                  # the output module
 
-main() {
-    args::level 1 hello goodbye
-    args::flag name value world
-    args::flag loud
-    args::required 1
-    args::require "$@"
+main() {                               # the script's main function
+    args::level 1 hello goodbye        # the first command word: hello or goodbye
+    args::flag name value world        # a --name flag with a value, default world
+    args::flag loud                    # a --loud switch with no value
+    args::required 1                   # the first word is required
+    args::require "$@"                 # parse the arguments; on error show the help and exit
 
-    # args::param 1        — the first word after the script name (hello or goodbye)
-    # args::flag_get name  — the --name value, or the default world
-    local -r command="$(args::param 1)"
-    local -r name="$(args::flag_get name)"
-    local msg
-    case "${command}" in
-        hello)   msg="Hello, ${name}!" ;;
-        goodbye) msg="Goodbye, ${name}!" ;;
-    esac
-    args::flag_is_set loud && msg="${msg^^}"
-    io::streams::print "${msg}"
+    local -r command="$(args::param 1)"      # the first word after the script name
+    local -r name="$(args::flag_get name)"   # the --name value or the default world
+    local msg                                # a variable for the final text
+    case "${command}" in                     # pick the text by command
+        hello)   msg="Hello, ${name}!" ;;    # a greeting
+        goodbye) msg="Goodbye, ${name}!" ;;  # a farewell
+    esac                                     # end of the choice
+    args::flag_is_set loud && msg="${msg^^}" # with --loud, turn the text UPPERCASE
+    io::streams::print "${msg}"              # print the result
 }
 
-main "$@"
+main "$@"                              # call main with all the script's arguments
 ```
 
-![greet.sh: a greeting, loud mode and the automatic help](documentation/assets/greet.png)
+```console
+$ bs run examples/greet.sh hello --name World
+Hello, World!
+$ bs run examples/greet.sh goodbye --loud
+GOODBYE, WORLD!
+```
 
 The full version with `--help` descriptions: [examples/greet.sh](examples/greet.sh).
 
 ### 🎛️ A terminal menu
 
-<img src="documentation/assets/tui-menu.png" alt="TUI menu" width="320" align="right">
+<img src="documentation/assets/tui-menu.png" alt="A TUI menu in a rounded frame" width="320" align="right">
 
 `↑↓` to select, `Enter` to run, `q` to quit. The full example with the
 key loop: [examples/menu.sh](examples/menu.sh).
 
 ```bash
-load "lib/tui/tui"
+load "lib/tui/tui"                                       # load the TUI library
 
-main() {
-    local -a items=("Run checks" "Show status" "Quit")
-    local -i sel=0
+main() {                                                 # the main function
+    local -a items=("Run checks" "Show status" "Quit")   # the menu items
+    local -i sel=0                                       # the selected item number
 
-    # full-screen mode
-    tui::init
-    # menu at (2, 2), item sel selected
-    tui::menu 2 2 items "${sel}" "Menu"
-    tui::render
-    # wait for a key: it lands in $TUI_KEY
-    tui::key_read
-    # ...
+    tui::init                                # switch to full-screen mode
+    tui::menu 2 2 items "${sel}" "Menu"      # a menu at row 2, column 2, in a rounded frame
+    tui::render                              # draw the frame on screen
+    tui::key_read                            # wait for a key: it lands in $TUI_KEY
+    # ...                                    # next: handle the key and redraw
 }
 ```
 
@@ -151,9 +154,11 @@ All of this lives in [examples/](examples/) and runs with one command.
 
 | | |
 |---|---|
-| ✅ **Todo list** `examples/todo.sh`<br>Windows, modals, a task file. | <img src="documentation/assets/todo.gif" alt="TUI todo" width="420"> |
-| 🔐 **sshd setup wizard** `examples/sshd_wizard.sh --dry-run`<br>Profiles, a tip for every option, safe apply. | <img src="documentation/assets/tui-sshd.png" alt="sshd wizard" width="420"> |
+| ✅ **Todo list** `examples/todo.sh`<br>Windows, modals, a task file. | <img src="documentation/assets/todo.gif" alt="TUI todo: adding, ticking and deleting tasks" width="420"> |
+| 🔐 **sshd setup wizard** `examples/sshd_wizard.sh --dry-run`<br>Profiles, a tip for every option, safe apply. | <img src="documentation/assets/tui-sshd.gif" alt="sshd wizard: sections, options and tips" width="420"> |
+| 🌍 **Locale wizard** `examples/locale_wizard.sh`<br>Steps for language, encoding and keyboard. | <img src="documentation/assets/tui-locale.gif" alt="Locale wizard step by step" width="420"> |
 | 🌐 **Network** `examples/netconn.sh`<br>Interfaces, addresses, live traffic. | <img src="documentation/assets/tui-netconn.png" alt="Network TUI" width="420"> |
+| 🧩 **TUI demo** `examples/tui_demo.sh`<br>Sections, a task list, an input modal, progress. | <img src="documentation/assets/tui-demo.png" alt="TUI demo" width="420"> |
 
 More examples:
 
@@ -165,6 +170,10 @@ More examples:
 
 ## 🧰 The `bs` tool
 
+<p align="center">
+  <img src="documentation/assets/bs-cli.gif" alt="bs version, bs version --full and bs help in a terminal" width="640">
+</p>
+
 | Command | What it does |
 |---|---|
 | `bs run script.sh` | run a script (or put `#!/usr/bin/env bs` at the top) |
@@ -175,12 +184,23 @@ More examples:
 | `bs doctor` | integrity check |
 | `bs update` | update installed copies |
 | `bs where` | find every BS install on the machine |
+| `bs version [--full]` | the version; `--full` adds the path, install kind and commit |
+| `bs help [command]` | the command list, or detailed help for one command |
+
+<details>
+<summary>📸 Screenshots of <code>bs version</code> and <code>bs help</code></summary>
+
+![bs version and bs version --full](documentation/assets/bs-version.png)
+
+![bs help: every command by group](documentation/assets/bs-help.png)
+
+</details>
 
 ## 📦 Installation
 
 ```bash
-./install.sh --local      # ~/.local/bin/bs, no sudo
-sudo ./install.sh         # /usr/local/bin/bs, for everyone
+./install.sh --local      # just for you: ~/.local/bin/bs, no sudo
+sudo ./install.sh         # for every user: /usr/local/bin/bs
 ```
 
 The installer copies the framework, so you can delete the clone afterwards.
@@ -205,8 +225,8 @@ documentation/  docs in Russian and English
 ## 🧪 Tests
 
 ```bash
-bash tests/runalltests.sh          # full suite
-bash tests/validateshellcheck.sh   # ShellCheck
+bash tests/runalltests.sh          # run the whole test suite
+bash tests/validateshellcheck.sh   # lint the code with ShellCheck
 ```
 
 ## 📚 Documentation
