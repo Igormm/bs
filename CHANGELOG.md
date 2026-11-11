@@ -4,6 +4,11 @@
 
 ### Added
 - feat(args): readable accessors for the parsed arguments. `args::param N [default]` (`bs_args_param`) is a plain name for `args::get`: the positional parameter counted from 1, like `$1`. `args::flag_get NAME [fallback]` takes an optional second argument, used when the flag was not given and has no declared default. Scripts no longer need the internal arrays: `$(args::flag_get name world)` instead of `${ARGS_FLAGS["name"]:-world}`, `$(args::param 1)` instead of `${ARGS_PARAMS[0]}`; the arrays keep working. `examples/greet.sh`, the README and the first-script tutorial use the new form; docs: `documentation/{en,ru}/03-modules/args.md` («Reading the arguments»). Tests: `testargsunit.sh` (+16 checks), `testargsportableunit.sh` (param and fallback in every shell).
+- docs(readme): `README.md` is now Russian only, shorter and friendlier: what BS does, quick start, the first script, `greet.sh` with a line-by-line table, a TUI GIF, a table of easy examples, `bs` commands, install, docs links. The English text moved to `README.en.md`; each links to the other. Pictures: `documentation/assets/greet.png`, `documentation/assets/todo.gif`. `tests/validatedocscode.sh` and `testdoctierscountunit.sh` also check `README.en.md`.
+
+### Fixed
+- fix(tui): `tui::render` ends a frame with a style reset when it left a style on. The next frame starts from "no style", so unstyled cells used to inherit the last style of the previous frame: typing in an input modal left reverse-video blocks on every other letter, and closing a modal left white bars behind.
+- fix(examples): `examples/todo.sh` sizes its window from the real terminal (`tui::size` before `tui::app::window`; it used the default 80x24, so on a shorter terminal the border ran over the status line) and refreshes the task count in the status line on every frame (it stayed at the count at start-up).
 
 ## [0.19.0] - 2026-11-11 "Purioa"
 
