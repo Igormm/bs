@@ -423,7 +423,7 @@ sshd_wz::draw_status() {
 # @private Полная перерисовка: очистка, стили, весь кадр (старт/resize/модалка/секция)
 sshd_wz::paint_all() {
     TUI_LINES_MINUS=$(( TUI_LINES - 7 ))
-    tui::border::set single
+    tui::border::set rounded
     sshd_wz::cache_styles
     tui::buf::clear
     SSHD_WZ_PARAMS_PAINTED=0

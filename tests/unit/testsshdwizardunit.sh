@@ -130,9 +130,9 @@ main() {
     testframework::assert_equal "1" "${SSHD_WZ_SECTION}" "menu DOWN moves section"
     testframework::assert_equal "PermitRootLogin" "${SSHD_WZ_NAMES[0]}" "params reloaded for new section"
 
-    testframework::section "single border / одинарная рамка"
+    testframework::section "rounded border / скруглённая рамка"
     sshd_wz::draw
-    testframework::assert_equal "┌" "${TUI_BORDER_TL}" "single border set"
+    testframework::assert_equal "╭" "${TUI_BORDER_TL}" "rounded border set"
     local has_double=0 key2
     for key2 in "${!TUI_BUF[@]}"; do [[ "${TUI_BUF[$key2]}" == "╔" ]] && has_double=1; done
     testframework::assert_equal "0" "${has_double}" "no double border chars"

@@ -12,7 +12,7 @@
 себя фреймворк.
 
 <p align="center">
-  <img src="documentation/assets/tui-netconn.png" alt="Сетевой TUI на BS: интерфейсы, сведения и трафик" width="760">
+  <img src="documentation/assets/tui-demo.gif" alt="TUI на BS: скруглённые рамки, задачи, модалка и прогресс" width="760">
 </p>
 
 ## ✨ Почему BS
@@ -29,17 +29,17 @@
 ## 🚀 Быстрый старт
 
 ```bash
-git clone https://github.com/Igormm/bs.git && cd bs
+git clone https://github.com/Igormm/bs.git && cd bs   # скачать репозиторий и перейти в него
 
-./bs run examples/hello.sh     # первый скрипт
-./bs repl                      # интерактивная консоль
-./bs doctor                    # проверить, что всё на месте
+./bs run examples/hello.sh     # запустить первый скрипт
+./bs repl                      # открыть интерактивную консоль
+./bs doctor                    # проверить, что все файлы фреймворка на месте
 ```
 
 Понравилось? Установите команду `bs` себе в `PATH`:
 
 ```bash
-./install.sh --local           # в ~/.local, без sudo
+./install.sh --local           # установить в ~/.local, права root не нужны
 ```
 
 ## 👋 Примеры
@@ -48,10 +48,11 @@ git clone https://github.com/Igormm/bs.git && cd bs
 
 ```bash
 #!/usr/bin/env bs
+# ↑ шебанг: скрипт запускает интерпретатор bs, а не голый bash
 
-load "lib/io/streams"
+load "lib/io/streams"          # подключить модуль вывода (зависимости подтянутся сами)
 
-io::streams::print "hello from BS $(bs::version::get)"
+io::streams::print "hello from BS $(bs::version::get)"   # напечатать строку с версией BS
 ```
 
 ```console
@@ -65,13 +66,14 @@ hello from BS 0.20.0
 
 ```bash
 #!/usr/bin/env bs
+# ↑ шебанг: логгер и is::* уже загружены, load не нужен
 
-log::info "Начинаю резервную копию"
-if is::file "/etc/hostname"; then
-    log::success "Файл на месте, можно копировать"
-else
-    log::warn "Файла нет, пропускаю"
-fi
+log::info "Начинаю резервную копию"                # обычное сообщение с меткой времени
+if is::file "/etc/hostname"; then                   # есть ли такой обычный файл?
+    log::success "Файл на месте, можно копировать"  # да: зелёное сообщение об успехе
+else                                                # иначе
+    log::warn "Файла нет, пропускаю"                # нет: жёлтое предупреждение
+fi                                                  # конец условия
 ```
 
 ```console
@@ -87,59 +89,60 @@ BS делает сам. Значения читаются по смыслу: `ar
 
 ```bash
 #!/usr/bin/env bs
+# ↑ шебанг: запуск через интерпретатор bs
 
-load "core/args"
-load "lib/io/streams"
+load "core/args"                       # модуль разбора параметров командной строки
+load "lib/io/streams"                  # модуль вывода
 
-main() {
-    args::level 1 hello goodbye
-    args::flag name value world
-    args::flag loud
-    args::required 1
-    args::require "$@"
+main() {                               # главная функция скрипта
+    args::level 1 hello goodbye        # первое слово команды: hello или goodbye
+    args::flag name value world        # флаг --name со значением, по умолчанию world
+    args::flag loud                    # флаг-переключатель --loud без значения
+    args::required 1                   # первое слово обязательно
+    args::require "$@"                 # разобрать аргументы; при ошибке показать справку и выйти
 
-    # args::param 1        — первое слово после имени скрипта (hello или goodbye)
-    # args::flag_get name  — значение --name; без него — дефолт world
-    local -r command="$(args::param 1)"
-    local -r name="$(args::flag_get name)"
-    local msg
-    case "${command}" in
-        hello)   msg="Hello, ${name}!" ;;
-        goodbye) msg="Goodbye, ${name}!" ;;
-    esac
-    args::flag_is_set loud && msg="${msg^^}"
-    io::streams::print "${msg}"
+    local -r command="$(args::param 1)"      # первое слово после имени скрипта
+    local -r name="$(args::flag_get name)"   # значение --name или дефолт world
+    local msg                                # переменная для итогового текста
+    case "${command}" in                     # выбрать текст по команде
+        hello)   msg="Hello, ${name}!" ;;    # приветствие
+        goodbye) msg="Goodbye, ${name}!" ;;  # прощание
+    esac                                     # конец выбора
+    args::flag_is_set loud && msg="${msg^^}" # с --loud перевести текст в ВЕРХНИЙ регистр
+    io::streams::print "${msg}"              # напечатать результат
 }
 
-main "$@"
+main "$@"                              # вызвать main со всеми аргументами скрипта
 ```
 
-![greet.sh: приветствие, громкий режим и автоматическая справка](documentation/assets/greet.png)
+```console
+$ bs run examples/greet.sh hello --name Мир
+Hello, Мир!
+$ bs run examples/greet.sh goodbye --loud
+GOODBYE, WORLD!
+```
 
 Полная версия с описаниями для `--help`: [examples/greet.sh](examples/greet.sh).
 
 ### 🎛️ Меню в терминале
 
-<img src="documentation/assets/tui-menu.png" alt="TUI-меню" width="320" align="right">
+<img src="documentation/assets/tui-menu.png" alt="TUI-меню со скруглённой рамкой" width="320" align="right">
 
 `↑↓` выбор, `Enter` действие, `q` выход. Полный пример с циклом
 обработки клавиш: [examples/menu.sh](examples/menu.sh).
 
 ```bash
-load "lib/tui/tui"
+load "lib/tui/tui"                                       # подключить TUI-библиотеку
 
-main() {
-    local -a items=("Run checks" "Show status" "Quit")
-    local -i sel=0
+main() {                                                 # главная функция
+    local -a items=("Run checks" "Show status" "Quit")   # пункты меню
+    local -i sel=0                                       # номер выбранного пункта
 
-    # полноэкранный режим
-    tui::init
-    # меню в точке (2, 2), выбран пункт sel
-    tui::menu 2 2 items "${sel}" "Menu"
-    tui::render
-    # ждём клавишу: она окажется в $TUI_KEY
-    tui::key_read
-    # ...
+    tui::init                                # включить полноэкранный режим
+    tui::menu 2 2 items "${sel}" "Menu"      # меню в строке 2, колонке 2, в скруглённой рамке
+    tui::render                              # вывести кадр на экран
+    tui::key_read                            # ждать клавишу: она окажется в $TUI_KEY
+    # ...                                    # дальше: обработать клавишу и перерисовать
 }
 ```
 
@@ -151,9 +154,11 @@ main() {
 
 | | |
 |---|---|
-| ✅ **Список задач** `examples/todo.sh`<br>Окна, модалки, файл задач. | <img src="documentation/assets/todo.gif" alt="TUI todo" width="420"> |
-| 🔐 **Мастер настройки sshd** `examples/sshd_wizard.sh --dry-run`<br>Профили, подсказка к каждому параметру, безопасное применение. | <img src="documentation/assets/tui-sshd.png" alt="Мастер sshd" width="420"> |
+| ✅ **Список задач** `examples/todo.sh`<br>Окна, модалки, файл задач. | <img src="documentation/assets/todo.gif" alt="TUI todo: добавление, отметка и удаление задач" width="420"> |
+| 🔐 **Мастер настройки sshd** `examples/sshd_wizard.sh --dry-run`<br>Профили, подсказка к каждому параметру, безопасное применение. | <img src="documentation/assets/tui-sshd.gif" alt="Мастер sshd: секции, параметры и подсказки" width="420"> |
+| 🌍 **Мастер локали** `examples/locale_wizard.sh`<br>Шаги, выбор языка, кодировки и раскладки. | <img src="documentation/assets/tui-locale.gif" alt="Мастер локали по шагам" width="420"> |
 | 🌐 **Сеть** `examples/netconn.sh`<br>Интерфейсы, адреса, трафик в реальном времени. | <img src="documentation/assets/tui-netconn.png" alt="Сетевой TUI" width="420"> |
+| 🧩 **Демо TUI** `examples/tui_demo.sh`<br>Секции, список задач, модалка ввода, прогресс. | <img src="documentation/assets/tui-demo.png" alt="Демо TUI" width="420"> |
 
 Ещё примеры:
 
@@ -165,6 +170,10 @@ main() {
 
 ## 🧰 Инструменты `bs`
 
+<p align="center">
+  <img src="documentation/assets/bs-cli.gif" alt="bs version, bs version --full и bs help в терминале" width="640">
+</p>
+
 | Команда | Что делает |
 |---|---|
 | `bs run script.sh` | запустить скрипт (или `#!/usr/bin/env bs` в шапке) |
@@ -175,12 +184,23 @@ main() {
 | `bs doctor` | проверка целостности |
 | `bs update` | обновить установленные копии |
 | `bs where` | найти все установки BS на машине |
+| `bs version [--full]` | версия; с `--full` ещё путь, вид установки и коммит |
+| `bs help [команда]` | список команд или подробная справка по одной |
+
+<details>
+<summary>📸 Скриншоты <code>bs version</code> и <code>bs help</code></summary>
+
+![bs version и bs version --full](documentation/assets/bs-version.png)
+
+![bs help: все команды по группам](documentation/assets/bs-help.png)
+
+</details>
 
 ## 📦 Установка
 
 ```bash
-./install.sh --local      # ~/.local/bin/bs, без sudo
-sudo ./install.sh         # /usr/local/bin/bs, для всех
+./install.sh --local      # для себя: ~/.local/bin/bs, без sudo
+sudo ./install.sh         # для всех пользователей: /usr/local/bin/bs
 ```
 
 Установщик копирует фреймворк, так что клон потом можно удалить. Виды
@@ -205,8 +225,8 @@ documentation/  документация на русском и английск
 ## 🧪 Тесты
 
 ```bash
-bash tests/runalltests.sh          # весь набор
-bash tests/validateshellcheck.sh   # ShellCheck
+bash tests/runalltests.sh          # запустить весь набор тестов
+bash tests/validateshellcheck.sh   # проверить код линтером ShellCheck
 ```
 
 ## 📚 Документация

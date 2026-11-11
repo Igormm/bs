@@ -9,7 +9,7 @@
 #   C. в сниппетах `#!/usr/bin/env bs` нет избыточного set -euo pipefail / IFS
 #   D. нет прямого source модулей фреймворка вместо load
 #   E. сниппет, ссылающийся на examples/X.sh, совпадает с реальным файлом
-#      (без учёта комментариев, пустых строк и финального guard-блока)
+#      (без учёта комментариев, в том числе хвостовых « # …», пустых строк и финального guard-блока)
 #
 # Checks bash snippets in README.md, README.en.md, documentation/ and examples/*.md:
 #   A. `load "..."` paths resolve (core/X.sh, lib/X/Y.sh)
@@ -17,7 +17,7 @@
 #   C. `#!/usr/bin/env bs` snippets carry no redundant set -euo pipefail / IFS
 #   D. no direct source of framework modules instead of load
 #   E. a snippet referencing examples/X.sh matches the real file
-#      (ignoring comments, blank lines and the trailing guard block)
+#      (ignoring comments, trailing « # …» ones included, blank lines and the trailing guard block)
 #
 # Exit codes / Коды выхода:
 #   0 — нет находок / no findings
@@ -89,6 +89,9 @@ normalize_code() {
         /^main[[:space:]]+"\$@"/ { next }
         /^\}[[:space:]]*$/ { next }
         {
+            # хвостовой комментарий « # пояснение» к строке тоже не считается кодом
+            # a trailing « # note» comment on a code line is not code either
+            sub(/[[:space:]]+#[[:space:]].*$/, "")
             sub(/^[[:space:]]+/, "")
             sub(/[[:space:]]+$/, "")
             print
