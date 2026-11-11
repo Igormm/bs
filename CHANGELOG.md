@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- feat(args): readable accessors for the parsed arguments. `args::param N [default]` (`bs_args_param`) is a plain name for `args::get`: the positional parameter counted from 1, like `$1`. `args::flag_get NAME [fallback]` takes an optional second argument, used when the flag was not given and has no declared default. Scripts no longer need the internal arrays: `$(args::flag_get name world)` instead of `${ARGS_FLAGS["name"]:-world}`, `$(args::param 1)` instead of `${ARGS_PARAMS[0]}`; the arrays keep working. `examples/greet.sh`, the README and the first-script tutorial use the new form; docs: `documentation/{en,ru}/03-modules/args.md` («Reading the arguments»). Tests: `testargsunit.sh` (+16 checks), `testargsportableunit.sh` (param and fallback in every shell).
+
 ## [0.19.0] - 2026-11-11 "Purioa"
 
 ### Added

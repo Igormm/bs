@@ -103,12 +103,13 @@ Flags / Флаги:
 
 ## Шаг 4: Провалидированные значения и обработка ошибок
 
-После успешного `args::parse` позиционные параметры лежат в массиве `ARGS_PARAMS`, а значения флагов читаются через `args::flag_get`:
+После успешного `args::parse` позиционные параметры читаются через `args::param N [дефолт]` (счёт с 1, как у `$1`), а значения флагов — через `args::flag_get ИМЯ [запасное]`:
 
 ```bash
-    local action="${ARGS_PARAMS[0]:-status}"
+    local action
+    action="$(args::param 1 status)"
     local env
-    env="$(args::flag_get env || printf 'staging')"
+    env="$(args::flag_get env staging)"
 
     case "${env}" in
         staging|production) ;;
@@ -216,9 +217,10 @@ main() {
     args::require "$@"
 
     # 3. Work with validated values
-    local action="${ARGS_PARAMS[0]:-status}"
+    local action
+    action="$(args::param 1 status)"
     local env
-    env="$(args::flag_get env || printf 'staging')"
+    env="$(args::flag_get env staging)"
 
     # Runtime validation: only two environments exist
     case "${env}" in
