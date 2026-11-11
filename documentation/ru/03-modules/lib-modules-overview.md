@@ -71,6 +71,7 @@ RFC-хелперы: UUID 4/7 ([uuid.sh](../../../lib/rfc/uuid.sh)), URI, CSV.
 ## network — `lib/network/`
 
 - [sshnetwork.sh](../../../lib/network/sshnetwork.sh) — операции по SSH в локальной сети: обнаружение устройств, удалённое выполнение команд, передача файлов и туннели.
+- [vpn/](../../../lib/network/vpn/) — VPN/прокси-клиент на ядре sing-box: ссылки (VLESS/REALITY, VMess, Trojan, Shadowsocks, Hysteria2, Hysteria, TUIC, AnyTLS, SOCKS), подписки, сборка конфига, управление процессом, Clash API, замеры задержки и полноэкранный TUI. Подробнее: [network-vpn.md](network-vpn.md).
 
 Ключевые функции: `sshnetwork::discover_devices`, `sshnetwork::execute_remote`, `sshnetwork::transfer_file`, `sshnetwork::create_tunnel`.
 
