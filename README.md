@@ -1,151 +1,109 @@
-# BS Framework
+# 🐚 BS Framework
 
-**BS** — модульный фреймворк и стандартная библиотека для shell-скриптов.
+> 🇷🇺 Русская версия · 🇬🇧 [English version](README.en.md)
+
+[![CI](https://github.com/Igormm/bs/actions/workflows/ci.yml/badge.svg)](https://github.com/Igormm/bs/actions/workflows/ci.yml)
+![bash 4.2+](https://img.shields.io/badge/bash-4.2%2B-4EAA25?logo=gnubash&logoColor=white)
+![kernel POSIX sh](https://img.shields.io/badge/ядро-POSIX%20sh-blue)
+[![MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+**BS — модульный фреймворк и стандартная библиотека для shell-скриптов.**
 Пишешь скрипт, подключаешь нужные модули через `load`, остальное берёт на
 себя фреймворк.
 
-- 📦 **Загрузчик модулей** с разрешением зависимостей
+<p align="center">
+  <img src="documentation/assets/tui-netconn.png" alt="Сетевой TUI на BS: интерфейсы, сведения и трафик" width="760">
+</p>
+
+## ✨ Почему BS
+
+- 📦 **Загрузчик модулей** с разрешением зависимостей: `load "lib/io/streams"`, и всё нужное подтянется само
 - 📝 **Логирование** и 🛡️ **обработка ошибок** из коробки
-- ⚙️ **Декларативные параметры** скриптов
-- 🔀 **Абстракция потоков** ввода/вывода
-- 🖥️ **Системные модули**: процессы, файлы, железо, интеграции
+- ⚙️ **Параметры скрипта одной декларацией**: валидация, `--help` и автодополнение сами
+- 🖥️ **TUI на чистом bash**: окна, меню, модалки, мышь
+- 🧰 **100+ модулей**: файлы, процессы, сеть, железо, сервисы, HTTP, LLM, Kubernetes
+- 📦 **`bs build`**: скрипт и фреймворк в одном файле, который работает без установки
+- 🐚 **Ядро на POSIX sh**, стандартная библиотека на Bash 4.2+
+- 🎯 **Ноль внешних зависимостей** и единый стиль кода
 
-🐚 Ядро написано на POSIX sh и работает в любой оболочке, стандартная
-библиотека написана на Bash.
-🎯 Единый code style, ни одной внешней зависимости.
-
-**BS** is a modular framework and standard library for shell scripts.
-Write your script, `load` the modules you need, and the framework does
-the rest.
-
-- 📦 **Module loader** with dependency resolution
-- 📝 **Logging** and 🛡️ **error handling** out of the box
-- ⚙️ **Declarative script parameters**
-- 🔀 **I/O streams abstraction**
-- 🖥️ **System modules**: processes, files, hardware, integrations
-
-🐚 The kernel is POSIX sh and runs in any shell; the standard library is
-written in Bash.
-🎯 One code style, zero external dependencies.
-
-## Возможности / Features
-
-- **Интерпретатор `bs`** — shebang-режим (`#!/usr/bin/env bs`) и `bs run`:
-  скрипты не требуют bootstrap-бойлерплейта
-- **Интерактивный REPL `bs repl`** — сессия с загруженным ядром: `load`,
-  eval-выражения, история команд, интроспекция (`:list`, `:doc`, `:info`)
-- **RPN-калькулятор `bs calc`** — обратная польская нотация на `dc`:
-  однострочный (`bs calc '2 3 4 * +'`) и интерактивный режим (стек живёт
-  между строками)
-- **Standalone-сборка `bs build`** — превращает скрипт в один
-  самодостаточный файл (фреймворк внутри, извлекается в кэш при первом
-  запуске): работает в любом дистрибутиве без установки BS
-- **`bs update`** — применить изменения репозитория к установленным копиям
-  без переустановки (local/system/custom): `./bs update --local`. Источник —
-  локальный репозиторий или GitHub (`bs update --github [--ref REF]`); из
-  установленной копии без репозитория рядом обновление идёт с GitHub. Если
-  локальный репозиторий отстаёт от GitHub, `bs` предупредит и спросит,
-  какой источник взять. Какие установки обновляются и что делает каждая
-  команда — в [documentation/ru/install.md](documentation/ru/install.md#обновление-bs-update)
-- **`bs where`** — все следы BS на машине без изменений: запущенная копия,
-  каждый `bs` в `PATH`, установки (local/system/custom) с версией, манифестом,
-  владельцем и остатками, репозитории, строки в rc-файлах, каталоги данных и
-  кэша; в конце — что вызывает вопросы и какими командами это исправить
-  (`bs where --deep` ищет копии и в необычных местах)
-- **Загрузчик модулей** — `load "lib/io/streams"`, зависимости через
-  `# @depends`, защита от циклов и повторной загрузки
-- **`core/args`** — декларативное дерево параметров: валидация, авто-help,
-  флаги `--key value`, дефолты, типы значений (`number`, `enum:a,b`,
-  валидатор-колбэк), повторяемые уровни, `--` для сырых аргументов и
-  генерация bash-completion из одного источника
-- **`lib/io/streams`** — безопасный вывод, перенаправления, save/restore FD,
-  pipe, буферизация stdio, `/dev` спецфайлы
-- **`core/logger`** — уровни, цвета, форматы text/json/structured
-- **`core/utils`** — идиомы тишины: `utils::has`, `utils::quiet`,
-  `utils::quiet_err`, `utils::ignore`, `utils::attempt` вместо ручных
-  `>/dev/null 2>&1`
-- **`core/lang`** — предикаты `is::file`, `is::empty`, `is::command` (настоящие
-  имена `bs_is_*`, работают в любой оболочке); строки `str::*`, коллекции
-  `arr::*`/`map::*` и интроспекцию `bs::func_name`/`bs::type_of` даёт мост
-  `lib/compat/lang` (только bash)
-- **`lib/tui`** — чистый bash TUI: diff-рендер, клавиши/мышь, модалки
-- **`lib/platform/facts`** — вектор возможностей (пробы, не `uname`)
-- **`lib/rfc/*`** — UUID (RFC 4122/9562), URI, CSV
-- **`lib/integration/*`** — HTTP-клиент, LLM (OpenAI/Ollama), Kubernetes,
-  JSON-контракт результата для интеграции с Go-backend / CI
-- **`lib/system/*`** — дистрибутивы, пакеты, пользователи, сервисы, сеть,
-  устройства, hw (20+ модулей)
-- **Тесты и CI** — свой тест-фреймворк, ShellCheck, матрица
-  ubuntu / debian / almalinux 8–9 (bash 4.4–5.x)
-
-## Требования / Requirements
-
-- **Bash 4.2+ — обязательно / required**: на нём написана вся `lib/` (87 модулей), ядро — POSIX sh; CI проверяет с 4.4, версии 4.2–4.3 допускаются кодом, но не проверяются / all of `lib/` (87 modules) is bash, the kernel is POSIX sh; CI checks from 4.4, 4.2–4.3 are accepted by the code but not verified
-- Запускать `bs` и `install.sh` можно из любой оболочки: пролог находит bash и перезапускается в нём / `bs` and `install.sh` can be started from any shell: the prologue finds bash and re-runs itself in it
-- Linux (основная платформа; macOS — частично)
-
-## Быстрый старт / Quick start
+## 🚀 Быстрый старт
 
 ```bash
-# Проверка целостности фреймворка / Framework integrity check
-./bs doctor
+git clone https://github.com/Igormm/bs.git && cd bs
 
-# Интерактивная консоль / Interactive shell
-./bs repl
-
-# RPN-калькулятор / RPN calculator
-./bs calc '2 3 4 * +'
-
-# Список модулей / List modules
-./bs list
-
-# Три примера со стартовой / Three landing examples
-./bs run examples/hello.sh
-./bs run examples/todo.sh
-./bs run examples/pulse.sh
+./bs run examples/hello.sh     # первый скрипт
+./bs repl                      # интерактивная консоль
+./bs doctor                    # проверить, что всё на месте
 ```
 
-## 1. Короткий скрипт / A short script
+Понравилось? Установите команду `bs` себе в `PATH`:
 
-`examples/hello.sh`:
+```bash
+./install.sh --local           # в ~/.local, без sudo
+```
+
+## 👋 Примеры
+
+### Hello, world
 
 ```bash
 #!/usr/bin/env bs
-# shellcheck shell=bash
 
 load "lib/io/streams"
 
 io::streams::print "hello from BS $(bs::version::get)"
 ```
 
-Запуск / Run: `./bs run examples/hello.sh`
+```console
+$ bs run examples/hello.sh
+hello from BS 0.20.0
+```
 
-### 1.1. Скрипт с параметрами / Script with arguments
+### 📝 Логи без лишнего кода
 
-`examples/greet.sh` — короткая утилита на `core/args`: дерево команд,
-флаги, авто-help и валидация.
+Логгер и проверки вроде `is::file` доступны сразу, без `load`:
 
 ```bash
 #!/usr/bin/env bs
-# shellcheck shell=bash
+
+log::info "Начинаю резервную копию"
+if is::file "/etc/hostname"; then
+    log::success "Файл на месте, можно копировать"
+else
+    log::warn "Файла нет, пропускаю"
+fi
+```
+
+```console
+[2026-11-11 08:06:35] INFO  Начинаю резервную копию
+[2026-11-11 08:06:35] SUCCESS Файл на месте, можно копировать
+```
+
+### ⚙️ Скрипт с параметрами
+
+Описываете параметры один раз, а проверку, сообщения об ошибках и `--help`
+BS делает сам. Значения читаются по смыслу: `args::param 1` (первое слово
+команды) и `args::flag_get name` (значение `--name`).
+
+```bash
+#!/usr/bin/env bs
 
 load "core/args"
 load "lib/io/streams"
 
 main() {
     args::level 1 hello goodbye
-    args::describe hello "Greet a name"
-    args::describe goodbye "Say goodbye to a name"
     args::flag name value world
     args::flag loud
-    args::flag_describe name "Who to greet"
-    args::flag_describe loud "Uppercase the greeting"
     args::required 1
     args::require "$@"
 
-    local -r name="${ARGS_FLAGS["name"]:-world}"
+    # args::param 1        — первое слово после имени скрипта (hello или goodbye)
+    # args::flag_get name  — значение --name; без него — дефолт world
+    local -r command="$(args::param 1)"
+    local -r name="$(args::flag_get name)"
     local msg
-    case "${ARGS_PARAMS[0]}" in
+    case "${command}" in
         hello)   msg="Hello, ${name}!" ;;
         goodbye) msg="Goodbye, ${name}!" ;;
     esac
@@ -156,275 +114,119 @@ main() {
 main "$@"
 ```
 
-Запуск / Run:
+![greet.sh: приветствие, громкий режим и автоматическая справка](documentation/assets/greet.png)
+
+Полная версия с описаниями для `--help`: [examples/greet.sh](examples/greet.sh).
+
+### 🎛️ Меню в терминале
+
+<img src="documentation/assets/tui-menu.png" alt="TUI-меню" width="320" align="right">
+
+`↑↓` выбор, `Enter` действие, `q` выход. Полный пример с циклом
+обработки клавиш: [examples/menu.sh](examples/menu.sh).
 
 ```bash
-./bs run examples/greet.sh hello --name Bob
-./bs run examples/greet.sh hello --name Bob --loud
-./bs run examples/greet.sh --help
-```
-
-### 1.2. TUI-меню / TUI menu
-
-`examples/menu.sh` — минимальное интерактивное меню на `lib/tui`:
-`↑↓` / `j k` — выбор, `Enter` — действие, `q` — выход.
-
-```bash
-#!/usr/bin/env bs
-# shellcheck shell=bash
-
-load "lib/io/streams"
 load "lib/tui/tui"
 
 main() {
     local -a items=("Run checks" "Show status" "Quit")
     local -i sel=0
 
+    # полноэкранный режим
     tui::init
-    while true; do
-        tui::handle_resize
-        tui::buf::clear
-        tui::menu 2 2 items "${sel}" "Menu"
-        tui::render
-        tui::key_read
-
-        case "${TUI_KEY}" in
-            UP|k)
-                if (( sel > 0 )); then
-                    sel=$(( sel - 1 ))
-                fi
-                ;;
-            DOWN|j)
-                if (( sel < ${#items[@]} - 1 )); then
-                    sel=$(( sel + 1 ))
-                fi
-                ;;
-            ENTER)
-                tui::quit
-                case "${sel}" in
-                    0) io::streams::print "Running checks..." ;;
-                    1) io::streams::print "All systems OK." ;;
-                    2) return 0 ;;
-                esac
-                break
-                ;;
-            q)
-                tui::quit
-                return 0
-                ;;
-        esac
-    done
+    # меню в точке (2, 2), выбран пункт sel
+    tui::menu 2 2 items "${sel}" "Menu"
+    tui::render
+    # ждём клавишу: она окажется в $TUI_KEY
+    tui::key_read
+    # ...
 }
 ```
 
-Запуск / Run: `./bs run examples/menu.sh`
+<br clear="right">
 
-### 1.3. TUI-приложение / TUI app
+## 🖼️ Что можно собрать на BS
 
-`examples/app_demo.sh` — окно с кнопками на высокоуровневом слое `lib/tui/app`:
-фокус, биндинги и модалки берёт на себя фреймворк.
+Всё это лежит в [examples/](examples/) и запускается одной командой.
 
-```bash
-load "lib/tui/app"
+| | |
+|---|---|
+| ✅ **Список задач** `examples/todo.sh`<br>Окна, модалки, файл задач. | <img src="documentation/assets/todo.gif" alt="TUI todo" width="420"> |
+| 🔐 **Мастер настройки sshd** `examples/sshd_wizard.sh --dry-run`<br>Профили, подсказка к каждому параметру, безопасное применение. | <img src="documentation/assets/tui-sshd.png" alt="Мастер sshd" width="420"> |
+| 🌐 **Сеть** `examples/netconn.sh`<br>Интерфейсы, адреса, трафик в реальном времени. | <img src="documentation/assets/tui-netconn.png" alt="Сетевой TUI" width="420"> |
 
-main() {
-    tui::app::window main "Hello BS" 2 2 30 9
-    tui::app::button main greet "Say hello" 3 4
-    tui::app::on greet app::say_hello
-    tui::app::statusbar "Tab / arrows — next button, Enter — press, q — quit"
-    tui::app::run
-}
-```
+Ещё примеры:
 
-- `tui::app::window` / `tui::app::button` — окно и кнопка внутри него.
-- `tui::app::on` — колбэк нажатия кнопки: `app::say_hello` показывает
-  модалку сообщения (`tui::app::message_modal`).
-- `tui::app::run` — главный цикл: `Tab`/`↑↓←→` — фокус кнопок, `Enter` —
-  нажатие, `q` — выход. Полный файл — [examples/app_demo.sh](examples/app_demo.sh).
+- 🛡️ `fail2ban_wizard.sh`, `ntp_wizard.sh`, `locale_wizard.sh`: мастера настройки системы
+- 🔑 `openbao_wizard.sh`: установка OpenBao, [подробнее](documentation/ru/03-modules/system-openbao.md)
+- 🛰️ `vpn.sh`: VPN-клиент на sing-box и Xray с TUI, [подробнее](documentation/ru/03-modules/network-vpn.md)
+- 💓 `pulse.sh`, `sysdiag.sh`: быстрый осмотр машины
+- 🌍 `http_example.sh`, `llm_example.sh`, `k8s_example.sh`: интеграции
 
-Запуск / Run: `./bs run examples/app_demo.sh`
+## 🧰 Инструменты `bs`
 
-## 2. TUI todo list
+| Команда | Что делает |
+|---|---|
+| `bs run script.sh` | запустить скрипт (или `#!/usr/bin/env bs` в шапке) |
+| `bs repl` | консоль с загруженным ядром, `:list`, `:doc`, `:info` |
+| `bs calc '2 3 4 * +'` | RPN-калькулятор |
+| `bs list` | список модулей |
+| `bs build script.sh` | один самодостаточный файл, работает без установки BS |
+| `bs doctor` | проверка целостности |
+| `bs update` | обновить установленные копии |
+| `bs where` | найти все установки BS на машине |
 
-Чистый bash, высокоуровневый слой `lib/tui/app` (окна, кнопки, модалки — для
-новичков, см. [app_demo.sh](examples/app_demo.sh)): список, модалки
-ввода/подтверждения, файл `~/.todo.tsv`.
-
-```bash
-./bs run examples/todo.sh
-./bs run examples/todo.sh --file /tmp/tasks.tsv
-```
-
-Клавиши / Keys: `↑↓` выбор, `Enter` toggle, `a` add, `e` edit, `d` delete, `q` выход.
-
-### 2.1. Визард sshd-конфига / SSHd config wizard
-
-`examples/sshd_wizard.sh` — полноэкранный TUI на `lib/tui/tui` поверх модуля
-`lib/system/sshd`: профили `basic`/`strict`/`paranoid`, настройка параметров
-по секциям (с русской подсказкой на каждый), `Match`/chroot, предпросмотр и
-безопасное применение (backup → `sshd -t` → запись → reload).
+## 📦 Установка
 
 ```bash
-./bs run examples/sshd_wizard.sh --dry-run
+./install.sh --local      # ~/.local/bin/bs, без sudo
+sudo ./install.sh         # /usr/local/bin/bs, для всех
 ```
 
-### 2.2. Визард OpenBao / OpenBao wizard
+Установщик копирует фреймворк, так что клон потом можно удалить. Виды
+установки, обновление и удаление описаны в
+[documentation/ru/install.md](documentation/ru/install.md).
 
-`examples/openbao_wizard.sh` — TUI-визард установки OpenBao: роль
-`server`/`client`/`both`, профили `dev` (HTTP, root-токен, сервер в
-терминале) и `prod` (TLS, systemd, `operator init` + unseal), клиентский
-адрес/CA/токен, шаговый журнал. Секреты — только в файлы `0600`.
+**Что нужно:** Linux и Bash 4.2+ (CI проверяет 4.4–5.x на ubuntu, debian и
+almalinux 8–9). Запускать `bs` можно из любой оболочки: он сам найдёт bash.
+
+## 🗂️ Устройство
+
+```
+bs              CLI и интерпретатор
+bootstrap/      загрузчик модулей
+core/           ядро: args, logger, errorhandler, utils, lang …
+lib/            стандартная библиотека: io, tui, system, network, integration …
+examples/       примеры
+tests/          тесты
+documentation/  документация на русском и английском
+```
+
+## 🧪 Тесты
 
 ```bash
-sudo ./bs run examples/openbao_wizard.sh --profile prod
-./bs run examples/openbao_wizard.sh --role client
-./bs run examples/openbao_wizard.sh --dry-run
+bash tests/runalltests.sh          # весь набор
+bash tests/validateshellcheck.sh   # ShellCheck
 ```
 
-Подробнее: [сервер](documentation/ru/03-modules/system-openbao.md) ·
-[клиент](documentation/ru/03-modules/integration-openbao.md).
+## 📚 Документация
 
-### 2.3. VPN-клиент / VPN client (sing-box, Xray)
+- 🏁 [Начало работы](documentation/ru/01-getting-started/README.md)
+- ✍️ [Первый скрипт: пошаговый урок](documentation/ru/05-tutorials/first-script.md)
+- 🏗️ [Архитектура](documentation/ru/02-core-concepts/architecture.md)
+- 🧩 [Обзор модулей](documentation/ru/03-modules/lib-modules-overview.md)
+- 📖 [Справочник API ядра](documentation/ru/04-api-reference/core-api.md)
+- 🎨 [Стиль кода](documentation/ru/code-style-guide.md)
+- 🇬🇧 [English documentation](documentation/en/README.md)
 
-`examples/vpn.sh` — клиент на готовых ядрах sing-box и Xray: VLESS (REALITY,
-XHTTP, шифрование VLESS), VMess, Trojan, Shadowsocks, Hysteria2, Hysteria,
-TUIC, AnyTLS, WireGuard (ссылки и `.conf`), NaiveProxy, SOCKS; ядро для
-профиля выбирается само. Импорт ссылок и подписок, режимы proxy и TUN,
-пресеты маршрутов (`bypass-ru` и др.), смена сервера без разрыва, замер
-задержки, полноэкранный TUI.
+## 💡 Принципы
 
-```bash
-./bs run examples/vpn.sh core install
-./bs run examples/vpn.sh core install xray   # для XHTTP и шифрования VLESS
-./bs run examples/vpn.sh import 'vless://…'
-./bs run examples/vpn.sh            # TUI
-```
+- **Bash есть везде:** ничего не нужно ставить.
+- **Это bash, а не новый язык:** вся экосистема bash открыта, `bash -x` работает.
+- **Без магии:** каждая строка читается как обычный bash.
+- **Для эксплуатации:** cron, CI, Docker, один файл через `bs build`.
+- **Честные границы:** тяжёлую работу с данными отдаём jq или Go через JSON.
 
-Подробнее: [network-vpn.md](documentation/ru/03-modules/network-vpn.md).
+## 📄 Лицензия
 
-## 3. Пульс машины / Host pulse
-
-Вектор возможностей: тир, userland, пробы `grep -P`/`sed -z`, SHA-цепочка,
-железо если есть `/proc`. Не `uname`-ветвление.
-
-```bash
-./bs run examples/pulse.sh
-```
-
-## Установка / Installation
-
-BS можно запускать прямо из клонированного репозитория, но для регулярного
-использования удобно установить команду `bs` в `PATH`.
-
-```bash
-# Локальная установка в ~/.local (без sudo)
-./install.sh --local
-
-# Системная установка в /usr/local (нужен root)
-sudo ./install.sh
-```
-
-Установщик **копирует** файлы фреймворка в целевой каталог и создаёт
-обёртку `bs` в соответствующем `bin/`. После успешной установки исходный
-репозиторий можно удалить — BS будет работать из целевого каталога.
-
-### Один файл без установки / A single file without installation
-
-```bash
-# Собрать самодостаточный исполняемый файл (фреймворк внутри, ~230 КБ)
-./bs build examples/sysdiag.sh                 # → examples/sysdiag.standalone.sh
-
-# Запуск на любой машине, где есть bash 4.2+ (дистрибутив и оболочка не важны)
-./examples/sysdiag.standalone.sh quick
-```
-
-При первом запуске встроенный фреймворк распаковывается в кэш
-`$XDG_CACHE_HOME/bs/<hash>` (переопределяется `BS_BUILD_CACHE_DIR`).
-Дистрибутив-агностично: не требует установки BS и root-прав.
-
-| Режим | Куда копируется | Обёртка |
-|-------|-----------------|---------|
-| `--local` | `~/.local/lib/bs` | `~/.local/bin/bs` |
-| system (по умолчанию) | `/usr/local/lib/bs` | `/usr/local/bin/bs` |
-| custom | `$LIB_DIR/bs` | `$BIN_DIR/bs` |
-
-Пути переопределяются переменными окружения `PREFIX`, `BIN_DIR` и
-`LIB_DIR`. Подробнее — в [documentation/ru/install.md](documentation/ru/install.md)
-/ [documentation/en/install.md](documentation/en/install.md): виды установок,
-манифест `.install`, обновление (`bs update`, `--local`/`--system`/`--github`),
-удаление.
-
-## Структура / Layout
-
-```
-bs                  # stage-2: CLI и shebang-интерпретатор / CLI & interpreter
-boot.sh             # stage-1: проверка среды и поиск BS_ROOT
-bootstrap/          # init.sh, загрузчик модулей loader.sh
-core/               # prereq, lang, const, logger, errorhandler, utils,
-                    # version, config, deps; args и repl — по запросу
-lib/                # io, tui, system, ui, network, data, platform, rfc,
-                    # integration, ...
-install/            # модульный установщик / modular installer
-tests/              # тест-фреймворк и наборы тестов / test framework & suites
-examples/           # примеры (bs run examples/...)
-documentation/      # документация: en/ и ru/ / docs: en/ & ru/
-AGENTS.md           # контракт для ИИ / AI agent contract
-```
-
-## Тестирование / Testing
-
-```bash
-bash tests/runalltests.sh          # весь набор / full suite
-bash tests/validatesyntax.sh       # синтаксис bash / bash syntax
-bash tests/validateshellcheck.sh   # ShellCheck (уровень error)
-```
-
-CI (GitHub Actions): lint + матрица тестов в контейнерах
-ubuntu, debian:stable, almalinux:9, almalinux:8 — см. `.github/workflows/ci.yml`.
-
-## Документация / Documentation
-
-Полная документация на двух языках / Full documentation in two languages:
-
-- **[documentation/ru/](documentation/ru/README.md)** — русская документация
-- **[documentation/en/](documentation/en/README.md)** — English documentation
-
-Точки входа / Entry points:
-
-- Начало работы / Getting started — [ru](documentation/ru/01-getting-started/README.md) · [en](documentation/en/01-getting-started/README.md)
-- Архитектура / Architecture — [ru](documentation/ru/02-core-concepts/architecture.md) · [en](documentation/en/02-core-concepts/architecture.md)
-- Идиомы тишины `utils::quiet*` / Silence idioms — [ru](documentation/ru/03-modules/core-utils.md) · [en](documentation/en/03-modules/core-utils.md)
-- JSON-контракт результата / Result contract — [ru](documentation/ru/03-modules/integration-result.md) · [en](documentation/en/03-modules/integration-result.md)
-- HTTP, LLM, Kubernetes / HTTP, LLM, Kubernetes — [ru](documentation/ru/03-modules/integration-http.md) · [en](documentation/en/03-modules/integration-http.md)
-- OpenBao: сервер и клиент / OpenBao server and client — [ru](documentation/ru/03-modules/system-openbao.md) · [en](documentation/en/03-modules/system-openbao.md)
-- Стиль кода / Code style — [ru](documentation/ru/code-style-guide.md) · [en](documentation/en/code-style-guide.md)
-- `examples/` — рабочие примеры с комментариями / working examples with comments
-
-## Ценности / Values
-
-- **Вездесущность** — Bash 4.2+ есть везде: ноль установки, ноль внешних
-  зависимостей в рантайме. / **Ubiquity** — Bash 4.2+ ships everywhere:
-  zero install, zero external runtime dependencies.
-- **Совместимость важнее новизны** — BS это bash + конвенции, а не новый
-  язык: вся экосистема bash открыта. / **Compatibility over novelty** —
-  BS is bash plus conventions, not a new language: the whole bash
-  ecosystem stays open.
-- **Прозрачность** — каждая строка читаемый bash: `bash -x`, `declare -p`,
-  никакой магии. / **Transparency** — every line is readable bash, no magic.
-- **Ноль форков в ядре** — языковые примитивы — чистый bash, без внешних
-  команд. / **Zero forks in the core** — language primitives are pure bash.
-- **Операционность** — cron, CI, Docker, матрица дистрибутивов (bash 4.4–5.x),
-  `bs build` в один самодостаточный файл. / **Ops-first** — cron, CI,
-  Docker, distro matrix, standalone builds.
-- **Честные границы** — BS не язык с типами и замыканиями; данные
-  делегируются бинарникам (jq, Go) по JSON-контракту. / **Honest
-  boundaries** — data-heavy work goes to binaries (jq, Go) via a JSON
-  contract.
-
-Чем платим / What we pay: префиксы `__arr_*` вместо namespace, колбэки
-по имени вместо замыканий, дисциплина вместо компилятора, рантайм-
-проверки вместо статических гарантий.
-
-## Лицензия / License
-
-MIT — см. [LICENSE](LICENSE).
+MIT, см. [LICENSE](LICENSE).

@@ -5,6 +5,15 @@
 ### Changed
 - refactor(cli): `bs_cli_uninstall_cmd` (`bs uninstall`, 203 lines) is split into 10 private helpers and is now 22 lines: `bs_cli_uninstall_help`, `_parse_flags`, `_detect`, `_require`, `_all` (per target: `_resolve`, `_find_wrapper`, `_writable`, `_remove`), `_report`. The code was moved, not rewritten: per-target `continue` became `return 1`, `--help` sets `__bs_cli_un_help`, the `__bs_cli_un_*` names and every message are unchanged. Ten uninstall scenarios (help, unknown flag, nothing installed, missing/foreign/checkout `--lib`, plain and verbose removal, a foreign wrapper, a symlinked lib, `--local --system`) give identical output and the same files left behind in dash, busybox ash, ksh93, mksh, zsh and bash; `testuninstallsafetyunit` passes; no public name changed.
 
+## [Unreleased]
+
+### Added
+- feat(args): readable accessors for the parsed arguments. `args::param N [default]` (`bs_args_param`) is a plain name for `args::get`: the positional parameter counted from 1, like `$1`. `args::flag_get NAME [fallback]` takes an optional second argument, used when the flag was not given and has no declared default. Scripts no longer need the internal arrays: `$(args::flag_get name world)` instead of `${ARGS_FLAGS["name"]:-world}`, `$(args::param 1)` instead of `${ARGS_PARAMS[0]}`; the arrays keep working. `examples/greet.sh`, the README and the first-script tutorial use the new form; docs: `documentation/{en,ru}/03-modules/args.md` («Reading the arguments»). Tests: `testargsunit.sh` (+16 checks), `testargsportableunit.sh` (param and fallback in every shell).
+- docs(readme): `README.md` is now Russian only, shorter and friendlier: what BS does, quick start, the first script, `greet.sh` with a line-by-line table, a TUI GIF, a table of easy examples, `bs` commands, install, docs links. The English text moved to `README.en.md`; each links to the other. Pictures: `documentation/assets/greet.png`, `documentation/assets/todo.gif`. `tests/validatedocscode.sh` and `testdoctierscountunit.sh` also check `README.en.md`.
+
+### Fixed
+- fix(tui): `tui::render` ends a frame with a style reset when it left a style on. The next frame starts from "no style", so unstyled cells used to inherit the last style of the previous frame: typing in an input modal left reverse-video blocks on every other letter, and closing a modal left white bars behind.
+- fix(examples): `examples/todo.sh` sizes its window from the real terminal (`tui::size` before `tui::app::window`; it used the default 80x24, so on a shorter terminal the border ran over the status line) and refreshes the task count in the status line on every frame (it stayed at the count at start-up).
 ## [0.20.0] - 2026-11-11 "Purioa"
 
 ### Changed

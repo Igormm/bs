@@ -104,7 +104,7 @@ test_counts_match_labels() {
     local -a files=()
     while IFS= read -r f; do files+=("${f}"); done < <(
         cd "${BS_PROJECT_ROOT}" && {
-            printf '%s\n' README.md AGENTS.md
+            printf '%s\n' README.md README.en.md AGENTS.md
             find documentation .agents -name '*.md' -not -path '.agents/skills/bs-kernel-code/*' | sort
         } | sed "s#^#${BS_PROJECT_ROOT}/#")
     for f in "${files[@]}"; do

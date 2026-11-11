@@ -372,6 +372,31 @@ main() {
     testframework::assert_equal "fallback" "$(args::get 2 fallback)" "args::get with default"
     testframework::assert_equal "first" "$(args::get 1 none)" "args::get default ignored when set"
 
+    testframework::section "Readable accessors / Понятные функции доступа"
+
+    args::reset
+    args::level 1 hello goodbye
+    args::flag name value world
+    args::flag port value
+    args::flag loud
+    args::parse hello --name Bob
+    testframework::assert_equal "hello" "$(args::param 1)" "args::param 1 is the first positional"
+    testframework::assert_equal "${ARGS_PARAMS[0]}" "$(args::param 1)" "args::param 1 equals \${ARGS_PARAMS[0]}"
+    testframework::assert_equal "none" "$(args::param 2 none)" "args::param with default"
+    testframework::assert_false "args::param 2" "args::param fails on a missing position without default"
+    testframework::assert_false "args::param 0" "args::param rejects zero position"
+    testframework::assert_equal "Bob" "$(args::flag_get name)" "flag_get: CLI value"
+    testframework::assert_equal "Bob" "$(args::flag_get name nobody)" "flag_get: CLI value wins over fallback"
+    testframework::assert_equal "8080" "$(args::flag_get port 8080)" "flag_get: fallback when not given and no declared default"
+    testframework::assert_equal "8080" "$(args::flag_get --port 8080)" "flag_get: fallback with -- prefix"
+    testframework::assert_equal "" "$(args::flag_get port '')" "flag_get: empty fallback is allowed"
+    testframework::assert_command "args::flag_get port ''" "flag_get: empty fallback returns 0"
+    testframework::assert_false "args::flag_get port" "flag_get: still fails without value, default and fallback"
+    testframework::assert_equal "false" "$(args::flag_get loud false)" "flag_get: bool flag not given takes fallback"
+    args::parse goodbye
+    testframework::assert_equal "world" "$(args::flag_get name nobody)" "flag_get: declared default wins over fallback"
+    testframework::assert_equal "goodbye" "$(args::param 1)" "args::param after a second parse"
+
     testframework::section "Dash-dash / Разделитель --"
 
     args::reset

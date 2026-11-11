@@ -23,9 +23,13 @@ main() {
     args::required 1
     args::require "$@"
 
-    local -r name="${ARGS_FLAGS["name"]:-world}"
+    # Читаем разобранные аргументы понятными функциями / Read the parsed arguments with readable functions:
+    #   args::param 1        — первое слово после имени скрипта (hello или goodbye) / the first word after the script name
+    #   args::flag_get name  — значение --name; без него — дефолт world из args::flag / the --name value, or the default world
+    local -r command="$(args::param 1)"
+    local -r name="$(args::flag_get name)"
     local msg
-    case "${ARGS_PARAMS[0]}" in
+    case "${command}" in
         hello)   msg="Hello, ${name}!" ;;
         goodbye) msg="Goodbye, ${name}!" ;;
     esac
