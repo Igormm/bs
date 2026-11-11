@@ -13,32 +13,27 @@ load "core/args"
 load "lib/io/streams"
 
 main() {
-    # 1. Описываем, что скрипт принимает / Declare what the script accepts
-    args::level 1 hello goodbye                 # первое слово: hello или goodbye
+    args::level 1 hello goodbye
     args::describe hello "Greet a name"
     args::describe goodbye "Say goodbye to a name"
-    args::flag name value world                 # --name ИМЯ, по умолчанию world
-    args::flag loud                             # --loud, флаг без значения
+    args::flag name value world
+    args::flag loud
     args::flag_describe name "Who to greet"
     args::flag_describe loud "Uppercase the greeting"
-    args::required 1                            # без команды — ошибка и help
-
-    # 2. Проверяем аргументы: ошибка или --help — выход сразу
-    #    Validate arguments: an error or --help exits right here
+    args::required 1
     args::require "$@"
 
-    # 3. Читаем значения по смыслу / Read the values by meaning
-    local command name msg
-    command="$(args::get 1)"                    # hello | goodbye
-    name="$(args::flag_get name)"               # значение --name или дефолт world
-
+    # Читаем разобранные аргументы понятными функциями / Read the parsed arguments with readable functions:
+    #   args::param 1        — первое слово после имени скрипта (hello или goodbye) / the first word after the script name
+    #   args::flag_get name  — значение --name; без него — дефолт world из args::flag / the --name value, or the default world
+    local -r command="$(args::param 1)"
+    local -r name="$(args::flag_get name)"
+    local msg
     case "${command}" in
         hello)   msg="Hello, ${name}!" ;;
         goodbye) msg="Goodbye, ${name}!" ;;
     esac
-    if args::flag_is_set loud; then
-        msg="${msg^^}"
-    fi
+    args::flag_is_set loud && msg="${msg^^}"
     io::streams::print "${msg}"
 }
 

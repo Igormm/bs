@@ -125,9 +125,9 @@ main() {
     fi
 
     local action
-    action="$(args::get 1 quick)"
+    action="$(args::param 1 quick)"
     local out_file
-    out_file="$(args::flag_get output || true)"
+    out_file="$(args::flag_get output "")"
 
     case "${action}" in
         quick)

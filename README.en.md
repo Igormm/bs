@@ -2,6 +2,11 @@
 
 > 🇬🇧 English version · 🇷🇺 [Русская версия](README.md)
 
+[![CI](https://github.com/Igormm/bs/actions/workflows/ci.yml/badge.svg)](https://github.com/Igormm/bs/actions/workflows/ci.yml)
+![bash 4.2+](https://img.shields.io/badge/bash-4.2%2B-4EAA25?logo=gnubash&logoColor=white)
+![kernel POSIX sh](https://img.shields.io/badge/kernel-POSIX%20sh-blue)
+[![MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 **BS is a modular framework and standard library for shell scripts.**
 Write your script, `load` the modules you need, and the framework does
 the rest.
@@ -77,7 +82,7 @@ fi
 ### ⚙️ A script with parameters
 
 Declare the parameters once; BS does the validation, error messages and
-`--help`. Read values by meaning: `args::get 1` (the first command word)
+`--help`. Read values by meaning: `args::param 1` (the first command word)
 and `args::flag_get name` (the value of `--name`).
 
 ```bash
@@ -87,38 +92,29 @@ load "core/args"
 load "lib/io/streams"
 
 main() {
-    args::level 1 hello goodbye           # first word: hello or goodbye
-    args::flag name value world           # --name NAME, default world
-    args::flag loud                       # --loud, no value
+    args::level 1 hello goodbye
+    args::flag name value world
+    args::flag loud
     args::required 1
-    args::require "$@"                    # an error or --help exits here
+    args::require "$@"
 
-    local command name msg
-    command="$(args::get 1)"              # hello | goodbye
-    name="$(args::flag_get name)"         # the --name value or world
-
+    # args::param 1        — the first word after the script name (hello or goodbye)
+    # args::flag_get name  — the --name value, or the default world
+    local -r command="$(args::param 1)"
+    local -r name="$(args::flag_get name)"
+    local msg
     case "${command}" in
         hello)   msg="Hello, ${name}!" ;;
         goodbye) msg="Goodbye, ${name}!" ;;
     esac
-    if args::flag_is_set loud; then
-        msg="${msg^^}"
-    fi
+    args::flag_is_set loud && msg="${msg^^}"
     io::streams::print "${msg}"
 }
 
 main "$@"
 ```
 
-```console
-$ bs run examples/greet.sh hello --name Bob
-Hello, Bob!
-$ bs run examples/greet.sh hello --name Bob --loud
-HELLO, BOB!
-$ bs run examples/greet.sh --help
-Usage: bs [flags] [hello|goodbye]
-...
-```
+![greet.sh: a greeting, loud mode and the automatic help](documentation/assets/greet.png)
 
 The full version with `--help` descriptions: [examples/greet.sh](examples/greet.sh).
 
@@ -155,7 +151,7 @@ All of this lives in [examples/](examples/) and runs with one command.
 
 | | |
 |---|---|
-| ✅ **Todo list** `examples/todo.sh`<br>Windows, modals, a task file. | <img src="documentation/assets/tui-todo.png" alt="TUI todo" width="420"> |
+| ✅ **Todo list** `examples/todo.sh`<br>Windows, modals, a task file. | <img src="documentation/assets/todo.gif" alt="TUI todo" width="420"> |
 | 🔐 **sshd setup wizard** `examples/sshd_wizard.sh --dry-run`<br>Profiles, a tip for every option, safe apply. | <img src="documentation/assets/tui-sshd.png" alt="sshd wizard" width="420"> |
 | 🌐 **Network** `examples/netconn.sh`<br>Interfaces, addresses, live traffic. | <img src="documentation/assets/tui-netconn.png" alt="Network TUI" width="420"> |
 

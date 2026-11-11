@@ -86,11 +86,11 @@ main() {
     # 3. Работаем с провалидированными параметрами
     #    Work with the validated parameters
 
-    # args::get N [дефолт] — значение N-го уровня дерева (с 1)
-    # args::get N [default] — the value of tree level N (from 1)
+    # args::param N [дефолт] — значение N-го уровня дерева (с 1)
+    # args::param N [default] — the value of tree level N (from 1)
     local action timing
-    action="$(args::get 1 status)"             # уровень 1: действие / level 1: action
-    timing="$(args::get 2 now)"                # уровень 2: время / level 2: timing
+    action="$(args::param 1 status)"             # уровень 1: действие / level 1: action
+    timing="$(args::param 2 now)"                # уровень 2: время / level 2: timing
     local env
     env="$(args::flag_get env)"                # дефолт приходит из args::flag / default from args::flag
     local retries

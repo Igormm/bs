@@ -3,7 +3,7 @@
 # tests/validatedocscode.sh — docs code snippet consistency checker
 # tests/validatedocscode.sh — проверка согласованности сниппетов кода в документации
 #
-# Проверяет bash-сниппеты в README.md, documentation/ и examples/*.md:
+# Проверяет bash-сниппеты в README.md, README.en.md, documentation/ и examples/*.md:
 #   A. пути `load "..."` существуют (core/X.sh, lib/X/Y.sh)
 #   B. каждый вызов module::func существует в загруженных модулях
 #   C. в сниппетах `#!/usr/bin/env bs` нет избыточного set -euo pipefail / IFS
@@ -11,7 +11,7 @@
 #   E. сниппет, ссылающийся на examples/X.sh, совпадает с реальным файлом
 #      (без учёта комментариев, пустых строк и финального guard-блока)
 #
-# Checks bash snippets in README.md, documentation/ and examples/*.md:
+# Checks bash snippets in README.md, README.en.md, documentation/ and examples/*.md:
 #   A. `load "..."` paths resolve (core/X.sh, lib/X/Y.sh)
 #   B. every module::func call exists in the loaded modules
 #   C. `#!/usr/bin/env bs` snippets carry no redundant set -euo pipefail / IFS
@@ -302,7 +302,7 @@ main() {
             BLOCKS=$(( BLOCKS + 1 ))
             check_block "${doc}" "${line}" "${end_line}"
         done < <(awk '/^```/{ print NR " " substr($0,4) }' "${doc}")
-    done < <(printf '%s\n' README.md documentation/**/*.md examples/*.md 2>/dev/null | sort -u)
+    done < <(printf '%s\n' README.md README.en.md documentation/**/*.md examples/*.md 2>/dev/null | sort -u)
 
     echo
     echo -e "${YELLOW}Blocks checked / Сниппетов проверено: ${BLOCKS}${NC}"

@@ -2,6 +2,11 @@
 
 > 🇷🇺 Русская версия · 🇬🇧 [English version](README.en.md)
 
+[![CI](https://github.com/Igormm/bs/actions/workflows/ci.yml/badge.svg)](https://github.com/Igormm/bs/actions/workflows/ci.yml)
+![bash 4.2+](https://img.shields.io/badge/bash-4.2%2B-4EAA25?logo=gnubash&logoColor=white)
+![kernel POSIX sh](https://img.shields.io/badge/ядро-POSIX%20sh-blue)
+[![MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 **BS — модульный фреймворк и стандартная библиотека для shell-скриптов.**
 Пишешь скрипт, подключаешь нужные модули через `load`, остальное берёт на
 себя фреймворк.
@@ -77,7 +82,7 @@ fi
 ### ⚙️ Скрипт с параметрами
 
 Описываете параметры один раз, а проверку, сообщения об ошибках и `--help`
-BS делает сам. Значения читаются по смыслу: `args::get 1` (первое слово
+BS делает сам. Значения читаются по смыслу: `args::param 1` (первое слово
 команды) и `args::flag_get name` (значение `--name`).
 
 ```bash
@@ -87,38 +92,29 @@ load "core/args"
 load "lib/io/streams"
 
 main() {
-    args::level 1 hello goodbye           # первое слово: hello или goodbye
-    args::flag name value world           # --name ИМЯ, по умолчанию world
-    args::flag loud                       # --loud без значения
+    args::level 1 hello goodbye
+    args::flag name value world
+    args::flag loud
     args::required 1
-    args::require "$@"                    # ошибка или --help: выход здесь
+    args::require "$@"
 
-    local command name msg
-    command="$(args::get 1)"              # hello | goodbye
-    name="$(args::flag_get name)"         # значение --name или world
-
+    # args::param 1        — первое слово после имени скрипта (hello или goodbye)
+    # args::flag_get name  — значение --name; без него — дефолт world
+    local -r command="$(args::param 1)"
+    local -r name="$(args::flag_get name)"
+    local msg
     case "${command}" in
         hello)   msg="Hello, ${name}!" ;;
         goodbye) msg="Goodbye, ${name}!" ;;
     esac
-    if args::flag_is_set loud; then
-        msg="${msg^^}"
-    fi
+    args::flag_is_set loud && msg="${msg^^}"
     io::streams::print "${msg}"
 }
 
 main "$@"
 ```
 
-```console
-$ bs run examples/greet.sh hello --name Bob
-Hello, Bob!
-$ bs run examples/greet.sh hello --name Bob --loud
-HELLO, BOB!
-$ bs run examples/greet.sh --help
-Usage: bs [flags] [hello|goodbye]
-...
-```
+![greet.sh: приветствие, громкий режим и автоматическая справка](documentation/assets/greet.png)
 
 Полная версия с описаниями для `--help`: [examples/greet.sh](examples/greet.sh).
 
@@ -155,7 +151,7 @@ main() {
 
 | | |
 |---|---|
-| ✅ **Список задач** `examples/todo.sh`<br>Окна, модалки, файл задач. | <img src="documentation/assets/tui-todo.png" alt="TUI todo" width="420"> |
+| ✅ **Список задач** `examples/todo.sh`<br>Окна, модалки, файл задач. | <img src="documentation/assets/todo.gif" alt="TUI todo" width="420"> |
 | 🔐 **Мастер настройки sshd** `examples/sshd_wizard.sh --dry-run`<br>Профили, подсказка к каждому параметру, безопасное применение. | <img src="documentation/assets/tui-sshd.png" alt="Мастер sshd" width="420"> |
 | 🌐 **Сеть** `examples/netconn.sh`<br>Интерфейсы, адреса, трафик в реальном времени. | <img src="documentation/assets/tui-netconn.png" alt="Сетевой TUI" width="420"> |
 

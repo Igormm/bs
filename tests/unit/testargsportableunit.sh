@@ -77,6 +77,8 @@ x
 y z" "${sh_name}: parse, getters, rest"
         eq "$(probe "${sh_bin}" "${DECL_T1}"$'\n''bs_args_parse cmd; echo "e=$(bs_args_flag_get env) n=$(bs_args_flag_get n; echo rc=$?) set=$(bs_args_flag_is_set env; echo $?) has1=$(bs_args_has 1; echo $?) has2=$(bs_args_has 2; echo $?)"')" \
 "e=staging n=rc=1 set=1 has1=0 has2=1" "${sh_name}: defaults, flag_is_set, has"
+        eq "$(probe "${sh_bin}" "${DECL_T1}"$'\n''bs_args_parse cmd --n 7; echo "p1=$(bs_args_param 1) p2=$(bs_args_param 2 dflt) p9=$(bs_args_param 9; echo rc=$?) n=$(bs_args_flag_get n 3) e=$(bs_args_flag_get env dev) v=$(bs_args_flag_get verbose 0) z=$(bs_args_flag_get zz; echo rc=$?)"')" \
+"p1=cmd p2=dflt p9=rc=1 n=7 e=staging v=0 z=rc=1" "${sh_name}: param and flag_get with a fallback"
         eq "$(probe "${sh_bin}" "${DECL_T1}"$'\n''bs_args_parse --verbose; echo "set=$(bs_args_flag_is_set verbose; echo $?)"; bs_args_parse --n 5 cmd; echo "rc=$? n=$(bs_args_flag_get n)"; bs_args_parse --n; echo "rc=$?"' | grep -E '^(set|rc)=' | tr '\n' ' ')" \
 "set=0 rc=0 n=5 rc=2 " "${sh_name}: value flags and a missing value"
         out="$(probe "${sh_bin}" "${DECL_T1}"$'\n''p() { bs_args_parse "$@" >/dev/null 2>&1; printf "%s " "$?"; }; p; p bogus; p cmd a b b a; p a; p --env bad; p --n x; p --nope; p --verbose=1; p cmd --' | tr -d '\n')"
@@ -110,7 +112,7 @@ test_aliases() {
     for sh_name in bash zsh; do
         sh_bin="$(command -v "${sh_name}" || true)"
         [[ -n "${sh_bin}" ]] || continue
-        eq "$(probe "${sh_bin}" 'args::define a b; args::flag v; args::describe a "x"; args::level 1 c; bs_args_parse c --v; echo "rc=$? $(args::get 1) $(args::flag_get v)"')" "rc=0 c 1" "${sh_name}: args::* are aliases of bs_args_*"
+        eq "$(probe "${sh_bin}" 'args::define a b; args::flag v; args::describe a "x"; args::level 1 c; bs_args_parse c --v; echo "rc=$? $(args::get 1) $(args::flag_get v) $(args::param 1) $(args::flag_get w 5)"')" "rc=0 c 1 c 5" "${sh_name}: args::* are aliases of bs_args_*"
     done
     # kernel in bash: the old names work, the results are real bash arrays (lib/compat/args.sh)
     load "core/args"

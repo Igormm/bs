@@ -61,8 +61,8 @@ args::flag dry-run                  # bool flag
 args::flag env value                # value flag
 args::flag_describe env "Target environment (staging, production)"
 
-# After args::parse — value with a default:
-env="$(args::flag_get env || printf 'staging')"
+# After args::parse — value with a fallback:
+env="$(args::flag_get env staging)"
 
 # Checking a bool flag:
 if args::flag_get dry-run >/dev/null; then
@@ -70,8 +70,10 @@ if args::flag_get dry-run >/dev/null; then
 fi
 ```
 
-`args::flag_get` выводит значение и возвращает 0, если флаг был задан;
-иначе ничего не выводит и возвращает `E_ERROR` (1).
+`args::flag_get` выводит значение и возвращает 0, если флаг был задан. Если
+не был — выводит дефолт, объявленный в `args::flag`, а без него — второй
+аргумент (запасное значение); если нет ни того, ни другого, ничего не
+выводит и возвращает `E_ERROR` (1).
 
 Если загружен `core/utils`, последнюю проверку можно записать идиомой
 тишины вместо явного перенаправления:
@@ -117,6 +119,32 @@ fi
 `args::get N` выводит провалидированный позиционный параметр на позиции N
 (нумерация с 1) или возвращает `E_ERROR` (1), если позиция не задана.
 
+## Чтение аргументов: `args::param`, `args::flag_get`
+
+После `args::require` скрипту нужны две вещи: какие слова передали и что
+лежит во флагах. Читайте их функциями, а не внутренними массивами — тогда
+код сам говорит, что делает:
+
+```bash
+# ./greet.sh hello --name Bob
+command="$(args::param 1)"         # hello — первое слово после имени скрипта
+name="$(args::flag_get name)"      # Bob   — значение --name
+port="$(args::flag_get port 8080)" # 8080  — --port не передали, берём запасное
+```
+
+| Вместо | Пишите | Почему |
+|---|---|---|
+| `${ARGS_PARAMS[0]}` | `$(args::param 1)` | счёт с 1, как у `$1`; работает в любой оболочке |
+| `${ARGS_FLAGS["name"]:-world}` | `$(args::flag_get name world)` | имя флага — обычный текст, дефолт — второе слово |
+
+`args::param N [дефолт]` — понятное имя для `args::get N [дефолт]`, оба
+остаются. `args::flag_get ИМЯ [запасное]` берёт первое, что есть: значение
+из командной строки, дефолт из `args::flag`, запасное значение. Переданный
+bool-флаг читается как `1`; проверять его удобнее через
+`args::flag_is_set ИМЯ`.
+
+Массивы `ARGS_PARAMS` и `ARGS_FLAGS` продолжают работать для старых скриптов.
+
 ## Help: `args::help`
 
 Выводит справку, сгенерированную из того же дерева, что управляет
@@ -161,9 +189,11 @@ args::define first middle last
 | `args::describe name "text"` | описание параметра для help |
 | `args::flag name [bool\|value]` | объявить флаг (по умолчанию `bool`) |
 | `args::flag_describe name "text"` | описание флага для help |
-| `args::flag_get name` | значение флага после `args::parse`; 1, если не задан |
+| `args::flag_get name [запасное]` | значение флага после `args::parse`, иначе его дефолт, иначе запасное; 1, если ничего нет |
+| `args::flag_is_set name` | 0, если флаг передан в командной строке |
 | `args::parse "$@"` | валидация входных параметров по дереву |
-| `args::get N` | провалидированный позиционный параметр N (с 1) |
+| `args::param N [дефолт]` | позиционный параметр N (с 1); понятное имя для `args::get` |
+| `args::get N [дефолт]` | провалидированный позиционный параметр N (с 1) |
 | `args::help [prog]` | сгенерированный help |
 | `args::completion [prog]` | генерация функции bash completion |
 | `args::reset` | сброс дерева, флагов и разобранного состояния |

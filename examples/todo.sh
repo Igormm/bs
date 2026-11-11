@@ -81,6 +81,8 @@ todo::delete() {
 todo::draw_list() {
     local -r r=4 c=4
     local -i total=${#TODO_TASKS[@]}
+    # Строка состояния с живым счётчиком: хук рисуется перед ней / The status line with a live count: the hook runs before it
+    tui::app::statusbar "Tasks: ${total}   ↑↓ select  Enter toggle  a add  e edit  d delete  q quit"
     if (( total == 0 )); then
         tui::put "${r}" "${c}" "empty — press [a] to add" "$(tui::style dim)"
         return 0
@@ -139,6 +141,8 @@ todo::move() {
 
 main() {
     todo::load
+    # Размер окна — от настоящего терминала, а не от дефолтных 80x24 / Size the window from the real terminal, not the default 80x24
+    tui::size
     tui::app::window list "Tasks" 3 2 $(( TUI_COLS - 3 )) $(( TUI_LINES - 5 ))
     tui::app::draw_hook todo::draw_list
     tui::app::bind "UP|k|K|ц|Ц" todo::move up
@@ -147,7 +151,6 @@ main() {
     tui::app::bind "a|A|ф|Ф" todo::add
     tui::app::bind "e|E|у|У" todo::edit
     tui::app::bind "d|D|в|В" todo::ask_delete
-    tui::app::statusbar "Tasks: ${#TODO_TASKS[@]}   ↑↓ select  Enter toggle  a add  e edit  d delete  q quit"
     tui::app::run
     io::streams::print "Tasks saved: ${TODO_TASK_FILE} (${#TODO_TASKS[@]})"
 }
