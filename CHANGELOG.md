@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.19.0] - 2026-11-11 "Purioa"
 
 ### Added
 - feat(network): `lib/network/conn` — network connections in the spirit of `nmtui`. `core.sh` reads interfaces from `/sys/class/net` (kind, state, MAC, MTU, speed, driver, byte counters), default routes from `/proc/net/route` and DNS from `resolv.conf`, so the list works with no tools; `ip` adds addresses and `ip link set up|down`, a running NetworkManager adds profiles (`nmcli connection up|down`) and Wi-Fi (scan, connect, radio). `tui.sh` is a full-screen TUI on `lib/tui`: Interfaces/Profiles tabs, details, live traffic with a sparkline, confirmations before turning things off, a Wi-Fi list with a masked password field. CLI: `examples/netconn.sh` (`list`, `show`, `up`, `down`, `routes`, `profiles`, `connect`, `disconnect`, `wifi …`; the password is asked or read from stdin, never taken from arguments). Docs: `documentation/{en,ru}/03-modules/network-conn.md`. Tests: `testnetconnunit.sh` (73 checks on a fake sysfs with fake `ip` and `nmcli`).
