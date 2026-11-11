@@ -11,6 +11,8 @@ Tier: **Linux-only** (writes under `/etc/ssh`, reloads via `systemctl`).
 Without the `sshd` binary or write access it degrades with defined
 `LIB_ERROR_*` codes — never a silent success.
 
+![The sshd wizard (`examples/sshd_wizard.sh --dry-run`): sections, options and a tip](../../assets/tui-sshd.gif)
+
 Source: [lib/system/sshd.sh](../../../lib/system/sshd.sh)
 
 ## Loading

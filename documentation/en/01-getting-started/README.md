@@ -56,15 +56,15 @@ puts the `bs` command into your `PATH`.
 ### Run from the repository
 
 ```bash
-git clone <repo-url> bs
-cd bs
-./bs doctor
+git clone <repo-url> bs  # download the repo into the bs directory
+cd bs                    # enter it
+./bs doctor              # check that all framework files are in place
 ```
 
 ### Local install (`~/.local`, no sudo)
 
 ```bash
-./install.sh --local
+./install.sh --local  # install just for you into ~/.local, no sudo
 ```
 
 Copies the framework to `~/.local/lib/bs`, creates a wrapper at
@@ -80,7 +80,7 @@ explicitly), idempotently. PATH helpers:
 ### System install (`/usr/local`, requires root)
 
 ```bash
-sudo ./install.sh
+sudo ./install.sh  # install for every user into /usr/local
 ```
 
 Files go to `/usr/local/lib/bs`, the wrapper to `/usr/local/bin/bs`.
@@ -132,11 +132,12 @@ Runnable copy: [examples/hello.sh](../../../examples/hello.sh).
 
 ```bash
 #!/usr/bin/env bs
+# ↑ shebang: the bs interpreter runs this script
 # shellcheck shell=bash
 
-load "lib/io/streams"
+load "lib/io/streams"                                   # load the output module
 
-io::streams::print "hello from BS $(bs::version::get)"
+io::streams::print "hello from BS $(bs::version::get)"  # print a line with the BS version
 ```
 
 - `#!/usr/bin/env bs` — runs the script through the `bs` interpreter; the
@@ -156,7 +157,7 @@ io::streams::print "hello from BS $(bs::version::get)"
 ## Running scripts
 
 ```bash
-./bs run examples/hello.sh
+./bs run examples/hello.sh  # run the script through bs
 ./examples/hello.sh          # when bs is in PATH
 ```
 
@@ -275,7 +276,7 @@ from, turn on strict mode:
 
 ```bash
 dash ./bs --strict-shell run script.sh   # the flag goes BEFORE the command
-BS_SHELL_STRICT=1 dash ./bs run script.sh
+BS_SHELL_STRICT=1 dash ./bs run script.sh  # the same through an environment variable
 ```
 
 A `lib/` module then loads only if its `@shell` is allowed for the origin

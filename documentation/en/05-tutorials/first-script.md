@@ -17,13 +17,14 @@ Create `deploy-lite.sh`:
 
 ```bash
 #!/usr/bin/env bs
-log::info "Hello from BS"
+# ↑ shebang: the bs interpreter runs this script
+log::info "Hello from BS"  # a log message with a timestamp
 ```
 
 The shebang `#!/usr/bin/env bs` makes the script run inside the BS environment when executed directly (requires `bs` in `PATH`). From the repository root you can always run it without installation:
 
 ```bash
-./bs run deploy-lite.sh
+./bs run deploy-lite.sh  # run the script
 ```
 
 Output:
@@ -40,21 +41,22 @@ Load the `core/args` module and declare what the utility accepts: two positional
 
 ```bash
 #!/usr/bin/env bs
+# ↑ shebang: the bs interpreter runs this script
 
-load "core/args"
+load "core/args"                                                # the argument parsing module
 
-main() {
-    args::level 1 deploy status
-    args::flag env value
-    args::flag dry-run
+main() {                                                        # the script's main function
+    args::level 1 deploy status                                 # the first command word: deploy or status
+    args::flag env value                                        # an --env flag with a value
+    args::flag dry-run                                          # a --dry-run switch
 
-    args::describe deploy "Deploy the application"
-    args::describe status "Show environment status"
-    args::flag_describe env "Target environment: staging or production (default: staging)"
-    args::flag_describe dry-run "Print the plan without executing"
-}
+    args::describe deploy "Deploy the application"              # the deploy description for --help
+    args::describe status "Show environment status"             # the status description for --help
+    args::flag_describe env "Target environment: staging or production (default: staging)"  # the --env description for --help
+    args::flag_describe dry-run "Print the plan without executing"  # the --dry-run description for --help
+}                                                               # end of the function
 
-main "$@"
+main "$@"                                                       # call main with all the script's arguments
 ```
 
 - `args::level 1 deploy status` — level 1 accepts `deploy` **or** `status` (tree branching).
@@ -70,7 +72,7 @@ The script still prints nothing new — the tree is declared but not used yet.
 Add `args::require` after the declarations:
 
 ```bash
-    args::require "$@"
+    args::require "$@"  # parse the arguments; on error show the reason and the help
 ```
 
 - On any invalid input `args::parse` prints the reason and the help to stderr itself and returns `E_INVALID` — `args::require` then exits with that code via `bs::exit`, which runs the cleanup stack.
@@ -80,7 +82,7 @@ Add `args::require` after the declarations:
 Run:
 
 ```bash
-./bs run deploy-lite.sh --help
+./bs run deploy-lite.sh --help  # show the automatic help
 ```
 
 Output:
@@ -106,22 +108,22 @@ Note: `args::help` defaults to the `$0` basename, and under `bs run` `$0` is `ba
 After `args::parse` succeeds, read positionals with `args::param N [default]` (counted from 1, like `$1`) and flag values with `args::flag_get NAME [fallback]`:
 
 ```bash
-    local action
-    action="$(args::param 1 status)"
-    local env
-    env="$(args::flag_get env staging)"
+    local action                                                # a variable for the command
+    action="$(args::param 1 status)"                            # the first word; status if missing
+    local env                                                   # a variable for the environment
+    env="$(args::flag_get env staging)"                         # the --env value; staging if missing
 
-    case "${env}" in
-        staging|production) ;;
-        *)
-            log::error "Unknown environment: ${env} (expected staging or production)"
-            bs::exit error
-            ;;
-    esac
+    case "${env}" in                                            # check the environment
+        staging|production) ;;                                  # allowed values: nothing to do
+        *)                                                      # any other value
+            log::error "Unknown environment: ${env} (expected staging or production)"  # a red error message
+            bs::exit error                                      # exit with an error code
+            ;;                                                  # end of the branch
+    esac                                                        # end of the choice
 
-    if args::flag_get dry-run >/dev/null; then
-        log::warn "DRY RUN: no changes will be made"
-    fi
+    if args::flag_get dry-run >/dev/null; then                  # if --dry-run was passed
+        log::warn "DRY RUN: no changes will be made"            # a yellow warning
+    fi                                                          # end of the condition
 ```
 
 - `args::flag_get` prints the flag value and returns 1 if the flag was not given, so `|| printf 'staging'` supplies the default.
@@ -131,7 +133,7 @@ After `args::parse` succeeds, read positionals with `args::param N [default]` (c
 Run:
 
 ```bash
-./bs run deploy-lite.sh deploy --env production --dry-run
+./bs run deploy-lite.sh deploy --env production --dry-run  # a trial run with no changes
 ```
 
 Output:
@@ -148,7 +150,7 @@ Output:
 And a semantic error:
 
 ```bash
-./bs run deploy-lite.sh deploy --env mars
+./bs run deploy-lite.sh deploy --env mars  # a wrong environment: we will see an error
 ```
 
 Output (stderr) and exit code:
@@ -167,20 +169,21 @@ For machine-readable status lines use `io::streams::printf` — the format strin
 
 ```bash
 #!/usr/bin/env bs
+# ↑ shebang: the bs interpreter runs this script
 
-load "core/args"
-load "lib/io/streams"
+load "core/args"                                                # the argument parsing module
+load "lib/io/streams"                                           # load the output module
 
 # ... inside main(), the status branch:
-        status)
-            io::streams::printf '  %-11s %s\n' "environment" "${env}" "release" "v1.0.0" "health" "green"
-            ;;
+        status)                                                 # the status command branch
+            io::streams::printf '  %-11s %s\n' "environment" "${env}" "release" "v1.0.0" "health" "green"  # a table of "name value" pairs
+            ;;                                                  # end of the branch
 ```
 
 Run:
 
 ```bash
-./bs run deploy-lite.sh status
+./bs run deploy-lite.sh status  # show the status
 ```
 
 Output:
@@ -197,63 +200,64 @@ Output:
 
 ```bash
 #!/usr/bin/env bs
+# ↑ shebang: the bs interpreter runs this script
 # deploy-lite.sh — tiny deploy CLI: args + colored output + error handling
 
-load "core/args"
-load "lib/io/streams"
+load "core/args"                                                # the argument parsing module
+load "lib/io/streams"                                           # load the output module
 
-main() {
+main() {                                                        # the script's main function
     # 1. Declare the parameter tree and flags
-    args::level 1 deploy status
-    args::flag env value
-    args::flag dry-run
+    args::level 1 deploy status                                 # the first command word: deploy or status
+    args::flag env value                                        # an --env flag with a value
+    args::flag dry-run                                          # a --dry-run switch
 
-    args::describe deploy "Deploy the application"
-    args::describe status "Show environment status"
-    args::flag_describe env "Target environment: staging or production (default: staging)"
-    args::flag_describe dry-run "Print the plan without executing"
+    args::describe deploy "Deploy the application"              # the deploy description for --help
+    args::describe status "Show environment status"             # the status description for --help
+    args::flag_describe env "Target environment: staging or production (default: staging)"  # the --env description for --help
+    args::flag_describe dry-run "Print the plan without executing"  # the --dry-run description for --help
 
     # 2. Validate input; on error parse prints the reason and help itself
-    args::require "$@"
+    args::require "$@"                                          # parse the arguments; on error show the reason and the help
 
     # 3. Work with validated values
-    local action
-    action="$(args::param 1 status)"
-    local env
-    env="$(args::flag_get env staging)"
+    local action                                                # a variable for the command
+    action="$(args::param 1 status)"                            # the first word; status if missing
+    local env                                                   # a variable for the environment
+    env="$(args::flag_get env staging)"                         # the --env value; staging if missing
 
     # Runtime validation: only two environments exist
-    case "${env}" in
-        staging|production) ;;
-        *)
-            log::error "Unknown environment: ${env} (expected staging or production)"
-            bs::exit error
-            ;;
-    esac
+    case "${env}" in                                            # check the environment
+        staging|production) ;;                                  # allowed values: nothing to do
+        *)                                                      # any other value
+            log::error "Unknown environment: ${env} (expected staging or production)"  # a red error message
+            bs::exit error                                      # exit with an error code
+            ;;                                                  # end of the branch
+    esac                                                        # end of the choice
 
-    if args::flag_get dry-run >/dev/null; then
-        log::warn "DRY RUN: no changes will be made"
-    fi
+    if args::flag_get dry-run >/dev/null; then                  # if --dry-run was passed
+        log::warn "DRY RUN: no changes will be made"            # a yellow warning
+    fi                                                          # end of the condition
 
-    case "${action}" in
-        deploy)
-            log::info "Deploying to ${env}..."
-            io::streams::printf '  %-10s %s\n' "artifacts" "resolved" "release" "applied" "health" "green"
-            log::success "Deploy to ${env} finished"
-            ;;
-        status)
-            io::streams::printf '  %-11s %s\n' "environment" "${env}" "release" "v1.0.0" "health" "green"
-            ;;
-    esac
-}
+    case "${action}" in                                         # pick the action by command
+        deploy)                                                 # the deploy command branch
+            log::info "Deploying to ${env}..."                  # report the start
+            io::streams::printf '  %-10s %s\n' "artifacts" "resolved" "release" "applied" "health" "green"  # a table of steps
+            log::success "Deploy to ${env} finished"            # a green success message
+            ;;                                                  # end of the branch
+        status)                                                 # the status command branch
+            io::streams::printf '  %-11s %s\n' "environment" "${env}" "release" "v1.0.0" "health" "green"  # a table of "name value" pairs
+            ;;                                                  # end of the branch
+    esac                                                        # end of the choice
+}                                                               # end of the function
 
-main "$@"
+main "$@"                                                       # call main with all the script's arguments
 ```
 
 Try the validation error path:
 
 ```bash
-./bs run deploy-lite.sh fly
+./bs run deploy-lite.sh fly  # an unknown command: we will see the help
 ```
 
 Output (stderr) and exit code:

@@ -587,19 +587,19 @@ tui::__mouse_sgr() {
 
 # @global TUI_BORDER_TL — Tui: top-left corner char (category: state)
 # @global TUI_BORDER_TL — Tui: символ верхнего левого угла (категория: state)
-declare -g TUI_BORDER_TL="╔" TUI_BORDER_TR="╗" TUI_BORDER_BL="╚" TUI_BORDER_BR="╝"
+declare -g TUI_BORDER_TL="╭" TUI_BORDER_TR="╮" TUI_BORDER_BL="╰" TUI_BORDER_BR="╯"
 # @global TUI_BORDER_H — Tui: horizontal border char (category: state)
 # @global TUI_BORDER_H — Tui: символ горизонтальной рамки (категория: state)
-declare -g TUI_BORDER_H="═" TUI_BORDER_V="║"
+declare -g TUI_BORDER_H="─" TUI_BORDER_V="│"
 
 # @description Select a border style / Выбрать стиль рамки.
-#   double (default) — ╔═╗║╚╝   single — ┌─┐│└┘
-#   rounded — ╭─╮│╰╯   dashed — ┌┄┐┆└┄┘
+#   rounded (default, стиль BS / BS look) — ╭─╮│╰╯   single — ┌─┐│└┘
+#   double — ╔═╗║╚╝   dashed — ┌┄┐┆└┄┘
 #   thick — ┏━┓┃┗━┛     none — без углов, только линии
 # @param $1 style name / имя стиля
 # @return 0 ok, 1 unknown
 tui::border::set() {
-  case "${1:-double}" in
+  case "${1:-rounded}" in
     double)  TUI_BORDER_TL="╔" TUI_BORDER_TR="╗" TUI_BORDER_BL="╚" TUI_BORDER_BR="╝" TUI_BORDER_H="═" TUI_BORDER_V="║" ;;
     single)  TUI_BORDER_TL="┌" TUI_BORDER_TR="┐" TUI_BORDER_BL="└" TUI_BORDER_BR="┘" TUI_BORDER_H="─" TUI_BORDER_V="│" ;;
     rounded) TUI_BORDER_TL="╭" TUI_BORDER_TR="╮" TUI_BORDER_BL="╰" TUI_BORDER_BR="╯" TUI_BORDER_H="─" TUI_BORDER_V="│" ;;

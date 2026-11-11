@@ -11,6 +11,8 @@
 `systemctl`). Без бинарника `sshd` или прав на запись — чистая деградация с
 определёнными кодами `LIB_ERROR_*`, никогда не молчаливый успех.
 
+![Мастер sshd (`examples/sshd_wizard.sh --dry-run`): секции, параметры и подсказка](../../assets/tui-sshd.gif)
+
 Источник: [lib/system/sshd.sh](../../../lib/system/sshd.sh)
 
 ## Подключение

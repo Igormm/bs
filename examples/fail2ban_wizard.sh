@@ -332,7 +332,7 @@ f2b_wz::draw_status() {
 }
 
 f2b_wz::paint_all() {
-    tui::border::set single
+    tui::border::set rounded
     f2b_wz::cache_styles
     tui::buf::clear
     F2B_WZ_PARAMS_PAINTED=0

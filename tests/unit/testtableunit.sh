@@ -72,10 +72,10 @@ test_table_renders_header_and_rows() {
         "__screen_contains 'NYC'" \
         "table buffer contains data cell NYC"
     testframework::assert_command \
-        "__screen_contains '╔'" \
+        "__screen_contains '╭'" \
         "table buffer contains box top-left corner"
     testframework::assert_command \
-        "__screen_contains '╚'" \
+        "__screen_contains '╰'" \
         "table buffer contains box bottom-left corner"
 }
 

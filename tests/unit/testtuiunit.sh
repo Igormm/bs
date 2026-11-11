@@ -123,10 +123,11 @@ test_box_long_title() {
     tui::buf::clear
     # заголовок длиннее w-5: раньше str::repeat получал -10 и убивал shell
     # title longer than w-5: str::repeat used to get -10 and kill the shell
+    tui::border::set
     tui::box 1 1 10 3 "long title here"
-    testframework::assert_equal "╔" "${TUI_BUF[0,0]}" "box TL drawn with long title"
-    testframework::assert_equal "╗" "${TUI_BUF[0,9]}" "box TR drawn with long title"
-    testframework::assert_equal "═" "${TUI_BUF[0,1]}" "box top line continuous"
+    testframework::assert_equal "╭" "${TUI_BUF[0,0]}" "box TL drawn with long title"
+    testframework::assert_equal "╮" "${TUI_BUF[0,9]}" "box TR drawn with long title"
+    testframework::assert_equal "─" "${TUI_BUF[0,1]}" "box top line continuous"
 }
 
 test_modal_stack() {
@@ -143,6 +144,12 @@ test_modal_stack() {
 }
 
 test_borders() {
+    # По умолчанию — скруглённая одинарная рамка (стиль BS)
+    # Default is the rounded single-line frame (BS look)
+    tui::border::set
+    testframework::assert_equal "╭" "${TUI_BORDER_TL}" "border default is rounded TL"
+    testframework::assert_equal "│" "${TUI_BORDER_V}" "border default is single-line"
+
     tui::border::set double
     testframework::assert_equal "╔" "${TUI_BORDER_TL}" "border double TL"
     testframework::assert_equal "╝" "${TUI_BORDER_BR}" "border double BR"
