@@ -10,6 +10,11 @@
 - fix(tui): `tui::render` ends a frame with a style reset when it left a style on. The next frame starts from "no style", so unstyled cells used to inherit the last style of the previous frame: typing in an input modal left reverse-video blocks on every other letter, and closing a modal left white bars behind.
 - fix(examples): `examples/todo.sh` sizes its window from the real terminal (`tui::size` before `tui::app::window`; it used the default 80x24, so on a shorter terminal the border ran over the status line) and refreshes the task count in the status line on every frame (it stayed at the count at start-up).
 
+## [0.20.0] - 2026-11-11 "Purioa"
+
+### Changed
+- refactor(cli): `bs_cli_where_main` (`bs where`, 383 lines) is split into 21 private helpers, one per section or step, and is now 32 lines: `bs_cli_where_parse_flags`, `_shell_section`, `_path_section` (`_path_hit`), `_collect` (`_rc_files`, `_rc_paths`, `_rc_line_path`, `_deep_search`), `_installs_section` (`_install_kind`, `_install_head`, `_install_wrapper`, `_install_state`), `_checkouts_section`, `_traces_section`, `_data_section`, `_env_section`, `_versions_check`, `_older_check`, `_verdict`. The code was moved, not rewritten: `continue` became `return` in the per-item helpers, `--help` sets `__bs_cli_wh_help`, the `__bs_cli_wh_*` names and every message are unchanged. `bs where` printed the same 83 lines before and after in dash, busybox ash, ksh93, mksh, zsh and bash on a sandbox with a broken wrapper, an install without a manifest or wrapper, leftovers, an older install and rc-file traces; `testwhereunit` passes; no public name changed.
+
 ## [0.19.0] - 2026-11-11 "Purioa"
 
 ### Added
