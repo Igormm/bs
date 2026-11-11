@@ -129,10 +129,11 @@ vpn::tui::proto_label() {
         vless) label="VLESS" ;; vmess) label="VMESS" ;; trojan) label="TROJAN" ;;
         shadowsocks) label="SS" ;; hysteria2) label="HY2" ;; hysteria) label="HY1" ;;
         tuic) label="TUIC" ;; anytls) label="ANYTLS" ;; socks) label="SOCKS" ;;
+        wireguard) label="WG" ;; naive) label="NAIVE" ;;
         *) label="$1" ;;
     esac
     [[ "${2-}" == "reality" ]] && label+="·R"
-    case "${3-}" in ws|grpc|http|httpupgrade) label+="·${3:0:2}" ;; esac
+    case "${3-}" in ws|grpc|http|httpupgrade|xhttp) label+="·${3:0:2}" ;; esac
     printf '%s' "${label^^}"
 }
 
@@ -311,8 +312,10 @@ vpn::tui::__draw_title() {
         state="● ПОДКЛЮЧЕНО"
         st="$(tui::style bold white bg:green)"
     fi
-    local -r ver="${VPN_SINGBOX_VERSION:-?}"
-    local text=" ◆ BS VPN │ sing-box ${ver} │ ${state} │ режим ${VPN_TUI_STATUS[mode]:-?} │ маршрут ${VPN_TUI_STATUS[route]:-?}"
+    local -r engine="${VPN_TUI_STATUS[engine]:-sing-box}"
+    local ver="${VPN_SINGBOX_VERSION:-?}"
+    [[ "${engine}" == "xray" ]] && ver="${VPN_XRAY_VERSION:-?}"
+    local text=" ◆ BS VPN │ ${engine} ${ver} │ ${state} │ режим ${VPN_TUI_STATUS[mode]:-?} │ маршрут ${VPN_TUI_STATUS[route]:-?}"
     is::not_empty "${VPN_TUI_BG}" && text+=" │ ◷ замер…"
     tui::titlebar "${text}" "${st}"
 }
@@ -385,8 +388,12 @@ vpn::tui::__draw_profile() {
         "защита|${p[security]:-none}${p[sni]:+ · sni ${p[sni]}}${p[fp]:+ · ${p[fp]}}"
         "транспорт|${p[transport]:-${p[proto]}}${p[path]:+ · ${p[path]}}${p[service_name]:+ · ${p[service_name]}}"
         "группа|${p[group]:-manual}"
+        "ядро|$(vpn::core::engine_for "${id}" 2>/dev/null || printf 'не подходит настройке core')"
     )
     [[ "${p[flow]:-}" ]] && rows+=("flow|${p[flow]}")
+    [[ "${p[encryption]:-}" ]] && rows+=("шифрование|${p[encryption]%%.*} (VLESS)")
+    [[ "${p[mode]:-}" ]] && rows+=("режим xhttp|${p[mode]}")
+    [[ "${p[address]:-}" ]] && rows+=("адрес|${p[address]}${p[mtu]:+ · mtu ${p[mtu]}}")
     [[ "${p[obfs]:-}" ]] && rows+=("обфускация|${p[obfs]}")
     [[ "${p[insecure]:-0}" == 1 ]] && rows+=("внимание|сертификат не проверяется (insecure)")
     local -i i
@@ -1162,7 +1169,8 @@ vpn::tui::help() {
         "" \
         "Режим proxy: SOCKS5/HTTP на 127.0.0.1:$(vpn::settings::get listen_port) — укажите его в браузере." \
         "Режим tun: весь трафик системы идёт через туннель; нужен root (sudo)." \
-        "Ядро: sing-box $(vpn::core::version 2>/dev/null) · $(vpn::core::bin 2>/dev/null)"
+        "Ядро sing-box: $(vpn::core::version sing-box 2>/dev/null || :) · $(vpn::core::bin sing-box 2>/dev/null || printf 'не установлено')" \
+        "Ядро Xray (XHTTP, шифрование VLESS): $(vpn::core::version xray 2>/dev/null || :) · $(vpn::core::bin xray 2>/dev/null || printf 'не установлено')"
 }
 
 # Main loop / Главный цикл
@@ -1234,7 +1242,8 @@ vpn::tui::__wait_key() {
 # @return 0
 vpn::tui::run() {
     vpn::store::init || return $?
-    VPN_SINGBOX_VERSION="$(vpn::core::version 2>/dev/null)"
+    VPN_SINGBOX_VERSION="$(vpn::core::version sing-box 2>/dev/null)"
+    VPN_XRAY_VERSION="$(vpn::core::version xray 2>/dev/null)"
     exec {VPN_TUI_SLEEP_FD}<> <(:)
     tui::init
     tui::mouse_off
@@ -1242,7 +1251,13 @@ vpn::tui::run() {
     vpn::tui::__styles
     vpn::tui::reload
     vpn::tui::refresh
-    vpn::core::bin >/dev/null 2>&1 || vpn::tui::say warn "Ядро sing-box не найдено: выполните «vpn core install» / core not found"
+    if ! vpn::core::bin sing-box >/dev/null 2>&1; then
+        if vpn::core::bin xray >/dev/null 2>&1; then
+            vpn::tui::say warn "sing-box не найден: работают только профили Xray («vpn core install») / sing-box not found"
+        else
+            vpn::tui::say warn "Ядро не найдено: выполните «vpn core install» / core not found"
+        fi
+    fi
     VPN_TUI_RUN=1
     VPN_TUI_TICK="${SECONDS}"
     while (( VPN_TUI_RUN == 1 )); do

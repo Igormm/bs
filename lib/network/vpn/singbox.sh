@@ -30,6 +30,13 @@ declare -g VPN_SINGBOX_VERSION="${VPN_SINGBOX_VERSION:-}"
 # @global VPN_SINGBOX_RULESET_BASE — Vpn singbox: базовый URL веток rule-set SagerNet (категория: hook)
 declare -g VPN_SINGBOX_RULESET_BASE="${BS_VPN_RULESET_BASE:-https://raw.githubusercontent.com/SagerNet}"
 
+# @global VPN_SINGBOX_OUT_IDS — Vpn singbox: profile id per outbounds[] index of the last config, "" for groups (category: state)
+# @global VPN_SINGBOX_OUT_IDS — Vpn singbox: id профиля по индексу outbounds[] последнего конфига, "" для групп (категория: state)
+declare -ga VPN_SINGBOX_OUT_IDS=()
+# @global VPN_SINGBOX_EP_IDS — Vpn singbox: profile id per endpoints[] index of the last config (category: state)
+# @global VPN_SINGBOX_EP_IDS — Vpn singbox: id профиля по индексу endpoints[] последнего конфига (категория: state)
+declare -ga VPN_SINGBOX_EP_IDS=()
+
 # JSON helpers / JSON-хелперы
 
 # @private
@@ -286,7 +293,52 @@ vpn::singbox::outbound() {
             vpn::singbox::__obj "${head}" "${port}" '"version":"5"' \
                 "$(vpn::singbox::__s username "${__vs_o[username]:-}")" \
                 "$(vpn::singbox::__s password "${__vs_o[password]:-}")" ;;
+        naive)
+            # naive принимает в tls только server_name (и сертификаты/ECH)
+            # naive accepts only server_name (and certificates/ECH) in tls
+            vpn::singbox::__obj "${head}" "${port}" \
+                "$(vpn::singbox::__s username "${__vs_o[username]:-}")" \
+                "$(vpn::singbox::__s password "${__vs_o[password]:-}")" \
+                "$(vpn::singbox::__n insecure_concurrency "${__vs_o[concurrency]:-}")" \
+                "$( [[ "${__vs_o[transport]:-}" == "quic" ]] && printf '"quic":true')" \
+                "\"tls\":$(vpn::singbox::__obj '"enabled":true' "$(vpn::singbox::__s server_name "${__vs_o[sni]:-${__vs_o[server]}}")")" ;;
+        wireguard)
+            # WireGuard в sing-box >= 1.11 — endpoint, а не outbound / in sing-box >= 1.11 it is an endpoint
+            local reserved="" addrs
+            is::not_empty "${__vs_o[reserved]:-}" && reserved="[${__vs_o[reserved]}]"
+            addrs="$(vpn::singbox::__csv "$(vpn::singbox::__prefixes "${__vs_o[address]}")")"
+            local -r peer="$(vpn::singbox::__obj "$(vpn::singbox::__s address "${__vs_o[server]}")" \
+                "$(vpn::singbox::__n port "${__vs_o[port]}")" \
+                "$(vpn::singbox::__s public_key "${__vs_o[peer_key]}")" \
+                "$(vpn::singbox::__s pre_shared_key "${__vs_o[psk]:-}")" \
+                '"allowed_ips":["0.0.0.0/0","::/0"]' \
+                "$(vpn::singbox::__n persistent_keepalive_interval "${__vs_o[keepalive]:-}")" \
+                "$(vpn::singbox::__r reserved "${reserved}")")"
+            vpn::singbox::__obj '"type":"wireguard"' "$(vpn::singbox::__s tag "${tag}")" \
+                "\"address\":${addrs}" \
+                "$(vpn::singbox::__s private_key "${__vs_o[private_key]}")" \
+                "$(vpn::singbox::__n mtu "${__vs_o[mtu]:-}")" \
+                "\"peers\":[${peer}]" ;;
     esac
+}
+
+# @private
+# @description Interface addresses with prefixes: a bare IPv4 gets /32, a bare IPv6 /128.
+# @description Адреса интерфейса с префиксом: голый IPv4 получает /32, голый IPv6 — /128.
+# @param $1 CSV / CSV
+# @stdout CSV / CSV
+vpn::singbox::__prefixes() {
+    local -a items=()
+    local item out=""
+    IFS=',' read -ra items <<< "${1-}"
+    for item in "${items[@]}"; do
+        is::empty "${item}" && continue
+        if [[ "${item}" != */* ]]; then
+            if [[ "${item}" == *:* ]]; then item+="/128"; else item+="/32"; fi
+        fi
+        out+="${out:+,}${item}"
+    done
+    printf '%s' "${out}"
 }
 
 # Config sections / Секции конфига
@@ -394,14 +446,23 @@ vpn::singbox::config() {
     done
     s[api_secret]="$(vpn::settings::secret)"
 
-    # outbounds / выходы
-    local -a obs=()
+    # outbounds и endpoints (WireGuard) / outbounds and endpoints (WireGuard)
+    local -a obs=() eps=()
     local id ob
+    VPN_SINGBOX_OUT_IDS=("")
+    (( ${#ids[@]} > 1 )) && VPN_SINGBOX_OUT_IDS+=("")
+    VPN_SINGBOX_EP_IDS=()
     for id in "${ids[@]}"; do
         local -A p=()
         vpn::store::load "${id}" p || return $?
         ob="$(vpn::singbox::outbound p "${id}")" || return $?
-        obs+=("${ob}")
+        if [[ "${p[proto]}" == "wireguard" ]]; then
+            eps+=("${ob}")
+            VPN_SINGBOX_EP_IDS+=("${id}")
+        else
+            obs+=("${ob}")
+            VPN_SINGBOX_OUT_IDS+=("${id}")
+        fi
         unset p
     done
     local -r ids_json="$(vpn::singbox::__words "${ids[@]}")"
@@ -494,7 +555,7 @@ vpn::singbox::config() {
     local -r route="$(vpn::singbox::__obj \
         "\"rules\":$(vpn::singbox::__arr "${rules[@]}")" \
         "$( (( ${#set_defs[@]} > 0 )) && printf '"rule_set":%s' "$(vpn::singbox::__arr "${set_defs[@]}")")" \
-        "\"final\":\"${final}\"" '"auto_detect_interface":true' \
+        "\"final\":\"${final}\"" "$( [[ "${s[mode]}" == "tun" ]] && printf '"auto_detect_interface":true')" \
         '"default_domain_resolver":"dns-direct"')"
     local http_clients=""
     if (( ${#set_defs[@]} > 0 )) && vpn::singbox::version_ge 1.14; then
@@ -510,6 +571,7 @@ vpn::singbox::config() {
         "\"dns\":${dns}" \
         "\"inbounds\":$(vpn::singbox::__arr "${ins[@]}")" \
         "\"outbounds\":$(vpn::singbox::__arr "${selector}" "${auto}" "${obs[@]}" '{"type":"direct","tag":"direct"}')" \
+        "$( (( ${#eps[@]} > 0 )) && printf '"endpoints":%s' "$(vpn::singbox::__arr "${eps[@]}")")" \
         "\"route\":${route}" \
         "${http_clients}" \
         "\"experimental\":${experimental}"
@@ -524,18 +586,27 @@ vpn::singbox::config() {
 vpn::singbox::test_config() {
     local -r api_port="${1:?api port required}"
     shift
-    local -a obs=()
+    local -a obs=() eps=()
     local id ob
+    VPN_SINGBOX_OUT_IDS=()
+    VPN_SINGBOX_EP_IDS=()
     for id in "$@"; do
         local -A p=()
         vpn::store::load "${id}" p 2>/dev/null || continue
         ob="$(vpn::singbox::outbound p "${id}" 2>/dev/null)" || continue
-        obs+=("${ob}")
+        if [[ "${p[proto]}" == "wireguard" ]]; then
+            eps+=("${ob}")
+            VPN_SINGBOX_EP_IDS+=("${id}")
+        else
+            obs+=("${ob}")
+            VPN_SINGBOX_OUT_IDS+=("${id}")
+        fi
         unset p
     done
     vpn::singbox::__obj '"log":{"level":"error"}' \
         '"dns":{"servers":[{"type":"local","tag":"dns-direct"}]}' \
         "\"outbounds\":$(vpn::singbox::__arr "${obs[@]}" '{"type":"direct","tag":"direct"}')" \
+        "$( (( ${#eps[@]} > 0 )) && printf '"endpoints":%s' "$(vpn::singbox::__arr "${eps[@]}")")" \
         '"route":{"final":"direct","default_domain_resolver":"dns-direct"}' \
         "\"experimental\":{\"clash_api\":{\"external_controller\":\"127.0.0.1:${api_port}\"}}"
     printf '\n'

@@ -24,7 +24,7 @@ bs::source_relative "../../../core/lang.sh" "../../../core/const.sh" "link.sh"
 
 # @global VPN_SETTINGS_ORDER — Vpn store: settings keys in display order (category: constant)
 # @global VPN_SETTINGS_ORDER — Vpn store: ключи настроек в порядке показа (категория: constant)
-declare -ga VPN_SETTINGS_ORDER=(mode route auto_select listen_port allow_lan \
+declare -ga VPN_SETTINGS_ORDER=(core mode route auto_select listen_port allow_lan \
     system_proxy tun_stack tun_mtu strict_route ipv6 dns_remote dns_direct \
     block_ads direct_domains proxy_domains block_domains log_level api_port \
     test_url active api_secret)
@@ -32,6 +32,7 @@ declare -ga VPN_SETTINGS_ORDER=(mode route auto_select listen_port allow_lan \
 # @global VPN_SETTINGS_DEFAULT — Vpn store: type|default per setting (category: constant)
 # @global VPN_SETTINGS_DEFAULT — Vpn store: тип|значение по умолчанию на настройку (категория: constant)
 declare -gA VPN_SETTINGS_DEFAULT=(
+    [core]='enum:auto,sing-box,xray|auto'
     [mode]='enum:proxy,tun|proxy'
     [route]='enum:global,bypass-ru,bypass-cn,bypass-ir,direct|global'
     [auto_select]='bool|0'
@@ -58,6 +59,7 @@ declare -gA VPN_SETTINGS_DEFAULT=(
 # @global VPN_SETTINGS_TIPS — Vpn store: one-line Russian tip per setting (category: constant)
 # @global VPN_SETTINGS_TIPS — Vpn store: однострочная подсказка на настройку (категория: constant)
 declare -gA VPN_SETTINGS_TIPS=(
+    [core]='Ядро: auto — sing-box, а для XHTTP и шифрования VLESS — Xray; sing-box или xray — всегда это ядро'
     [mode]='proxy — локальный SOCKS/HTTP-прокси; tun — весь трафик системы через туннель (нужен root)'
     [route]='global — всё через VPN; bypass-ru/cn/ir — сайты страны напрямую; direct — всё напрямую'
     [auto_select]='1 — автоматически выбирать самый быстрый сервер группы (urltest)'
@@ -75,7 +77,7 @@ declare -gA VPN_SETTINGS_TIPS=(
     [proxy_domains]='Домены через запятую, которые всегда идут через VPN'
     [block_domains]='Домены через запятую, которые блокируются'
     [log_level]='Подробность журнала ядра'
-    [api_port]='Порт Clash API ядра (статистика, переключение серверов)'
+    [api_port]='Порт API ядра (Clash API sing-box или API статистики Xray)'
     [test_url]='HTTPS-адрес для проверки задержки серверов (http:// ядро не принимает)'
     [active]='Выбранный профиль'
     [api_secret]='Секрет Clash API (генерируется автоматически)'
@@ -265,7 +267,7 @@ vpn::store::field() {
 vpn::store::__identity() {
     local -n __vs_m="${1:?}"
     printf '%s|%s|%s|%s%s' "${__vs_m[proto]:-}" "${__vs_m[server]:-}" "${__vs_m[port]:-}" \
-        "${__vs_m[uuid]:-}" "${__vs_m[password]:-}${__vs_m[auth]:-}"
+        "${__vs_m[uuid]:-}" "${__vs_m[password]:-}${__vs_m[auth]:-}${__vs_m[private_key]:-}"
 }
 
 # @description Save a profile record from stdin; updates a duplicate in the same group.
@@ -331,6 +333,14 @@ vpn::store::import_text() {
     local -r text="${1-}" group="${2:-manual}"
     local link
     local -i ok=0 bad=0
+    # .conf WireGuard ([Interface] + [Peer]) — один профиль
+    # a WireGuard .conf ([Interface] + [Peer]) is one profile
+    if [[ "${text}" == *"[Interface]"* && "${text}" == *"[Peer]"* ]]; then
+        local record
+        record="$(vpn::link::wg_conf "${text}")" || return "${LIB_ERROR_INVALID_INPUT}"
+        printf '%s\n' "${record}" | vpn::store::add "${group}"
+        return $?
+    fi
     while IFS= read -r link; do
         if vpn::store::import "${link}" "${group}" 2>/dev/null; then
             ok=$(( ok + 1 ))

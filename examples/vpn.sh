@@ -1,14 +1,17 @@
 #!/usr/bin/env bs
 # shellcheck shell=bash
-# examples/vpn.sh — VPN/proxy client on the sing-box core: VLESS (REALITY), VMess,
-# Trojan, Shadowsocks, Hysteria2, Hysteria, TUIC, AnyTLS, SOCKS; CLI and full-screen TUI
-# examples/vpn.sh — VPN/прокси-клиент на ядре sing-box: VLESS (REALITY), VMess,
-# Trojan, Shadowsocks, Hysteria2, Hysteria, TUIC, AnyTLS, SOCKS; CLI и полноэкранный TUI
+# examples/vpn.sh — VPN/proxy client on the sing-box and Xray cores: VLESS (REALITY,
+# XHTTP, encryption), VMess, Trojan, Shadowsocks, Hysteria2, Hysteria, TUIC, AnyTLS,
+# WireGuard, NaiveProxy, SOCKS; CLI and full-screen TUI
+# examples/vpn.sh — VPN/прокси-клиент на ядрах sing-box и Xray: VLESS (REALITY, XHTTP,
+# шифрование), VMess, Trojan, Shadowsocks, Hysteria2, Hysteria, TUIC, AnyTLS,
+# WireGuard, NaiveProxy, SOCKS; CLI и полноэкранный TUI
 #
 # Run / Запуск:
 #   bs run examples/vpn.sh                 # TUI (в терминале) / TUI (on a terminal)
 #   bs run examples/vpn.sh help            # все команды / all commands
 #   bs run examples/vpn.sh core install    # скачать sing-box / download sing-box
+#   bs run examples/vpn.sh core install xray   # и Xray для XHTTP / and Xray for XHTTP
 #   bs run examples/vpn.sh import 'vless://…'
 #   bs run examples/vpn.sh connect
 #
@@ -21,12 +24,13 @@ load "lib/network/vpn/tui"
 # @description Print the usage / Вывести справку.
 vpn_cli::usage() {
     cat <<'EOF'
-BS VPN — клиент на ядре sing-box / client on the sing-box core
+BS VPN — клиент на ядрах sing-box и Xray / client on the sing-box and Xray cores
 
 Использование / Usage: vpn.sh [команда] [аргументы]
 
   tui                        полноэкранный интерфейс (по умолчанию в терминале)
-  import <ссылка|файл|->     импорт ссылок vless/vmess/trojan/ss/hy2/hysteria/tuic/anytls/socks
+  import <ссылка|файл|->     импорт ссылок vless/vmess/trojan/ss/hy2/hysteria/tuic/anytls/
+                             wireguard/naive/socks, подписок и .conf WireGuard
   list [группа]              серверы (● — подключён), задержка последнего замера
   show <id>                  поля профиля
   link <id> [--qr]           ссылка для передачи (и QR-код, если есть qrencode)
@@ -45,14 +49,16 @@ BS VPN — клиент на ядре sing-box / client on the sing-box core
   sub update [имя]           обновить одну или все подписки
   sub list | sub rm <имя>    список / удаление (вместе с серверами)
 
-  config [id]                показать сгенерированный конфиг sing-box
+  config [id]                показать сгенерированный конфиг ядра (sing-box или Xray)
   settings                   все настройки
   get <ключ> | set-option <ключ> <значение>
-                             mode proxy|tun · route global|bypass-ru|bypass-cn|bypass-ir|direct ·
+                             core auto|sing-box|xray · mode proxy|tun ·
+                             route global|bypass-ru|bypass-cn|bypass-ir|direct ·
                              listen_port · allow_lan · dns_remote · dns_direct · block_ads ·
                              direct_domains · proxy_domains · block_domains · tun_stack · ipv6 …
 
-  core info | core install [версия]   ядро sing-box: версия и путь / загрузка с GitHub
+  core info                           ядра: версии и пути
+  core install [sing-box|xray] [версия]   загрузка ядра с GitHub (по умолчанию sing-box)
   service install|remove|show         автозапуск через systemd (root)
 EOF
 }
@@ -109,6 +115,7 @@ vpn_cli::status() {
     local cur
     cur="$(vpn::core::current 2>/dev/null)" || cur="${st[id]}"
     printf '  сервер     %s (%s)\n' "$(vpn::tui::narrow "$(vpn::store::field "${cur#auto:}" name 2>/dev/null)")" "${cur}"
+    printf '  ядро       %s\n' "${st[engine]}"
     printf '  режим      %s%s\n' "${st[mode]}" "$([[ "${st[mode]}" == proxy ]] && printf ' · socks5/http %s' "${st[listen]}")"
     printf '  маршрут    %s\n' "${st[route]}"
     printf '  время      %s\n' "$(vpn::tui::duration "${st[uptime]}")"
@@ -158,7 +165,7 @@ vpn_cli::test() {
     local id ms
     while IFS=$'\t' read -r id ms; do
         case "${ms}" in
-            -1) printf '%s\tfail\n' "${id}" ;; -2) printf '%s\tbad (ядро не принимает профиль)\n' "${id}" ;;
+            -1) printf '%s\tfail\n' "${id}" ;; -2) printf '%s\tbad (ядро не принимает профиль или не установлено)\n' "${id}" ;;
             *) printf '%s\t%sms\n' "${id}" "${ms}" ;;
         esac
     done < <(vpn::core::test_real "$@")
@@ -195,18 +202,27 @@ vpn_cli::sub() {
 vpn_cli::core() {
     case "${1:-info}" in
         info)
-            local bin
-            if bin="$(vpn::core::bin)"; then
-                printf 'sing-box %s\n%s\n' "$(vpn::core::version)" "${bin}"
-            else
-                printf 'sing-box не установлен: vpn.sh core install / not installed\n'
-                return "${LIB_ERROR_DEPENDENCY_MISSING}"
-            fi ;;
+            local bin engine assets
+            local -i found=0
+            for engine in sing-box xray; do
+                if bin="$(vpn::core::bin "${engine}")"; then
+                    printf '%-9s %-10s %s\n' "${engine}" "$(vpn::core::version "${engine}")" "${bin}"
+                    found=$(( found + 1 ))
+                else
+                    printf '%-9s %-10s vpn.sh core install %s\n' "${engine}" "—" "${engine}"
+                fi
+            done
+            if vpn::core::bin xray >/dev/null 2>&1; then
+                assets="$(vpn::core::xray_assets)" || assets="нет geoip.dat/geosite.dat / no geo files"
+                printf '%-9s %-10s %s\n' "" "geo" "${assets}"
+            fi
+            (( found > 0 )) || return "${LIB_ERROR_DEPENDENCY_MISSING}" ;;
         install)
-            local path
-            path="$(vpn::core::install "${2-}")" || exit $?
-            printf 'установлено / installed: %s (%s)\n' "${path}" "$(vpn::core::version)" ;;
-        *) vpn_cli::die "core: info|install [версия]" "${LIB_ERROR_INVALID_ARGS}" ;;
+            local path engine="${2:-sing-box}"
+            [[ "${engine}" =~ ^v?[0-9] ]] && engine="sing-box"
+            path="$(vpn::core::install "${@:2}")" || exit $?
+            printf 'установлено / installed: %s (%s)\n' "${path}" "$(vpn::core::version "${engine}")" ;;
+        *) vpn_cli::die "core: info|install [sing-box|xray] [версия]" "${LIB_ERROR_INVALID_ARGS}" ;;
     esac
 }
 
@@ -264,12 +280,18 @@ main() {
         logs|log) vpn_cli::logs "$@" ;;
         sub) vpn_cli::sub "$@" ;;
         config)
-            vpn::core::require 2>/dev/null || VPN_SINGBOX_VERSION=""
-            local id="${1:-$(vpn::settings::get active)}"
-            is::empty "${id}" && id="$(vpn::store::ids | head -n 1)"
+            local id="${1:-$(vpn::settings::get active)}" engine
+            is::empty "${id}" && id="$(vpn::store::ids | sed -n 1p)"
+            engine="$(vpn::core::engine_for "${id}")" || exit $?
             local -a ids=()
-            mapfile -t ids < <(vpn::core::config_ids "${id}")
-            vpn::singbox::config "${ids[@]}" ;;
+            mapfile -t ids < <(vpn::core::config_ids "${id}" "${engine}")
+            if [[ "${engine}" == "xray" ]]; then
+                vpn::core::xray_assets >/dev/null && VPN_XRAY_GEO=1
+                vpn::xray::config "${ids[@]}"
+            else
+                vpn::core::require sing-box 2>/dev/null || VPN_SINGBOX_VERSION=""
+                vpn::singbox::config "${ids[@]}"
+            fi ;;
         settings) vpn::settings::list ;;
         get) vpn::settings::get "${1:?ключ / key}" ;;
         set-option|option) vpn::settings::set "${1:?ключ / key}" "${2-}" && printf '%s=%s (применится при переподключении / applies on reconnect)\n' "$1" "${2-}" ;;

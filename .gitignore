@@ -26,6 +26,7 @@ desktop.ini
 # Дампы ядра и бинарные артефакты / Core dumps and binary artifacts
 *.core
 core.*
+!lib/network/vpn/core.sh
 
 # Локальные черновики / Local drafts (never committed)
 # Local promo/article drafts that should never be committed

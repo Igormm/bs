@@ -31,20 +31,21 @@ bs::source_relative "../../../core/lang.sh" "../../../core/const.sh" "../../rfc/
 # @global VPN_LINK_KEYS — Vpn link: canonical profile keys in display order (category: constant)
 # @global VPN_LINK_KEYS — Vpn link: канонические ключи профиля в порядке показа (категория: constant)
 declare -ga VPN_LINK_KEYS=(name proto server port ports uuid password method \
-    username flow security sni alpn fp pbk sid insecure transport path host \
-    service_name obfs obfs_password up_mbps down_mbps auth congestion \
-    udp_relay alter_id cipher plugin plugin_opts packet_encoding group)
+    username flow encryption security sni alpn fp pbk sid spx pqv pcs vcn insecure transport \
+    path host service_name mode extra obfs obfs_password up_mbps down_mbps auth \
+    congestion udp_relay alter_id cipher plugin plugin_opts packet_encoding \
+    private_key peer_key psk address mtu reserved keepalive concurrency group)
 
 # @global VPN_LINK_PROTOS — Vpn link: supported protocols (category: constant)
 # @global VPN_LINK_PROTOS — Vpn link: поддерживаемые протоколы (категория: constant)
 # shellcheck disable=SC2034 # читается по имени через arr::contains / read by name via arr::contains
 declare -ga VPN_LINK_PROTOS=(vless vmess trojan shadowsocks hysteria2 hysteria \
-    tuic anytls socks)
+    tuic anytls socks wireguard naive)
 
-# @global VPN_LINK_TRANSPORTS — Vpn link: v2ray transports sing-box supports (category: constant)
-# @global VPN_LINK_TRANSPORTS — Vpn link: транспорты v2ray, которые знает sing-box (категория: constant)
+# @global VPN_LINK_TRANSPORTS — Vpn link: v2ray transports of either core (category: constant)
+# @global VPN_LINK_TRANSPORTS — Vpn link: транспорты v2ray любого из ядер (категория: constant)
 # shellcheck disable=SC2034 # читается по имени через arr::contains / read by name via arr::contains
-declare -ga VPN_LINK_TRANSPORTS=(tcp ws grpc http httpupgrade quic)
+declare -ga VPN_LINK_TRANSPORTS=(tcp ws grpc http httpupgrade quic xhttp)
 
 # Base64 / Base64
 
@@ -161,10 +162,17 @@ vpn::link::__v2ray_common() {
     case "${__vl_src[allowInsecure]:-${__vl_src[insecure]:-${__vl_src[allow_insecure]:-0}}}" in
         1|true|yes) __vl_dst[insecure]=1 ;;
     esac
+    __vl_dst[spx]="${__vl_src[spx]:-}"
+    __vl_dst[pqv]="${__vl_src[pqv]:-}"
+    # Xray: отпечаток сертификата (замена allowInsecure) и имя для проверки сертификата
+    # Xray: pinned certificate hash (replaces allowInsecure) and the name to verify the certificate by
+    __vl_dst[pcs]="${__vl_src[pcs]:-}"
+    __vl_dst[vcn]="${__vl_src[vcn]:-}"
     local transport="${__vl_src[type]:-tcp}"
     case "${transport}" in
         h2) transport="http" ;;
         raw|"") transport="tcp" ;;
+        splithttp) transport="xhttp" ;;
     esac
     __vl_dst[transport]="${transport}"
     # tcp + headerType=http — это http-обфускация v2ray / tcp + headerType=http is v2ray http obfuscation
@@ -176,6 +184,12 @@ vpn::link::__v2ray_common() {
     __vl_dst[service_name]="${__vl_src[serviceName]:-${__vl_src[service_name]:-}}"
     [[ "${transport}" == "grpc" && -z "${__vl_dst[service_name]}" ]] && __vl_dst[service_name]="${__vl_src[path]:-}"
     __vl_dst[packet_encoding]="${__vl_src[packetEncoding]:-}"
+    # XHTTP: режим и «extra» (JSON с тонкими настройками) — только для Xray
+    # XHTTP: mode and "extra" (JSON with fine tuning) — Xray only
+    if [[ "${transport}" == "xhttp" ]]; then
+        __vl_dst[mode]="${__vl_src[mode]:-}"
+        __vl_dst[extra]="${__vl_src[extra]:-}"
+    fi
     return 0
 }
 
@@ -223,6 +237,9 @@ vpn::link::__vless() {
     vpn::link::__query "${VPN_LINK__QUERY}" q
     __vl_p[proto]="vless"
     __vl_p[uuid]="${VPN_LINK__USER}"
+    # encryption=none — обычный VLESS; иное (mlkem768x25519plus…) — шифрование Xray
+    # encryption=none is plain VLESS; anything else (mlkem768x25519plus…) is Xray encryption
+    [[ "${q[encryption]:-none}" != "none" ]] && __vl_p[encryption]="${q[encryption]}"
     vpn::link::__v2ray_common "${2}" q
 }
 
@@ -451,6 +468,154 @@ vpn::link::__socks() {
     return 0
 }
 
+# @private
+# @description WireGuard "reserved" as three decimal bytes: "1,2,3" stays, base64 of 3 bytes is decoded.
+# @description «reserved» WireGuard как три десятичных байта: «1,2,3» остаётся, base64 трёх байт раскодируется.
+# @param $1 value / значение
+# @stdout "a,b,c" or nothing / «a,b,c» или ничего
+vpn::link::__reserved() {
+    local v="${1-}"
+    v="${v//[[:space:]\[\]]/}"
+    is::empty "${v}" && return 0
+    if [[ "${v}" =~ ^[0-9]{1,3},[0-9]{1,3},[0-9]{1,3}$ ]]; then
+        printf '%s' "${v}"
+        return 0
+    fi
+    local bytes
+    bytes="$(vpn::link::b64decode "${v}" 2>/dev/null | od -An -tu1 2>/dev/null)" || return 0
+    local -a b=()
+    IFS=$' \t\n' read -ra b <<< "${bytes//$'\n'/ }"
+    (( ${#b[@]} == 3 )) && printf '%s,%s,%s' "${b[0]}" "${b[1]}" "${b[2]}"
+    return 0
+}
+
+# @private
+vpn::link::__wireguard() {
+    local -n __vl_p="${2:?}"
+    local link="$1"
+    # Ключ base64 в userinfo часто не кодируют, а «/» в нём ломает разбор authority
+    # A base64 key in userinfo is often left unencoded, and a "/" in it breaks the authority
+    local scheme="${link%%://*}" body="${link#*://}"
+    if [[ "${body}" == *"@"* ]]; then
+        local ui="${body%%@*}"
+        body="$(uri::encode "$(uri::decode "${ui}")")@${body#*@}"
+    fi
+    local -A q=()
+    vpn::link::__authority "${scheme}://${body}" "${2}" || return $?
+    vpn::link::__query "${VPN_LINK__QUERY}" q
+    __vl_p[proto]="wireguard"
+    __vl_p[private_key]="${VPN_LINK__USER:-${q[privatekey]:-${q[private_key]:-${q[secretKey]:-${q[pk]:-}}}}}"
+    __vl_p[peer_key]="${q[publickey]:-${q[public_key]:-${q[peer_public_key]:-${q[peer]:-}}}}"
+    __vl_p[psk]="${q[presharedkey]:-${q[pre_shared_key]:-${q[psk]:-}}}"
+    local addr="${q[address]:-${q[ip]:-${q[local_address]:-}}}"
+    __vl_p[address]="${addr//[[:space:]]/}"
+    __vl_p[mtu]="${q[mtu]:-}"
+    __vl_p[reserved]="$(vpn::link::__reserved "${q[reserved]:-}")"
+    __vl_p[keepalive]="${q[keepalive]:-${q[persistent_keepalive]:-}}"
+    return 0
+}
+
+# @private
+vpn::link::__naive() {
+    local -n __vl_p="${2:?}"
+    local link="$1" scheme
+    scheme="$(str::lower "${link%%://*}")"
+    local -A q=()
+    vpn::link::__authority "naive://${link#*://}" "${2}" || return $?
+    vpn::link::__query "${VPN_LINK__QUERY}" q
+    __vl_p[proto]="naive"
+    __vl_p[username]="${VPN_LINK__USER}"
+    __vl_p[password]="${VPN_LINK__PASS}"
+    __vl_p[security]="tls"
+    __vl_p[sni]="${q[sni]:-${q[peer]:-}}"
+    is::empty "${__vl_p[port]}" && __vl_p[port]=443
+    [[ "${scheme}" == "naive+quic" || "${q[quic]:-0}" == 1 ]] && __vl_p[transport]="quic"
+    __vl_p[concurrency]="${q[insecure-concurrency]:-${q[insecure_concurrency]:-}}"
+    return 0
+}
+
+# @description Parse a WireGuard .conf ([Interface] + [Peer]) into a profile record.
+# @description Разобрать .conf WireGuard ([Interface] + [Peer]) в запись профиля.
+#   Only the first peer is used; DNS and AllowedIPs are ignored (routing is the client's job).
+#   Берётся первый peer; DNS и AllowedIPs не используются (маршрутизацией занимается клиент).
+# @param $1 text of the .conf / текст .conf
+# @param $2 [optional] profile name / имя профиля
+# @stdout profile record / запись профиля
+# @return 0 ok, LIB_ERROR_INVALID_INPUT not a WireGuard config
+vpn::link::wg_conf() {
+    local -r text="${1-}" name="${2-}"
+    local -A p=([proto]=wireguard)
+    local line key val section="" endpoint="" addr=""
+    local -i peers=0
+    while IFS= read -r line || is::not_empty "${line}"; do
+        line="${line%%#*}"
+        line="$(vpn::link::__clean "${line}")"
+        line="${line#"${line%%[![:space:]]*}"}"
+        line="${line%"${line##*[![:space:]]}"}"
+        is::empty "${line}" && continue
+        if [[ "${line}" =~ ^\[([A-Za-z]+)\]$ ]]; then
+            section="$(str::lower "${BASH_REMATCH[1]}")"
+            [[ "${section}" == "peer" ]] && peers=$(( peers + 1 ))
+            continue
+        fi
+        [[ "${line}" == *=* ]] || continue
+        key="$(str::lower "${line%%=*}")"
+        key="${key//[[:space:]]/}"
+        val="${line#*=}"
+        val="${val#"${val%%[![:space:]]*}"}"
+        case "${section}:${key}" in
+            interface:privatekey) p[private_key]="${val}" ;;
+            interface:address) addr+="${addr:+,}${val//[[:space:]]/}" ;;
+            interface:mtu) p[mtu]="${val}" ;;
+        esac
+        (( peers == 1 )) || continue
+        case "${section}:${key}" in
+            peer:publickey) p[peer_key]="${val}" ;;
+            peer:presharedkey) p[psk]="${val}" ;;
+            peer:endpoint) endpoint="${val//[[:space:]]/}" ;;
+            peer:persistentkeepalive) p[keepalive]="${val}" ;;
+        esac
+    done <<< "${text}"
+    p[address]="${addr}"
+    if [[ "${endpoint}" =~ ^\[(.*)\]:([0-9]+)$ || "${endpoint}" =~ ^([^:]+):([0-9]+)$ ]]; then
+        p[server]="${BASH_REMATCH[1]}"
+        p[port]="${BASH_REMATCH[2]}"
+    fi
+    if is::empty "${p[private_key]:-}" || (( peers == 0 )); then
+        printf 'это не конфиг WireGuard / not a WireGuard config\n' >&2
+        return "${LIB_ERROR_INVALID_INPUT}"
+    fi
+    p[name]="$(vpn::link::__clean "${name}")"
+    vpn::link::validate p || return $?
+    is::empty "${p[name]}" && p[name]="wg-${p[server]}"
+    vpn::link::__emit p
+}
+
+# @description Which core a profile needs: "xray" (XHTTP, VLESS encryption), "sing-box"
+#   (Hysteria/TUIC/AnyTLS/Naive, http/quic transports) or "any".
+# @description Какое ядро нужно профилю: «xray» (XHTTP, шифрование VLESS), «sing-box»
+#   (Hysteria/TUIC/AnyTLS/Naive, транспорты http/quic) или «any».
+# @param $1 profile map name / имя карты профиля
+# @stdout xray|sing-box|any
+vpn::link::core_need() {
+    local -n __vl_n="${1:?map name required}"
+    local -r proto="${__vl_n[proto]:-}" transport="${__vl_n[transport]:-tcp}"
+    if [[ "${transport}" == "xhttp" ]] || [[ "${proto}" == "vless" && -n "${__vl_n[encryption]:-}" ]]; then
+        printf 'xray\n'
+        return 0
+    fi
+    case "${proto}" in
+        hysteria2|hysteria|tuic|anytls|naive) printf 'sing-box\n'; return 0 ;;
+    esac
+    case "${transport}" in
+        http|quic) printf 'sing-box\n'; return 0 ;;
+    esac
+    # плагины shadowsocks (obfs, v2ray-plugin) есть только в sing-box
+    # shadowsocks plugins (obfs, v2ray-plugin) exist only in sing-box
+    [[ "${proto}" == "shadowsocks" && -n "${__vl_n[plugin]:-}" ]] && { printf 'sing-box\n'; return 0; }
+    printf 'any\n'
+}
+
 # Public API / Публичный API
 
 # @description Protocol of a share link by its scheme.
@@ -472,6 +637,8 @@ vpn::link::scheme_proto() {
         tuic) printf 'tuic\n' ;;
         anytls) printf 'anytls\n' ;;
         socks|socks5) printf 'socks\n' ;;
+        wireguard|wg) printf 'wireguard\n' ;;
+        naive|naive+https|naive+quic) printf 'naive\n' ;;
         *) return "${LIB_ERROR_INVALID_INPUT}" ;;
     esac
 }
@@ -541,14 +708,49 @@ vpn::link::validate() {
             shadowsocks)
                 is::not_empty "${__vl_v[method]:-}" || reason="нет метода / no method"
                 is::not_empty "${__vl_v[password]:-}" || [[ "${__vl_v[method]:-}" == "none" ]] || reason="нет пароля / no password" ;;
+            wireguard)
+                local -r key_re='^[A-Za-z0-9+/]{42,43}=?$'
+                local -r addr_re='^[0-9A-Fa-f.:]+(/[0-9]{1,3})?(,[0-9A-Fa-f.:]+(/[0-9]{1,3})?)*$'
+                if [[ ! "${__vl_v[private_key]:-}" =~ ${key_re} ]]; then
+                    reason="приватный ключ / private key"
+                elif [[ ! "${__vl_v[peer_key]:-}" =~ ${key_re} ]]; then
+                    reason="публичный ключ сервера / peer public key"
+                elif is::not_empty "${__vl_v[psk]:-}" && [[ ! "${__vl_v[psk]}" =~ ${key_re} ]]; then
+                    reason="pre-shared key"
+                elif [[ ! "${__vl_v[address]:-}" =~ ${addr_re} ]]; then
+                    reason="адрес интерфейса / interface address '${__vl_v[address]:-}'"
+                elif is::not_empty "${__vl_v[reserved]:-}" && [[ ! "${__vl_v[reserved]}" =~ ^[0-9]{1,3},[0-9]{1,3},[0-9]{1,3}$ ]]; then
+                    reason="reserved '${__vl_v[reserved]}'"
+                elif is::not_empty "${__vl_v[mtu]:-}" && ! { is::number "${__vl_v[mtu]}" && (( __vl_v[mtu] >= 576 && __vl_v[mtu] <= 65535 )); }; then
+                    reason="mtu '${__vl_v[mtu]}'"
+                elif is::not_empty "${__vl_v[keepalive]:-}" && ! is::number "${__vl_v[keepalive]}"; then
+                    reason="keepalive '${__vl_v[keepalive]}'"
+                fi ;;
+            naive)
+                if is::not_empty "${__vl_v[concurrency]:-}" && ! is::number "${__vl_v[concurrency]}"; then
+                    reason="insecure-concurrency '${__vl_v[concurrency]}'"
+                fi ;;
         esac
+        # «extra» XHTTP идёт в конфиг как сырой JSON: допускаем только объект
+        # XHTTP "extra" goes into the config as raw JSON: only an object is allowed
+        if is::empty "${reason}" && is::not_empty "${__vl_v[extra]:-}" && ! vpn::link::json_object_ok "${__vl_v[extra]}"; then
+            reason="extra (XHTTP) — не JSON-объект / not a JSON object"
+        fi
+        if is::empty "${reason}" && is::not_empty "${__vl_v[mode]:-}" \
+            && [[ ! "${__vl_v[mode]}" =~ ^(auto|packet-up|stream-up|stream-one)$ ]]; then
+            reason="mode (XHTTP) '${__vl_v[mode]}'"
+        fi
+        if is::empty "${reason}" && is::not_empty "${__vl_v[encryption]:-}" \
+            && [[ ! "${__vl_v[encryption]}" =~ ^[A-Za-z0-9._+/=-]+$ ]]; then
+            reason="encryption '${__vl_v[encryption]}'"
+        fi
         local ports="${__vl_v[ports]:-}"
         if is::empty "${reason}" && is::not_empty "${ports}" && [[ ! "${ports}" =~ ^[0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*$ ]]; then
             reason="диапазон портов / port range '${ports}'"
         fi
         local transport="${__vl_v[transport]:-}"
         if is::empty "${reason}" && is::not_empty "${transport}" && ! arr::contains VPN_LINK_TRANSPORTS "${transport}"; then
-            reason="транспорт не поддерживается sing-box / transport not supported by sing-box: ${transport}"
+            reason="транспорт не поддерживается / transport not supported: ${transport}"
         fi
     fi
     if is::not_empty "${reason}"; then
@@ -612,12 +814,14 @@ vpn::link::build() {
                 vpn::link::__qadd transport_q path "${p[path]:-}"
                 vpn::link::__qadd transport_q host "${p[host]:-}"
                 vpn::link::__qadd transport_q serviceName "${p[service_name]:-}"
+                vpn::link::__qadd transport_q mode "${p[mode]:-}"
+                vpn::link::__qadd transport_q extra "${p[extra]:-}"
             fi
             ;;
     esac
     case "${p[proto]}" in
         vless)
-            vpn::link::__qadd qs encryption none
+            vpn::link::__qadd qs encryption "${p[encryption]:-none}"
             vpn::link::__qadd qs security "${p[security]:-none}"
             vpn::link::__qadd qs flow "${p[flow]:-}"
             ;;
@@ -632,6 +836,10 @@ vpn::link::build() {
             vpn::link::__qadd qs fp "${p[fp]:-}"
             vpn::link::__qadd qs pbk "${p[pbk]:-}"
             vpn::link::__qadd qs sid "${p[sid]:-}"
+            vpn::link::__qadd qs spx "${p[spx]:-}"
+            vpn::link::__qadd qs pqv "${p[pqv]:-}"
+            vpn::link::__qadd qs pcs "${p[pcs]:-}"
+            vpn::link::__qadd qs vcn "${p[vcn]:-}"
             [[ "${p[insecure]:-0}" == 1 ]] && vpn::link::__qadd qs allowInsecure 1
             is::not_empty "${transport_q}" && qs+="${qs:+&}${transport_q}"
             ;;
@@ -693,6 +901,21 @@ vpn::link::build() {
             local auth=""
             is::not_empty "${p[username]:-}" && auth="$(uri::encode "${p[username]}"):$(uri::encode "${p[password]:-}")@"
             printf 'socks5://%s%s:%s#%s\n' "${auth}" "${host}" "${p[port]}" "${name}" ;;
+        wireguard)
+            vpn::link::__qadd qs publickey "${p[peer_key]}"
+            vpn::link::__qadd qs presharedkey "${p[psk]:-}"
+            vpn::link::__qadd qs address "${p[address]}"
+            vpn::link::__qadd qs mtu "${p[mtu]:-}"
+            vpn::link::__qadd qs reserved "${p[reserved]:-}"
+            vpn::link::__qadd qs keepalive "${p[keepalive]:-}"
+            printf 'wireguard://%s@%s:%s/?%s#%s\n' "$(uri::encode "${p[private_key]}")" "${host}" "${p[port]}" "${qs}" "${name}" ;;
+        naive)
+            local scheme="naive+https" auth=""
+            [[ "${p[transport]:-}" == "quic" ]] && scheme="naive+quic"
+            is::not_empty "${p[username]:-}${p[password]:-}" && auth="$(uri::encode "${p[username]:-}"):$(uri::encode "${p[password]:-}")@"
+            vpn::link::__qadd qs sni "${p[sni]:-}"
+            vpn::link::__qadd qs insecure-concurrency "${p[concurrency]:-}"
+            printf '%s://%s%s:%s%s#%s\n' "${scheme}" "${auth}" "${host}" "${p[port]}" "${qs:+?${qs}}" "${name}" ;;
     esac
 }
 
@@ -709,6 +932,43 @@ vpn::link::json_escape() {
     s="${s//$'\t'/\\t}"
     s="${s//[[:cntrl:]]/}"
     printf '%s' "${s}"
+}
+
+# @description Is the text one well-formed JSON object (balanced, strings closed, nothing after it)?
+# @description Является ли текст одним корректным JSON-объектом (скобки сбалансированы, строки закрыты, после него ничего)?
+#   A structural check, enough to embed the text into a config as raw JSON.
+#   Структурная проверка — достаточно, чтобы вставить текст в конфиг как сырой JSON.
+# @param $1 text / текст
+# @return 0 yes, 1 no
+vpn::link::json_object_ok() {
+    local s="${1-}"
+    s="${s#"${s%%[![:space:]]*}"}"
+    s="${s%"${s##*[![:space:]]}"}"
+    [[ "${s}" == "{"*"}" ]] || return 1
+    [[ "${s}" == *[[:cntrl:]]* ]] && return 1
+    local -i i depth=0 in_str=0 esc=0
+    local c
+    for (( i = 0; i < ${#s}; i++ )); do
+        c="${s:i:1}"
+        if (( in_str )); then
+            if (( esc )); then esc=0
+            elif [[ "${c}" == "\\" ]]; then esc=1
+            elif [[ "${c}" == '"' ]]; then in_str=0
+            fi
+            continue
+        fi
+        case "${c}" in
+            '"') in_str=1 ;;
+            '{'|'[') depth=$(( depth + 1 )) ;;
+            '}'|']')
+                depth=$(( depth - 1 ))
+                (( depth < 0 )) && return 1
+                # объект закрылся раньше конца текста / the object closed before the end
+                (( depth == 0 && i != ${#s} - 1 )) && return 1
+                ;;
+        esac
+    done
+    (( depth == 0 && in_str == 0 ))
 }
 
 # @description Decode a subscription body: base64 or plain text, one link per line.
