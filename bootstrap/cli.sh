@@ -1148,23 +1148,31 @@ bs_cli_euid() {
   fi
 }
 
-# bs uninstall: удалить установленные копии BS (каталог lib + обёртка)
-# bs uninstall: remove installed BS copies (lib tree + wrapper)
-bs_cli_uninstall_cmd() {
-  bs_arr_clear bs_cli_un_targets
-  bs_arr_clear bs_cli_un_kinds
-  bs_arr_clear bs_cli_un_skipped
-  __bs_cli_un_explicit=0
-  __bs_cli_un_verbose=0
-  __bs_cli_un_banner=1
-  for __bs_cli_un_a in "$@"; do
-    case "${__bs_cli_un_a}" in
-      -h|--help) __bs_cli_un_banner=0 ;;
-    esac
-  done
-  bs_cli_update_ctx
-  if [ "${__bs_cli_un_banner}" -ne 0 ]; then printf '%s\n' "${UPDATE_RUN_BLOCK}"; fi
+# @private
+# @description Справка bs uninstall / The bs uninstall help
+bs_cli_uninstall_help() {
+  printf 'Использование / Usage: bs uninstall [--local] [--system] [--lib DIR] [-v]\n\n'
+  printf 'Удаляет установленные копии BS (каталог lib + обёртка).\n'
+  printf 'Removes installed BS copies (lib tree + wrapper).\n'
+  printf '  --local   ~/.local/lib/bs and its wrapper in ~/.local/bin\n'
+  # shellcheck disable=SC2016
+  printf '  --system  $BS_SYSTEM_PREFIX/lib/bs (default /usr/local) and its wrapper (needs root)\n'
+  printf '  --lib DIR a custom install directory\n'
+  printf 'Without flags: every detected install (local + system).\n'
+  printf 'Safety / Безопасность: only directories that are unmistakably BS installs\n'
+  printf '(bs + bootstrap/init.sh) are removed; a source checkout (.git/tests) is\n'
+  printf 'refused; a wrapper is deleted only when it points back at the target.\n'
+  printf 'Every notice shows which bs copy printed it. Removing the copy bs runs\n'
+  printf 'from is allowed and announced. Exit code 1 if nothing could be removed or some targets were skipped.\n'
+  printf 'PATH lines in rc files are cleaned by: ./install.sh --local uninstall\n'
+}
 
+# @private
+# @description Разобрать флаги bs uninstall; --help ставит __bs_cli_un_help=1 /
+#   Parse the bs uninstall flags; --help sets __bs_cli_un_help=1
+# @param $@ arguments / аргументы
+bs_cli_uninstall_parse_flags() {
+  __bs_cli_un_help=0
   while [ $# -gt 0 ]; do
     case "${1:-}" in
       --local)
@@ -1188,38 +1196,34 @@ bs_cli_uninstall_cmd() {
         __bs_cli_un_verbose=1
         shift ;;
       -h|--help)
-        printf 'Использование / Usage: bs uninstall [--local] [--system] [--lib DIR] [-v]\n\n'
-        printf 'Удаляет установленные копии BS (каталог lib + обёртка).\n'
-        printf 'Removes installed BS copies (lib tree + wrapper).\n'
-        printf '  --local   ~/.local/lib/bs and its wrapper in ~/.local/bin\n'
-        # shellcheck disable=SC2016
-        printf '  --system  $BS_SYSTEM_PREFIX/lib/bs (default /usr/local) and its wrapper (needs root)\n'
-        printf '  --lib DIR a custom install directory\n'
-        printf 'Without flags: every detected install (local + system).\n'
-        printf 'Safety / Безопасность: only directories that are unmistakably BS installs\n'
-        printf '(bs + bootstrap/init.sh) are removed; a source checkout (.git/tests) is\n'
-        printf 'refused; a wrapper is deleted only when it points back at the target.\n'
-        printf 'Every notice shows which bs copy printed it. Removing the copy bs runs\n'
-        printf 'from is allowed and announced. Exit code 1 if nothing could be removed or some targets were skipped.\n'
-        printf 'PATH lines in rc files are cleaned by: ./install.sh --local uninstall\n'
+        bs_cli_uninstall_help
+        __bs_cli_un_help=1
         return 0 ;;
       *)
         bs_cli_update_die "uninstall: неизвестный аргумент / unknown argument: $1 (bs uninstall --help)" ;;
     esac
   done
+  return 0
+}
 
-  # Детект установок / Detect installs
-  if [ "${__bs_cli_un_explicit}" -eq 0 ]; then
-    if [ -d "${HOME:-}/.local/lib/bs" ]; then
-      bs_arr_push bs_cli_un_targets "${HOME:-}/.local/lib/bs"
-      bs_arr_push bs_cli_un_kinds auto
-    fi
-    if [ -d "$(bs_cli_update_system_lib)" ]; then
-      bs_arr_push bs_cli_un_targets "$(bs_cli_update_system_lib)"
-      bs_arr_push bs_cli_un_kinds auto
-    fi
+# @private
+# @description Без флагов: найти локальную и системную установки / Without flags: find the local and system installs
+bs_cli_uninstall_detect() {
+  if [ -d "${HOME:-}/.local/lib/bs" ]; then
+    bs_arr_push bs_cli_un_targets "${HOME:-}/.local/lib/bs"
+    bs_arr_push bs_cli_un_kinds auto
   fi
+  if [ -d "$(bs_cli_update_system_lib)" ]; then
+    bs_arr_push bs_cli_un_targets "$(bs_cli_update_system_lib)"
+    bs_arr_push bs_cli_un_kinds auto
+  fi
+  return 0
+}
 
+# @private
+# @description Нет ни одной цели — рамка «УДАЛЯТЬ НЕЧЕГО» и выход 1 /
+#   No target at all — the "NOTHING TO UNINSTALL" box and exit 1
+bs_cli_uninstall_require() {
   __bs_cli_un_count=$(bs_arr_len bs_cli_un_targets)
   if [ "${__bs_cli_un_count}" -eq 0 ]; then
     bs_cli_update_box "УДАЛЯТЬ НЕЧЕГО / NOTHING TO UNINSTALL" \
@@ -1227,7 +1231,140 @@ bs_cli_uninstall_cmd() {
       "Укажите каталог / point to one: bs uninstall --lib DIR"
     exit 1
   fi
+  return 0
+}
 
+# @private
+# @description Цель __bs_cli_un_raw: есть ли, не повтор ли, установка ли BS, не checkout ли /
+#   The target __bs_cli_un_raw: exists, not a duplicate, a BS install, not a checkout
+# @returns 0 resolved into __bs_cli_un_target, 1 skip (reason collected) / 0 — в __bs_cli_un_target, 1 — пропустить
+bs_cli_uninstall_resolve() {
+  __bs_cli_un_tin=${__bs_cli_un_raw%/}
+  if [ ! -d "${__bs_cli_un_tin}" ]; then
+    bs_cli_push_lines bs_cli_un_skipped "$(bs_cli_update_missing_lines "${__bs_cli_un_tin}" "${__bs_cli_un_kind}" uninstall)"
+    return 1
+  fi
+  __bs_cli_un_target=$(bs_cli_update_realpath "${__bs_cli_un_tin}")
+  case "${__bs_cli_un_seen}" in
+    *"|${__bs_cli_un_target}|"*) return 1 ;;
+  esac
+  __bs_cli_un_seen="${__bs_cli_un_seen} |${__bs_cli_un_target}|"
+  # Безопасность: удаляем только каталоги, которые однозначно являются BS
+  # Safety: only remove directories that are unmistakably BS installs
+  if [ ! -f "${__bs_cli_un_target}/bs" ] || [ ! -f "${__bs_cli_un_target}/bootstrap/init.sh" ]; then
+    bs_arr_push bs_cli_un_skipped "• ${__bs_cli_un_target} — не установка BS (нет bs + bootstrap/init.sh); не тронут / not a BS install; left untouched"
+    return 1
+  fi
+  # Никогда не удалять исходный чекаут: у него есть .git или tests/.
+  # Never remove the source checkout: it has .git or tests/.
+  if [ -e "${__bs_cli_un_target}/.git" ] || [ -d "${__bs_cli_un_target}/tests" ]; then
+    bs_arr_push bs_cli_un_skipped "• ${__bs_cli_un_target} — исходный репозиторий (.git/tests), не установка; не тронут / source checkout; refusing to remove"
+    return 1
+  fi
+  return 0
+}
+
+# @private
+# @description Найти обёртку цели и решить, наша ли она (__bs_cli_un_mine) /
+#   Find the target wrapper and decide whether it is ours (__bs_cli_un_mine)
+bs_cli_uninstall_find_wrapper() {
+  # Обёртка — из манифеста, иначе выводится из пути .../lib/bs.
+  # The wrapper comes from the manifest, else from a .../lib/bs path.
+  __bs_cli_un_wrapper=$(bs_cli_update_install_wrapper "${__bs_cli_un_target}")
+  # lib задан симлинком и манифест без bin=: путь обёртки выводится из него
+  # lib given as a symlink and a manifest without bin=: derive it from the link
+  if [ -z "${__bs_cli_un_wrapper}" ]; then
+    __bs_cli_un_wrapper=$(bs_cli_update_install_wrapper "${__bs_cli_un_tin}")
+  fi
+  __bs_cli_un_bin=${__bs_cli_un_wrapper%/*}
+  __bs_cli_un_mine=0
+  if [ -n "${__bs_cli_un_wrapper}" ] && [ -f "${__bs_cli_un_wrapper}" ]; then
+    if grep -Fq "BS_ROOT=\"${__bs_cli_un_target}\"" "${__bs_cli_un_wrapper}" 2>/dev/null; then
+      __bs_cli_un_mine=1
+    else
+      # Обёртка может называть lib через симлинк (~/.local/lib/bs -> ...):
+      # сравниваем и заданный путь, и реальный.
+      # The wrapper may name the lib through a symlink: compare both the
+      # given path and the real one.
+      __bs_cli_un_wroot=$(bs_cli_update_wrapper_root "${__bs_cli_un_wrapper}")
+      if [ -n "${__bs_cli_un_wroot}" ]; then
+        if [ "${__bs_cli_un_wroot%/}" = "${__bs_cli_un_tin}" ] \
+           || [ "$(bs_cli_update_realpath "${__bs_cli_un_wroot}")" = "${__bs_cli_un_target}" ]; then
+          __bs_cli_un_mine=1
+        fi
+      fi
+    fi
+  fi
+  return 0
+}
+
+# @private
+# @description Есть ли права удалить каталог и (нашу) обёртку /
+#   Is there permission to remove the directory and (our) wrapper
+# @returns 0 writable, 1 skip (reason collected) / 0 — можно, 1 — пропустить
+bs_cli_uninstall_writable() {
+  __bs_cli_un_denied=0
+  if [ ! -w "${__bs_cli_un_target%/*}" ]; then __bs_cli_un_denied=1; fi
+  if [ "${__bs_cli_un_mine}" -eq 1 ] && [ ! -w "${__bs_cli_un_bin}" ]; then __bs_cli_un_denied=1; fi
+  if [ "${__bs_cli_un_denied}" -eq 1 ]; then
+    bs_arr_push bs_cli_un_skipped "• ${__bs_cli_un_target} — нет прав на удаление / no permission to remove (try: sudo bs uninstall --system)"
+    return 1
+  fi
+  return 0
+}
+
+# @private
+# @description Удалить каталог, ссылку на него, нашу обёртку и пустой bin /
+#   Remove the directory, a link to it, our wrapper and an empty bin
+# @returns 0 removed, 1 rm failed (reason collected) / 0 — удалено, 1 — rm не удался
+bs_cli_uninstall_remove() {
+  bs_log_info "uninstalling ${__bs_cli_un_target}"
+  if [ "${__bs_cli_un_target}" = "$(bs_cli_update_realpath "${BS_ROOT}")" ]; then
+    bs_log_info "uninstall: удаляется копия, из которой запущен bs — это нормально / removing the copy bs runs from — this is fine"
+  fi
+  __bs_cli_un_removed=0
+  if [ "${__bs_cli_un_mine}" -eq 0 ] && [ -n "${__bs_cli_un_wrapper}" ] && [ -f "${__bs_cli_un_wrapper}" ]; then
+    bs_cli_update_warn "uninstall: wrapper not matching this install, left in place: ${__bs_cli_un_wrapper} / обёртка не от этой установки, оставлена"
+  fi
+
+  # rm -rf на защищённый target безопасен: выше проверено, что это настоящая
+  # BS-установка, не чекаут и записываемый каталог.
+  # Обёртку удаляем ПОСЛЕ каталога: при сбое rm остаётся рабочая команда bs,
+  # и удаление можно повторить.
+  # rm -rf on the guarded target is safe: it is a real BS install, not a
+  # checkout, and writable. The wrapper goes AFTER the directory: if rm
+  # fails, a working bs command is left and the removal can be retried.
+  if ! rm -rf -- "${__bs_cli_un_target}"; then
+    bs_arr_push bs_cli_un_skipped "• ${__bs_cli_un_target} — удаление не удалось (часть файлов могла быть удалена; обёртка оставлена; остаток удалите вручную) / removal failed (some files may be gone; the wrapper is kept; remove the rest by hand)"
+    return 1
+  fi
+  if [ "${__bs_cli_un_verbose}" -eq 1 ]; then
+    bs_log_info "  removed: ${__bs_cli_un_target}"
+  fi
+  # Симлинк на каталог установки больше никуда не ведёт: убираем и его
+  # The symlink to the install directory points nowhere now: drop it too
+  if [ -L "${__bs_cli_un_tin}" ]; then
+    rm -f -- "${__bs_cli_un_tin}" || true
+  fi
+  if [ "${__bs_cli_un_mine}" -eq 1 ]; then
+    rm -f -- "${__bs_cli_un_wrapper}"
+    __bs_cli_un_removed=1
+    if [ "${__bs_cli_un_verbose}" -eq 1 ]; then
+      bs_log_info "  removed: ${__bs_cli_un_wrapper}"
+    fi
+  fi
+  # rmdir удаляет только пустой bin_dir; чужие файлы не трогаются.
+  # rmdir removes only an empty bin_dir; foreign files are never touched.
+  if [ "${__bs_cli_un_removed}" -ne 0 ]; then
+    rmdir -- "${__bs_cli_un_bin}" 2>/dev/null || true
+  fi
+  return 0
+}
+
+# @private
+# @description Пройти по целям и удалить подходящие; __bs_cli_un_ok=1, если удалено хоть что-то /
+#   Walk the targets and remove the suitable ones; __bs_cli_un_ok=1 when anything was removed
+bs_cli_uninstall_all() {
   __bs_cli_un_ok=0
   __bs_cli_un_seen=""
   __bs_cli_un_idx=0
@@ -1237,105 +1374,19 @@ bs_cli_uninstall_cmd() {
     bs_arr_get bs_cli_un_targets "${__bs_cli_un_idx}" __bs_cli_un_raw
     bs_arr_get bs_cli_un_kinds "${__bs_cli_un_idx}" __bs_cli_un_kind
     __bs_cli_un_idx=$((__bs_cli_un_idx + 1))
-    __bs_cli_un_tin=${__bs_cli_un_raw%/}
-    if [ ! -d "${__bs_cli_un_tin}" ]; then
-      bs_cli_push_lines bs_cli_un_skipped "$(bs_cli_update_missing_lines "${__bs_cli_un_tin}" "${__bs_cli_un_kind}" uninstall)"
-      continue
-    fi
-    __bs_cli_un_target=$(bs_cli_update_realpath "${__bs_cli_un_tin}")
-    case "${__bs_cli_un_seen}" in
-      *"|${__bs_cli_un_target}|"*) continue ;;
-    esac
-    __bs_cli_un_seen="${__bs_cli_un_seen} |${__bs_cli_un_target}|"
-    # Безопасность: удаляем только каталоги, которые однозначно являются BS
-    # Safety: only remove directories that are unmistakably BS installs
-    if [ ! -f "${__bs_cli_un_target}/bs" ] || [ ! -f "${__bs_cli_un_target}/bootstrap/init.sh" ]; then
-      bs_arr_push bs_cli_un_skipped "• ${__bs_cli_un_target} — не установка BS (нет bs + bootstrap/init.sh); не тронут / not a BS install; left untouched"
-      continue
-    fi
-    # Никогда не удалять исходный чекаут: у него есть .git или tests/.
-    # Never remove the source checkout: it has .git or tests/.
-    if [ -e "${__bs_cli_un_target}/.git" ] || [ -d "${__bs_cli_un_target}/tests" ]; then
-      bs_arr_push bs_cli_un_skipped "• ${__bs_cli_un_target} — исходный репозиторий (.git/tests), не установка; не тронут / source checkout; refusing to remove"
-      continue
-    fi
-    # Обёртка — из манифеста, иначе выводится из пути .../lib/bs.
-    # The wrapper comes from the manifest, else from a .../lib/bs path.
-    __bs_cli_un_wrapper=$(bs_cli_update_install_wrapper "${__bs_cli_un_target}")
-    # lib задан симлинком и манифест без bin=: путь обёртки выводится из него
-    # lib given as a symlink and a manifest without bin=: derive it from the link
-    if [ -z "${__bs_cli_un_wrapper}" ]; then
-      __bs_cli_un_wrapper=$(bs_cli_update_install_wrapper "${__bs_cli_un_tin}")
-    fi
-    __bs_cli_un_bin=${__bs_cli_un_wrapper%/*}
-    __bs_cli_un_mine=0
-    if [ -n "${__bs_cli_un_wrapper}" ] && [ -f "${__bs_cli_un_wrapper}" ]; then
-      if grep -Fq "BS_ROOT=\"${__bs_cli_un_target}\"" "${__bs_cli_un_wrapper}" 2>/dev/null; then
-        __bs_cli_un_mine=1
-      else
-        # Обёртка может называть lib через симлинк (~/.local/lib/bs -> ...):
-        # сравниваем и заданный путь, и реальный.
-        # The wrapper may name the lib through a symlink: compare both the
-        # given path and the real one.
-        __bs_cli_un_wroot=$(bs_cli_update_wrapper_root "${__bs_cli_un_wrapper}")
-        if [ -n "${__bs_cli_un_wroot}" ]; then
-          if [ "${__bs_cli_un_wroot%/}" = "${__bs_cli_un_tin}" ] \
-             || [ "$(bs_cli_update_realpath "${__bs_cli_un_wroot}")" = "${__bs_cli_un_target}" ]; then
-            __bs_cli_un_mine=1
-          fi
-        fi
-      fi
-    fi
-    __bs_cli_un_denied=0
-    if [ ! -w "${__bs_cli_un_target%/*}" ]; then __bs_cli_un_denied=1; fi
-    if [ "${__bs_cli_un_mine}" -eq 1 ] && [ ! -w "${__bs_cli_un_bin}" ]; then __bs_cli_un_denied=1; fi
-    if [ "${__bs_cli_un_denied}" -eq 1 ]; then
-      bs_arr_push bs_cli_un_skipped "• ${__bs_cli_un_target} — нет прав на удаление / no permission to remove (try: sudo bs uninstall --system)"
-      continue
-    fi
-    bs_log_info "uninstalling ${__bs_cli_un_target}"
-    if [ "${__bs_cli_un_target}" = "$(bs_cli_update_realpath "${BS_ROOT}")" ]; then
-      bs_log_info "uninstall: удаляется копия, из которой запущен bs — это нормально / removing the copy bs runs from — this is fine"
-    fi
-    __bs_cli_un_removed=0
-    if [ "${__bs_cli_un_mine}" -eq 0 ] && [ -n "${__bs_cli_un_wrapper}" ] && [ -f "${__bs_cli_un_wrapper}" ]; then
-      bs_cli_update_warn "uninstall: wrapper not matching this install, left in place: ${__bs_cli_un_wrapper} / обёртка не от этой установки, оставлена"
-    fi
-
-    # rm -rf на защищённый target безопасен: выше проверено, что это настоящая
-    # BS-установка, не чекаут и записываемый каталог.
-    # Обёртку удаляем ПОСЛЕ каталога: при сбое rm остаётся рабочая команда bs,
-    # и удаление можно повторить.
-    # rm -rf on the guarded target is safe: it is a real BS install, not a
-    # checkout, and writable. The wrapper goes AFTER the directory: if rm
-    # fails, a working bs command is left and the removal can be retried.
-    if ! rm -rf -- "${__bs_cli_un_target}"; then
-      bs_arr_push bs_cli_un_skipped "• ${__bs_cli_un_target} — удаление не удалось (часть файлов могла быть удалена; обёртка оставлена; остаток удалите вручную) / removal failed (some files may be gone; the wrapper is kept; remove the rest by hand)"
-      continue
-    fi
-    if [ "${__bs_cli_un_verbose}" -eq 1 ]; then
-      bs_log_info "  removed: ${__bs_cli_un_target}"
-    fi
-    # Симлинк на каталог установки больше никуда не ведёт: убираем и его
-    # The symlink to the install directory points nowhere now: drop it too
-    if [ -L "${__bs_cli_un_tin}" ]; then
-      rm -f -- "${__bs_cli_un_tin}" || true
-    fi
-    if [ "${__bs_cli_un_mine}" -eq 1 ]; then
-      rm -f -- "${__bs_cli_un_wrapper}"
-      __bs_cli_un_removed=1
-      if [ "${__bs_cli_un_verbose}" -eq 1 ]; then
-        bs_log_info "  removed: ${__bs_cli_un_wrapper}"
-      fi
-    fi
-    # rmdir удаляет только пустой bin_dir; чужие файлы не трогаются.
-    # rmdir removes only an empty bin_dir; foreign files are never touched.
-    if [ "${__bs_cli_un_removed}" -ne 0 ]; then
-      rmdir -- "${__bs_cli_un_bin}" 2>/dev/null || true
-    fi
+    bs_cli_uninstall_resolve || continue
+    bs_cli_uninstall_find_wrapper
+    bs_cli_uninstall_writable || continue
+    bs_cli_uninstall_remove || continue
     __bs_cli_un_ok=1
   done
+  return 0
+}
 
+# @private
+# @description Итог: «ничего не удалено», «часть пропущена» или успех и код возврата /
+#   Summary: "nothing removed", "some skipped" or success, and the exit code
+bs_cli_uninstall_report() {
   if [ "${__bs_cli_un_ok}" -eq 0 ]; then
     eval "$(bs_arr_to_args bs_cli_un_skipped)"
     bs_cli_update_box "НИЧЕГО НЕ УДАЛЕНО / NOTHING REMOVED" "$@"
@@ -1352,6 +1403,31 @@ bs_cli_uninstall_cmd() {
   fi
   bs_log_success "uninstall done"
   return 0
+}
+
+# bs uninstall: удалить установленные копии BS (каталог lib + обёртка)
+# bs uninstall: remove installed BS copies (lib tree + wrapper)
+bs_cli_uninstall_cmd() {
+  bs_arr_clear bs_cli_un_targets
+  bs_arr_clear bs_cli_un_kinds
+  bs_arr_clear bs_cli_un_skipped
+  __bs_cli_un_explicit=0
+  __bs_cli_un_verbose=0
+  __bs_cli_un_banner=1
+  for __bs_cli_un_a in "$@"; do
+    case "${__bs_cli_un_a}" in
+      -h|--help) __bs_cli_un_banner=0 ;;
+    esac
+  done
+  bs_cli_update_ctx
+  if [ "${__bs_cli_un_banner}" -ne 0 ]; then printf '%s\n' "${UPDATE_RUN_BLOCK}"; fi
+
+  bs_cli_uninstall_parse_flags "$@"
+  if [ "${__bs_cli_un_help}" -eq 1 ]; then return 0; fi
+  if [ "${__bs_cli_un_explicit}" -eq 0 ]; then bs_cli_uninstall_detect; fi
+  bs_cli_uninstall_require
+  bs_cli_uninstall_all
+  bs_cli_uninstall_report
 }
 
 
