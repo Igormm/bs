@@ -3,7 +3,7 @@
 # Shell portability
 
 **BS requires bash 4.2+.** All of `lib/` (87 modules, none of them POSIX) and the `bootstrap/bs.sh`
-commands that run it are written in bash. The 23 small `@shell posix` kernel files (all of `core/`),
+commands that run it are written in bash. The 24 small `@shell posix` kernel files (all of `core/`),
 the prologue of the entry points and the command set in `bootstrap/cli.sh` do not depend on it.
 "Usable from most shells" means: `bs` can be started from any shell — commands that need bash
 re-run in it, while the POSIX commands stay in the current shell — and `install.sh` runs even with
@@ -283,13 +283,17 @@ POSIX sh has no arrays or associative arrays, and the kernel needs them (the lis
 
 Worth knowing: functions that change state and return a value (`bs_arr_pop`, `bs_arr_shift`) must not be called as `$(…)` — the change would stay in the subshell; take the result into a variable (`bs_arr_pop name result`). Verified by 272 checks in six shells and by a random comparison with native bash arrays (6 sets of 2500 operations, no differences). The old `arr::*` and `map::*` (now in `lib/compat/lang.sh`) work on real bash arrays and stay as they are; the kernel itself uses this layer.
 
+## The object model `core/object.sh`
+
+`core/object.sh` (`@shell posix`, loaded on demand with `load "core/object"`, not part of the auto-loaded kernel) builds a portable object model on the data layer: classes are maps (`objC<Name>`), instances are IDs `o<N>` with their own maps (`objI<N>`), the live registry is `objLive`. One model covers: instance fields and shared type fields (`bs_obj_field`, `bs_obj_shared`, `bs_obj_const`), instance and type methods (`bs_obj_method`, `bs_obj_type_method`, `bs_obj_call`, `bs_obj_type_call` — a method is a plain function receiving the ID or the class first), creation with defaults, an `init` method and `field=value` pairs (`bs_obj_new`, `bs_obj_new_to`), computed properties with getters/setters (`bs_obj_property`), change watchers (`bs_obj_watch`), immutable fields (`bs_obj_readonly`), conventional privacy (`bs_obj_private` + `bs_obj_raw_get/raw_set` — shell cannot hide the `__bs_dat_*` variables from the same process, privacy is an API rule), contracts (`bs_obj_contract`, `bs_obj_check`, checked at creation, inherited), inheritance through method tables (`bs_obj_class Child Parent`), composition and delegation (`bs_obj_delegate`), identity vs content equality (`bs_obj_same`, `bs_obj_equal`), explicit destruction (`bs_obj_destroy`, `bs_obj_destroy_all`). Dispatch uses no `eval`: the method function is called as `"$fn" "$id" "$@"`; every `eval` stays in the data layer with checked names. Status codes: 0 ok, 1 no such thing, 2 bad name/argument, 3 rule violation. Objects belong to the shell process that created them: `bs_obj_new` inside `$(…)` leaves the object in the subshell — take the ID with `bs_obj_new_to`. Verified by 394 checks in six shells (`unit/testobjectportableunit.sh`) and 18 loader/alias/strict-mode checks in bash (`unit/testobjectunit.sh`); examples: `example_core/counter.sh`, `example_core/shapes.sh`.
+
 ## `repl` outside the kernel
 
-`bs repl` is an interactive bash session with the kernel loaded, so by its nature it is not a kernel part. The module moved from `core/repl.sh` to `lib/ui/repl.sh` (loaded with `load "lib/ui/repl"`); the kernel keeps 23 files.
+`bs repl` is an interactive bash session with the kernel loaded, so by its nature it is not a kernel part. The module moved from `core/repl.sh` to `lib/ui/repl.sh` (loaded with `load "lib/ui/repl"`); the kernel keeps 24 files.
 
 ## Heading for shell independence
 
-The goal is for `bootstrap/`, `core/`, `install/`, `boot.sh`, `bs` and `install.sh` to live in one namespace `bs_*` and be shell-independent. State: all 23 `core/` files are done (`prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `config`, `lang`, `args`, `args-completion`, `var`, `str`, `num`, `msg`, `var-schema`, `store`, `regex`), plus the shell and shebang layer, the loader, `base.sh`, `init.sh` and `cli.sh` in `bootstrap/`, `install/*`, and the entry points `install.sh`, `bs` and `boot.sh`. Still bash 4.2+: `bootstrap/bs.sh` (the call stack and `BASH_REMATCH`, with the 9 `bs::cli::*` commands that run `lib/`) and the 87 modules of `lib/`; so a full BS still wants bash 4.2+ (see the top of this page), and without it the POSIX part above runs.
+The goal is for `bootstrap/`, `core/`, `install/`, `boot.sh`, `bs` and `install.sh` to live in one namespace `bs_*` and be shell-independent. State: all 24 `core/` files are done (`prereq`, `guard`, `const`, `version`, `quiet`, `fmt`, `logger`, `calc`, `data`, `utils`, `deps`, `errorhandler`, `config`, `lang`, `args`, `args-completion`, `var`, `str`, `num`, `msg`, `var-schema`, `store`, `regex`, `object`), plus the shell and shebang layer, the loader, `base.sh`, `init.sh` and `cli.sh` in `bootstrap/`, `install/*`, and the entry points `install.sh`, `bs` and `boot.sh`. Still bash 4.2+: `bootstrap/bs.sh` (the call stack and `BASH_REMATCH`, with the 9 `bs::cli::*` commands that run `lib/`) and the 87 modules of `lib/`; so a full BS still wants bash 4.2+ (see the top of this page), and without it the POSIX part above runs.
 
 ## Not done yet
 

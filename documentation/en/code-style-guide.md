@@ -967,3 +967,103 @@ The `posix` tier has no `local`, `FUNCNAME`, `BASH_SOURCE` or call stack, so the
 5. **Messages instead of a trace.** `BS_LOG_LEVEL=TRACE` turns `bs_log_trace` and `bs_log_debug` on; `BS_DEBUG=1` shows the steps of `bootstrap/init.sh`. Remember §12.8: `bs_log_debug` writes to stdout, so inside a function whose stdout is the result a debug line is written with `printf '%s\n' "…" >&2`.
 
 6. **There is no call stack anywhere but bash** (`bs_error_exit_with_backtrace` prints "no call stack in this shell" in the other shells). The message format of §12.9 replaces it: `function_name: what is wrong: value`. In the `posix` tier an error message without the function name is a defect.
+
+## 13. Classes and objects (`core/object.sh`)
+
+The object model is the portable module `core/object.sh` (`@shell posix`), loaded on demand: `load "core/object"`. In bash and zsh the `object::*` aliases exist; in every shell the real names are `bs_obj_*`. The full model description: `documentation/en/08-development/shell-portability.md`; examples: `example_core/counter.sh`, `example_core/shapes.sh`.
+
+### 13.1 When a class is needed
+
+A class is justified when there is **state + behavior + several instances** (sessions, connections, tasks, widgets). For a single instance or pure stateless functions a class is not needed — plain module functions are simpler (YAGNI). Classes are declared at runtime, not as files: the declaration lives in the module or script that uses it.
+
+### 13.2 Naming
+
+- Class and field names are `lower_snake_case` (§2.1): `session`, `ssh_connection`, `retry_count`. CamelCase is forbidden even for classes.
+- Validator limit: `[A-Za-z][A-Za-z0-9_]*`, no `__` and no trailing `_` (a class name becomes part of a data-layer map name).
+- Method functions are `class_method` (`session_open`) in every tier: the name validator rejects `::` (code 2), and such names exist only in bash/zsh. The module's public API stays `module::function`; a method function is an internal callback, not part of the API.
+- ID variables are semantic: `session_id`, `conn_id`, not `obj1`.
+- Reserved fields: `class` and `__init` must not be written (code 2).
+
+### 13.3 Declaration skeleton
+
+Order: the method functions first, then the class declaration and its members.
+
+```bash
+load "core/object"
+
+# Methods are plain functions: $1 is the object ID, then the call arguments
+session_open()  { object::set "$1" state open; }
+session_close() { object::set "$1" state closed; }
+
+object::class session
+object::field session state new
+object::field session token ''
+object::field session created ''
+object::private session token
+object::readonly session created
+object::method session open session_open
+object::method session close session_close
+object::contract session open close
+
+object::new_to session_id session created=now token=abc
+object::call "$session_id" open
+object::destroy "$session_id"
+```
+
+### 13.4 Methods
+
+- An instance method receives **the ID as its first argument**; a type method receives the class name. State is read and written through `object::get/set`; private fields — only through `object::raw_get/raw_set` inside the methods of their own class.
+- A method's result goes to stdout (one value = one line), its status is the return code. Mutating calls (`object::new`, `object::set`, `object::call` of a mutating method) must **not** run inside `$(...)`: the change would stay in the subshell. Take the ID with `object::new_to`.
+- The method function is checked at call time, not at declaration: a method may be declared before its function is defined, but called only after.
+
+### 13.5 Creation and initialization
+
+- Order: field defaults → the `init` method (if declared) → `field=value` pairs (the pairs have the final word). The contract is checked before creation; a failed `init` destroys the object and returns its status.
+- A factory is a type method: `object::type_call session from token "$t"`; inside — `object::new_to`.
+- A pair with an unknown field or without `=` is an error (1/2); no object is created.
+
+### 13.6 Properties and watchers
+
+- Getter: `FN ID` → the value on stdout. Setter: `FN ID VALUE` — it stores via `object::raw_set` itself. A getter-only property + `readonly` refuses writes.
+- Watcher: `FN ID FIELD OLD NEW`, called after a successful write; its status is ignored. A watcher is user code: it may nest its own model calls, that is safe.
+
+### 13.7 Inheritance, contracts, delegation
+
+- The parent is declared before the child: `object::class child parent`. Fields, methods, properties, type members and contracts are inherited; the child overrides a method simply by declaring its own method with the same name. An inheritance cycle is error 2.
+- A contract (`object::contract`) lists the required methods; it is checked at the creation of every instance, including the children's.
+- Delegation (`object::delegate class field`) is composition: the field holds another object's ID, a method not found is tried on it (order: the fields as declared, then the parents). Code 1 from a delegate means "try the next one"; other codes go out. **The owner destroys the delegates too**: `object::destroy` does not remove the objects held in fields automatically.
+
+### 13.8 Privacy and immutability
+
+- Privacy is **conventional**: the public `get/set` refuse (code 3), but the `__bs_dat_*` variables are visible to the whole process. It is an API rule, not a barrier — do not build security on it.
+- A `readonly` field is writable only during creation (pairs) and inside `init`; a type constant (`object::const`) is never writable. A private field is set by the creation pairs (`object::new_to s session token=abc`) and via `raw_set` inside `init`/methods; the public `set` always refuses.
+
+### 13.9 Lifetime and ownership
+
+- Objects belong to the **shell process** that created them; IDs do not cross processes and are never reused after destruction.
+- Whoever created destroys: `object::destroy` (calls the `destroy` method if declared, then clears the fields and the registry). At an entry point — `object::destroy_all` on exit; it can be registered: `bs_cleanup_add object::destroy_all`.
+
+### 13.10 Return codes
+
+| Code | Meaning |
+| --- | --- |
+| 0 | success |
+| 1 | no such thing: object, class, field, method, method function |
+| 2 | bad name or argument (including the reserved fields) |
+| 3 | rule violation: readonly, private, constant, contract |
+
+### 13.11 Tests
+
+- A bash module with classes: a unit test through `load "core/object"` (model: `tests/unit/testobjectunit.sh`) — creation, methods, codes 1/2/3, subshell isolation, cleanup.
+- Posix code with classes: a portable test in six shells (model: `tests/unit/testobjectportableunit.sh`, skill `bs-write-test`).
+- Required scenarios: a failed contract, a write to readonly/private, nested calls (init/setter/destroy creating their own objects), delegation with an empty and a foreign field.
+
+### 13.12 Common mistakes
+
+- `id=$(object::new …)` — the object stayed in the subshell; use `object::new_to`.
+- Calling a method function directly without the ID as the first argument.
+- A CamelCase class name (`Counter`) — a §2.1 violation; the validator accepts it, the style does not.
+- A forgotten `load "core/object"`: the `object::*` aliases exist only after the load.
+- A watcher or a setter inside `$(...)`/a pipe — the mutation is lost even though the output is visible.
+- Relying on privacy as a barrier (see 13.8).
+- ShellCheck SC2154 on an ID variable from `object::new_to`: the assignment goes through `bs_var_set`, which ShellCheck cannot follow. A `# shellcheck disable=SC2154` directive with a bilingual reason follows the repo convention (model: `example_core/counter.sh`).

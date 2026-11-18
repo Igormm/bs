@@ -18,6 +18,7 @@ Central place for everything AI-facing in the repo (replaces the old `ai/` direc
 |---|---|
 | `bs-new-lib-module` | scaffold a new `lib/` module |
 | `bs-new-core-module` | add a `core/` module + registration |
+| `bs-object-class` | develop a class on `core/object.sh` (style guide ch. 13) |
 | `bs-write-test` | unit/integration test skeleton + assert API |
 | `bs-validate` | mandatory validation cycle |
 | `bs-version-bump` | bump/check the framework version: single source, CHANGELOG, en/ru docs, no-bash test |
