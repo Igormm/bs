@@ -83,7 +83,54 @@ HELP
 }
 
 # Разбор аргументов и запуск действия / Parse the arguments and run the action
-bs_install_main() {
+# @private
+# @description --strict-shell NAME / --strict-shell=NAME: как --shell, но оболочка без bash 4.2+
+#   на машине (tier unsupported) — отказ / like --shell, but a shell with no bash 4.2+ on the
+#   machine (tier unsupported) is refused
+# @param $@ the arguments starting at the flag / аргументы начиная с флага
+# Scratch globals: __bs_mn_used (written: how many arguments to shift), BS_USER_SHELL (exported)
+bs_install_strict_shell() {
+  __bs_mn_used=1
+  case "$1" in
+    --strict-shell=*)
+      __bs_mn_name=${1#--strict-shell=}; __bs_mn_used=1 ;;
+    *)
+      __bs_mn_name=${2:-}
+      if [ $# -ge 2 ]; then __bs_mn_used=2; else __bs_mn_used=1; fi ;;
+  esac
+  if [ -z "${__bs_mn_name}" ] || [ "$(bs_shell_of_name "${__bs_mn_name}")" = "unknown" ]; then
+    printf "ERROR: --strict-shell требует имя оболочки: bash zsh ash dash sh ksh mksh oksh osh fish nu\n" >&2
+    printf "       --strict-shell needs a shell name: bash zsh ash dash sh ksh mksh oksh osh fish nu\n" >&2
+    exit 1
+  fi
+  BS_USER_SHELL="$(bs_shell_of_name "${__bs_mn_name}")"; export BS_USER_SHELL
+  if [ "$(bs_shell_tier "${BS_USER_SHELL}")" = "unsupported" ]; then
+    printf "ERROR: установка для '%s' отклонена: на машине нет bash 4.2+ (tier unsupported)\n" "${BS_USER_SHELL}" >&2
+    printf "       install for '%s' refused: there is no bash 4.2+ on this machine (tier unsupported)\n" "${BS_USER_SHELL}" >&2
+    exit 1
+  fi
+  unset __bs_mn_name
+  return 0
+}
+
+# @private
+# @description --shell NAME: оболочка, для которой ставится BS (PATH, rc, подсказки) /
+#   --shell NAME: the shell BS is installed for (PATH, rc, hints)
+# @param $1 shell name / имя оболочки
+bs_install_pick_shell() {
+  if [ -z "${1:-}" ] || [ "$(bs_shell_of_name "${1:-}")" = "unknown" ]; then
+    printf "ERROR: --shell требует имя оболочки: bash zsh ash dash sh ksh mksh oksh osh fish nu\n" >&2
+    printf "       --shell needs a shell name: bash zsh ash dash sh ksh mksh oksh osh fish nu\n" >&2
+    exit 1
+  fi
+  BS_USER_SHELL="$(bs_shell_of_name "${1:-}")"; export BS_USER_SHELL
+  return 0
+}
+
+# @private
+# @description Разобрать аргументы установщика в MODE, ACTION, FLAG_* / Parse the installer arguments into MODE, ACTION, FLAG_*
+# @param $@ arguments / аргументы
+bs_install_parse_args() {
   # Дефолтные значения для параметров \ Parse arguments
   MODE="system"        # system|local
   MODE_EXPLICIT="0"    # 1 если режим задан флагом --local
@@ -102,36 +149,10 @@ bs_install_main() {
       --update-path)
         FLAG_UPDATE_PATH="1"; shift ;;
       --strict-shell|--strict-shell=*)
-        # Оболочка, для которой ставится BS (PATH, rc, подсказки): то же, что --shell NAME,
-        # но жёстче: оболочка без bash 4.2+ на машине (tier unsupported) — отказ, а не подсказка
-        # The shell BS is installed for (PATH, rc, hints): the same as --shell NAME, but stricter:
-        # a shell with no bash 4.2+ on the machine (tier unsupported) is refused, not just hinted
-        case "$1" in
-          --strict-shell=*)
-            __bs_mn_name=${1#--strict-shell=}; shift 1 ;;
-          *)
-            __bs_mn_name=${2:-}
-            if [ $# -ge 2 ]; then shift 2; else shift; fi ;;
-        esac
-        if [ -z "${__bs_mn_name}" ] || [ "$(bs_shell_of_name "${__bs_mn_name}")" = "unknown" ]; then
-          printf "ERROR: --strict-shell требует имя оболочки: bash zsh ash dash sh ksh mksh oksh osh fish nu\n" >&2
-          printf "       --strict-shell needs a shell name: bash zsh ash dash sh ksh mksh oksh osh fish nu\n" >&2
-          exit 1
-        fi
-        BS_USER_SHELL="$(bs_shell_of_name "${__bs_mn_name}")"; export BS_USER_SHELL
-        if [ "$(bs_shell_tier "${BS_USER_SHELL}")" = "unsupported" ]; then
-          printf "ERROR: установка для '%s' отклонена: на машине нет bash 4.2+ (tier unsupported)\n" "${BS_USER_SHELL}" >&2
-          printf "       install for '%s' refused: there is no bash 4.2+ on this machine (tier unsupported)\n" "${BS_USER_SHELL}" >&2
-          exit 1
-        fi
-        unset __bs_mn_name ;;
+        bs_install_strict_shell "$@"
+        shift "${__bs_mn_used}" ;;
       --shell)
-        if [ $# -lt 2 ] || [ -z "${2:-}" ] || [ "$(bs_shell_of_name "$2")" = "unknown" ]; then
-          printf "ERROR: --shell требует имя оболочки: bash zsh ash dash sh ksh mksh oksh osh fish nu\n" >&2
-          printf "       --shell needs a shell name: bash zsh ash dash sh ksh mksh oksh osh fish nu\n" >&2
-          exit 1
-        fi
-        BS_USER_SHELL="$(bs_shell_of_name "$2")"; export BS_USER_SHELL
+        bs_install_pick_shell "${2:-}"
         shift 2 ;;
       -h|--help)
         bs_install_usage; exit 0 ;;
@@ -142,7 +163,13 @@ bs_install_main() {
         exit 1 ;;
     esac
   done
+  return 0
+}
 
+# @private
+# @description Запомнить переопределения пользователя; удаление без --local идёт туда, где реально стоит BS /
+#   Remember user overrides; an uninstall without --local follows what is really installed
+bs_install_autodetect_mode() {
   # Переопределения пользователя запоминаем до подстановки значений по умолчанию
   # (нужны для точных команд в подсказках).
   # Remember user overrides before defaults are filled in (exact commands in hints).
@@ -171,13 +198,12 @@ bs_install_main() {
       printf "Local install found (mode=%s) — removing %s\n" "${__bs_mn_mode:-local}" "${HOME}/.local/lib/bs"
     fi
   fi
+  return 0
+}
 
-  # local-режиму нужен HOME: ошибка вместо «unbound variable».
-  # Local mode needs HOME: an error instead of "unbound variable".
-  if [ "${MODE}" = "local" ] && [ "${INSTALL_EARLY_CHECKED:-0}" != "1" ]; then
-    bs_install_require_home || exit 1
-  fi
-
+# @private
+# @description Вычислить PREFIX, BIN_DIR, LIB_DIR, TARGET_* по режиму / Derive PREFIX, BIN_DIR, LIB_DIR, TARGET_* from the mode
+bs_install_resolve_paths() {
   # Resolve paths
   SOURCE_ROOT="${SCRIPT_DIR}"
 
@@ -212,7 +238,13 @@ bs_install_main() {
     # A custom PREFIX (Termux: $PREFIX, /opt/x): next to it, not in /usr, which may not exist there
     TARGET_COMPLETION="${PREFIX}/share/bash-completion/completions/bs"
   fi
+  return 0
+}
 
+# @private
+# @description --path и --update-path: только с --local, без действия; выполнить и выйти /
+#   --path and --update-path: only with --local and without an action; run and exit
+bs_install_path_flags() {
   # PATH flags are local-only (help: valid only with --local)
   # Флаги PATH работают только в local-режиме (help: только с --local)
   if [ "${FLAG_PATH}" = "1" ] || [ "${FLAG_UPDATE_PATH}" = "1" ]; then
@@ -238,6 +270,21 @@ bs_install_main() {
     bs_auto_update_path
     exit 0
   fi
+  return 0
+}
+
+bs_install_main() {
+  bs_install_parse_args "$@"
+  bs_install_autodetect_mode
+
+  # local-режиму нужен HOME: ошибка вместо «unbound variable».
+  # Local mode needs HOME: an error instead of "unbound variable".
+  if [ "${MODE}" = "local" ] && [ "${INSTALL_EARLY_CHECKED:-0}" != "1" ]; then
+    bs_install_require_home || exit 1
+  fi
+
+  bs_install_resolve_paths
+  bs_install_path_flags
 
   # sudo ./install.sh --local: не ставить root-файлы в домашний каталог пользователя
   # sudo ./install.sh --local: no root-owned files inside a user's home
