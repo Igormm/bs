@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.22.0] - 2026-11-18 "кеш бабки миллионы миллиарды"
 
 ### Added
 - feat(core): `core/cache.sh` — a three-level transparent cache (`@shell posix`, on demand via `load "core/cache"` or the new `bs cache` CLI command: stats/list/get/put/delete/prune/clear). L1 = process maps (zero forks), L2 = files + a human-readable `key=value` manifest (id/key/fp/level/size/created/ttl/hits/used, atomic temp+mv writes), L3 = a probed backend: sqlite3 → the existing C store (`BS_STORE_BACKEND`, base64 values) → plain files; `BS_CACHE_L3` forces the choice. No data hiding: `bs cache list` prints the manifest, values are plain files/rows. Hits require a matching fingerprint (`bs_cache_fp_files` via `cksum`) and a live ttl (checked before EVERY level, L1 included); put is write-through, get promotes L3→L2→L1, prune removes expired entries and evicts LRU over `BS_CACHE_L2_BYTES`/`BS_CACHE_L3_BYTES`. One writer assumed; trailing newlines of values are trimmed by the shell read (documented). Example: `example_core/cache_demo.sh`. Tests: `testcacheportableunit.sh` (188 checks in six shells), `testcacheunit.sh` (27 checks: cross-process CLI, C backend, strict mode). Docs: tier counts 24→25, a new section in `shell-portability.md` (en/ru); `bs doctor` checks the file.
