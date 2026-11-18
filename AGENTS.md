@@ -95,7 +95,7 @@ For focused development tasks, use the dedicated prompt files:
 Reusable workflow skills live in `.agents/skills/` (Kimi Code / agents-compatible format):
 
 - `bs-new-lib-module` — scaffold a new `lib/` module (skeleton, guard, `@depends`, metadata).
-- `bs-new-core-module` — add a `core/` module and register it in `bootstrap/init.sh` + `bs doctor`.
+- `bs-new-core-module` — add a `core/` module and register it in `bootstrap/kernel.sh` (or on-demand via `load`) + `bs doctor`.
 - `bs-object-class` — develop a class on the object model `core/object.sh` (fields, methods, properties, contracts, inheritance, delegation, lifetime; code-style-guide chapter 13).
 - `bs-regex` — work with regular expressions across the two tiers: `core/regex.sh` (`bs_re_*`, POSIX ERE) vs `lib/data/regex.sh` (`regex::*`, ERE+PCRE); dialect portability (GNU vs busybox vs BSD) and engine fallbacks.
 - `bs-pre-kernel-namespace` — write/edit functions in `bootstrap/bs.sh` (dependency-free helpers usable before the loader).

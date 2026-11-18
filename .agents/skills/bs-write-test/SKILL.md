@@ -68,11 +68,25 @@ bash .agents/skills/bs-write-test/scripts/gen_test_skeleton.sh core/lang.sh --wr
 
 - `testframework::init` / `testframework::summary` — summary exits 1 on failures.
 - `testframework::assert_true "<condition>" "name"` — eval'd as `[[ ... ]]`.
-- `testframework::assert_false "<command>" "name"` — expects the command to fail.
+- `testframework::assert_false "<condition>" "name"` — ALSO eval'd as `[[ ... ]]`, NOT a command.
 - `testframework::assert_equal "expected" "actual" "name"`.
 - `testframework::assert_file_exists "path" "name"`.
-- `testframework::assert_command "<command>" "name"`.
+- `testframework::assert_command "<command>" "name"` — for COMMANDS; negate with `!` inside.
 - `testframework::section "..."`, `print_header "..."` — output structure; headers bilingual ru/en.
+
+Assert traps (hit while testing `core/object.sh`):
+
+- A command string in `assert_true`/`assert_false` (`"object::equal '$a' '$a'"`) becomes
+  `[[ object::equal ... ]]` — a syntax error swallowed by `2>/dev/null`, reported as FAILED.
+  Commands go to `assert_command` (negation: `assert_command "! cmd"`).
+- The condition is eval'd INSIDE the assert function: the caller's `local` variables are
+  invisible there. Interpolate values into the string (`"object::alive '$id'"`), do not
+  pass `'$id'` unexpanded.
+- In portable-test probe snippets, a mutating call inside `$(...)` or a pipe runs in a
+  subshell: its output is captured but the state change is lost. Assert state OUTSIDE the
+  substitution; capture watcher/method output separately (`cmd | grep watch` is fine for
+  output-only checks). Expected values must match the real output ORDER (a nested watcher
+  prints before the outer one).
 
 ## Rules
 

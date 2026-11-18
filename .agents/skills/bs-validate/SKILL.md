@@ -41,5 +41,7 @@ bash .agents/skills/bs-version-bump/scripts/version.sh check   # 0 drift = consi
 
 - All three must pass before reporting a task as done. Never claim success on a red run.
 - On failure: read the actual error, fix the root cause, re-run ALL THREE (not just the failed one).
+- **Long runs:** on a typical dev machine `validateshellcheck.sh` (one shellcheck invocation over ~490 files) and `runalltests.sh` take ~20 minutes each. Run them in the background with a log (`nohup bash tests/validateshellcheck.sh > /tmp/sc.log 2>&1 &`), do targeted unit tests and `check_posix_tier.sh` in the foreground meanwhile, and read the logs before claiming success. A foreground timeout is not a pass.
+- `examples/` and `example_core/` are NOT covered by `validatesyntax.sh` — check changed example scripts manually (`bash -n`, `shellcheck -s bash`, and a real run via `./bs`).
 - CI mirrors this in `.github/workflows/ci.yml`: a lint job (syntax + shellcheck) and a tests job across containers (ubuntu, debian, almalinux 9, almalinux 8 = minimum Bash 4.4). If a change could behave differently on Bash 4.4 (associative arrays, `${var@Q}`, etc.), flag it — the local run may use a newer bash.
 - `bs doctor` is a useful extra sanity check after touching `core/` or `bootstrap/`.

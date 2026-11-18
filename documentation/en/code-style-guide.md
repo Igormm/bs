@@ -1024,7 +1024,7 @@ object::destroy "$session_id"
 
 ### 13.6 Properties and watchers
 
-- Getter: `FN ID` → the value on stdout. Setter: `FN ID VALUE` — it stores via `object::raw_set` itself. A getter-only property + `readonly` refuses writes.
+- Getter: `FN ID` → the value on stdout. Setter: `FN ID VALUE` — it stores via `object::raw_set` itself. A getter-only property + `readonly` refuses writes. Redeclaring a property without a setter removes the old setter; the declaration is atomic (a bad setter name does not change the getter).
 - Watcher: `FN ID FIELD OLD NEW`, called after a successful write; its status is ignored. A watcher is user code: it may nest its own model calls, that is safe.
 
 ### 13.7 Inheritance, contracts, delegation

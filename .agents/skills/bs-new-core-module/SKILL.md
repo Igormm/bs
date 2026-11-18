@@ -1,6 +1,6 @@
 ---
 name: bs-new-core-module
-description: Create or modify a core/ kernel module of the BS framework, including registration in bootstrap/init.sh and the bs doctor checks
+description: Create or modify a core/ kernel module of the BS framework, including registration in bootstrap/kernel.sh (or on-demand load) and the bs doctor checks
 type: prompt
 whenToUse: When the user asks to add a new core/ module, change kernel behavior, or modify the framework boot sequence
 arguments:
@@ -14,7 +14,8 @@ Create or modify core module `$module_name`. Core modules differ from lib module
 - **Two tiers.** A core file is `# @shell posix` (default for NEW core code; valid POSIX sh, runs in dash, ash, ksh, mksh, zsh, bash) or `# @shell bash4` (only if it really needs associative arrays, namerefs, `=~`: today no `core/` file; what needs real bash arrays goes to a bridge in `lib/compat/`, like `args`, `deps`, `lang`). The tier is the single source of truth about the shell dependency.
 - **`posix` files** live in the one `bs_` namespace (`bs_module_name`; the `module::name` alias is made by `bs_shell_alias` at the end of the file), have `#!/bin/sh`, no `local`/`[[ ]]`/arrays, and a portable test. Write them with the skill **`bs-kernel-code`** (skeleton, rules in chapter 12 of the code style guide) — this skill only covers registration.
 - `bash4` files keep `#!/usr/bin/env bash`, `bs::guard`, `module::function` names.
-- No manual dependency sourcing between modules unless the file is loaded alone: the whole core is loaded by `bootstrap/kernel.sh` (sourced by `bootstrap/init.sh`) in a fixed order: `prereq → lang → const → var → str → num → msg → logger → quiet → fmt → data → errorhandler → version → utils → config → deps → args` (then, in the full mode, the bridges `lib/compat/deps`, `lib/compat/lang` and `lib/compat/args`). Add a new module to the list in `kernel.sh`. A module may call only what is loaded before it; `bs_source_relative` for explicit dependencies, `command -v` for optional ones.
+- No manual dependency sourcing between modules unless the file is loaded alone: the whole core is loaded by `bootstrap/kernel.sh` (sourced by `bootstrap/init.sh`) in a fixed order: `prereq → lang → const → var → store → str → num → msg → logger → quiet → fmt → data → errorhandler → version → utils → config → deps → args` (then, in the full mode, the bridges `lib/compat/deps`, `lib/compat/lang` and `lib/compat/args`). Add a new AUTO-LOADED module to the list in `kernel.sh`. A module may call only what is loaded before it; `bs_source_relative` for explicit dependencies, `command -v` for optional ones.
+- **On-demand variant** (precedent: `core/object.sh`): a module loaded by the user via `load "core/…"` does NOT go into the `kernel.sh` auto-list, but still needs everything else: the `@depends` header (the loader scans it), the doctor file list, the portable test, the tier-count updates and the docs/CHANGELOG entries.
 - `core/prereq.sh` is the ONLY module allowed a manual self-guard, because `bs_guard` is defined there. Never copy that pattern elsewhere.
 - Strict mode is never set in core modules.
 
@@ -38,8 +39,8 @@ declare -g MYMODULE_VERSION="1.0.0"
 
 ## Registration checklist (all required for a NEW core module)
 
-1. Add the module to the load list in `bootstrap/init.sh` (`load "core/…"` lines), in the correct dependency position (after everything it calls).
-2. Add it to the required-files list (`req=(…)`) in `bs::cli::doctor_cmd` in `bootstrap/bs.sh`.
+1. Auto-loaded: add the module to `bs_kernel_load_modules` in `bootstrap/kernel.sh`, in the correct dependency position (after everything it calls). On-demand (`load "core/…"`): skip this step, keep the `@depends` header.
+2. Add the file to the required-files loop of `bs doctor` in `bootstrap/cli.sh` (the `for __bs_cli_df2 in bootstrap/init.sh … core/…` list). The doctor check COUNT is masked in `testbsnobashunit.sh`, so adding a file does not break it.
 3. Add a unit test `tests/unit/test<module>unit.sh` (see `bs-write-test`) and, for a `posix` file, `tests/unit/test<module>portableunit.sh` (`bs-kernel-code`, step 6); `testposixtierunit.sh` requires it.
 4. Run the full validation cycle (see `bs-validate`):
    ```bash

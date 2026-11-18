@@ -37,6 +37,17 @@ You are a skeptical code reviewer. Review `$module_path` and produce a **priorit
 - Dead code / unused locals / unused args; args not validated (`${1:?}`).
 - Missing `bs::guard`; wrong shebang; missing `# shellcheck shell=bash`; wrong namespace (`module::function`).
 
+## Kernel / posix-tier additions (audit 2026-11-18 + object.sh development — all hit for real)
+
+- Unquoted variable INSIDE a `case` pattern (`*" $2 "*`) → the value becomes a glob: `*`/`?` bypass validation (found in `core/args.sh`, `core/var.sh`). Quote the variable part: `*" "$2" "*`.
+- Pipeline status is the LAST command's: `grep … | sed -n 1p` returns 0 even when grep found nothing; without pipefail the "not found" contract silently breaks (`core/regex.sh` `bs_re_find`).
+- `awk 'while (match(s, pat)) …'` with an empty-match pattern (`x*`, RLENGTH=0) → infinite loop; advance one char on empty matches (`core/regex.sh` `bs_re_count`).
+- Digits-only validation does not make `$((08))` safe: leading zeros are a fatal octal error in dash/bash; strip them or use the `bs_num_*` layer (`core/str.sh`, `core/args.sh`, `core/data.sh`).
+- `$?` after `if cmd; then …; fi` WITHOUT else is 0, not cmd's status; capture in `else` (verified in dash and bash).
+- Scratch globals clobbered across USER-CODE callbacks: a method/init/setter/destroy/watcher may nest the same API and overwrite every `__bs_*` the caller reads afterwards (five races found in `core/object.sh`); state must be saved by depth and restored.
+- zsh does not word-split unquoted `$var` in `for x in $var` — a "posix" loop silently iterates once over the whole string (`bootstrap/cli.sh` `bs where`); iterate via `bs_arr_to_args` or manual `${var%% *}` splitting.
+- A failed `read` treated as valid input (`read … || k=""` then `"" → ENTER`) turns EOF/signals into phantom keypresses (`lib/tui/tui.sh`).
+
 ## Focus lens `$focus` (pick the relevant set)
 
 - `portability` — §11: GNU-only tools (`grep -P`, `sed -z/-i`, `stat -c`, `date +%N`, `readlink -f`, `find -printf`), missing probe chains, `uname` branching, hardcoded paths (/proc, /sys) without guards, locale dependence, bash 4.x vs 5.x features.
