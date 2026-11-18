@@ -11,11 +11,11 @@ BS is a modular Bash 4.2+ framework and standard library. It provides:
 - `bootstrap/bs.sh` — pre-kernel root namespace: dependency-free helpers available
   before the loader (shell detection `bs::shell::*`, `bs::script_dir`, PATH tweak);
   sourced by entry points, `bootstrap/init.sh` and the loader itself
-- `core/` — framework kernel: `args`, `logger`, `errorhandler`, `const`, `utils`, `version`, `config`, `deps`, `prereq`, `lang`, `object` (on demand) (predicates `is::*`; the other bash primitives are in `lib/compat/lang`)
+- `core/` — framework kernel: `args`, `logger`, `errorhandler`, `const`, `utils`, `version`, `config`, `deps`, `prereq`, `lang`, `object`, `cache` (on demand) (predicates `is::*`; the other bash primitives are in `lib/compat/lang`)
 - `lib/` — standard library: `io/streams`, `io/files`, `io/process`, `system/*`, `integration/*`, `ui/*`, etc.
 - `tests/` — custom test framework, ShellCheck validation, syntax validation
 
-**BS requires bash 4.2+**: all of `lib/` (87 modules) and the `bootstrap/bs.sh` commands that run it are Bash 4.2+ scripts. Only the 24 `@shell posix` files of `core/` (all of them), `bootstrap/loader.sh`, `base.sh`, `init.sh` (its POSIX mode), `install/*` with `install.sh` (the installer runs without bash), `boot.sh` and the prologue of the entry points are shell-independent; `bs` itself runs `help`, `version`, `env`, `list`, `calc`, `doctor`, `uninstall`, `where`, `update`, `init-shell`, `shebang` and `call` without bash (`bootstrap/cli.sh`); its other commands, `bootstrap/bs.sh` and `lib/` still need bash. No external dependencies are required at runtime.
+**BS requires bash 4.2+**: all of `lib/` (87 modules) and the `bootstrap/bs.sh` commands that run it are Bash 4.2+ scripts. Only the 25 `@shell posix` files of `core/` (all of them), `bootstrap/loader.sh`, `base.sh`, `init.sh` (its POSIX mode), `install/*` with `install.sh` (the installer runs without bash), `boot.sh` and the prologue of the entry points are shell-independent; `bs` itself runs `help`, `version`, `env`, `list`, `calc`, `doctor`, `uninstall`, `where`, `update`, `init-shell`, `shebang` and `call` without bash (`bootstrap/cli.sh`); its other commands, `bootstrap/bs.sh` and `lib/` still need bash. No external dependencies are required at runtime.
 
 ## How AI should work with this framework
 

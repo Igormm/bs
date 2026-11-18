@@ -107,7 +107,7 @@ bs_cli_maybe_exec_script() {
     '') ;;
     *)
       case "$1" in
-        help|-h|--help|version|env|list|clean|lang-doc|lsp|chat|sync|rfc|api|ts|audit|doctor|build|repl|calc|init-shell|shebang|call|update|uninstall|where) ;;
+        help|-h|--help|version|env|list|clean|lang-doc|lsp|chat|sync|rfc|api|ts|audit|doctor|build|repl|calc|cache|init-shell|shebang|call|update|uninstall|where) ;;
         *)
           if [ -f "$1" ]; then
             __bs_cli_es_script=$1
@@ -153,6 +153,7 @@ bs_cli_help() {
   bs_cli_help_row 'build <script>' 'Assemble a standalone self-extracting script / сборка'
   bs_cli_help_row 'repl' 'Interactive REPL (BS shell) / интерактивная консоль'
   bs_cli_help_row 'calc' 'RPN calculator / калькулятор ОПН'
+  bs_cli_help_row 'cache' 'Three-level transparent cache / трёхуровневый прозрачный кеш'
   bs_cli_help_row 'rfc [number]' 'RFC helpers (1925, 3986, 4122, 4180) / RFC'
   bs_cli_help_row 'api <sub> [args]' 'OpenAPI 3.x client / OpenAPI-клиент'
   bs_cli_help_row 'ts <command>' 'TypeScript toolchain / TS-тулчейн'
@@ -219,6 +220,7 @@ bs_cli_help_cmd() {
     build)          bs_cli_delegate build bs::cli::build_cmd --help ;;
     repl)           printf 'Usage: bs repl\n\nInteractive REPL (BS shell).\n' ;;
     calc)           printf 'Usage: bs calc [expression]\n\nRPN calculator on dc.\n' ;;
+    cache)          printf 'Usage: bs cache <stats|list|get|put|delete|prune|clear> [args]\n\nThree-level cache (L1 memory, L2 files, L3 sqlite/C/files) with a readable manifest.\n' ;;
     update|sync)    bs_cli_update_cmd --help ;;
     uninstall)      bs_cli_uninstall_cmd --help ;;
     where)          bs_cli_where_cmd --help ;;
@@ -759,7 +761,7 @@ bs_cli_doctor_cmd() {
   # повторная проверка не нужна.
 
   # Required core files / Обязательные файлы ядра
-  for __bs_cli_df2 in bootstrap/init.sh bootstrap/loader.sh bootstrap/base.sh bootstrap/cli.sh bootstrap/bs.sh bootstrap/shell.sh bootstrap/trampoline.sh core/prereq.sh core/lang.sh core/const.sh core/var.sh core/var-schema.sh core/store.sh core/regex.sh core/str.sh core/num.sh core/msg.sh core/logger.sh core/errorhandler.sh core/version.sh core/quiet.sh core/fmt.sh core/data.sh core/utils.sh core/config.sh core/deps.sh core/calc.sh core/args.sh core/args-completion.sh core/object.sh; do
+  for __bs_cli_df2 in bootstrap/init.sh bootstrap/loader.sh bootstrap/base.sh bootstrap/cli.sh bootstrap/bs.sh bootstrap/shell.sh bootstrap/trampoline.sh core/prereq.sh core/lang.sh core/const.sh core/var.sh core/var-schema.sh core/store.sh core/regex.sh core/str.sh core/num.sh core/msg.sh core/logger.sh core/errorhandler.sh core/version.sh core/quiet.sh core/fmt.sh core/data.sh core/utils.sh core/config.sh core/deps.sh core/calc.sh core/args.sh core/args-completion.sh core/object.sh core/cache.sh; do
     if [ -f "${BS_ROOT}/${__bs_cli_df2}" ]; then
       bs_log_success "$(printf '  %-8s | %-30s | %s' "OK" "${__bs_cli_df2}" "required core file")"
       __bs_cli_dpass=$((__bs_cli_dpass + 1))
