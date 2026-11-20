@@ -3,6 +3,7 @@ name: bs-variable-metadata
 description: Use when designing or implementing metadata for shell variables in BS — `# @var` annotations, pseudo-types, access/operation rules, validation, change hooks/logging, generated schema or audit — or when someone proposes rwx permissions, a protected variable store, or a preprocessor for shell variables.
 type: prompt
 whenToUse: Before writing `bs_var_*` metadata code, adding `@type`/`@ops` annotations, or reviewing a design that promises typed or access-controlled shell variables; also when a user asks for rwx/access control or pseudo-types on shell variables.
+tier: both
 ---
 
 # BS variable metadata / Метаданные shell-переменных

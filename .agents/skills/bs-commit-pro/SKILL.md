@@ -3,6 +3,7 @@ name: bs-commit-pro
 description: Professional commit engineering - atomic intent, staging discipline, bisect/revert safety, message anatomy, series ordering; the repo's dense "subject; clarifiers" convention
 type: prompt
 whenToUse: When preparing, splitting or reviewing git commits for real: multi-file changes, mixed work trees, commit series, or when a commit must survive blame/bisect/revert months later; goes beyond bs-commit-style (format) - this skill is about the engineering of history
+tier: meta
 arguments: []
 ---
 

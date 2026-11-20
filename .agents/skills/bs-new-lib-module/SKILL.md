@@ -3,6 +3,7 @@ name: bs-new-lib-module
 description: Scaffold a new BS framework library module under lib/ with guard, dependencies, metadata, and a matching unit test
 type: prompt
 whenToUse: When the user asks to create a new lib/ module, add a new feature module to the standard library, or extend an existing lib module with new public functions
+tier: bash4
 arguments:
   - module_path
 ---

@@ -3,6 +3,7 @@ name: bs-pre-kernel-namespace
 description: Write or modify functions in bootstrap/bs.sh — the dependency-free pre-kernel root namespace (bs::shell::*, bs::script_dir, PATH tweak) that must be usable BEFORE the loader
 type: prompt
 whenToUse: When adding/editing functions that run before bootstrap/loader.sh loads (entry-point gates, shell detection, early helpers), or when moving a helper out of core/ into the pre-kernel namespace
+tier: pre-kernel
 ---
 
 Since the split, the POSIX half of the pre-kernel (`bs_strict`, `bs_append_local_bin_to_path`, `bs_shell_name/host/version/ok/ensure_version`) lives in `bootstrap/base.sh` (`@shell posix`, real names `bs_*`, the `bs::…` names are aliases) and only what reads the call stack, `BASH_REMATCH` or `BASH_SOURCE` stays in `bootstrap/bs.sh` (bash). Put new dependency-free helpers into `base.sh` unless they need bash.

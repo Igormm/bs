@@ -3,6 +3,7 @@ name: bs-check-docs-code
 description: Verify that bash code snippets in README.md, documentation/ and examples/*.md are consistent with framework reality — conventions (no redundant set -euo pipefail in bs scripts), existing load paths, real module APIs, and the actual example files they reference
 type: prompt
 whenToUse: After editing README/docs code snippets, after adding or renaming example scripts or module functions, before committing doc changes, or when the user asks to check docs-code drift
+tier: meta
 arguments:
   - scope
 ---

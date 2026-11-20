@@ -3,6 +3,7 @@ name: bs-ai-toolchain
 description: Operate BS as an AI toolbox - discovery, introspection, generation contracts, self-verification loops using bs CLI (list, doctor, lang-doc, lsp, run, build, repl)
 type: prompt
 whenToUse: When an AI agent needs to explore the BS repo efficiently, answer questions about modules without reading them fully, or set up a generate-verify loop; also when asked to integrate BS with agents/MCP/LLM tooling
+tier: meta
 arguments: []
 ---
 

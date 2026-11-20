@@ -3,12 +3,38 @@ name: bs-review-module
 description: Review a BS module as a skeptical critic — find doubts (bugs, traps, violations) without fixing anything; output a prioritized doubt list
 type: prompt
 whenToUse: When the user asks to review a module, find bugs, run a parallel critic pass, or collect doubts across the framework
+tier: both
 arguments:
   - module_path
   - focus
 ---
 
 You are a skeptical code reviewer. Review `$module_path` and produce a **prioritized list of doubts**. You MUST NOT fix anything, only report. Doubt = a concrete suspicion with a reason, not a general remark.
+
+## 0. FIRST: resolve the file's tier — the settings differ
+
+Do NOT apply one checklist to both tiers: posix and bash4 have **opposite**
+settings, and most false positives come from conflating them. Read the first
+60 lines for `# @shell posix|bash4` (or: `core/`, `bootstrap/`, `install/`,
+`boot.sh`, `bs` → posix; `lib/` and `bootstrap/bs.sh` → bash4), then check the
+file against the MATCHING column and use the MATCHING checklist only.
+
+| Setting | `@shell posix` (core/, bootstrap/) | `@shell bash4` (lib/, bootstrap/bs.sh) |
+| --- | --- | --- |
+| Shebang + line 2 | `#!/bin/sh`, `# shellcheck shell=sh` | `#!/usr/bin/env bs`, `# shellcheck shell=bash` |
+| Tier label | `# @shell posix — причина` in the first 14 lines | `# @shell bash4 — причина` |
+| Namespace | real names `bs_*`; `::` only via `bs_shell_alias` at the bottom | `module::function()`; private `module::__helper`/`_module_helper` |
+| `local` / `[[ ]]` / arrays | **forbidden** (scratch globals `__bs_*` instead) | allowed (`local -r`, `[[ ]]`, assoc arrays) |
+| Source guard | `bs_guard MODULE \|\| return 0` | `bs::guard "MODULE" \|\| return 0` |
+| Strict mode | never in modules (entry points only, now `strict::enable`) | never in modules (entry points only) |
+| Logging / errors | `bs_log_*`; before the logger `printf '%s\n' "…" >&2` | `log::*`; `error::throw`; `utils::quiet` |
+| Strings / collections | `bs_str_*`, `bs_arr_*`/`bs_map_*` (core/data.sh) | `str::*`, `arr::*`/`map::*` (real bash arrays) |
+| Codes | `0/1/2` + `LIB_ERROR_*` `${E_ERROR:-1}` form | `0/1/2` + `LIB_ERROR_*` |
+
+zsh runs the posix tier: no word splitting of `$var` (`for w in $var`), `readonly`
+inside `load` becomes function-local (use `bs_shell_readonly`), an EXIT trap set
+inside a function fires on its return (`zshexit`), `${#s}` counts bytes in dash/mksh.
+A doubt that depends on the WRONG tier is not a doubt — do not report it.
 
 ## Required context to read first (before the module)
 

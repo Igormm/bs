@@ -3,6 +3,7 @@ name: bs-write-test
 description: Write a BS framework unit or integration test using the custom testframework.sh asserts and auto-discovery conventions
 type: prompt
 whenToUse: When the user asks to add tests, write a unit test for a module, or fix/extend existing tests in tests/
+tier: both
 arguments:
   - target_module
 ---

@@ -3,6 +3,7 @@ name: bs-object-class
 description: Develop a class on the BS object model (core/object.sh) — fields, methods, properties, contracts, inheritance, delegation, lifetime — with the naming rules and a matching test
 type: prompt
 whenToUse: When asked to create a class or objects in BS, model stateful entities (sessions, connections, tasks, widgets), or extend code that uses object::* / bs_obj_*
+tier: both
 arguments:
   - class_name
 ---

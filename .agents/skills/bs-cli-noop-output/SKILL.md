@@ -3,6 +3,7 @@ name: bs-cli-noop-output
 description: Design "nothing to do / no changes" output for BS CLI commands (bs update, uninstall, doctor, sync, any new command) as a framed bilingual notice «... НЕТ / NO ...» with per-item reasons and next-step hints — never a raw WARN/ERROR + "see messages above"; detect no-op states by content comparison before redoing work; pad frames by characters, not bytes (printf %-*s measures bytes and breaks Cyrillic borders); exit 0 for no-ops, exit 1 only for real failures
 type: prompt
 whenToUse: When implementing or fixing the output of a BS CLI command whose run can legitimately end in "nothing was done" (all targets skipped, nothing to update, nothing to delete, no changes to apply) — or when a user reports that a command's empty-result output is confusing (raw ERROR line, "see messages above", frame borders misaligned with Cyrillic)
+tier: both
 ---
 
 # Стиль вывода «ничего не сделано» / BS CLI "nothing to do" output style

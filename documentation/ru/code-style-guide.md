@@ -43,6 +43,14 @@ IFS=$'\n\t'
 - Скрипты `#!/usr/bin/env bs` получают строгий режим от интерпретатора:
   `bs run` включает `set -euo pipefail` **до** source вашего скрипта —
   строка не нужна (см. [getting-started](../01-getting-started/README.md)).
+- Вместо рукописного `set -euo pipefail` точка входа под bs может вызвать
+  `strict::enable` (`core/strict.sh`, грузится ядром автоматически): одной
+  строкой — флаги по возможностям оболочки (pipefail там, где он есть),
+  безопасный IFS, EXIT-ловушка со стеком очистки (`bs_cleanup_add`),
+  ERR-ловушка с трассировкой (где оболочка умеет ERR), коды 130/143/129 на
+  INT/TERM/HUP и трассировка по `BS_DEBUG=1`. Честные различия оболочек
+  показывает `strict::status`. Примеры: `example_core/*.sh`. Только точки
+  входа, никогда модулы.
 - Обычные точки входа `#!/usr/bin/env bash` (`bs`, `boot.sh`, тестовые
   раннеры) ставят его сами — через pre-kernel `bs::strict()`
   ([bootstrap/bs.sh](../../bootstrap/bs.sh)), через `utils::strict()`

@@ -3,6 +3,7 @@ name: bs-scenario-audit
 description: Scenario-driven logic audit of BS library functions and CLI commands - write a six-part scenario card per function (user, main, alternative, parameters, half-scenario, parameter groups), compare actual with expected in a sandbox, report and fix logic errors that ShellCheck and unit tests do not see. Use when sweeping the project or a module for logic errors, checking scenarios, parameters and failure paths of library functions, or before a release
 type: prompt
 whenToUse: When the user asks to sweep the project or a module for logic or business-logic errors in library functions, to check scenarios, parameters and failure paths, or to prepare code for a release; not for style or syntax (use bs-validate, bs-review-module)
+tier: both
 arguments:
   - scope
 ---

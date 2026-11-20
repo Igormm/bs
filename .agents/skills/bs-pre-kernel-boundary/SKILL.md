@@ -3,6 +3,7 @@ name: bs-pre-kernel-boundary
 description: Check the pre-kernel boundary — code running before the loader (bootstrap/bs.sh, entry-point headers, init.sh pre-loader section) must NOT use core/lib abstractions; after load they are required
 type: prompt
 whenToUse: After any change to bootstrap/bs.sh, boot.sh, bs, bootstrap/init.sh, bootstrap/loader.sh, or when reviewing whether pre-load code depends on the kernel
+tier: pre-kernel
 ---
 
 ## The rule

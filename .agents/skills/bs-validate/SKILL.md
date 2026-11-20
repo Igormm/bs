@@ -3,6 +3,7 @@ name: bs-validate
 description: Run the full BS framework validation cycle (syntax, ShellCheck, all tests) and the version check, and interpret the results after any code change
 type: prompt
 whenToUse: After any change to project code, before committing, or when the user asks to check/verify/validate the project — including checking that the version was bumped with the change
+tier: meta
 ---
 
 Run the three mandatory validators from the project root, in this order (AGENTS.md requires all three after ANY change):

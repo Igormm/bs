@@ -3,6 +3,7 @@ name: bs-version-bump
 description: Bump and verify the BS framework version — the single source core/version.sh, the CHANGELOG release heading, en/ru documentation examples and the hardcoded no-bash test output. Use when cutting a release, when the user asks to update/bump/check the version, or when a version string may be stale.
 type: prompt
 whenToUse: Before a release, when the user asks to bump or verify the framework version, or after changing BS_VERSION
+tier: meta
 arguments:
   - version
 ---

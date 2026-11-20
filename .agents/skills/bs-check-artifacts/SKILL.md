@@ -3,6 +3,7 @@ name: bs-check-artifacts
 description: Check the repo for traces of unfinished AI generation (placeholders, style violations, template boilerplate) and for leakage of the user's request text into code/docs — verbatim request phrases must never appear in documentation or comments
 type: prompt
 whenToUse: Before committing generated code, after running parallel agents, when reviewing new/changed files, or when the user asks to check for AI artifacts or prompt leakage
+tier: meta
 arguments:
   - scope
 ---

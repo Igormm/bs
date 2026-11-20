@@ -3,6 +3,7 @@ name: bs-shell-portability
 description: Keep BS usable from most shells (bash, zsh, ash/dash, ksh, fish, nushell) — the host/user shell model, the @shell tier annotation with a description, the POSIX layer (bootstrap/shell.sh, bootstrap/trampoline.sh), the shell registry (rc file, PATH line, reload command), the tier scanner and the shell probe
 type: prompt
 whenToUse: When writing or changing anything that touches the shell — an installer step, a PATH/rc edit, a hint such as "source ~/.bashrc", shell detection, an entry point, bootstrap/ code, completion — or a new lib/ module and you must decide (and declare) which shells can run it; also before claiming "this works in zsh/dash/nu"
+tier: doctrine
 ---
 
 # Переносимость между оболочками / Shell portability

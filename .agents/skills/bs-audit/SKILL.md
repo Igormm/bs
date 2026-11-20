@@ -3,6 +3,7 @@ name: bs-audit
 description: Full project audit of the BS framework — run the validation cycle (syntax, ShellCheck, tests), docs-code snippet check, AI-artifact scan, en/ru docs sync, and a skeptical module review, then produce a triaged verdict. Use before releases, after big merges, or when the user asks for a full audit
 type: prompt
 whenToUse: Before a release, after a large merge, when the user asks for a full audit of the project, or periodically to verify framework health
+tier: meta
 arguments:
   - modules
 ---

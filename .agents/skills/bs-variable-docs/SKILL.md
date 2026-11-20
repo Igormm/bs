@@ -3,6 +3,7 @@ name: bs-variable-docs
 description: Check that module-level variables (declare -g, readonly, export, : "${VAR:=...}") in documented categories carry a bilingual # @global doc snippet naming their category — so a reader can see what type of variable it is
 type: prompt
 whenToUse: After adding/renaming a module-level variable, when reviewing whether globals are documented, or when enforcing code-style-guide §4.2
+tier: both
 ---
 
 The format is defined in `documentation/en|ru/code-style-guide.md` §4.2:

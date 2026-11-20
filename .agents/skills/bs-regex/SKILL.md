@@ -3,6 +3,7 @@ name: bs-regex
 description: Use when working with regular expressions in BS — choosing between core/regex.sh (POSIX ERE, bs_re_*) and lib/data/regex.sh (bash4/PCRE, regex::*), writing portable ERE, or handling GNU vs busybox vs BSD dialect differences and fallbacks.
 type: prompt
 whenToUse: Before writing a grep/sed/awk regex in a core or lib module, when porting a regex to busybox/ash, or when picking an engine (ERE vs PCRE) for a validation/extract/replace task.
+tier: both
 ---
 
 # BS regex — два яруса, один диалект / two tiers, one dialect model

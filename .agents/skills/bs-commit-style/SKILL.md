@@ -3,6 +3,7 @@ name: bs-commit-style
 description: Create git commits for the BS framework following its Conventional Commits style, scopes, and history-safety rules
 type: prompt
 whenToUse: When the user asks to commit changes, write a commit message, or prepare a commit for the project
+tier: meta
 ---
 
 Create a commit following this repository's conventions. IMPORTANT: never run `git commit`/`git push` without the user's explicit request — this skill only applies once they asked.

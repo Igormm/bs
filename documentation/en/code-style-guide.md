@@ -41,6 +41,14 @@ IFS=$'\n\t'
 - `#!/usr/bin/env bs` scripts get strict mode from the interpreter: `bs run`
   enables `set -euo pipefail` **before** the script is sourced — no strict
   line needed (see [getting-started](../01-getting-started/README.md)).
+- Instead of a hand-written `set -euo pipefail`, an entry point under bs may
+  call `strict::enable` (`core/strict.sh`, auto-loaded by the kernel): one
+  line gives the flags per the shell's abilities (pipefail where it exists),
+  a safe IFS, an EXIT trap with the cleanup stack (`bs_cleanup_add`), an ERR
+  trap with a backtrace (where the shell has ERR), codes 130/143/129 on
+  INT/TERM/HUP, and tracing on `BS_DEBUG=1`. `strict::status` reports the
+  honest per-shell differences. Examples: `example_core/*.sh`. Entry points
+  only, never modules.
 - Plain `#!/usr/bin/env bash` entry points (`bs`, `boot.sh`, test runners)
   set it themselves — via the pre-kernel `bs::strict()`
   ([bootstrap/bs.sh](../../bootstrap/bs.sh)), via `utils::strict()`

@@ -3,6 +3,7 @@ name: bs-docs-sync
 description: Keep the bilingual documentation (documentation/en and documentation/ru) and in-code comments in sync when changing documented behavior
 type: prompt
 whenToUse: When the user asks to update documentation, when a change alters documented behavior or public API, or when adding features that need docs in both languages
+tier: meta
 ---
 
 The project documentation is fully bilingual: `documentation/en/` and `documentation/ru/` mirror each other (guides `01-getting-started` … `09-migration`, plus `code-style-guide.md` and `best-practices.md`). Both versions MUST be updated together — never change only one language.

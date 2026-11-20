@@ -12,41 +12,21 @@ Central place for everything AI-facing in the repo (replaces the old `ai/` direc
 └── guides/     human-facing guides: MCP, using BS with AI, toolchain, TS dev
 ```
 
-## skills/ — reusable workflows (28)
+## skills/ — reusable workflows by tier
 
-| Skill | Purpose |
+Полный каталог с определением tier и группировкой — **[skills/README.md](skills/README.md)**.
+Каждый bs-скилл несёт поле `tier:` во frontmatter; плоская раскладка каталогов
+сохраняется для обнаружения скиллов. Полный каталог — в skills/README.md.
+
+| Tier | Скиллы |
 |---|---|
-| `bs-new-lib-module` | scaffold a new `lib/` module |
-| `bs-new-core-module` | add a `core/` module + registration |
-| `bs-object-class` | develop a class on `core/object.sh` (style guide ch. 13) |
-| `bs-write-test` | unit/integration test skeleton + assert API |
-| `bs-validate` | mandatory validation cycle |
-| `bs-version-bump` | bump/check the framework version: single source, CHANGELOG, en/ru docs, no-bash test |
-| `bs-docs-sync` | keep en/ru documentation in sync |
-| `bs-commit-style` | commit message conventions + history safety |
-| `bs-commit-pro` | professional commit engineering (atomic intent, staging) |
-| `bs-review-module` | skeptical critic pass (bash pitfalls, §11 lens) |
-| `bs-audit` | full project audit chain: validation, docs snippets, artifacts, en/ru sync, module review |
-| `bs-check-docs-code` | code snippets in docs vs framework reality |
-| `bs-check-ansi` | ANSI escape usage across the project |
-| `bs-cli-flags-style` | flags/values structure of CLI scripts on top of `core/args` (RU) |
-| `bs-cli-noop-output` | framed bilingual «nothing to do» output for CLI commands |
-| `bs-debug-logging` | debugging interactive scripts, never-without-a-log guarantee (RU) |
-| `bs-pre-kernel-namespace` | functions in `bootstrap/bs.sh` usable before the loader |
-| `bs-pre-kernel-boundary` | pre-loader code must not use core/lib abstractions |
-| `bs-variable-docs` | bilingual `# @global` snippets for module-level variables |
-| `bs-scenario-audit` | scenario-driven logic audit: six-part scenario card, actual vs expected, function inventory by risk |
-| `doc-coauthoring` | co-authoring docs in three stages: context, section-by-section refinement, reader testing (imported from anthropics/skills) |
-| `bash-defensive-patterns` | defensive Bash patterns (imported from wshobson/agents, MIT): strict mode, quoting, traps, temp files, idempotency |
-| `bs-code-review-security` | security-first review: injection, quoting, paths, temp files, privilege, `@shell` tier, tests, P0–P3 report (adapted from DataDog/rshell, Apache-2.0) |
-| `bs-shell-portability` | shell-independence of BS: host/user/script shell, `@shell` tiers, trampoline, `tier_scan.sh`, `probe_shells.sh` |
-| `bs-shell-abstraction` | the shell dependency is set by the `@shell` tier; `find_leaks.sh`, `check_posix_tier.sh` (bash does not take part in `posix`) |
-| `bs-docs-shell-claims` | fix documentation that says the whole kernel needs bash 4 when only the `bash4` tier does |
-| `bs-kernel-code` | write/convert kernel code in the `bs_` namespace (`@shell posix`): names + aliases, skeleton, portable test, differential run vs the old implementation; rules in code-style-guide ch. 12 |
-| `bs-check-artifacts` | AI-generation traces + request-text leakage scan |
-| `bs-cli-markdown-style` | markdown-simplicity principle for CLI/output/docs (RU) |
-| `bs-device-module` | Linux device/hardware modules (evdev/sysfs) |
-| `bs-ai-toolchain` | operate BS as an AI toolbox |
+| `posix` (ядро) | `bs-kernel-code`, `bs-new-core-module`, `bs-posix-output` |
+| `bash4` (lib/) | `bs-new-lib-module`, `bs-device-module`, `bs-debug-logging` |
+| pre-kernel | `bs-pre-kernel-namespace`, `bs-pre-kernel-boundary` |
+| doctrine (о ярусах) | `bs-shell-portability`, `bs-shell-abstraction`, `bs-docs-shell-claims` |
+| both | `bs-object-class`, `bs-regex`, `bs-write-test`, `bs-review-module`, `bs-variable-docs`, `bs-variable-metadata`, `bs-check-ansi`, `bs-code-review-security`, `bs-cli-style`, `bs-cli-flags-style`, `bs-cli-noop-output`, `bs-cli-markdown-style`, `bs-scenario-audit` |
+| meta (процесс) | `bs-validate`, `bs-version-bump`, `bs-docs-sync`, `bs-commit-style`, `bs-commit-pro`, `bs-audit`, `bs-check-docs-code`, `bs-check-artifacts`, `bs-ai-toolchain`, `bs-code-design` |
+| импортированные (verbatim) | `posix-shell` (posix), `bash-defensive-patterns` (bash4), `shell` (both), методические и инженерные скиллы (meta) — классификация в skills/README.md, файлы не редактируются |
 
 ## prompts/ — role prompts
 

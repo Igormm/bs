@@ -11,11 +11,11 @@ BS is a modular Bash 4.2+ framework and standard library. It provides:
 - `bootstrap/bs.sh` — pre-kernel root namespace: dependency-free helpers available
   before the loader (shell detection `bs::shell::*`, `bs::script_dir`, PATH tweak);
   sourced by entry points, `bootstrap/init.sh` and the loader itself
-- `core/` — framework kernel: `args`, `logger`, `errorhandler`, `const`, `utils`, `version`, `config`, `deps`, `prereq`, `lang`, `object`, `cache` (on demand) (predicates `is::*`; the other bash primitives are in `lib/compat/lang`)
+- `core/` — framework kernel: `args`, `logger`, `errorhandler`, `const`, `utils`, `version`, `config`, `deps`, `prereq`, `lang`, `object`, `cache`, `strict` (on demand) (predicates `is::*`; the other bash primitives are in `lib/compat/lang`)
 - `lib/` — standard library: `io/streams`, `io/files`, `io/process`, `system/*`, `integration/*`, `ui/*`, etc.
 - `tests/` — custom test framework, ShellCheck validation, syntax validation
 
-**BS requires bash 4.2+**: all of `lib/` (87 modules) and the `bootstrap/bs.sh` commands that run it are Bash 4.2+ scripts. Only the 25 `@shell posix` files of `core/` (all of them), `bootstrap/loader.sh`, `base.sh`, `init.sh` (its POSIX mode), `install/*` with `install.sh` (the installer runs without bash), `boot.sh` and the prologue of the entry points are shell-independent; `bs` itself runs `help`, `version`, `env`, `list`, `calc`, `doctor`, `uninstall`, `where`, `update`, `init-shell`, `shebang` and `call` without bash (`bootstrap/cli.sh`); its other commands, `bootstrap/bs.sh` and `lib/` still need bash. No external dependencies are required at runtime.
+**BS requires bash 4.2+**: all of `lib/` (87 modules) and the `bootstrap/bs.sh` commands that run it are Bash 4.2+ scripts. Only the 26 `@shell posix` files of `core/` (all of them), `bootstrap/loader.sh`, `base.sh`, `init.sh` (its POSIX mode), `install/*` with `install.sh` (the installer runs without bash), `boot.sh` and the prologue of the entry points are shell-independent; `bs` itself runs `help`, `version`, `env`, `list`, `calc`, `doctor`, `uninstall`, `where`, `update`, `init-shell`, `shebang` and `call` without bash (`bootstrap/cli.sh`); its other commands, `bootstrap/bs.sh` and `lib/` still need bash. No external dependencies are required at runtime.
 
 ## How AI should work with this framework
 
@@ -62,7 +62,7 @@ group::module::function() {
 - Use `bs::guard` for idempotency; never hand-roll `[[ -n "${__X_SOURCED:-}" ]] && return 0`.
 - Use `bs::source_relative` for relative dependency sourcing.
 - Use `utils::has`, `utils::quiet`, `utils::quiet_err`, `utils::ignore` instead of raw redirects.
-- Strict mode (`set -euo pipefail`) is set only in entry points, never in library modules.
+- Strict mode (`set -euo pipefail`) is set only in entry points, never in library modules; entry points under bs may use `strict::enable` (`core/strict.sh`) instead of the raw line.
 - **Kernel code** (`bootstrap/`, `core/`, `install/`, entry points) is written in the one `bs_` namespace as `@shell posix` code (real names `bs_module_name`, `module::name` kept as bash/zsh aliases): the rules are chapter 12 of `code-style-guide.md`, the procedure is the skill `bs-kernel-code`. The `module::function` / `local` / `[[ ]]` conventions above are for `lib/`, `bootstrap/bs.sh` and the bridges `lib/compat/*`: no `core/` file is `bash4` any more.
 
 ## Testing
@@ -94,38 +94,58 @@ For focused development tasks, use the dedicated prompt files:
 
 Reusable workflow skills live in `.agents/skills/` (Kimi Code / agents-compatible format):
 
-- `bs-new-lib-module` — scaffold a new `lib/` module (skeleton, guard, `@depends`, metadata).
+Skills are grouped by the project's **tier** (`@shell posix|bash4`; the doctrine: `documentation/{en,ru}/02-core-concepts/architecture.md`, `08-development/shell-portability.md`, code-style-guide ch. 12). Each skill carries a `tier:` frontmatter field; the full catalog is `.agents/skills/README.md`. The flat directory layout is intentional (skill discovery).
+
+**Tier posix — the kernel** (`core/`, the `bootstrap/` layer; bash, zsh, dash, ash, ksh93, mksh):
+
+- `bs-kernel-code` — write or convert a kernel function/module into the one `bs_` namespace as `@shell posix` code: names and `::` aliases, skeleton, six-shell validation, portable test, differential run against the old implementation (`scripts/diff_old_new.sh`, `scripts/fuzz_arr_vs_native.sh`), docs/tier lists/CHANGELOG; rules in code-style-guide chapter 12.
 - `bs-new-core-module` — add a `core/` module and register it in `bootstrap/kernel.sh` (or on-demand via `load`) + `bs doctor`.
-- `bs-object-class` — develop a class on the object model `core/object.sh` (fields, methods, properties, contracts, inheritance, delegation, lifetime; code-style-guide chapter 13).
-- `bs-regex` — work with regular expressions across the two tiers: `core/regex.sh` (`bs_re_*`, POSIX ERE) vs `lib/data/regex.sh` (`regex::*`, ERE+PCRE); dialect portability (GNU vs busybox vs BSD) and engine fallbacks.
+- `bs-posix-output` — I/O of the posix tier: returning values (§12.8), diagnostics (§12.9), user-facing output on `bs_log_*` (framed sections, RU first, tty colour), input parsing and the per-shell output traps (zsh splitting, byte widths, printf padding).
+
+**Tier bash4 — `lib/`** (bash 4.2+ only):
+
+- `bs-new-lib-module` — scaffold a new `lib/` module (skeleton, guard, `@depends`, metadata).
+- `bs-device-module` — write Linux device/hardware modules (evdev/sysfs, binary decoding, test hooks, graceful degradation).
+- `bs-debug-logging` — debug interactive BS scripts (wizards, TUI) and guarantee that a script cannot end without a log: the `lib/ui/steplog` component, debugging techniques (RU).
+
+**Pre-kernel — before the loader** (`bootstrap/base.sh` posix, `bootstrap/bs.sh` bash, entry-point prologues):
+
 - `bs-pre-kernel-namespace` — write/edit functions in `bootstrap/bs.sh` (dependency-free helpers usable before the loader).
 - `bs-pre-kernel-boundary` — check that pre-load code uses no core/lib abstractions; after load they are required.
+
+**Tier doctrine — about the tiers themselves**:
+
+- `bs-shell-portability` — shell-independence of BS: host/user/script shell, `@shell posix|bash4` tiers, POSIX layer (`bootstrap/shell.sh`, trampoline), `tier_scan.sh` and `probe_shells.sh`.
+- `bs-shell-abstraction` — the shell dependency is set once, by the `@shell posix|bash4` tier of a file: no `BASH_SOURCE`/`ZSH_*`/`$SHELL` checks outside the abstraction layer (`bs::is_main`, `bs::script_dir`, `bs::shell::*`), commands as `bs::cli::*`, no bash version checks in modules; `scripts/find_leaks.sh`, `scripts/check_posix_tier.sh` (bash does not take part in the `posix` tier).
+- `bs-docs-shell-claims` — find and fix documentation that says the whole kernel needs bash 4 when only the `bash4` tier does; every shell/version/tier claim must match the code and a real run.
+
+**Both tiers**:
+
+- `bs-object-class` — develop a class on the object model `core/object.sh` (fields, methods, properties, contracts, inheritance, delegation, lifetime; code-style-guide chapter 13).
+- `bs-regex` — work with regular expressions across the two tiers: `core/regex.sh` (`bs_re_*`, POSIX ERE) vs `lib/data/regex.sh` (`regex::*`, ERE+PCRE); dialect portability (GNU vs busybox vs BSD) and engine fallbacks.
+- `bs-write-test` — unit/integration test skeleton and `testframework.sh` assert API.
+- `bs-review-module` — skeptical critic pass over a module (bash-pitfalls checklist, kernel/posix additions, §11 lens, prioritized doubt report).
 - `bs-variable-docs` — check that module-level variables carry a bilingual `# @global` snippet naming their category (code-style-guide §4.2).
 - `bs-variable-metadata` — design/implement metadata-only contracts for shell variables: `# @var` annotations, pseudo-types, `@ops` access rules, validation, change hooks/logging, generated schema and audit; keeps enforcement honest (`$var` cannot be intercepted) and defers real access control to a separate `bs_store` layer.
-- `bs-write-test` — unit/integration test skeleton and `testframework.sh` assert API.
+- `bs-check-ansi` — verify ANSI escape usage across the project: no literal `\033` in `printf %s` arguments, correct `$'\033'` quoting, no fragile `echo -e`.
+- `bs-cli-style` — style the CLI output and code comments for humans: framed headers (not `==`/`# ====`), highlight the main point, bilingual, tty-aware colour, alternative-action handling and actionable hints.
+- `bs-cli-flags-style` — design the flags/values structure and code style of BS CLI scripts in the docker/podman/go conventions on top of `core/args` (RU).
+- `bs-cli-noop-output` — «nothing to do» output for BS CLI commands: framed bilingual «…НЕТ / NO …» box with per-item reasons and next-step hints instead of raw WARN/ERROR; up-to-date detection before redoing work; character-based frame padding (printf %-*s pads by bytes and breaks Cyrillic borders); exit 0 for no-ops, exit 1 for real failures.
+- `bs-cli-markdown-style` — apply the «markdown simplicity» principle to CLI/interface/output/docs design (7-criteria test, Russian).
+- `bs-scenario-audit` — scenario-driven logic audit of library functions and CLI commands: a six-part scenario card per function (user, main, alternative, parameters, half-scenario, parameter groups), actual-vs-expected runs in a sandbox, a read-only inventory of public functions by risk and test coverage (`scripts/inventory.sh`), classes of logic errors found in this project.
+
+**Meta — process, tier-independent**:
+
 - `bs-validate` — the mandatory validation cycle after any change.
 - `bs-version-bump` — bump and check the framework version: single source `core/version.sh`, CHANGELOG heading, en/ru docs, hardcoded no-bash test output.
 - `bs-docs-sync` — keep `documentation/en/` and `documentation/ru/` in sync.
 - `bs-commit-style` — commit message conventions and history-safety rules.
 - `bs-commit-pro` — professional commit engineering (atomic intent, staging discipline, bisect/revert safety, series ordering).
-- `bs-review-module` — skeptical critic pass over a module (bash-pitfalls checklist, §11 lens, prioritized doubt report).
-- `bs-check-artifacts` — scan for traces of unfinished AI generation and leakage of request/prompt text into code and docs.
-- `bs-cli-markdown-style` — apply the «markdown simplicity» principle to CLI/interface/output/docs design (7-criteria test, Russian).
-- `bs-cli-style` — style the CLI output and code comments for humans: framed headers (not `==`/`# ====`), highlight the main point, bilingual, tty-aware colour, alternative-action handling and actionable hints.
-- `bs-code-design` — the BS-adapted code-design chain (brainstorm → map → plan → TDD → verify → review → commit) over the imported methodology skills, with the tier/namespace rules, the validation cycle and the honesty principles (verify before abstracting; no lowest-common-denominator abstractions).
 - `bs-audit` — full project audit as a chain of stages: validation cycle, docs-code snippets, AI-artifact scan, en/ru docs sync, skeptical module review, triaged verdict (report first, fix only on request).
 - `bs-check-docs-code` — verify that bash snippets in README, `documentation/` and `examples/*.md` match framework reality (conventions, `load` paths, real module APIs, matching example files); backs `tests/validatedocscode.sh`.
-- `bs-check-ansi` — verify ANSI escape usage across the project: no literal `\033` in `printf %s` arguments, correct `$'\033'` quoting, no fragile `echo -e`.
-- `bs-cli-flags-style` — design the flags/values structure and code style of BS CLI scripts in the docker/podman/go conventions on top of `core/args` (RU).
-- `bs-debug-logging` — debug interactive BS scripts (wizards, TUI) and guarantee that a script cannot end without a log: the `lib/ui/steplog` component, debugging techniques (RU).
-- `bs-scenario-audit` — scenario-driven logic audit of library functions and CLI commands: a six-part scenario card per function (user, main, alternative, parameters, half-scenario, parameter groups), actual-vs-expected runs in a sandbox, a read-only inventory of public functions by risk and test coverage (`scripts/inventory.sh`), classes of logic errors found in this project.
-- `bs-cli-noop-output` — «nothing to do» output for BS CLI commands: framed bilingual «…НЕТ / NO …» box with per-item reasons and next-step hints instead of raw WARN/ERROR; up-to-date detection before redoing work; character-based frame padding (printf %-*s pads by bytes and breaks Cyrillic borders); exit 0 for no-ops, exit 1 for real failures.
-- `bs-device-module` — write Linux device/hardware modules (evdev/sysfs, binary decoding, test hooks, graceful degradation).
+- `bs-check-artifacts` — scan for traces of unfinished AI generation and leakage of request/prompt text into code and docs.
 - `bs-ai-toolchain` — operate BS as an AI toolbox (discovery ladder, verification loops, generation contracts).
-- `bs-shell-portability` — shell-independence of BS: host/user/script shell, `@shell posix|bash4` tiers, POSIX layer (`bootstrap/shell.sh`, trampoline), `tier_scan.sh` and `probe_shells.sh`.
-- `bs-shell-abstraction` — the shell dependency is set once, by the `@shell posix|bash4` tier of a file: no `BASH_SOURCE`/`ZSH_*`/`$SHELL` checks outside the abstraction layer (`bs::is_main`, `bs::script_dir`, `bs::shell::*`), commands as `bs::cli::*`, no bash version checks in modules; `scripts/find_leaks.sh`, `scripts/check_posix_tier.sh` (bash does not take part in the `posix` tier).
-- `bs-docs-shell-claims` — find and fix documentation that says the whole kernel needs bash 4 when only the `bash4` tier does; every shell/version/tier claim must match the code and a real run.
-- `bs-kernel-code` — write or convert a kernel function/module into the one `bs_` namespace as `@shell posix` code: names and `::` aliases, skeleton, six-shell validation, portable test, differential run against the old implementation (`scripts/diff_old_new.sh`, `scripts/fuzz_arr_vs_native.sh`), docs/tier lists/CHANGELOG; rules in code-style-guide chapter 12.
+- `bs-code-design` — the BS-adapted code-design chain (brainstorm → map → plan → TDD → verify → review → commit) over the imported methodology skills, with the tier/namespace rules, the validation cycle and the honesty principles (verify before abstracting; no lowest-common-denominator abstractions).
 
 ### Imported shell-safety skills (external)
 

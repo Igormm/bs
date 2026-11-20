@@ -3,6 +3,7 @@ name: bs-device-module
 description: Write or extend a Linux device/hardware module (evdev, /sys, /dev nodes) with sysfs test hooks, pure-bash binary decoding and graceful degradation
 type: prompt
 whenToUse: When asked to add support for a hardware device (sensor, touchscreen, buttons, serial, hwmon, block) to lib/system/* or a similar lib group
+tier: bash4
 arguments:
   - module_path
 ---

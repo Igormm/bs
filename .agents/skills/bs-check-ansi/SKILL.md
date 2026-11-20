@@ -3,6 +3,7 @@ name: bs-check-ansi
 description: Verify ANSI escape usage across the whole project — no literal '\033' text in printf %s args (broken colors), correct $'\033' ANSI-C quoting, no fragile echo -e, printf format-string escapes accepted
 type: prompt
 whenToUse: After any change to color/log output (core/logger.sh, core/const.sh, lib/ui/*, update/uninstall messages), before committing output-related code, or when the user reports literal \033[90m text instead of colors
+tier: both
 arguments:
   - scope
 ---

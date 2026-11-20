@@ -3,6 +3,7 @@ name: bs-shell-abstraction
 description: Remove the dependency of BS code on a particular command shell — move every BASH_SOURCE/BASH_VERSION/ZSH_*/$SHELL check into the abstraction layer (bootstrap/bs.sh, bootstrap/shell.sh), mark what cannot be abstracted with an `@shell` tier and a bilingual reason, support bash, zsh, ash, nushell first (then fish, ksh, osh), keep everything testable and honest about what was really run. Use when writing or changing any module, installer step, check or CLI command, or when sweeping the project for shell-specific code. Work happens on branch fix/kernel-security-p0, not on main.
 type: prompt
 whenToUse: When code touches shell detection, script paths, "run vs sourced", PATH/rc-file setup, installers, checks, or when a new lib/ or core/ module is added; also before merging kernel-security-p0 work
+tier: doctrine
 arguments:
   - scope
 ---

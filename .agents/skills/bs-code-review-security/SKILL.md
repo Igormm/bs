@@ -1,6 +1,7 @@
 ---
 name: bs-code-review-security
 description: "Security-first code review of BS changes (PR, commit range, branch, file): injection and eval, quoting and word splitting, path and symlink handling, temp files, privilege and rm -rf, bash compatibility, @shell tier correctness, test coverage, P0-P3 report. Use before merging core/, bootstrap/, install/ and lib/ changes."
+tier: both
 argument-hint: "[pr-number|pr-url|file-path|commit-range]"
 ---
 

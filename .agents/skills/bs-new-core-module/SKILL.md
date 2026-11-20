@@ -3,6 +3,7 @@ name: bs-new-core-module
 description: Create or modify a core/ kernel module of the BS framework, including registration in bootstrap/kernel.sh (or on-demand load) and the bs doctor checks
 type: prompt
 whenToUse: When the user asks to add a new core/ module, change kernel behavior, or modify the framework boot sequence
+tier: posix
 arguments:
   - module_name
 ---

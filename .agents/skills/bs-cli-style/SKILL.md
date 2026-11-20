@@ -3,6 +3,7 @@ name: bs-cli-style
 description: Use when styling CLI output, section headers, prompts, error/hint messages or code comments in BS — no `==...==`/`# ====` ASCII-art, framed headers, highlight the main point, bilingual, tty-aware colour, and human-friendly action hints instead of robotic "might need to install package".
 type: prompt
 whenToUse: When adding or touching user-facing output (headers, summaries, prompts, diagnostics) or section comments; when a message looks robotic, over-long or misses the main point; when choosing how to separate code sections in a module.
+tier: both
 ---
 
 # BS CLI/вывод стиль — «стильно, модно, молодёжно» / BS output style

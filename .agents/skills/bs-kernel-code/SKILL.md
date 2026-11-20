@@ -3,6 +3,7 @@ name: bs-kernel-code
 description: Write or convert a kernel function/module (bootstrap/, core/, install/) into the one bs_ namespace as shell-independent `@shell posix` code — decide the real name and the `::` alias, write the file from a skeleton, validate in dash/ash/ksh/mksh/zsh/bash, write the portable test, prove the behaviour is unchanged by a differential run against the old implementation, update docs and tier lists, commit. Code style rules live in documentation/*/code-style-guide.md chapter 12.
 type: prompt
 whenToUse: When adding a function or a file to the kernel, or moving a core/ file from bash4 to posix (phase work "X на POSIX"); before claiming that a kernel file "works in dash/zsh/ksh"
+tier: posix
 arguments:
   - target
 ---
