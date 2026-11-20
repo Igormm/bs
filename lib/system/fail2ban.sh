@@ -5,7 +5,7 @@
 # lib/system/fail2ban.sh — конфиг джейлов fail2ban: каталог параметров с
 # русскими подсказками, валидация, профили, INI-рендер, безопасная установка
 #
-# @depends core/lang, core/const, core/logger, core/utils, lib/io/files, lib/data/format
+# @depends core/lang, core/const, core/logger, core/utils, core/object, lib/io/files, lib/data/format
 # @tier core
 # @shell bash4 — нужны конструкции bash: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags / needs bash constructs: double-bracket [[ ]], arithmetic command (( )), array, local/declare flags
 
@@ -14,7 +14,7 @@ bs::guard "LIB_SYSTEM_FAIL2BAN" || return 0
 
 # Dependencies / Зависимости
 bs::source_relative "../../core/lang.sh" "../../core/const.sh" \
-    "../../core/logger.sh" "../../core/utils.sh" "../io/files.sh" "../data/format.sh"
+    "../../core/logger.sh" "../../core/utils.sh" "../../core/object.sh" "../io/files.sh" "../data/format.sh"
 
 # @global BS_FAIL2BAN_DIR — Fail2ban: config root (category: hook)
 # @global BS_FAIL2BAN_DIR — Fail2ban: корень конфигов (категория: hook)
@@ -136,14 +136,75 @@ declare -gA F2B_JAILS=(
     [phpmyadmin]='phpmyadmin-syslog|||false'
 )
 
+# Каталог параметров/джейлов живёт в объектной модели (core/object.sh): каждая
+# запись «type|default|recommended» становится объектом fail2ban_param с типизиро-
+# ванными полями, джейл — объектом fail2ban_jail. Сборка — один раз при загрузке;
+# доступоры читают поля объекта, а не режут упакованную строку. Пример object.sh в lib/.
+# The param/jail catalog lives in the object model (core/object.sh): each
+# "type|default|recommended" entry becomes a fail2ban_param object with typed
+# fields, a jail becomes a fail2ban_jail. Built once at load; the accessors read
+# object fields instead of splitting a packed string. An object.sh demo in lib/.
+# @global F2B_PARAM_ID — Fail2ban: scope:name → object id (category: state)
+# @global F2B_PARAM_ID — Fail2ban: scope:имя → id объекта (категория: state)
+declare -gA F2B_PARAM_ID=()
+# @global F2B_JAIL_ID — Fail2ban: jail name → object id (category: state)
+# @global F2B_JAIL_ID — Fail2ban: имя джейла → id объекта (категория: state)
+declare -gA F2B_JAIL_ID=()
+
+object::class fail2ban_param
+object::field fail2ban_param type ''
+object::field fail2ban_param default ''
+object::field fail2ban_param recommended ''
+object::field fail2ban_param tip ''
+
+object::class fail2ban_jail
+object::field fail2ban_jail filter ''
+object::field fail2ban_jail logpath ''
+object::field fail2ban_jail port ''
+object::field fail2ban_jail recommended ''
+
+# @private Айди параметра (default прежде jail, как и раньше) / The param object id (default before jail, as before)
+# @param $1 Param name / Имя параметра
+fail2ban::__id() {
+    local -r name="${1:?param name required}"
+    if [[ -n "${F2B_PARAM_ID[default:${name}]:-}" ]]; then printf '%s\n' "${F2B_PARAM_ID[default:${name}]}"; return 0; fi
+    if [[ -n "${F2B_PARAM_ID[jail:${name}]:-}" ]]; then printf '%s\n' "${F2B_PARAM_ID[jail:${name}]}"; return 0; fi
+    return "${LIB_ERROR_INVALID_ARGS}"
+}
+
+# @private Разобрать упакованные таблицы в объекты / Parse the packed tables into objects
+fail2ban::__catalog() {
+    local name meta type def rec fid
+    for name in "${F2B_DEFAULT_ORDER[@]}"; do
+        meta="${F2B_DEFAULT[${name}]}"
+        type="${meta%%|*}"; rec="${meta##*|}"; def="${meta#*|}"; def="${def%|${rec}}"
+        object::new_to fid fail2ban_param "type=${type}" "default=${def}" "recommended=${rec}" "tip=${F2B_TIPS[${name}]:-}"
+        F2B_PARAM_ID["default:${name}"]="${fid}"
+    done
+    for name in "${F2B_JAIL_ORDER[@]}"; do
+        meta="${F2B_JAIL_PARAM[${name}]}"
+        type="${meta%%|*}"; rec="${meta##*|}"; def="${meta#*|}"; def="${def%|${rec}}"
+        object::new_to fid fail2ban_param "type=${type}" "default=${def}" "recommended=${rec}" "tip=${F2B_TIPS[${name}]:-}"
+        F2B_PARAM_ID["jail:${name}"]="${fid}"
+    done
+    local filter logpath port
+    for name in "${!F2B_JAILS[@]}"; do
+        meta="${F2B_JAILS[${name}]}"
+        filter="${meta%%|*}"; rec="${meta##*|}"
+        meta="${meta#*|}"; logpath="${meta%%|*}"; port="${meta#*|}"; port="${port%|${rec}}"
+        object::new_to fid fail2ban_jail "filter=${filter}" "logpath=${logpath}" "port=${port}" "recommended=${rec}"
+        F2B_JAIL_ID["${name}"]="${fid}"
+    done
+}
+
 # @private Look up a param's meta in DEFAULT then JAIL / Метаданные параметра
 # @param $1 Param name / Имя параметра
 # @stdout type|default|recommended / тип|default|recommended
 fail2ban::__meta() {
-    local -r name="${1:?param name required}"
-    if [[ -n "${F2B_DEFAULT[$name]:-}" ]]; then printf '%s\n' "${F2B_DEFAULT[$name]}"; return 0; fi
-    if [[ -n "${F2B_JAIL_PARAM[$name]:-}" ]]; then printf '%s\n' "${F2B_JAIL_PARAM[$name]}"; return 0; fi
-    return "${LIB_ERROR_INVALID_ARGS}"
+    local id
+    id="$(fail2ban::__id "${1:?param name required}")" || return $?
+    printf '%s|%s|%s\n' \
+        "$(object::get "${id}" type)" "$(object::get "${id}" default)" "$(object::get "${id}" recommended)"
 }
 
 # @description Report missing runtime pieces (never fails) / Сообщить об отсутствии
@@ -174,39 +235,46 @@ fail2ban::param_list() {
 # @param $1 Param name / Имя параметра
 # @stdout type / тип
 fail2ban::param_type() {
-    local meta
-    meta="$(fail2ban::__meta "${1:?param name required}")" || return $?
-    printf '%s\n' "${meta%%|*}"
+    local id
+    id="$(fail2ban::__id "${1:?param name required}")" || return $?
+    object::get "${id}" type
 }
 
 # @description Two-line Russian tip / Двухстрочная русская подсказка
 # @param $1 Param name / Имя параметра
 # @stdout tip / подсказка
 fail2ban::param_desc() {
-    local -r tip="${F2B_TIPS[${1:?param name required}]:-}"
+    local id tip
+    id="$(fail2ban::__id "${1:?param name required}")" || return $?
+    tip="$(object::get "${id}" tip)"
     is::empty "${tip}" && return "${LIB_ERROR_INVALID_ARGS}"
     printf '%s\n' "${tip}"
 }
 
 # @description Default value / Значение по умолчанию
 fail2ban::param_default() {
-    local meta; meta="$(fail2ban::__meta "${1:?param name required}")" || return $?
-    local rest="${meta#*|}"
-    printf '%s\n' "${rest%%|*}"
+    local id
+    id="$(fail2ban::__id "${1:?param name required}")" || return $?
+    object::get "${id}" default
 }
 
 # @description Recommended value / Рекомендуемое значение
 fail2ban::param_recommended() {
-    local meta; meta="$(fail2ban::__meta "${1:?param name required}")" || return $?
-    printf '%s\n' "${meta##*|}"
+    local id
+    id="$(fail2ban::__id "${1:?param name required}")" || return $?
+    object::get "${id}" recommended
 }
 
 # @description Jail catalog / Каталог джейлов
 # @stdout jail<TAB>filter<TAB>logpath<TAB>port<TAB>recommended / строки TSV
 fail2ban::jails() {
-    local jail
+    local jail id
     for jail in $(printf '%s\n' "${!F2B_JAILS[@]}" | sort); do
-        printf '%s\t%s\n' "${jail}" "${F2B_JAILS[$jail]}"
+        id="${F2B_JAIL_ID[${jail}]:-}"
+        [[ -n "${id}" ]] || continue
+        printf '%s\t%s|%s|%s|%s\n' "${jail}" \
+            "$(object::get "${id}" filter)" "$(object::get "${id}" logpath)" \
+            "$(object::get "${id}" port)" "$(object::get "${id}" recommended)"
     done
 }
 
@@ -492,3 +560,6 @@ fail2ban::jailed() {
     is::command "${BS_FAIL2BAN_CLIENT}" || return "${LIB_ERROR_DEPENDENCY_MISSING}"
     "${BS_FAIL2BAN_CLIENT}" status "${jail}" 2>/dev/null | format::emit_lines ip "${BS_OUTPUT_FORMAT:-string}"
 }
+
+# Каталог собирается один раз при загрузке модуля / The catalog is built once at module load
+fail2ban::__catalog

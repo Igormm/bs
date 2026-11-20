@@ -36,13 +36,13 @@
 # @author BS Framework
 # @since 2026-01-06
 # @version 1.0.0
-# @depends core/const, core/logger, core/utils, core/errorhandler, lib/system/platformcheck
+# @depends core/const, core/logger, core/utils, core/object, core/errorhandler, lib/system/platformcheck
 
 # Source Guard / Защита от повторной загрузки
 bs::guard "INTEGRATION_VK_API" || return 0
 
 # Зависимости / Dependencies
-bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/errorhandler.sh" "../system/platformcheck.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/object.sh" "../../core/errorhandler.sh" "../system/platformcheck.sh"
 
 # @global LIB_ERROR_INVALID_ARGS — Lib error: invalid arguments (category: error-const)
 # @global LIB_ERROR_INVALID_ARGS — Ошибка lib: неверные аргументы (категория: error-const)
@@ -95,6 +95,54 @@ VK_API_ACCESS_TOKEN=""
 VK_API_LAST_REQUEST_TIME=0
 VK_API_CACHE_DIR="${BS_ROOT:-/tmp}/vk_api_cache"
 
+# Каноническое состояние — объект vkapi_client (core/object.sh): поля app_id,
+# app_secret, access_token, cache_dir (идентичность/конфиг). Прежние VK_API_* — снимки
+# для обратной совместимости; init/auth пишут в объект и в снимки. Счётчик
+# rate-limit (VK_API_LAST_REQUEST_TIME) намеренно остаётся обычной глобальной: это
+# транзиентное состояние горячего пути, объектной семантике оно не подлежит.
+# Canonical state is the vkapi_client object (core/object.sh): app_id, app_secret,
+# access_token, cache_dir (identity/config). The legacy VK_API_* stay as snapshots;
+# init/auth write the object and the snapshots. The rate-limit counter
+# (VK_API_LAST_REQUEST_TIME) deliberately stays a plain global: it is transient
+# hot-path state and does not deserve object semantics.
+# @global VK_API_CLIENT_ID — Vkapi: vkapi_client object id (category: state)
+# @global VK_API_CLIENT_ID — Vkapi: id объекта vkapi_client (категория: state)
+VK_API_CLIENT_ID=""
+
+object::class vkapi_client
+object::field vkapi_client app_id ''
+object::field vkapi_client app_secret ''
+object::field vkapi_client access_token ''
+object::field vkapi_client cache_dir ''
+
+# @description Прочитать поле клиента из объекта / Read a client field from the object
+# @param $1 field: app_id|app_secret|access_token|cache_dir / поле
+# @stdout value / значение
+vkapi::client_get() {
+    [[ -n "${VK_API_CLIENT_ID}" ]] || return "${E_ERROR}"
+    object::get "${VK_API_CLIENT_ID}" "${1:?field required}"
+}
+
+# @description Записать поле клиента (объект + снимок) / Write a client field (object + snapshot)
+# @param $1 field / поле
+# @param $2 value / значение
+vkapi::client_set() {
+    [[ -n "${VK_API_CLIENT_ID}" ]] || return "${E_ERROR}"
+    local -r field="${1:?field required}" value="${2:-}"
+    object::set "${VK_API_CLIENT_ID}" "${field}" "${value}" || return $?
+    case "${field}" in
+        app_id) VK_API_APP_ID="${value}" ;;
+        app_secret) VK_API_APP_SECRET="${value}" ;;
+        access_token) VK_API_ACCESS_TOKEN="${value}" ;;
+        cache_dir) VK_API_CACHE_DIR="${value}" ;;
+    esac
+    return "${E_SUCCESS}"
+}
+
+# Инициализировать одиночку один раз при загрузке / Initialize the singleton once at load
+object::new_to VK_API_CLIENT_ID vkapi_client \
+    "cache_dir=${VK_API_CACHE_DIR}"
+
 # Ensure function_exists helper is available
 if ! utils::has function_exists; then
   function_exists() { utils::quiet declare -F "$1"; }
@@ -121,9 +169,9 @@ vkapi::init() {
     
     log::info "Initializing VK API module..."
     
-    # Store credentials
-    VK_API_APP_ID="${app_id}"
-    VK_API_APP_SECRET="${app_secret}"
+    # Store credentials (canonical object + snapshot) / Учётные данные (объект + снимок)
+    vkapi::client_set app_id "${app_id}" || true
+    vkapi::client_set app_secret "${app_secret}" || true
     
     # Check dependencies
     vkapi::check_dependencies
@@ -213,7 +261,7 @@ vkapi::auth() {
             "${LIB_ERROR_INVALID_ARGS}"
     fi
     
-    VK_API_ACCESS_TOKEN="${access_token}"
+    vkapi::client_set access_token "${access_token}" || true
     log::info "VK API authentication configured"
 }
 
@@ -232,7 +280,7 @@ vkapi::rate_limit_delay() {
         sleep "${sleep_time}"
     fi
     
-    VK_API_LAST_REQUEST_TIME=$(utils::now_float)
+    VK_API_LAST_REQUEST_TIME="$(utils::now_float)"
 }
 
 # Generate cache key for request

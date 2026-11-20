@@ -3,13 +3,13 @@
 # @shell bash4 — нужны конструкции bash: double-bracket [[ ]], array, local/declare flags / needs bash constructs: double-bracket [[ ]], array, local/declare flags
 # distro.sh — Distribution detection and compatibility / Определение дистрибутива и
 # совместимость
-# @depends core/const, core/logger, core/utils
+# @depends core/const, core/logger, core/utils, core/cache
 
 # Source Guard / Защита от повторной загрузки
 bs::guard "SYSTEM_DISTRO" || return 0
 
 # Зависимости / Dependencies
-bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/cache.sh"
 
 # @global DISTRO_ID — Distro: OS ID from /etc/os-release (category: constant)
 # @global DISTRO_ID — Distro: ID ОС из /etc/os-release (категория: constant)
@@ -27,10 +27,34 @@ declare -g DISTRO_FAMILY=""  # debian, redhat, arch, suse, etc.
 # @global DISTRO_PACKAGE_MANAGER — Distro: команда пакетного менеджера (категория: constant)
 declare -g DISTRO_PACKAGE_MANAGER=""
 
+# @private Отпечаток источников детекта: меняется при апгрейде/смене дистрибутива /
+#   Fingerprint of the detection sources: changes on a distro upgrade/change
+system::distro::__fp() {
+    printf '%s:%s\n' \
+        "$(bs_cache_fp_files /etc/os-release /etc/debian_version /etc/redhat-release /etc/SuSE-release /etc/lsb-release 2>/dev/null)" \
+        "$(utils::has lsb_release && printf 1 || printf 0)"
+}
+
 # @description Detect Linux distribution / Определить дистрибутив Linux
 # @example
 #   system::distro::detect
 system::distro::detect() {
+    # Трёхуровневый кеш (core/cache.sh): отпечаток источников меняется при смене
+    # дистрибутива — тогда детект пересчитывается, иначе читается из L1/L2/L3.
+    # The three-level cache (core/cache.sh): the source fingerprint changes on a
+    # distro change — detection re-runs then, otherwise it reads L1/L2/L3.
+    local -r fp="$(system::distro::__fp)"
+    local cached
+    if cache::get "distro" "${fp}" cached; then
+        local -a parts
+        readarray -t parts <<< "${cached}"
+        DISTRO_ID="${parts[0]:-unknown}"
+        DISTRO_NAME="${parts[1]:-Unknown}"
+        DISTRO_VERSION="${parts[2]:-unknown}"
+        DISTRO_FAMILY="${parts[3]:-unknown}"
+        DISTRO_PACKAGE_MANAGER="${parts[4]:-unknown}"
+        return "${E_SUCCESS}"
+    fi
     # Try /etc/os-release first (modern standard) / Попробовать /etc/os-release сначала
     # (современный стандарт)
     if is::file /etc/os-release; then
@@ -111,6 +135,15 @@ system::distro::detect() {
             DISTRO_PACKAGE_MANAGER="unknown"
             ;;
     esac
+
+    # Кладём кортеж в кеш: строки через перевод строки (имя/менеджер — однострочные)
+    # Put the tuple into the cache: newline-separated lines (the name/manager are one-liners)
+    cache::put "distro" "${fp}" \
+        "${DISTRO_ID}
+${DISTRO_NAME}
+${DISTRO_VERSION}
+${DISTRO_FAMILY}
+${DISTRO_PACKAGE_MANAGER}" || log::debug "distro cache write failed / не удалось записать кеш distro"
 
     log::debug "Detected distro: ${DISTRO_NAME} (${DISTRO_ID}) ${DISTRO_VERSION}, family: ${DISTRO_FAMILY}, pkg: ${DISTRO_PACKAGE_MANAGER}"
 }

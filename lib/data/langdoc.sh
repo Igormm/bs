@@ -3,7 +3,7 @@
 # lib/data/langdoc.sh — function documentation index (LSP metadata)
 # lib/data/langdoc.sh — индекс документации функций (метаданные для LSP)
 
-# @depends core/lang, core/const, core/errorhandler
+# @depends core/lang, core/const, core/errorhandler, core/cache
 # @tier core
 # @shell bash4 — нужны конструкции bash: local/declare flags, process substitution, case/replace expansion / needs bash constructs: local/declare flags, process substitution, case/replace expansion
 
@@ -11,7 +11,7 @@
 bs::guard "LIB_DATA_LANGDOC" || return 0
 
 # Dependencies
-bs::source_relative "../../core/lang.sh" "../../core/const.sh" "../../core/errorhandler.sh"
+bs::source_relative "../../core/lang.sh" "../../core/const.sh" "../../core/errorhandler.sh" "../../core/cache.sh"
 
 # Documentation index / Индекс документации
 #
@@ -81,12 +81,26 @@ langdoc::index() {
     log::error "langdoc::index: jq is required (install jq) / требуется jq (установите jq)"
     return 1
   fi
+  # Кеш (core/cache.sh, L2/L3): индекс — дорогой (jq на файл, сотни форков), чистый
+  # отпечаток — содержимое+имя каждого файла списка. Изменение любого файла меняет fp.
+  # Cache (core/cache.sh, L2/L3): the index is expensive (a jq per file, hundreds of
+  # forks); a pure fingerprint — content+name of each listed file. Any file change
+  # changes the fp.
+  local -a __ld_files=()
   local __ld_file
-  {
-    while IFS= read -r __ld_file; do
-      langdoc::parse_file "${__ld_file}"
-    done < <(find "${__ld_root}/core" "${__ld_root}/lib" -type f -name '*.sh' 2>/dev/null | sort)
-  } | jq -s -c .
+  while IFS= read -r __ld_file; do
+    __ld_files+=("${__ld_file}")
+  done < <(find "${__ld_root}/core" "${__ld_root}/lib" -type f -name '*.sh' 2>/dev/null | sort)
+  local -r __ld_fp="$(bs_cache_fp_files "${__ld_files[@]}")"
+  local __ld_cached
+  if cache::get "langdoc-index:${__ld_root}" "${__ld_fp}" __ld_cached; then
+    printf '%s\n' "${__ld_cached}"
+    return 0
+  fi
+  local __ld_out
+  __ld_out="$(for __ld_file in "${__ld_files[@]}"; do langdoc::parse_file "${__ld_file}"; done | jq -s -c .)" || return 1
+  cache::put "langdoc-index:${__ld_root}" "${__ld_fp}" "${__ld_out}" 0 || true
+  printf '%s\n' "${__ld_out}"
 }
 
 # @description Reflect documented functions by glob pattern (C++26 std::meta).

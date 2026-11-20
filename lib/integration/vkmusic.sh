@@ -39,13 +39,13 @@
 # @author BS Framework
 # @since 2026-01-06
 # @version 1.0.0
-# @depends core/const, core/logger, core/utils, core/errorhandler, lib/system/platformcheck, lib/integration/vkapi, lib/io/files
+# @depends core/const, core/logger, core/utils, core/errorhandler, core/object, core/cache, lib/system/platformcheck, lib/integration/vkapi, lib/io/files
 
 # Source Guard / Защита от повторной загрузки
 bs::guard "INTEGRATION_VK_MUSIC" || return 0
 
 # Зависимости / Dependencies
-bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/errorhandler.sh" "../system/platformcheck.sh" "vkapi.sh" "../io/files.sh" "../rfc/uri.sh"
+bs::source_relative "../../core/const.sh" "../../core/logger.sh" "../../core/utils.sh" "../../core/errorhandler.sh" "../../core/object.sh" "../../core/cache.sh" "../system/platformcheck.sh" "vkapi.sh" "../io/files.sh" "../rfc/uri.sh"
 
 # @global VK_MUSIC_CACHE_DIR — Hook: vk music cache directory (category: constant)
 # @global VK_MUSIC_CACHE_DIR — Хук: каталог кэша VK-музыки (категория: constant)
@@ -66,10 +66,78 @@ readonly VK_MUSIC_MAX_DURATION="3600"  # 1 hour in seconds
 # @global VK_MUSIC_QUALITY — Хук: качество загрузки: high/medium/low (категория: constant)
 readonly VK_MUSIC_QUALITY="high"  # high, medium, low
 
-# Module state variables
+# @global VK_MUSIC_CACHE_TTL — Hook: object/cache TTL in seconds for the audio-list
+#   endpoints (search, get/recommendations/popular) (category: hook)
+# @global VK_MUSIC_CACHE_TTL — Хук: TTL кеша списков аудио в секундах (категория: hook)
+declare -g VK_MUSIC_CACHE_TTL=300
+
+# Module state variables / Состояние модуля
+# @global VK_MUSIC_USER_ID — VkMusic: current user id (category: state)
+# @global VK_MUSIC_USER_ID — VkMusic: текущий id пользователя (категория: state)
 VK_MUSIC_USER_ID=""
+# @global VK_MUSIC_ACCESS_TOKEN — VkMusic: access token (category: state)
+# @global VK_MUSIC_ACCESS_TOKEN — VkMusic: токен доступа (категория: state)
 VK_MUSIC_ACCESS_TOKEN=""
+# @global VK_MUSIC_LAST_SEARCH_RESULTS — VkMusic: last search result item count (category: state)
+# @global VK_MUSIC_LAST_SEARCH_RESULTS — VkMusic: число элементов последнего поиска (категория: state)
 VK_MUSIC_LAST_SEARCH_RESULTS=()
+
+# Объектная модель треков: последний список живёт как объекты vkmusic_track (поля
+# id/owner_id/artist/title/duration/url/album/access_key) в массиве VK_MUSIC_TRACKS.
+# The track object model: the last list lives as vkmusic_track objects (typed
+# fields) in the VK_MUSIC_TRACKS array.
+# @global VK_MUSIC_TRACKS — VkMusic: object ids of the last list (category: state)
+# @global VK_MUSIC_TRACKS — VkMusic: id объектов последнего списка (категория: state)
+declare -ga VK_MUSIC_TRACKS=()
+
+object::class vkmusic_track
+object::field vkmusic_track id ''
+object::field vkmusic_track owner_id ''
+object::field vkmusic_track artist ''
+object::field vkmusic_track title ''
+object::field vkmusic_track duration ''
+object::field vkmusic_track url ''
+object::field vkmusic_track album ''
+object::field vkmusic_track access_key ''
+
+# @private Построить объекты треков из items-стрима (каждая строка — JSON-объект) /
+#   Build track objects from an items stream (each line is one JSON object)
+# @param $1 lines / строки
+vkmusic::__collect() {
+    VK_MUSIC_TRACKS=()
+    local item tid
+    while IFS= read -r item; do
+        [[ -n "${item}" ]] || continue
+        object::new_to tid vkmusic_track             "id=$(echo "${item}" | utils::quiet_err jq -r '.id' 2>/dev/null || true)"             "owner_id=$(echo "${item}" | utils::quiet_err jq -r '.owner_id' 2>/dev/null || true)"             "artist=$(echo "${item}" | utils::quiet_err jq -r '.artist // "Unknown"' 2>/dev/null || true)"             "title=$(echo "${item}" | utils::quiet_err jq -r '.title // "Unknown"' 2>/dev/null || true)"             "duration=$(echo "${item}" | utils::quiet_err jq -r '.duration // 0' 2>/dev/null || true)"             "url=$(echo "${item}" | utils::quiet_err jq -r '.url // ""' 2>/dev/null || true)"             "album=$(echo "${item}" | utils::quiet_err jq -r '.album.title // ""' 2>/dev/null || true)"             "access_key=$(echo "${item}" | utils::quiet_err jq -r '.access_key // ""' 2>/dev/null || true)"
+        VK_MUSIC_TRACKS+=("${tid}")
+    done <<< "${1:-}"
+    VK_MUSIC_LAST_SEARCH_RESULTS=("${VK_MUSIC_TRACKS[@]}")
+}
+
+# @private Отпечаток кеша: хеш токена+пользователя (токен не пишется в манифест) /
+#   Cache fingerprint: a hash of token+user (the token never reaches the manifest)
+vkmusic::__fp() {
+    printf '%s
+' "$(printf '%s:%s' "${VK_MUSIC_ACCESS_TOKEN:-anon}" "${VK_MUSIC_USER_ID:-0}" | cksum | cut -d' ' -f1)"
+}
+
+# @private Кешированный список: попадание — из object/cache, промах — API + put /
+#   Cached list: a hit comes from object/cache, a miss goes to the API and is put
+# @param $1 cache key / ключ кеша
+# @param $2 params for vkapi::api_call / параметры API
+# @stdout response (JSON) / ответ (JSON)
+# @returns 0 / 1 — пусто или ошибка API / empty or an API error
+vkmusic::__cached_list() {
+    local -r key="${1:?key required}" params="${2:?params required}"
+    local response
+    if ! cache::get "${key}" "$(vkmusic::__fp)" response; then
+        response="$(vkapi::api_call "${key%%:*}" "${params}")" || return "${E_ERROR}"
+        is::empty "${response}" && return "${E_ERROR}"
+        cache::put "${key}" "$(vkmusic::__fp)" "${response}" "${VK_MUSIC_CACHE_TTL}" || true
+    fi
+    printf '%s
+' "${response}"
+}
 
 # Module initialization
 # @description Initialize the VK Music module and set up cache/download directories
@@ -183,76 +251,106 @@ vkmusic::search() {
     fi
     
     log::info "Searching for: ${query}"
-    
-    # Make API request
+
+    # Make API request (cached) / Запрос к API (через object/cache)
     local params="q=${query}&count=${count}&offset=${offset}&search_own=0"
     local response
-    response=$(vkapi::api_call "audio.search" "${params}")
-    
+    response="$(vkmusic::__cached_list "audio.search:${query}:${count}:${offset}" "${params}")" || {
+        error::throw "Empty response from API" "${LIB_ERROR_INVALID_RESPONSE}"
+    }
     if is::empty "${response}"; then
         error::throw "Empty response from API" \
             "${LIB_ERROR_INVALID_RESPONSE}"
     fi
-    
-    # Parse and store results
+
+    # Parse and store results / Разобрать и сохранить результат
     local audio_count
     audio_count=$(echo "${response}" | utils::quiet_err jq -r '.count' || echo "0")
-    
+
     if [[ "${audio_count}" == "0" ]] || [[ "${audio_count}" == "null" ]]; then
         log::warn "No audio found for query: ${query}"
         return "${E_ERROR}"
     fi
-    
-    # Store results in array
-    VK_MUSIC_LAST_SEARCH_RESULTS=()
-    while IFS= read -r audio_info; do
-        VK_MUSIC_LAST_SEARCH_RESULTS+=("${audio_info}")
-    done < <(echo "${response}" | utils::quiet_err jq -c '.items[]')
-    
+
+    # Коллекция — объекты vkmusic_track / The collection is vkmusic_track objects
+    vkmusic::__collect "$(echo "${response}" | utils::quiet_err jq -c '.items[]')"
+
     log::success "Found ${audio_count} audio tracks"
-    
-    # Display results
+
     vkmusic::display_search_results
-    
+
     echo "${response}"
 }
 
-# Display search results
+# @description Number of tracks in the last collection / Число треков в последней коллекции
+# @stdout count / число
+vkmusic::track_count() {
+    printf '%s\n' "${#VK_MUSIC_TRACKS[@]}"
+}
+
+# @description One field of the i-th track (0-based) / Одно поле i-го трека (с нуля)
+# @param $1 index / индекс
+# @param $2 field: id|owner_id|artist|title|duration|url|album|access_key / поле
+# @stdout value / значение
+vkmusic::track_field() {
+    local -r index="${1:?index required}" field="${2:-title}"
+    [[ "${index}" =~ ^[0-9]+$ ]] || return "${LIB_ERROR_INVALID_ARGS}"
+    [[ "${index}" -lt "${#VK_MUSIC_TRACKS[@]}" ]] || return "${E_ERROR}"
+    object::get "${VK_MUSIC_TRACKS[$index]}" "${field}"
+}
+
+# @description Full summary line of the i-th track: "artist - title [mm:ss]" /
+#   Сводная строка i-го трека: «artist - title [mm:ss]»
+# @param $1 index / индекс
+vkmusic::track_line() {
+    local -r index="${1:?index required}"
+    local artist title duration id
+    id="$(vkmusic::track_field "${index}" id)" || return $?
+    artist="$(vkmusic::track_field "${index}" artist)"
+    title="$(vkmusic::track_field "${index}" title)"
+    duration="$(vkmusic::track_field "${index}" duration)"
+    is::empty "${duration}" || [[ "${duration}" == "0" ]] && duration=0
+    printf '%s - %s [%02d:%02d] (ID: %s)\n' \
+        "${artist}" "${title}" "$((duration / 60))" "$((duration % 60))" "${id}"
+}
+
+# @description Download the i-th track of the last collection via its object fields /
+#   Скачать i-й трек последней коллекции через поля его объекта
+# @param $1 index (0-based) / индекс
+# @param $2 output dir (optional) / каталог (необязательно)
+# @param $3 filename (optional) / имя файла (необязательно)
+# @stdout downloaded file path / путь скачанного файла
+vkmusic::download_track() {
+    local -r index="${1:?index required}"
+    local owner_id audio_id
+    owner_id="$(vkmusic::track_field "${index}" owner_id)" || return $?
+    audio_id="$(vkmusic::track_field "${index}" id)" || return $?
+    local info
+    info="$(vkmusic::get_audio "${owner_id}" "${audio_id}")" || return $?
+    # get_audio возвращает {response:[{...}]}; download принимает JSON-элемент или ID /
+    # get_audio returns {response:[{...}]}; download takes a JSON item or an ID
+    local item
+    item="$(echo "${info}" | utils::quiet_err jq -c '.response[0] // .items[0]' 2>/dev/null || true)"
+    is::empty "${item}" && item="${info}"
+    vkmusic::download "${item}" "${2:-${VK_MUSIC_DOWNLOAD_DIR}}" "${3:-}"
+}
+
 # @description Display VK Music search results with artist, title, duration and audio ID
 # @description Показать результаты поиска музыки с исполнителем, названием и ID аудио
 vkmusic::display_search_results() {
-    
-    if [[ ${#VK_MUSIC_LAST_SEARCH_RESULTS[@]} -eq 0 ]]; then
+    if [[ ${#VK_MUSIC_TRACKS[@]} -eq 0 ]]; then
         log::warn "No search results to display"
         return "${E_ERROR}"
     fi
-    
+
     log::info "Search Results:"
-    
-    local index=1
-    for audio_info in "${VK_MUSIC_LAST_SEARCH_RESULTS[@]}"; do
-        local artist
-        artist=$(echo "${audio_info}" | utils::quiet_err jq -r '.artist' || echo "Unknown")
-        
-        local title
-        title=$(echo "${audio_info}" | utils::quiet_err jq -r '.title' || echo "Unknown")
-        
-        local duration
-        duration=$(echo "${audio_info}" | utils::quiet_err jq -r '.duration' || echo "0")
-        
-        local id
-        id=$(echo "${audio_info}" | utils::quiet_err jq -r '.id' || echo "")
-        
-        local owner_id
-        owner_id=$(echo "${audio_info}" | utils::quiet_err jq -r '.owner_id' || echo "")
-        
-        # Format duration
-        local duration_formatted
-        duration_formatted=$(printf "%02d:%02d" $((duration / 60)) $((duration % 60)))
-        
-        echo "  ${index}. ${artist} - ${title} [${duration_formatted}] (ID: ${owner_id}_${id})"
+
+    local index=0
+    while (( index < ${#VK_MUSIC_TRACKS[@]} )); do
+        echo "  $(vkmusic::track_line "${index}")"
         index=$(( index + 1 ))
     done
+    return "${E_SUCCESS}"
 }
 
 # Get audio by ID
@@ -293,8 +391,11 @@ vkmusic::get_user_audio() {
     
     local params="owner_id=${user_id}&count=${count}&offset=${offset}"
     local response
-    response=$(vkapi::api_call "audio.get" "${params}")
-    
+    response="$(vkmusic::__cached_list "audio.get:${user_id}:${count}:${offset}" "${params}")" || {
+        return "${E_ERROR}"
+    }
+    vkmusic::__collect "$(echo "${response}" | utils::quiet_err jq -c '.items[]' 2>/dev/null || true)"
+
     echo "${response}"
 }
 
@@ -311,10 +412,13 @@ vkmusic::get_recommendations() {
     if is::not_empty "${user_id}"; then
         params="${params}&user_id=${user_id}"
     fi
-    
+
     local response
-    response=$(vkapi::api_call "audio.getRecommendations" "${params}")
-    
+    response="$(vkmusic::__cached_list "audio.getRecommendations:${count}:${user_id:-0}" "${params}")" || {
+        return "${E_ERROR}"
+    }
+    vkmusic::__collect "$(echo "${response}" | utils::quiet_err jq -c '.items[]' 2>/dev/null || true)"
+
     echo "${response}"
 }
 
@@ -331,10 +435,13 @@ vkmusic::get_popular() {
     if is::not_empty "${genre_id}"; then
         params="${params}&genre_id=${genre_id}"
     fi
-    
+
     local response
-    response=$(vkapi::api_call "audio.getPopular" "${params}")
-    
+    response="$(vkmusic::__cached_list "audio.getPopular:${genre_id:-0}:${count}" "${params}")" || {
+        return "${E_ERROR}"
+    }
+    vkmusic::__collect "$(echo "${response}" | utils::quiet_err jq -c '.items[]' 2>/dev/null || true)"
+
     echo "${response}"
 }
 
