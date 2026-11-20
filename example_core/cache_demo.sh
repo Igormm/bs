@@ -8,54 +8,59 @@
 # L1 (process memory) → L2 (files) → L3 (sqlite3 / C backend / files),
 # a key=value manifest, TTL, LRU eviction, promotion L3→L2.
 # Запуск / run: ./bs example_core/cache_demo.sh
+#
+# Вывод — по стилю проекта (bs-cli-style, bs-posix-output): рамки, вердикты
+# success, данные info; манифест — голые данные без рамок (машинный слой).
+# Output follows the project style; the manifest stays plain data.
 
 # v присваивает cache::get через bs_var_set, ShellCheck этого не видит /
 # v is assigned by cache::get via bs_var_set, which ShellCheck cannot follow
 # shellcheck disable=SC2154
 
-set -euo pipefail
+strict::enable
 
 load "core/cache"
 
 demo_dir="$(mktemp -d)"
 export BS_CACHE_DIR="${demo_dir}/cache"
 cache::init
-printf 'Каталог / dir: %s\n' "$BS_CACHE_DIR"
-printf 'Бэкенд L3 / L3 backend: %s\n' "$(cache::stats | grep '^l3=' | cut -d= -f2)"
+bs_log_section "Трёхуровневый кеш / Three-level cache"
+bs_log_info "  каталог / dir: $BS_CACHE_DIR"
+bs_log_info "  бэкенд L3 / L3 backend: $(cache::stats | grep '^l3=' | cut -d= -f2)"
 
-printf '\nL1: запись и чтение в памяти процесса / put and read in process memory\n'
+bs_log_section "L1: память процесса / L1: process memory"
 cache::put report fp1 "готово / done"
 cache::get report fp1 v
-printf '  report=%s\n' "$v"
+bs_log_info "  report=$v"
 
-printf '\nМанифест прозрачен / the manifest is transparent\n'
+bs_log_section "Манифест прозрачен / The manifest is transparent"
 cache::list | sed 's/^/  /'
 
-printf '\nL2: значение переживает состояние процесса / the value survives the process state\n'
+bs_log_section "L2: переживает состояние процесса / L2: survives the process state"
 bs_map_clear cacheV
 bs_map_clear cacheF
 cache::init
 cache::get report fp1 v
-printf '  после повторной init / after a re-init: %s\n' "$v"
+bs_log_info "  после повторной init / after a re-init: $v"
 
-printf '\nL3: файлы L2 удалены — значение берётся из холодного уровня / L2 files removed — the cold level answers\n'
+bs_log_section "L3: холодный уровень / L3: the cold level"
 rm -f "${BS_CACHE_DIR}"/v/*
 cache::get report fp1 v
-printf '  из L3 / from L3: %s (продвинуто в L2 / promoted to L2)\n' "$v"
+bs_log_success "из L3 / from L3: $v (продвинуто в L2 / promoted to L2)"
 
-printf '\nTTL: запись живёт 1 секунду / the entry lives 1 second\n'
+bs_log_section "TTL: запись живёт 1 секунду / TTL: the entry lives 1 second"
 cache::put temp fp1 "исчезну / will vanish" 1
 sleep 2
 if cache::get temp fp1 v 2>/dev/null; then
-    printf '  ERROR: expired entry answered\n'
+    bs_log_error "просроченная запись ответила / an expired entry answered"
 else
-    printf '  просрочено / expired (rc=1)\n'
+    bs_log_success "просрочено / expired (rc=1)"
 fi
-printf '  prune удалил / prune removed: %s\n' "$(cache::prune)"
+bs_log_info "  prune удалил / prune removed: $(cache::prune)"
 
-printf '\nСтатистика / stats\n'
+bs_log_section "Статистика / Stats"
 cache::stats | sed 's/^/  /'
 
 cache::clear
 rm -rf "$demo_dir"
-printf '\nОчищено / cleared\n'
+bs_log_success "очищено / cleared"

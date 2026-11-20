@@ -79,7 +79,7 @@ if [ "${BS_KERNEL_MINIMAL:-0}" = 1 ]; then
     prereq const version str var num logger quiet data errorhandler utils
 else
   bs_kernel_load_modules \
-    prereq lang const var store str num msg logger quiet fmt data errorhandler version utils config deps args
+    prereq lang const var store str num msg logger quiet fmt data errorhandler strict version utils config deps args
   # Конфигурация из файлов и окружения / Configuration from files and environment
   bs_config_load
 fi

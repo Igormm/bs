@@ -42,8 +42,8 @@ test_modes() {
     local sh_bin sh_name want_mode want_count want_bridge
     while IFS= read -r sh_bin; do
         sh_name="${sh_bin##*/}"
-        want_mode=posix; want_count=18; want_bridge=no-bridge
-        if [[ "${sh_name}" == bash ]]; then want_mode=full; want_count=21; want_bridge=bridge; fi
+        want_mode=posix; want_count=19; want_bridge=no-bridge
+        if [[ "${sh_name}" == bash ]]; then want_mode=full; want_count=22; want_bridge=bridge; fi
         eq "mode=${want_mode} modules=${want_count}" "$(probe "${sh_bin}" 'printf "mode=%s modules=%s" "$BS_KERNEL_MODE" "$(printf %s "$__bs_ld_loaded" | grep -c .)"')" "${sh_name}: the kernel mode and the number of loaded modules"
         eq "ok" "$(probe "${sh_bin}" 'bs_load_is_loaded core/logger && bs_load_is_loaded core/deps && bs_load_is_loaded core/num && echo ok')" "${sh_name}: logger, deps and num are loaded"
         eq "ok|false" "$(probe "${sh_bin}" 'bs_load_is_loaded core/config && printf "ok|"; bs_config_get BS_FILES_ATOMIC')" "${sh_name}: config is loaded and bs_config_load ran, in both kernel modes"
