@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.23.0] - 2026-11-20 "объект да кеш"
 
 ### Added
 - refactor(lib): architectural recommendations applied — the object model (`core/object.sh`) and the three-level cache (`core/cache.sh`) in `lib/`. `lib/system/fail2ban.sh`: the param/jail catalog now lives in `fail2ban_param`/`fail2ban_jail` objects (each `type|default|recommended` entry becomes a typed-field object built once at load; accessors read fields, the public API is unchanged, 57+13 checks green). `lib/system/distro.sh`: `detect` is wrapped in the cache — a fingerprint of `/etc/os-release`/fallback files invalidates on a distro change, the tuple is read from L1/L2/L3 otherwise (43 checks). `lib/integration/vkapi.sh`: a canonical `vkapi_client` object (app_id/app_secret/access_token/last_request_time/cache_dir) with `client_get`/`client_set`; `init`/`auth`/rate-limit write through it, legacy `VK_API_*` stay as snapshots (16 checks). `lib/integration/vkmusic.sh`: search/get_user_audio/recommendations/popular are cached (TTL via `VK_MUSIC_CACHE_TTL`, token never reaches the manifest — a cksum fingerprint); results become `vkmusic_track` objects (typed fields), with `track_count`/`track_field`/`track_line`/`download_track` (22 checks). `lib/data/langdoc.sh`: `index` is cached on a content fingerprint of every parsed file (18 checks). New: `lib/integration/vkmusic_tui.sh` — a full-screen VK Music client on `lib/tui/app` (selection/viewport, search/recommendations/popular/my-music, download and info modals; 13 checks) and `examples/vkmusic_tui.sh`.
