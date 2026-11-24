@@ -24,43 +24,43 @@ load "core/cache"
 demo_dir="$(mktemp -d)"
 export BS_CACHE_DIR="${demo_dir}/cache"
 cache::init
-bs_log_section "Трёхуровневый кеш / Three-level cache"
-bs_log_info "  каталог / dir: $BS_CACHE_DIR"
-bs_log_info "  бэкенд L3 / L3 backend: $(cache::stats | grep '^l3=' | cut -d= -f2)"
+log::section "Трёхуровневый кеш / Three-level cache"
+log::info "  каталог / dir: $BS_CACHE_DIR"
+log::info "  бэкенд L3 / L3 backend: $(cache::stats | grep '^l3=' | cut -d= -f2)"
 
-bs_log_section "L1: память процесса / L1: process memory"
+log::section "L1: память процесса / L1: process memory"
 cache::put report fp1 "готово / done"
 cache::get report fp1 v
-bs_log_info "  report=$v"
+log::info "  report=$v"
 
-bs_log_section "Манифест прозрачен / The manifest is transparent"
+log::section "Манифест прозрачен / The manifest is transparent"
 cache::list | sed 's/^/  /'
 
-bs_log_section "L2: переживает состояние процесса / L2: survives the process state"
+log::section "L2: переживает состояние процесса / L2: survives the process state"
 bs_map_clear cacheV
 bs_map_clear cacheF
 cache::init
 cache::get report fp1 v
-bs_log_info "  после повторной init / after a re-init: $v"
+log::info "  после повторной init / after a re-init: $v"
 
-bs_log_section "L3: холодный уровень / L3: the cold level"
+log::section "L3: холодный уровень / L3: the cold level"
 rm -f "${BS_CACHE_DIR}"/v/*
 cache::get report fp1 v
-bs_log_success "из L3 / from L3: $v (продвинуто в L2 / promoted to L2)"
+log::success "из L3 / from L3: $v (продвинуто в L2 / promoted to L2)"
 
-bs_log_section "TTL: запись живёт 1 секунду / TTL: the entry lives 1 second"
+log::section "TTL: запись живёт 1 секунду / TTL: the entry lives 1 second"
 cache::put temp fp1 "исчезну / will vanish" 1
 sleep 2
 if cache::get temp fp1 v 2>/dev/null; then
-    bs_log_error "просроченная запись ответила / an expired entry answered"
+    log::error "просроченная запись ответила / an expired entry answered"
 else
-    bs_log_success "просрочено / expired (rc=1)"
+    log::success "просрочено / expired (rc=1)"
 fi
-bs_log_info "  prune удалил / prune removed: $(cache::prune)"
+log::info "  prune удалил / prune removed: $(cache::prune)"
 
-bs_log_section "Статистика / Stats"
+log::section "Статистика / Stats"
 cache::stats | sed 's/^/  /'
 
 cache::clear
 rm -rf "$demo_dir"
-bs_log_success "очищено / cleared"
+log::success "очищено / cleared"

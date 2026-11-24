@@ -114,7 +114,9 @@ bs_log_success "готово / done"
 Posix-файл, подключаемый напрямую (`. файл` из любой оболочки реестра):
 логгер уже загружен ядром — те же `bs_log_*` без всякого подключения. До ядра
 (pre-kernel пролог) — только `printf '%s\n' "…" >&2`, никаких `bs_log_*`.
-Образцы: `example_core/*.sh`, `bootstrap/cli.sh`.
+Образец posix-вывода: `bootstrap/cli.sh` (`bs_log_section`, `bs_log_info`,
+`bs_log_success`). Скрипты `example_core/*.sh` — ярус bash4, там имена `log::*`
+(см. скилл `bs-logging`): результат тот же набор рамок/вердиктов, но с `log::section`.
 
 ## Частые ошибки (все встречались в проекте)
 

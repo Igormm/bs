@@ -57,29 +57,29 @@ object::field Window inner ''
 object::delegate Window inner
 object::method Window report window_report
 
-bs_log_section "Наследование и контракт / Inheritance and contract"
+log::section "Наследование и контракт / Inheritance and contract"
 object::new_to ci Circle name=circle radius=2
 object::new_to re Rect name=rect width=3 height=4
 for obj in "$ci" "$re"; do
     if object::is_a "$obj" Shape; then
-        bs_log_info "  $(object::call "$obj" name) is_a shape: area=$(object::call "$obj" area)"
+        log::info "  $(object::call "$obj" name) is_a shape: area=$(object::call "$obj" area)"
     fi
 done
 
-bs_log_section "Контракт при создании / The contract at creation"
+log::section "Контракт при создании / The contract at creation"
 object::class Broken Shape
 if object::new_to bad Broken 2>/dev/null; then
-    bs_log_error "класс без area создан / a class without area was created"
+    log::error "класс без area создан / a class without area was created"
 else
-    bs_log_success "broken без area не создан / broken without area was refused (rc=3)"
+    log::success "broken без area не создан / broken without area was refused (rc=3)"
 fi
 
-bs_log_section "Композиция и делегирование / Composition and delegation"
+log::section "Композиция и делегирование / Composition and delegation"
 object::new_to w Window
 object::set "$w" inner "$ci"
-bs_log_info "  $(object::call "$w" report)"
+log::info "  $(object::call "$w" report)"
 object::set "$w" inner "$re"
-bs_log_info "  $(object::call "$w" report)"
-bs_log_success "window делегирует area / window delegates area: $(object::call "$w" area)"
+log::info "  $(object::call "$w" report)"
+log::success "window делегирует area / window delegates area: $(object::call "$w" area)"
 
 object::destroy_all

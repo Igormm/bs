@@ -24,7 +24,7 @@ Central place for everything AI-facing in the repo (replaces the old `ai/` direc
 | `bash4` (lib/) | `bs-new-lib-module`, `bs-device-module`, `bs-debug-logging` |
 | pre-kernel | `bs-pre-kernel-namespace`, `bs-pre-kernel-boundary` |
 | doctrine (о ярусах) | `bs-shell-portability`, `bs-shell-abstraction`, `bs-docs-shell-claims` |
-| both | `bs-object-class`, `bs-regex`, `bs-write-test`, `bs-review-module`, `bs-variable-docs`, `bs-variable-metadata`, `bs-check-ansi`, `bs-code-review-security`, `bs-cli-style`, `bs-cli-flags-style`, `bs-cli-noop-output`, `bs-cli-markdown-style`, `bs-scenario-audit` |
+| both | `bs-object-class`, `bs-regex`, `bs-write-test`, `bs-review-module`, `bs-variable-docs`, `bs-variable-metadata`, `bs-logging`, `bs-check-ansi`, `bs-code-review-security`, `bs-cli-style`, `bs-cli-flags-style`, `bs-cli-noop-output`, `bs-cli-markdown-style`, `bs-scenario-audit` |
 | meta (процесс) | `bs-validate`, `bs-version-bump`, `bs-docs-sync`, `bs-commit-style`, `bs-commit-pro`, `bs-audit`, `bs-check-docs-code`, `bs-check-artifacts`, `bs-ai-toolchain`, `bs-code-design` |
 | импортированные (verbatim) | `posix-shell` (posix), `bash-defensive-patterns` (bash4), `shell` (both), методические и инженерные скиллы (meta) — классификация в skills/README.md, файлы не редактируются |
 

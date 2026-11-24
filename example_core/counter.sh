@@ -8,8 +8,8 @@
 # Fields, methods, a property, a watcher, a constant, a shared type field,
 # readonly, a factory, equality and destruction. Run: ./bs example_core/counter.sh
 #
-# Вывод — по стилю проекта (bs-cli-style, bs-posix-output): рамки bs_log_section,
-# вердикты bs_log_success, данные bs_log_info, RU первым, цвет только на tty.
+# Вывод — по стилю проекта (bs-cli-style, bs-posix-output): рамки log::section,
+# вердикты log::success, данные log::info, RU первым, цвет только на tty.
 # Output follows the project style: framed sections, success verdicts, RU first.
 
 # c/c2/c3 присваивает object::new_to через bs_var_set, ShellCheck этого не видит /
@@ -39,7 +39,7 @@ counter_double() {
     printf '%s\n' "$((v * 2))"
 }
 counter_log() {
-    bs_log_info "  наблюдатель / watcher: $2 $3 -> $4"
+    log::info "  наблюдатель / watcher: $2 $3 -> $4"
 }
 counter_from() {
     object::new_to "$2" "$1" count="$3"
@@ -59,41 +59,41 @@ object::const Counter MAX 100
 object::type_method Counter from counter_from
 object::contract Counter inc
 
-bs_log_section "Создание / Creation"
+log::section "Создание / Creation"
 object::new_to c Counter created=now
-bs_log_info "  id=$c class=$(object::class_of "$c") count=$(object::get "$c" count)"
+log::info "  id=$c class=$(object::class_of "$c") count=$(object::get "$c" count)"
 
-bs_log_section "Методы и свойства / Methods and properties"
+log::section "Методы и свойства / Methods and properties"
 object::call "$c" inc
 object::call "$c" inc
-bs_log_info "  count=$(object::get "$c" count) double=$(object::get "$c" double)"
+log::info "  count=$(object::get "$c" count) double=$(object::get "$c" double)"
 
-bs_log_section "Неизменяемость и константы / Immutability and constants"
+log::section "Неизменяемость и константы / Immutability and constants"
 if object::set "$c" created later 2>/dev/null; then
-    bs_log_error "readonly принял запись / readonly accepted a write"
+    log::error "readonly принял запись / readonly accepted a write"
 else
-    bs_log_success "readonly-поле защищено / readonly field refused the write (rc=3)"
+    log::success "readonly-поле защищено / readonly field refused the write (rc=3)"
 fi
-bs_log_info "  MAX=$(object::type_get Counter MAX)"
+log::info "  MAX=$(object::type_get Counter MAX)"
 
-bs_log_section "Фабрика и общее поле типа / Factory and shared type field"
+log::section "Фабрика и общее поле типа / Factory and shared type field"
 object::type_call Counter from c2 10
 object::type_set Counter instances 2
-bs_log_info "  c2 count=$(object::get "$c2" count) instances=$(object::type_get Counter instances)"
+log::info "  c2 count=$(object::get "$c2" count) instances=$(object::type_get Counter instances)"
 
-bs_log_section "Идентичность и равенство / Identity and equality"
+log::section "Идентичность и равенство / Identity and equality"
 object::new_to c3 Counter created=now
 object::call "$c3" inc >/dev/null
 object::call "$c3" inc >/dev/null
 if object::equal "$c" "$c3"; then
-    bs_log_success "c и c3 равны по содержимому / c and c3 are content-equal"
+    log::success "c и c3 равны по содержимому / c and c3 are content-equal"
 fi
 if ! object::same "$c" "$c3"; then
-    bs_log_info "  c и c3 — разные объекты / c and c3 are distinct objects"
+    log::info "  c и c3 — разные объекты / c and c3 are distinct objects"
 fi
 
-bs_log_section "Уничтожение / Destruction"
+log::section "Уничтожение / Destruction"
 object::destroy "$c3"
-bs_log_info "  живых объектов / live objects: $(object::count)"
+log::info "  живых объектов / live objects: $(object::count)"
 object::destroy_all
-bs_log_success "после destroy_all / after destroy_all: $(object::count)"
+log::success "после destroy_all / after destroy_all: $(object::count)"

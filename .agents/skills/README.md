@@ -100,6 +100,7 @@ zsh исполняет posix-ярус: не делит `$var` на слова, `
 | `bs-review-module` | скептический обзор: bash-ловушки + kernel/posix чек-лист, §11, приоритизированные сомнения |
 | `bs-variable-docs` |Двуязычные `# @global` для переменных модуля (§4.2) |
 | `bs-variable-metadata` | метаданные переменных: `@var`, псевдотипы, `@ops`, валидация, хуки, схема |
+| `bs-logging` | логирование по ярусам: `bs_log_*` (posix) vs `log::*` (bash4/zsh), уровни, потоки, `log::section` |
 | `bs-check-ansi` | ANSI-escape по проекту: `$'\033'` vs `printf '\033'`, никаких литералов в `printf %s` |
 | `bs-code-review-security` | security-first ревью (инъекции, кавычки, пути, temp, привилегии, ярус, тесты), P0–P3 |
 | `bs-cli-style` | стиль CLI-вывода: рамки, главное подсвечено, двуязычно, tty-цвет, человечные подсказки |

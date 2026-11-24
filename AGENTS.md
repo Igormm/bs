@@ -127,6 +127,7 @@ Skills are grouped by the project's **tier** (`@shell posix|bash4`; the doctrine
 - `bs-review-module` — skeptical critic pass over a module (bash-pitfalls checklist, kernel/posix additions, §11 lens, prioritized doubt report).
 - `bs-variable-docs` — check that module-level variables carry a bilingual `# @global` snippet naming their category (code-style-guide §4.2).
 - `bs-variable-metadata` — design/implement metadata-only contracts for shell variables: `# @var` annotations, pseudo-types, `@ops` access rules, validation, change hooks/logging, generated schema and audit; keeps enforcement honest (`$var` cannot be intercepted) and defers real access control to a separate `bs_store` layer.
+- `bs-logging` — logging by tier (`bs_log_*` in posix, `log::*` in bash4/zsh): levels, streams (info/success → stdout, warn/error/fatal → stderr), `log::section` framed headers, tty colour, character widths.
 - `bs-check-ansi` — verify ANSI escape usage across the project: no literal `\033` in `printf %s` arguments, correct `$'\033'` quoting, no fragile `echo -e`.
 - `bs-cli-style` — style the CLI output and code comments for humans: framed headers (not `==`/`# ====`), highlight the main point, bilingual, tty-aware colour, alternative-action handling and actionable hints.
 - `bs-cli-flags-style` — design the flags/values structure and code style of BS CLI scripts in the docker/podman/go conventions on top of `core/args` (RU).

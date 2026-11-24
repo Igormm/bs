@@ -28,12 +28,12 @@
 
 # ИМЕНА / NAMES
 #   Real functions: bs_log_trace, bs_log_debug, bs_log_info, bs_log_success, bs_log_warn, bs_log_error, bs_log_fatal,
-#   bs_log_print, bs_log_header, bs_log_list, bs_log_table, bs_log_progress, bs_log_clear_line and the private
+#   bs_log_print, bs_log_header, bs_log_section, bs_log_list, bs_log_table, bs_log_progress, bs_log_clear_line and the private
 #   bs_log_timestamp, bs_log_is_color_enabled, bs_log_level_to_number, bs_log_is_level_allowed,
 #   bs_log_get_level_color, bs_log_json_escape, bs_log_join_words, bs_log_print_json,
 #   bs_log_print_structured, bs_log_print_plain, bs_log_print_color, bs_log_format_message; in bash and zsh also log::*
 #   (the old names, used by the whole framework) and log::__* for the private ones.
-#   Настоящие функции: bs_log_trace … bs_log_clear_line и приватные bs_log_timestamp …
+#   Настоящие функции: bs_log_trace … bs_log_section, bs_log_clear_line и приватные bs_log_timestamp …
 #   bs_log_format_message; в bash и zsh — ещё и log::* (прежние имена, их зовёт весь фреймворк)
 #   и log::__* для приватных.
 
@@ -485,6 +485,7 @@ bs_shell_alias bs_log_error log::error
 bs_shell_alias bs_log_fatal log::fatal
 bs_shell_alias bs_log_print log::print
 bs_shell_alias bs_log_header log::header
+bs_shell_alias bs_log_section log::section
 bs_shell_alias bs_log_list log::list
 bs_shell_alias bs_log_table log::table
 bs_shell_alias bs_log_progress log::progress
