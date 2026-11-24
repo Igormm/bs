@@ -7,8 +7,10 @@
 # This script runs all framework tests and outputs a detailed report.
 #
 # Usage / Использование:
-#   bash tests/runalltests.sh                # безопасный прогон (из любого каталога)
-#   bash tests/runalltests.sh --with-root    # + деструктивные тесты (только под root)
+#   bash tests/runalltests.sh                    # последовательно / serial
+#   bash tests/runalltests.sh --jobs 8           # параллельно / parallel
+#   BS_TEST_JOBS=8 bash tests/runalltests.sh      # через окружение / via env
+#   bash tests/runalltests.sh --with-root        # + деструктивные тесты (только под root)
 
 set -euo pipefail
 
@@ -17,6 +19,7 @@ set -euo pipefail
 # shell-gate: исполняемый раннер вне bs; $0 — единственный источник пути / a runner executed outside bs; $0 is the only source of its path
 readonly RUNNER_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "${RUNNER_DIR}"
+export RUNNER_DIR
 
 # Общий фреймворк: print_header, цвета и гейт NO_COLOR / TERM=dumb / не-tty
 # Shared framework: print_header, colors and the NO_COLOR / TERM=dumb / non-tty gate
@@ -34,25 +37,41 @@ declare -i skipped_tests=0
 # Checks skipped inside the files (testframework::skip) are collected here for the summary
 BS_TEST_SKIP_LOG="$(mktemp)"
 export BS_TEST_SKIP_LOG
-trap 'rm -f "${BS_TEST_SKIP_LOG}"' EXIT
+RESULT_DIR=""
+QUEUE_FILE=""
+cleanup() {
+    rm -f "${BS_TEST_SKIP_LOG}"
+    [[ -z "${QUEUE_FILE}" ]] || rm -f "${QUEUE_FILE}"
+    [[ -z "${RESULT_DIR}" ]] || rm -rf "${RESULT_DIR}"
+}
+trap cleanup EXIT
 
 # Разбор аргументов
 with_root=0
-for arg in "$@"; do
-  case "${arg}" in
-    --with-root) with_root=1 ;;
+TEST_JOBS="${BS_TEST_JOBS:-1}"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --with-root) with_root=1; shift ;;
+    --jobs)
+      [[ $# -ge 2 ]] || { echo "--jobs requires a number / --jobs требует число" >&2; exit 2; }
+      TEST_JOBS="$2"; shift 2 ;;
+    --jobs=*) TEST_JOBS="${1#--jobs=}"; shift ;;
     -h|--help)
-      echo "Usage: bash tests/runalltests.sh [--with-root]"
+      echo "Usage: bash tests/runalltests.sh [--with-root] [--jobs N]"
       echo "  --with-root  Также запустить root-требующие/деструктивные тесты (нужен root)"
       echo "               Also run root-requiring/destructive tests (requires root)"
-      exit 0
-      ;;
+      echo "  --jobs N     Параллельных тестов (default 1; env BS_TEST_JOBS)"
+      echo "               Parallel tests (default 1; env BS_TEST_JOBS)"
+      exit 0 ;;
     *)
-      echo "Unknown option: ${arg}" >&2
-      exit 2
-      ;;
+      echo "Unknown option: ${1}" >&2
+      exit 2 ;;
   esac
 done
+if [[ ! "${TEST_JOBS}" =~ ^[1-9][0-9]*$ ]]; then
+  echo "Invalid --jobs value: ${TEST_JOBS} (expected positive integer / ожидается положительное целое)" >&2
+  exit 2
+fi
 
 # Деструктивные/root-требующие тесты (только с --with-root и EUID=0):
 # Destructive/root-requiring tests (only with --with-root and EUID=0):
@@ -72,47 +91,22 @@ is_root_test() {
   return 1
 }
 
-# Функция пропуска теста
-# @description Skip a test with an explicit message
-skip_test() {
-  local test_name="$1"
-  local reason="$2"
+# Очередь тестов: метка, скрипт, причина пропуска (пусто = запускать).
+# Test queue: label, script, skip reason (empty = run).
+declare -a TEST_LABELS=()
+declare -a TEST_SCRIPTS=()
+declare -a TEST_SKIPS=()
 
-  ((++total_tests))
-  ((++skipped_tests))
-  echo -e "${YELLOW}▶ Skipping test:${NC} $test_name"
-  echo -e "  ${YELLOW}Reason / Причина:${NC} $reason"
-  echo
-  return 0
+queue_skip() {
+  TEST_LABELS+=("$1")
+  TEST_SCRIPTS+=("$2")
+  TEST_SKIPS+=("$3")
 }
 
-# Функция запуска теста
-# @description Run a test and track results
-# @param $1 Test name / Название теста
-# @param $2 Test script / Скрипт теста
-# @return 0 always: the outcome is counted (passed_tests / failed_tests), the final exit code follows it
-run_test() {
-  local test_name="$1"
-  local test_script="$2"
-
-  ((++total_tests))
-  echo -e "${YELLOW}▶ Running test:${NC} $test_name"
-  echo -e "${BLUE}────────────────────────${NC}"
-
-  if env -u BS_ROOT -u BS_INITIALIZED bash "${RUNNER_DIR}/../bs" run "${test_script}"; then
-    echo -e "${GREEN}✓ $test_name: PASSED${NC}"
-    ((++passed_tests))
-    echo
-    return 0
-  else
-    echo -e "${RED}✗ $test_name: FAILED${NC}"
-    ((++failed_tests))
-    failed_names+=("${test_name}")
-    echo
-    # Падение теста не обрывает прогон (set -e): считаем и идём дальше, итог — по failed_tests
-    # A failing test does not abort the run (set -e): count it and go on, the verdict comes from failed_tests
-    return 0
-  fi
+queue_run() {
+  TEST_LABELS+=("$1")
+  TEST_SCRIPTS+=("$2")
+  TEST_SKIPS+=("")
 }
 
 # Запуск тестов каталога
@@ -125,23 +119,129 @@ run_test_dir() {
 
   [[ -d "${dir}" ]] || return 0
 
-  echo -e "${BLUE}${label}:${NC}"
   local test_file test_name
   for test_file in "${dir}"/*.sh; do
     [[ -f "${test_file}" ]] || continue
     test_name=$(basename "${test_file}" .sh)
     if is_root_test "${test_file}"; then
       if [[ "${with_root}" -eq 1 ]] && [[ "${EUID}" -eq 0 ]]; then
-        run_test "${label}: ${test_name}" "${test_file}"
+        queue_run "${label}: ${test_name}" "${test_file}"
       elif [[ "${with_root}" -eq 1 ]]; then
-        skip_test "${label}: ${test_name}" "requires root / требует root (EUID != 0)"
+        queue_skip "${label}: ${test_name}" "${test_file}" "requires root / требуется root (EUID != 0)"
       else
-        skip_test "${label}: ${test_name}" "destructive/root test, use --with-root / деструктивный тест, нужен --with-root"
+        queue_skip "${label}: ${test_name}" "${test_file}" "destructive/root test, use --with-root / деструктивный тест, нужен --with-root"
       fi
     else
-      run_test "${label}: ${test_name}" "${test_file}"
+      queue_run "${label}: ${test_name}" "${test_file}"
     fi
   done
+}
+
+print_skip() {
+  local test_name="$1" reason="$2"
+  ((++skipped_tests))
+  echo -e "${YELLOW}▶ Skipping test:${NC} $test_name"
+  echo -e "  ${YELLOW}Reason / Причина:${NC} $reason"
+  echo
+}
+
+# Последовательный запуск с живым выводом.
+# Serial run with live output.
+run_serial() {
+  local i test_name test_script reason
+  for (( i=0; i<${#TEST_LABELS[@]}; i++ )); do
+    test_name="${TEST_LABELS[$i]}"
+    test_script="${TEST_SCRIPTS[$i]}"
+    reason="${TEST_SKIPS[$i]}"
+    ((++total_tests))
+    if [[ -n "${reason}" ]]; then
+      print_skip "${test_name}" "${reason}"
+      continue
+    fi
+    echo -e "${YELLOW}▶ Running test:${NC} $test_name"
+    echo -e "${BLUE}────────────────────────${NC}"
+    if env -u BS_ROOT -u BS_INITIALIZED bash "${RUNNER_DIR}/../bs" run "${test_script}"; then
+      echo -e "${GREEN}✓ $test_name: PASSED${NC}"
+      ((++passed_tests))
+    else
+      echo -e "${RED}✗ $test_name: FAILED${NC}"
+      ((++failed_tests))
+      failed_names+=("${test_name}")
+    fi
+    echo
+  done
+}
+
+# Параллельный запуск: каждый воркер пишет вывод/rc/skip-log в свой файл,
+# родитель собирает итог в исходном порядке. Это исключает гонки счётчиков
+# и общего BS_TEST_SKIP_LOG.
+# Parallel run: each worker writes output/rc/skip-log to its own files; the
+# parent aggregates in the original order. This avoids counter and shared
+# BS_TEST_SKIP_LOG races.
+run_parallel() {
+  RESULT_DIR="$(mktemp -d)"
+  QUEUE_FILE="$(mktemp)"
+  export RESULT_DIR
+
+  local i test_name test_script reason runnable=0
+  for (( i=0; i<${#TEST_LABELS[@]}; i++ )); do
+    reason="${TEST_SKIPS[$i]}"
+    [[ -n "${reason}" ]] && continue
+    printf '%s\0' "$i" "${TEST_LABELS[$i]}" "${TEST_SCRIPTS[$i]}" >> "${QUEUE_FILE}"
+    runnable=$(( runnable + 1 ))
+  done
+
+  echo -e "${BLUE}Running ${runnable} tests on ${TEST_JOBS} parallel jobs / Запуск ${runnable} тестов в ${TEST_JOBS} потоков${NC}"
+  echo
+
+  if (( runnable > 0 )); then
+    xargs -0 -n3 -P "${TEST_JOBS}" bash -c '
+      idx="$1"; label="$2"; script="$3"
+      skip="$(mktemp "${RESULT_DIR}/skip.XXXXXX")"
+      if BS_TEST_SKIP_LOG="${skip}" env -u BS_ROOT -u BS_INITIALIZED \
+          bash "${RUNNER_DIR}/../bs" run "${script}" \
+          > "${RESULT_DIR}/${idx}.out" 2>&1; then
+        rc=0
+      else
+        rc=$?
+      fi
+      printf "%s\n" "${rc}" > "${RESULT_DIR}/${idx}.rc"
+      cat "${skip}" > "${RESULT_DIR}/${idx}.skip"
+      rm -f "${skip}"
+    ' _ < "${QUEUE_FILE}"
+  fi
+  rm -f "${QUEUE_FILE}"; QUEUE_FILE=""
+
+  local rc line
+  for (( i=0; i<${#TEST_LABELS[@]}; i++ )); do
+    test_name="${TEST_LABELS[$i]}"
+    test_script="${TEST_SCRIPTS[$i]}"
+    reason="${TEST_SKIPS[$i]}"
+    ((++total_tests))
+    if [[ -n "${reason}" ]]; then
+      print_skip "${test_name}" "${reason}"
+      continue
+    fi
+    echo -e "${YELLOW}▶ Running test:${NC} $test_name"
+    echo -e "${BLUE}────────────────────────${NC}"
+    cat "${RESULT_DIR}/${i}.out"
+    rc="$(cat "${RESULT_DIR}/${i}.rc")"
+    if [[ "${rc}" -eq 0 ]]; then
+      echo -e "${GREEN}✓ $test_name: PASSED${NC}"
+      ((++passed_tests))
+    else
+      echo -e "${RED}✗ $test_name: FAILED${NC}"
+      ((++failed_tests))
+      failed_names+=("${test_name}")
+    fi
+    if [[ -s "${RESULT_DIR}/${i}.skip" ]]; then
+      while IFS= read -r line; do
+        printf '%s\n' "${line}" >> "${BS_TEST_SKIP_LOG}"
+      done < "${RESULT_DIR}/${i}.skip"
+    fi
+    echo
+  done
+  rm -rf "${RESULT_DIR}"; RESULT_DIR=""
 }
 
 # Основная функция тестирования
@@ -160,6 +260,12 @@ main() {
   run_test_dir "status" "Status Tests / Тесты статуса"
   run_test_dir "audit" "Audit Tests / Тесты аудита"
   run_test_dir "demos" "Demo Tests / Демонстрационные тесты"
+
+  if (( TEST_JOBS > 1 )); then
+    run_parallel
+  else
+    run_serial
+  fi
 
   # Сводка результатов
   print_header "TEST SUMMARY / СВОДКА ТЕСТОВ"
@@ -197,7 +303,7 @@ main() {
     exit 0
   else
     echo -e "${RED}❌ Some tests failed!${NC}"
-    echo -e "${RED}❌ Некоторые тесты провалены!${NC}"
+    echo -e "${RED}❌ Некоторые тесты провалились!${NC}"
     echo -e "${YELLOW}Please check the output above for details.${NC}"
     echo -e "${YELLOW}Пожалуйста, проверьте вывод выше для деталей.${NC}"
     exit 1

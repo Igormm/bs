@@ -45,11 +45,13 @@ tests/
 ## Running the full suite
 
 ```bash
-bash tests/runalltests.sh        # from the project root
+bash tests/runalltests.sh        # from the project root (serial)
 cd tests && bash runalltests.sh  # or from tests/
+bash tests/runalltests.sh --jobs 8   # parallel workers
+BS_TEST_JOBS=8 bash tests/runalltests.sh  # same, via environment
 ```
 
-Paths are resolved from the script location, so the run works from any directory. The runner walks the directories in this order: `unit`, `integration`, `data`, `frameworks`, `network`, `status`, `audit`, `demos`, then prints a summary (total / passed / failed / skipped) and exits `0` if nothing failed, `1` otherwise. An unknown option exits with code `2`.
+Paths are resolved from the script location, so the run works from any directory. The runner walks the directories in this order: `unit`, `integration`, `data`, `frameworks`, `network`, `status`, `audit`, `demos`, then prints a summary (total / passed / failed / skipped) and exits `0` if nothing failed, `1` otherwise. An unknown option exits with code `2`. Serial is the default; `--jobs N` / `BS_TEST_JOBS=N` enables isolated parallel workers with parent-side result aggregation.
 
 The default run needs no root and writes nothing to `/etc` or the real `~/.config`: modules that touch the home directory are tested in an isolated temporary `HOME`.
 
