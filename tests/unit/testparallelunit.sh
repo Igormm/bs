@@ -108,6 +108,31 @@ test_pid_map_concurrency_limit() {
     done
 }
 
+test_run_task_file() {
+    local sh_bin out_dir tasks rc=0
+    for sh_bin in bash zsh; do
+        out_dir="$T/${sh_bin}-tasks"
+        tasks="$T/${sh_bin}-tasks.txt"
+        cat > "$tasks" <<'TASKS'
+# comment
+printf 'one\n'
+printf 'two\n' >&2
+false
+printf 'four\n'
+TASKS
+        probe "$sh_bin" -- '
+            io::parallel::run --jobs 2 --out-dir "$1" -- "$2"
+            printf "aggregate=%s\n" "$?"
+        ' _ "$out_dir" "$tasks" >/dev/null || rc=$?
+        testframework::assert_equal "0" "$rc" "${sh_bin}: run returns aggregate failure, not a fatal exit"
+        testframework::assert_equal "one" "$(cat "$out_dir/0000.out")" "${sh_bin}: first task stdout"
+        testframework::assert_equal "two" "$(cat "$out_dir/0001.err")" "${sh_bin}: second task stderr"
+        testframework::assert_equal "1" "$(cat "$out_dir/0002.rc")" "${sh_bin}: failing task rc"
+        testframework::assert_equal "four" "$(cat "$out_dir/0003.out")" "${sh_bin}: later task still runs"
+        rc=0
+    done
+}
+
 main() {
     T="$(mktemp -d)"; mkdir -p "$T/home"; export T
     trap 'rm -rf "$T"' EXIT
@@ -115,6 +140,7 @@ main() {
     testframework::section "Invalid arguments / Неверные аргументы"; test_invalid_arguments
     testframework::section "PID map / PID map"; test_pid_map_contract
     testframework::section "Concurrency / Параллелизм"; test_pid_map_concurrency_limit
+    testframework::section "Task file / Файл задач"; test_run_task_file
     testframework::summary
 }
 

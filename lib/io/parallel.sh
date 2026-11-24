@@ -166,6 +166,28 @@ io::parallel::map() {
     io::parallel::__pid_map "$callback" "${items[@]}"
 }
 
+# @private
+# @description Run task strings through the PID scheduler.
+# @description Выполнить строки задач через PID scheduler.
+# @param $@ task strings
+# @returns E_SUCCESS or E_ERROR
+io::parallel::__pid_tasks() {
+    local idx=0 task
+    IO_PARALLEL_PIDS=(); IO_PARALLEL_INDICES=(); IO_PARALLEL_FAILED=0
+    for task in "$@"; do
+        while (( ${#IO_PARALLEL_PIDS[@]} >= IO_PARALLEL_JOBS )); do
+            io::parallel::__pid_reap_one
+        done
+        io::parallel::__pid_start "$idx" bash -c "$task"
+        idx=$(( idx + 1 ))
+    done
+    while (( ${#IO_PARALLEL_PIDS[@]} > 0 )); do
+        io::parallel::__pid_reap_one
+    done
+    (( IO_PARALLEL_FAILED == 0 )) || return "${E_ERROR:-1}"
+    return "${E_SUCCESS:-0}"
+}
+
 # @description Run one shell command per non-comment line of a task file.
 # @description Выполнить одну shell-команду на строку файла задач.
 # @contract action
@@ -173,5 +195,20 @@ io::parallel::map() {
 # @returns E_SUCCESS, E_INVALID or E_ERROR
 io::parallel::run() {
     io::parallel::__parse "$@" || return $?
-    return "${E_INVALID:-2}"
+    (( ${#IO_PARALLEL_ARGS[@]} == 1 )) || {
+        bs_log_error "io::parallel::run: exactly one task file is required"
+        return "${E_INVALID:-2}"
+    }
+    local file="${IO_PARALLEL_ARGS[0]}" line=""
+    [[ -r "$file" ]] || {
+        bs_log_error "io::parallel::run: task file is not readable: $file"
+        return "${E_INVALID:-2}"
+    }
+    local -a tasks=()
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        [[ -z "$line" || "$line" == \#* ]] && continue
+        tasks+=("$line")
+    done < "$file"
+    mkdir -p "$IO_PARALLEL_OUT" || return "${E_ERROR:-1}"
+    io::parallel::__pid_tasks "${tasks[@]}"
 }
