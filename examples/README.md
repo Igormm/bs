@@ -102,6 +102,10 @@ io::streams::print "hello from BS"
 - `menu.sh` — minimal interactive menu / минимальное интерактивное меню
 - `tui_demo.sh` — full TUI framework demo (lists, modals, progress) /
   полноценное демо TUI-фреймворка
+- `dripfetch.sh` — matrix-rain terminal dashboard (`@shell bash4,zsh`: logo,
+  sysinfo, clock, calendar, weather, net, text boxes, YAML config) /
+  терминальный дашборд с «матричным» дождём (`@shell bash4,zsh`: боксы logo,
+  sysinfo, clock, calendar, weather, net, text, YAML-конфиг)
 - `todo.sh` — terminal todo list on `lib/tui/app` /
   терминальный список задач
 - `wizard_example.sh` — interactive setup wizard with Unicode frames /
