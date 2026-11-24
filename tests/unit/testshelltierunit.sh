@@ -80,7 +80,7 @@ test_repository() {
     # Каждая аннотация @shell несёт описание после тире
     local bad=0 line
     while IFS= read -r line; do
-        [[ "${line}" =~ ^[^:]+:[0-9]+:#\ @shell\ [a-z0-9]+\ —\ .+ ]] || { bad=$(( bad + 1 )); printf '    no description / нет описания: %s\n' "${line}"; }
+        [[ "${line}" =~ ^[^:]+:[0-9]+:#\ @shell\ [a-z0-9,]+\ —\ .+ ]] || { bad=$(( bad + 1 )); printf '    no description / нет описания: %s\n' "${line}"; }
     done < <(grep -rnE '^# @shell ' "${BS_PROJECT_ROOT}/bootstrap" "${BS_PROJECT_ROOT}/core" "${BS_PROJECT_ROOT}/lib" "${BS_PROJECT_ROOT}/install" "${BS_PROJECT_ROOT}/bs" "${BS_PROJECT_ROOT}/install.sh" "${BS_PROJECT_ROOT}/boot.sh" 2>/dev/null)
     eq "0" "${bad}" "every # @shell annotation has a description after the dash"
 }
