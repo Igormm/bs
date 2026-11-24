@@ -828,6 +828,103 @@ bs_args_parse_positional() {
   return "${E_INVALID:-2}"
 }
 
+# @private
+# @description Должен ли "-..." разбираться как короткие опции / Should a dash token use short-option parsing
+# @param $1 token
+# @returns 0 short options, 1 positional
+bs_args_use_short() {
+  __bs_args_us_token=$1
+  __bs_args_us_first=${__bs_args_us_token#-}
+  __bs_args_us_first=${__bs_args_us_first%"${__bs_args_us_first#?}"}
+  if [ -n "$__bs_args_us_first" ] && bs_map_has bs_args_short_flag "$__bs_args_us_first"; then
+    return 0
+  fi
+  if [ "$__bs_args_us_token" = "-h" ]; then
+    bs_args_mget bs_args_flags h __bs_args_us_h
+    [ -z "$__bs_args_us_h" ] && return 0
+  fi
+  __bs_args_us_next=$((__bs_args_ps_pos + 1))
+  if [ "$__bs_args_us_next" -le "$__bs_args_ps_max" ] && bs_args_is_allowed_at "$__bs_args_us_next" "$__bs_args_us_token"; then
+    return 1
+  fi
+  __bs_args_us_real=$(bs_args_level_of "$__bs_args_us_token")
+  [ -z "$__bs_args_us_real" ] || return 1
+  [ "$(bs_map_count bs_args_short_flag)" -eq 0 ] && return 1
+  return 0
+}
+
+# @private
+# @description Разобрать короткий flag или cluster / Parse a short flag or cluster
+# @param $1 token beginning with -
+# @param $@ remaining arguments
+# @returns E_SUCCESS or E_INVALID
+bs_args_parse_short() {
+  __bs_args_pss_token=$1
+  shift
+  __bs_args_pss_cluster=${__bs_args_pss_token#-}
+  __bs_args_ps_used=0
+
+  while [ -n "$__bs_args_pss_cluster" ]; do
+    __bs_args_pss_char=${__bs_args_pss_cluster%"${__bs_args_pss_cluster#?}"}
+    __bs_args_pss_cluster=${__bs_args_pss_cluster#?}
+
+    if ! bs_map_has bs_args_short_flag "$__bs_args_pss_char"; then
+      if [ "$__bs_args_pss_char" = h ]; then
+        bs_args_mget bs_args_flags h __bs_args_pss_hkind
+        if [ -z "$__bs_args_pss_hkind" ]; then
+          ARGS_HELP_REQUESTED=1
+          bs_args_help
+          return "${E_SUCCESS:-0}"
+        fi
+      fi
+      bs_args_parse_refuse "unknown short flag: \"-${__bs_args_pss_char}\""
+      return "${E_INVALID:-2}"
+    fi
+
+    bs_map_get_to bs_args_short_flag "$__bs_args_pss_char" __bs_args_pss_name
+    bs_args_mget bs_args_flags "$__bs_args_pss_name" __bs_args_pss_kind
+
+    if [ "$__bs_args_pss_kind" = value ]; then
+      if [ -n "$__bs_args_pss_cluster" ]; then
+        __bs_args_pss_value=${__bs_args_pss_cluster#=}
+      elif [ $# -gt 0 ] && [ "$1" != "--" ]; then
+        __bs_args_pss_value=$1
+        __bs_args_ps_used=1
+      else
+        bs_args_parse_refuse "flag \"-${__bs_args_pss_char}\" requires a value"
+        return "${E_INVALID:-2}"
+      fi
+      if ! bs_args_validate_flag_value "$__bs_args_pss_name" "$__bs_args_pss_value"; then
+        bs_args_parse_refuse "flag \"-${__bs_args_pss_char}\" has an invalid value: \"${__bs_args_pss_value}\" (expected $(bs_args_flag_value_hint "$__bs_args_pss_name"))"
+        return "${E_INVALID:-2}"
+      fi
+      bs_args_store_flag_value "$__bs_args_pss_name" "$__bs_args_pss_value"
+      return "${E_SUCCESS:-0}"
+    fi
+
+    __bs_args_pss_value=1
+    if bs_map_has bs_args_flag_bool_value "$__bs_args_pss_name" && [ -n "$__bs_args_pss_cluster" ]; then
+      case "$__bs_args_pss_cluster" in
+        '=true')  __bs_args_pss_value=1; __bs_args_pss_cluster="" ;;
+        '=false') __bs_args_pss_value=0; __bs_args_pss_cluster="" ;;
+        '=*')
+          bs_args_parse_refuse "flag \"-${__bs_args_pss_char}\" accepts only true or false"
+          return "${E_INVALID:-2}"
+          ;;
+      esac
+    elif [ -n "$__bs_args_pss_cluster" ]; then
+      case "$__bs_args_pss_cluster" in
+        '=*')
+          bs_args_parse_refuse "flag \"-${__bs_args_pss_char}\" does not take a value"
+          return "${E_INVALID:-2}"
+          ;;
+      esac
+    fi
+    bs_args_store_flag_value "$__bs_args_pss_name" "$__bs_args_pss_value"
+  done
+  return "${E_SUCCESS:-0}"
+}
+
 # @description Проверить аргументы по объявленному дереву
 # @description Validate arguments against the declared tree
 #   Успех: заполняет массив bs_args_params, возвращает 0
@@ -873,6 +970,16 @@ bs_args_parse() {
         bs_args_parse_flag "$__bs_args_ps_param" "$@" || return $?
         if [ "$__bs_args_ps_used" -eq 1 ]; then shift; fi
         ;;
+      -*)
+        if bs_args_use_short "$__bs_args_ps_param"; then
+          bs_args_parse_short "$__bs_args_ps_param" "$@" || return $?
+          if [ "$__bs_args_ps_used" -eq 1 ]; then shift; fi
+          if [ "${ARGS_HELP_REQUESTED:-0}" -eq 1 ]; then break; fi
+        else
+          __bs_args_ps_pos=$((__bs_args_ps_pos + 1))
+          bs_args_parse_positional "$__bs_args_ps_param" || return $?
+        fi
+        ;;
       *)
         __bs_args_ps_pos=$((__bs_args_ps_pos + 1))
         bs_args_parse_positional "$__bs_args_ps_param" || return $?
@@ -881,7 +988,9 @@ bs_args_parse() {
   done
 
   # Минимальное количество позиционных параметров / Minimum positional count
-  bs_args_parse_required "$__bs_args_ps_pos" || return $?
+  if [ "${ARGS_HELP_REQUESTED:-0}" -eq 0 ]; then
+    bs_args_parse_required "$__bs_args_ps_pos" || return $?
+  fi
 
   return "${E_SUCCESS:-0}"
 }

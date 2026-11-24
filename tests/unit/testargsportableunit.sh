@@ -144,6 +144,36 @@ bs_args_parse --color=yes >/dev/null 2>&1; printf "bad=%s\n" "$?"
 ')" \
 "bare=1 set=0 false=0 set=0 true=1 bad=2" \
 "${sh_name}: bool-value long forms"
+        eq "$(probe "${sh_bin}" '
+bs_args_define deploy
+bs_args_flag port value "" number
+bs_args_flag_short port p
+bs_args_flag verbose
+bs_args_flag_short verbose v
+bs_args_flag force
+bs_args_flag_short force f
+bs_args_flag output value
+bs_args_flag_short output o
+bs_args_flag color bool
+bs_args_flag_bool_value color
+bs_args_flag_short color c
+bs_args_parse deploy -v -p 8080; printf "a=%s,%s,%s " "$(bs_args_flag_get port)" "$(bs_args_flag_get verbose)" "$(bs_args_get 1)"
+bs_args_parse -p=8081 -f deploy; printf "b=%s,%s " "$(bs_args_flag_get port)" "$(bs_args_flag_get force)"
+bs_args_parse deploy -p8082; printf "c=%s " "$(bs_args_flag_get port)"
+bs_args_parse -vfp=8083 deploy; printf "d=%s,%s,%s " "$(bs_args_flag_get verbose)" "$(bs_args_flag_get force)" "$(bs_args_flag_get port)"
+bs_args_parse -vo report deploy; printf "e=%s,%s " "$(bs_args_flag_get verbose)" "$(bs_args_flag_get output)"
+bs_args_parse -c=false deploy; printf "f=%s,%s " "$(bs_args_flag_get color)" "$(bs_args_flag_is_set color; echo $?)"
+bs_args_parse -x deploy >/dev/null 2>&1; printf "x=%s " "$?"
+bs_args_parse -p -- deploy >/dev/null 2>&1; printf "missing=%s\n" "$?"
+')" \
+"a=8080,1,deploy b=8081,1 c=8082 d=1,1,8083 e=1,report f=0,0 x=2 missing=2" \
+"${sh_name}: short flags, attached values and clusters"
+        eq "$(probe "${sh_bin}" '
+bs_args_define -foo
+bs_args_flag port value
+bs_args_flag_short port p
+bs_args_parse -foo; printf "rc=%s value=%s\n" "$?" "$(bs_args_get 1)"
+')" "rc=0 value=-foo" "${sh_name}: legacy dash positional survives short aliases"
     done < <(testframework::posix_shells)
 }
 
