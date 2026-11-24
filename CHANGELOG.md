@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.0] - 2026-11-24 "контракт"
+
+### Added
+- feat(meta): `bs-function-contract` skill and code-style-guide §5.1 — one contract model for predicates, getters, actions, emitters and callbacks across posix/bash4/zsh; status/stdout/stderr/output-variable channels; canonical API records rendered as string/json/xml.
+- feat(logging): `bs-logging` skill — tier-correct logger names and streams, `log::section` alias, and object/cache examples migrated from posix names to bash4 `log::*`.
+- feat(test): `runalltests.sh --jobs N` / `BS_TEST_JOBS` — isolated worker output and skip logs, parent-side aggregation, explicit positive-integer validation; serial remains the default.
+
 ## [0.24.0] - 2026-11-24 "тишина"
 
 ### Added
