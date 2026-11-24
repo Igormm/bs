@@ -52,7 +52,21 @@ echo
 # но все файлы фреймворка — bash
 # -s bash: the '#!/usr/bin/env bs' shebang is unknown to ShellCheck,
 # but all framework files are bash
-if shellcheck -s bash --severity=error "${files[@]}"; then
+# ShellCheck — CPU-bound и однопоточный. Гоняем ЧАНКАМИ с -P (число ядер):
+# xargs -n <батч> группирует файлы, поэтому кэш source-зависимостей работает
+# внутри батча и параллельность не теряется; xargs возвращает 123, если хоть
+# один батч дал ошибку уровня error. ВНИМАНИЕ: строка комментария не может
+# начинаться с «# shellcheck» строчными — это директива ShellCheck.
+# ShellCheck is CPU-bound and single-threaded. Run in CHUNKS with -P (cores):
+# xargs -n <batch> groups files, so the source-following cache works inside a
+# batch and parallelism is retained; xargs returns 123 if any batch has an
+# error. NOTE: a comment must not start with lowercase "# shellcheck" — that
+# is a ShellCheck directive.
+declare -r SHC_JOBS="${SHELLCHECK_JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || printf 4)}"
+declare -r SHC_BATCH="$(( (${#files[@]} + SHC_JOBS - 1) / SHC_JOBS ))"
+echo -e "${BLUE}ShellCheck on ${SHC_JOBS} jobs, batch ${SHC_BATCH} files (SHELLCHECK_JOBS=N → override) / ${SHC_JOBS} потоков, батч ${SHC_BATCH} файлов (SHELLCHECK_JOBS=N → переопределить)${NC}"
+
+if printf '%s\0' "${files[@]}" | xargs -0 -n "${SHC_BATCH}" -P "${SHC_JOBS}" shellcheck -s bash --severity=error; then
     echo -e "${GREEN}✓ No ShellCheck errors / Ошибок ShellCheck нет${NC}"
 else
     echo -e "${RED}✗ ShellCheck errors found / Найдены ошибки ShellCheck${NC}" >&2
@@ -64,5 +78,5 @@ fi
 if [[ "${1:-}" == "--warnings" ]]; then
     echo
     echo -e "${BLUE}Warnings (informational) / Предупреждения (информационно):${NC}"
-    shellcheck -s bash --severity=warning "${files[@]}" || true
+    printf '%s\0' "${files[@]}" | xargs -0 -n "${SHC_BATCH}" -P "${SHC_JOBS}" shellcheck -s bash --severity=warning || true
 fi

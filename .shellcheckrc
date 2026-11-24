@@ -1,9 +1,13 @@
 # .shellcheckrc — настройки ShellCheck для BS framework
 # .shellcheckrc — ShellCheck settings for the BS framework
 
-# Подхватывать source-файлы при анализе
-# Follow sourced files during analysis
-external-sources=true
+# НЕ следовать за source-файлами: каждый .sh и так проверяется отдельно
+# (validateshellcheck.sh перечисляет все файлы), поэтому follow источников —
+# чисто дублирующая работа; на bs.sh это давало 13× (18с → 1.4с).
+# Do NOT follow sourced files: every .sh is checked on its own anyway
+# (validateshellcheck.sh lists every file), so following sources is pure
+# redundant work; on bs.sh it cost 13× (18s → 1.4s).
+external-sources=false
 
 # Динамические пути source (${BS_ROOT}/..., "${file}") не проверяются —
 # это штатный механизм загрузчика фреймворка
