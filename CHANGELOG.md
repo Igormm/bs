@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.27.0] - 2026-11-25 "ключи"
+
+### Added
+- feat(args): short aliases and Docker-style clusters, repeatable value flags with lossless bash arrays, and explicit `--flag=true|false`; help and completion expose the new forms while existing declarations remain compatible.
+
 ## [0.26.0] - 2026-11-24 "параллель"
 
 ### Added

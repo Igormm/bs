@@ -82,6 +82,41 @@ idiom instead of a raw redirect:
 if utils::quiet args::flag_get dry-run; then ...; fi
 ```
 
+## Short aliases, repeats and boolean values
+
+`args::flag_short NAME SHORT` assigns one ASCII letter or digit to a declared
+flag. `args::flag_repeat NAME` makes a `value` flag repeatable.
+`args::flag_bool_value NAME` lets a `bool` flag accept an explicit boolean value.
+
+```bash
+args::flag port value 8080 number
+args::flag_short port p
+args::flag env value
+args::flag_repeat env
+args::flag color bool
+args::flag_bool_value color
+
+# Accepted short forms: -p 8080, -p=8080, -p8080
+# Boolean clusters are accepted too: -abc
+# Explicit long bool value: --color=false
+```
+
+`args::flag_get env` returns the first CLI value. `args::flag_get_all env`
+prints all CLI values one per line, in input order. That output is
+line-oriented, so it cannot unambiguously represent embedded newlines. In bash,
+use the lossless reader:
+
+```bash
+local -a environments=()
+args::flag_values env environments
+printf '%s\n' "${environments[@]}"
+```
+
+`args::flag_values NAME ARRAY_NAME` copies only values passed on the command
+line; it does not inject the declared default. With no values it leaves the
+array empty and returns success. A bool-value flag stores `1` or `0`, while
+`args::flag_is_set` remains true for an explicit `--flag=false`.
+
 ## Validation: `args::parse`, `args::get`
 
 ```bash
@@ -190,8 +225,13 @@ args::define first middle last
 | `args::level N a b ...` | allowed alternatives at level N (1-based) |
 | `args::describe name "text"` | parameter description for the help |
 | `args::flag name [bool\|value]` | declare a flag (`bool` is the default) |
+| `args::flag_short name short` | assign a one-character short alias |
+| `args::flag_repeat name` | make a value flag repeatable |
+| `args::flag_bool_value name` | allow `--name=true` / `--name=false` |
 | `args::flag_describe name "text"` | flag description for the help |
 | `args::flag_get name [fallback]` | flag value after `args::parse`, else its default, else the fallback; 1 if none |
+| `args::flag_get_all name` | all CLI values, one per line |
+| `args::flag_values name array` | copy CLI values into a bash array losslessly |
 | `args::flag_is_set name` | 0 if the flag was given on the command line |
 | `args::parse "$@"` | validate input parameters against the tree |
 | `args::param N [default]` | positional parameter N (1-based); readable name for `args::get` |

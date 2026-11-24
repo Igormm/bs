@@ -10,6 +10,7 @@
 #
 # Попробуйте / Try it:
 #   bs run examples/argsparseexample.sh deploy now
+#   bs run examples/argsparseexample.sh deploy now -l one --label "two words" -c=false
 #   bs run examples/argsparseexample.sh now          # ошибка уровня / level error
 #   bs run examples/argsparseexample.sh fly          # неизвестный параметр / unknown
 #   bs run examples/argsparseexample.sh --help
@@ -42,8 +43,16 @@ main() {
     args::flag env value staging "enum:staging,prod"  # дефолт + тип / default + type
     args::flag dry-run                                # --dry-run (без значения / no value)
     args::flag retries value 3 number                 # дефолт 3, тип number
+    args::flag label value
+    args::flag_repeat label
+    args::flag_short label l
+    args::flag color bool
+    args::flag_bool_value color
+    args::flag_short color c
     args::flag_describe env "Target environment (staging, production)"
     args::flag_describe dry-run "Print the plan without executing"
+    args::flag_describe label "Repeatable label"
+    args::flag_describe color "Enable colour (true or false)"
 
     # Минимум один позиционный параметр / At least one positional
     args::required 1
@@ -95,6 +104,12 @@ main() {
     env="$(args::flag_get env)"                # дефолт приходит из args::flag / default from args::flag
     local retries
     retries="$(args::flag_get retries)"
+    local -a labels=()
+    args::flag_values label labels
+    log::info "Labels: ${#labels[@]}"
+    local color
+    color="$(args::flag_get color 1)"
+    log::info "Color: ${color}"
     local servers="${#ARGS_PARAMS[@]}"         # 1 + N повторов уровня 3 / 1 + N repeats of level 3
 
     log::info "Action: ${action}, timing: ${timing}, env: ${env}, retries: ${retries}, servers: ${servers}"

@@ -82,6 +82,41 @@ fi
 if utils::quiet args::flag_get dry-run; then ...; fi
 ```
 
+## Короткие aliases, повторы и bool-значения
+
+`args::flag_short NAME SHORT` назначает объявленному флагу одну ASCII-букву или
+цифру. `args::flag_repeat NAME` делает `value`-флаг повторяемым.
+`args::flag_bool_value NAME` разрешает `bool`-флагу явное boolean-значение.
+
+```bash
+args::flag port value 8080 number
+args::flag_short port p
+args::flag env value
+args::flag_repeat env
+args::flag color bool
+args::flag_bool_value color
+
+# Короткие формы: -p 8080, -p=8080, -p8080
+# Группы bool-флагов тоже поддерживаются: -abc
+# Явное длинное bool-значение: --color=false
+```
+
+`args::flag_get env` возвращает первое CLI-значение. `args::flag_get_all env`
+печатает все CLI-значения по одному на строке в порядке входа. Этот вывод
+ориентирован на строки и не может однозначно представить вложенные переводы
+строк. В bash используйте lossless-чтение:
+
+```bash
+local -a environments=()
+args::flag_values env environments
+printf '%s\n' "${environments[@]}"
+```
+
+`args::flag_values NAME ARRAY_NAME` копирует только значения, переданные в
+командной строке; объявленный default не добавляется. Если значений нет, массив
+остаётся пустым, а функция возвращает успех. Bool-value флаг хранит `1` или `0`,
+при этом `args::flag_is_set` остаётся истинным для явного `--flag=false`.
+
 ## Валидация: `args::parse`, `args::get`
 
 ```bash
@@ -188,8 +223,13 @@ args::define first middle last
 | `args::level N a b ...` | допустимые альтернативы уровня N (с 1) |
 | `args::describe name "text"` | описание параметра для help |
 | `args::flag name [bool\|value]` | объявить флаг (по умолчанию `bool`) |
+| `args::flag_short name short` | назначить короткий alias из одного символа |
+| `args::flag_repeat name` | сделать value-флаг повторяемым |
+| `args::flag_bool_value name` | разрешить `--name=true` / `--name=false` |
 | `args::flag_describe name "text"` | описание флага для help |
 | `args::flag_get name [запасное]` | значение флага после `args::parse`, иначе его дефолт, иначе запасное; 1, если ничего нет |
+| `args::flag_get_all name` | все CLI-значения, по одному на строке |
+| `args::flag_values name array` | lossless-копия CLI-значений в bash-массив |
 | `args::flag_is_set name` | 0, если флаг передан в командной строке |
 | `args::parse "$@"` | валидация входных параметров по дереву |
 | `args::param N [дефолт]` | позиционный параметр N (с 1); понятное имя для `args::get` |

@@ -120,14 +120,21 @@ args::flag verbose
 args::require "$@"
 ```
 
-## 4. Часть C: расширения core/args (roadmap, НЕ реализовано)
+## 4. Часть C: расширения core/args (реализовано)
 
-Когда go-грамматике не хватает парсера, расширяй осознанно, с тестами и обратной совместимостью:
-
-- **Шорт-алиас**: предложить 6-й параметр `args::flag port value 4096 number p` → парсер принимает `-p 4096` и `--port 4096`; group-алиасы (`-it`) — отдельная задача, по умолчанию не нужны.
-- **Repeat-флаг**: `args::flag env value "" "" repeat` → значения собираются в `ARGS_FLAGS_REPEAT["env"]` (пробело-разделённый список или массив); `args::flag_get env` возвращает первое значение, новый `args::flag_get_all env` — все.
-- **Негация**: `args::flag no-cache` декларируется явно как bool; `--flag=false` — только если парсер доработан (bool со значением), иначе не обещать.
-- Каждое расширение: unit-тест в `tests/unit/testargsunit.sh`, обновление `documentation/en|ru`, пример в `examples/argsparseexample.sh`.
+- **Шорт-алиас:** `args::flag_short port p`; парсер принимает `-p 8080`,
+  `-p=8080` и `-p8080`.
+- **Repeat-флаг:** `args::flag_repeat env`; `args::flag_get env` возвращает
+  первое значение, `args::flag_get_all env` — все по строкам, а
+  `args::flag_values env environments` lossless-копирует значения в bash-массив.
+- **Bool-value:** `args::flag_bool_value color`; принимаются `--color`,
+  `--color=true` и `--color=false`.
+- **Группы коротких флагов:** `-abc`; значение может идти у последнего флага
+  группы (`-abp8080`).
+- Каждое расширение покрыто unit/portable-тестами, help/completion и примером
+  `examples/argsparseexample.sh`.
+- Явный non-goal: автоматическое `--no-flag`; отрицание объявляется отдельным
+  bool-флагом.
 
 ## 5. Чеклист ревью ключей
 

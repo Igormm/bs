@@ -1125,17 +1125,12 @@ In `.agents/skills/bs-cli-flags-style/SKILL.md`, replace the “Часть C: р
 
 - [ ] **Step 4: Bump the release**
 
-Set in `core/version.sh`:
-
-```sh
-export BS_VERSION="0.27.0"
-: "${BS_CODENAME:=ключи}"
-```
+Set `BS_VERSION` to `0.27.0` and `BS_CODENAME` to `ключи` in `core/version.sh`.
 
 Add to `CHANGELOG.md` above `0.26.0`:
 
 ```markdown
-## [0.27.0] - 2026-11-24 "ключи"
+## [0.27.0] - 2026-11-25 "ключи"
 
 ### Added
 - feat(args): short aliases and Docker-style clusters, repeatable value flags with lossless bash arrays, and explicit `--flag=true|false`; help and completion expose the new forms while existing declarations remain compatible.
