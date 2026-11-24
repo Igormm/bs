@@ -22,7 +22,7 @@ bash 4.2+ и zsh. Модуль решает две задачи:
 load "lib/io/parallel"
 
 io::parallel::map --jobs 4 --out-dir results \
-    --scheduler pid -- my_worker -- item1 item2 item3
+    --scheduler pid -- my_worker item1 item2 item3
 
 io::parallel::run --jobs 4 --out-dir results \
     --scheduler fifo -- tasks.txt

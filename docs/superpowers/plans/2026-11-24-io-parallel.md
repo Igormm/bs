@@ -100,10 +100,10 @@ test_invalid_arguments() {
     local sh_bin rc out
     for sh_bin in bash zsh; do
         rc=0
-        out="$(probe "$sh_bin" -- 'io::parallel::map --jobs 0 --out-dir "$HOME/r" -- true -- a')" || rc=$?
+        out="$(probe "$sh_bin" -- 'io::parallel::map --jobs 0 --out-dir "$HOME/r" -- true a')" || rc=$?
         testframework::assert_equal "2" "$rc" "${sh_bin}: zero jobs returns E_INVALID"
         rc=0
-        out="$(probe "$sh_bin" -- 'io::parallel::map --jobs 2 --out-dir "$HOME/r" --scheduler bad -- true -- a')" || rc=$?
+        out="$(probe "$sh_bin" -- 'io::parallel::map --jobs 2 --out-dir "$HOME/r" --scheduler bad -- true a')" || rc=$?
         testframework::assert_equal "2" "$rc" "${sh_bin}: unknown scheduler returns E_INVALID"
     done
 }
@@ -205,7 +205,7 @@ io::parallel::__result_name() {
 # @description Run a callback once for each input element.
 # @description Вызвать callback один раз для каждого элемента.
 # @contract action
-# @param $@ common options, callback, --, items
+# @param $@ common options, --, callback, items
 # @returns E_SUCCESS, E_INVALID or E_ERROR
 io::parallel::map() {
     io::parallel::__parse "$@" || return $?
@@ -297,7 +297,7 @@ test_pid_map_concurrency_limit() {
                 sleep 0.05
                 printf "end %s\n" "$$" >> "$1/events"
             }
-            io::parallel::map --jobs 2 --out-dir "$1" -- slow_worker -- a b c d e
+            io::parallel::map --jobs 2 --out-dir "$1" -- slow_worker a b c d e
         ' _ "$out_dir")" || rc=$?
         testframework::assert_equal "0" "$rc" "${sh_bin}: bounded map succeeds"
         testframework::assert_equal "2" \
@@ -593,7 +593,7 @@ test_fifo_requires_mkfifo() {
         rc=0
         probe "$sh_bin" -- '
             PATH="$HOME/no-tools"
-            io::parallel::map --jobs 1 --scheduler fifo --out-dir "$HOME/r" -- true -- a
+            io::parallel::map --jobs 1 --scheduler fifo --out-dir "$HOME/r" -- true a
         ' >/dev/null || rc=$?
         testframework::assert_equal "1" "$rc" "${sh_bin}: missing mkfifo returns E_ERROR"
         rc=0
@@ -873,7 +873,7 @@ test_cancel_cleans_workers() {
         rc=0
         probe "$sh_bin" -- '
             slow_task() { sleep 5; printf "leaked\n" > "$1"; }
-            io::parallel::map --jobs 1 --out-dir "$HOME/r" -- slow_task -- "$1" &
+            io::parallel::map --jobs 1 --out-dir "$HOME/r" -- slow_task "$1" &
             pool_pid=$!
             sleep 0.1
             kill -TERM "$pool_pid"
@@ -1035,7 +1035,7 @@ stdout stays clean.
 
 ```bash
 load "lib/io/parallel"
-io::parallel::map --jobs 4 --out-dir results -- my_worker -- item1 item2
+io::parallel::map --jobs 4 --out-dir results -- my_worker item1 item2
 io::parallel::run --jobs 4 --scheduler fifo --out-dir results -- tasks.txt
 ```
 
