@@ -313,6 +313,34 @@ matches both masks.
 
 ## 5. Error handling and logging
 
+### 5.1 Function contract: purpose, channels and format
+
+A contract is **purpose + channels + statuses + format**; the tier changes the
+mechanisms, not the meaning. The full matrix and examples live in the
+`bs-function-contract` skill.
+
+| Purpose | stdout | stderr | status |
+| --- | --- | --- | --- |
+| Predicate (`is/has/exists/can`) | empty | usually empty | `0` true, `1` false/missing, `2` invalid call |
+| Getter (`get/list/info/stats/detect`) | data | diagnostics | `0` success, `1` missing/error, `2` invalid argument |
+| Action (`set/create/delete/write/apply`) | empty by default | diagnostics | `0` success, domain error code |
+| Emitter (`emit/render/show/print/report`) | presentation | diagnostics | `0` success |
+| Callback/hook | undefined | undefined | interpreted by the caller |
+
+- A getter's stdout is data only: no `log::info/success/debug/trace/print/section`;
+  diagnostics go to stderr.
+- A function never calls `exit`; the entry point owns process termination.
+- A stateful getter (`pop/shift/next`) and values with trailing newlines use an
+  **output variable**, not `$(...)`: a subshell loses state changes and strips
+  trailing newlines.
+- posix: multiple values use `bs_arr_*`/`bs_map_*` and the output variable name
+  is validated before `eval`; bash4/zsh may use arrays/namerefs with the same
+  contract.
+- API layer: a method emits canonical `key=value` records into `format::emit`
+  (`string|json|xml`); human output belongs only to the CLI layer.
+- Public DocBlock: `@description`, `@contract`, `@param`, `@returns`,
+  `@stdout`/`@stderr`, `@example`.
+
 The Google guide suggests plain `echo` for errors; the framework provides a
 logging module ([core/logger.sh](../../core/logger.sh)) and an error-handling
 module ([core/errorhandler.sh](../../core/errorhandler.sh)):

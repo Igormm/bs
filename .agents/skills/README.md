@@ -95,6 +95,7 @@ zsh исполняет posix-ярус: не делит `$var` на слова, `
 | Скилл | Назначение |
 | --- | --- |
 | `bs-object-class` | класс на объектной модели `core/object.sh` (posix-модель, классы в bash4-модулях и posix-скриптах), глава 13 |
+| `bs-function-contract` | контракт функции по назначению и ярусам: predicate/getter/action/emitter/callback, status/stdout/stderr/output-variable, API `key=value` → string/json/xml |
 | `bs-regex` | два яруса regex: `core/regex.sh` (`bs_re_*`, POSIX ERE) vs `lib/data/regex.sh` (`regex::*`, ERE+PCRE), диалекты GNU/busybox/BSD |
 | `bs-write-test` | юнит-тест (bash) + переносимый тест (6 оболочек), assert API testframework |
 | `bs-review-module` | скептический обзор: bash-ловушки + kernel/posix чек-лист, §11, приоритизированные сомнения |

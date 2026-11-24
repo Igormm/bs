@@ -122,6 +122,7 @@ Skills are grouped by the project's **tier** (`@shell posix|bash4`; the doctrine
 **Both tiers**:
 
 - `bs-object-class` — develop a class on the object model `core/object.sh` (fields, methods, properties, contracts, inheritance, delegation, lifetime; code-style-guide chapter 13).
+- `bs-function-contract` — define/review a function contract across posix and bash4/zsh: purpose (predicate/getter/action/emitter/callback), status/stdout/stderr/output-variable channels, and canonical API records rendered as string/json/xml.
 - `bs-regex` — work with regular expressions across the two tiers: `core/regex.sh` (`bs_re_*`, POSIX ERE) vs `lib/data/regex.sh` (`regex::*`, ERE+PCRE); dialect portability (GNU vs busybox vs BSD) and engine fallbacks.
 - `bs-write-test` — unit/integration test skeleton and `testframework.sh` assert API.
 - `bs-review-module` — skeptical critic pass over a module (bash-pitfalls checklist, kernel/posix additions, §11 lens, prioritized doubt report).
