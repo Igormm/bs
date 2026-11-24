@@ -50,7 +50,7 @@ sysdiag::uptime_str() {
 }
 
 sysdiag::load_avg() {
-    cut -d' ' -f1-3 /proc/loadavg 2>/dev/null || printf 'n/a'
+    utils::quiet_err cut -d' ' -f1-3 /proc/loadavg || printf 'n/a'
 }
 
 # Отчёты / Reports

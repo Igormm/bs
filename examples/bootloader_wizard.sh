@@ -49,11 +49,11 @@ CONFIRM_SEL=0
 # Helpers / Помощники
 
 wiz::load() {
-    TIMEOUT="$(system::bootloader::grub_get GRUB_TIMEOUT 2>/dev/null || true)"
-    DEFAULT="$(system::bootloader::grub_get GRUB_DEFAULT 2>/dev/null || true)"
-    CMDLINE="$(system::bootloader::grub_get GRUB_CMDLINE_LINUX 2>/dev/null || true)"
-    RECOVERY="$(system::bootloader::grub_get GRUB_DISABLE_RECOVERY 2>/dev/null || true)"
-    TERMINAL="$(system::bootloader::grub_get GRUB_TERMINAL_OUTPUT 2>/dev/null || true)"
+    TIMEOUT="$(utils::attempt system::bootloader::grub_get GRUB_TIMEOUT)"
+    DEFAULT="$(utils::attempt system::bootloader::grub_get GRUB_DEFAULT)"
+    CMDLINE="$(utils::attempt system::bootloader::grub_get GRUB_CMDLINE_LINUX)"
+    RECOVERY="$(utils::attempt system::bootloader::grub_get GRUB_DISABLE_RECOVERY)"
+    TERMINAL="$(utils::attempt system::bootloader::grub_get GRUB_TERMINAL_OUTPUT)"
     [[ -z "${TIMEOUT}" ]] && TIMEOUT="5"
     [[ -z "${DEFAULT}" ]] && DEFAULT="saved"
     [[ -z "${RECOVERY}" ]] && RECOVERY="false"
@@ -236,7 +236,7 @@ wiz::apply() {
     tui::clear_screen
     printf 'Backing up / Бэкап…\n'
     local backup=""
-    backup="$(system::bootloader::grub_backup 2>/dev/null || true)"
+    backup="$(utils::attempt system::bootloader::grub_backup)"
     printf 'Backup: %s\n' "${backup:-none}"
 
     system::bootloader::grub_set GRUB_TIMEOUT "${TIMEOUT}" || true

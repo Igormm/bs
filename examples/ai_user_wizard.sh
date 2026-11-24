@@ -360,7 +360,7 @@ main() {
     # paths, only existing files are checked; Torvalds: no guesswork).
     local opencode_bin=""
     local oc
-    for oc in "$(command -v opencode 2>/dev/null || true)" \
+    for oc in "$(utils::attempt command -v opencode)" \
         "${HOME}/.opencode/bin/opencode" "${HOME}/.local/bin/opencode" \
         /home/*/.opencode/bin/opencode /home/*/.local/bin/opencode; do
         if is::not_empty "${oc}" && [[ -x "${oc}" ]]; then
@@ -382,7 +382,8 @@ main() {
         local oc_dir="${opencode_bin}"
         while [[ "${oc_dir}" != "/" ]]; do
             local oc_mode
-            oc_mode="$(stat -c '%a' "${oc_dir}" 2>/dev/null || printf '0')"
+            oc_mode="$(utils::quiet_err stat -c '%a' "${oc_dir}")"
+            [[ -n "${oc_mode}" ]] || oc_mode='0'
             (( (10#${oc_mode} & 1) == 1 )) || { opencode_reachable=0; break; }
             oc_dir="${oc_dir%/*}"
         done
@@ -537,7 +538,7 @@ main() {
         state_limits="уже были / existed"
     fi
     step_go "запись лимитов / writing ${limits_file}"
-        aiw::apply "запись лимитов / writing" user::write_limits "${ai_user}" "${nproc}" "${nofile}" >/dev/null
+        utils::quiet_out aiw::apply "запись лимитов / writing" user::write_limits "${ai_user}" "${nproc}" "${nofile}"
     step_ok "лимиты записаны / limits written"
 
     # ---- systemd-сервис / service unit
@@ -653,7 +654,7 @@ main() {
     # web/server dirs under SELinux).
     if (( want_selinux == 1 )); then
         step_go "SELinux: fcontext + restorecon"
-        if command -v semanage >/dev/null 2>&1; then
+        if utils::has semanage; then
             aiw::apply "semanage fcontext ${ai_user}" semanage fcontext -a -t httpd_sys_rw_content_t "/srv/${ai_user}(/.*)?"
             aiw::apply "restorecon /srv/${ai_user}" restorecon -Rv "/srv/${ai_user}"
             step_ok "контекст применён / context applied"
@@ -672,7 +673,7 @@ main() {
     # password — once, on its own line (never clipped by the frame).
     printf '\n\n'
     # реальный IP машины для строки подключения / the machine IP for the connect line
-    local -r machine_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+    local -r machine_ip="$(utils::quiet_err hostname -I | awk '{print $1}')"
     is::empty "${machine_ip}" && local -r machine_ip="<ip>"
     # mDNS .local имя хоста для подключения без запоминания IP
     # mDNS .local hostname for connecting without memorizing the IP
@@ -753,7 +754,7 @@ main() {
     local -i fin_lines=0
     while IFS= read -r _; do fin_lines=$((fin_lines + 1)); done <<< "${final}"
     wizard::box "ИТОГ / RESULT" "${final}" "  Enter — завершить / to finish"
-    wizard::__read_key >/dev/null
+    utils::quiet_out wizard::__read_key
 
     # Выход из alt-экрана: итог и следующие шаги остаются в терминале.
     # Leave the alternate screen: the result and next steps stay visible.

@@ -34,7 +34,7 @@ main() {
 Запуск каждого / run each:
   bs run lib/ui/elements/<имя>.sh / <name>.sh"
     tui::render
-    tui::key_read >/dev/null
+    utils::quiet_out tui::key_read
     tui::quit
 }
 

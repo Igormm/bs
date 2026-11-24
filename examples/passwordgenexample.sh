@@ -62,7 +62,7 @@ main() {
 
     local i password
     for ((i = 1; i <= count; i++)); do
-        if args::flag_get hex >/dev/null; then
+        if utils::quiet_out args::flag_get hex; then
             # hex: каждый байт — два символа / hex: two characters per byte
             password="$(io::streams::random_bytes $(( (length + 1) / 2 )) | od -An -tx1 | tr -d ' \n' | head -c "${length}")"
         else

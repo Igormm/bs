@@ -723,7 +723,7 @@ main() {
             --dry-run) BS_SSHD_DRY_RUN=1 ;;
         esac
     done
-    sshd::init 2>/dev/null || true
+    utils::attempt sshd::init
     sshd_wz::load_sections
     sshd_wz::load_names
     tui::init

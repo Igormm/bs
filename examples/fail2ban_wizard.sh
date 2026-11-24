@@ -652,7 +652,7 @@ main() {
             --dry-run) BS_FAIL2BAN_DRY_RUN=1 ;;
         esac
     done
-    fail2ban::init 2>/dev/null || true
+    utils::attempt fail2ban::init
     f2b_wz::load_jails
     F2B_WZ_JAIL_ON["sshd"]=1
     F2B_WZ_VALUES["sshd.enabled"]="true"

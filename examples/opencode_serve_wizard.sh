@@ -71,7 +71,7 @@ wz::step_ip() {
             WZ_SOURCE="ip"
             return 0
         fi
-        wizard::alert "Неверный IP / Invalid IP: ${value}" >/dev/null || true
+        utils::ignore wizard::alert "Неверный IP / Invalid IP: ${value}"
     done
 }
 
@@ -88,10 +88,10 @@ wz::step_iface() {
         else
             wz_items+=("${iface}  (без IPv4 / no IPv4)")
         fi
-    done < <(ip -4 -o addr show 2>/dev/null | awk '$2 != "lo" {print $2}' | sort -u)
+    done < <(utils::quiet_err ip -4 -o addr show | awk '$2 != "lo" {print $2}' | sort -u)
 
     if (( ${#wz_names[@]} == 0 )); then
-        wizard::alert "Нет интерфейсов с IPv4 / No interfaces with IPv4" >/dev/null || true
+        utils::ignore wizard::alert "Нет интерфейсов с IPv4 / No interfaces with IPv4"
         return 1
     fi
 
@@ -116,7 +116,7 @@ wz::step_port() {
             WZ_PORT="${value}"
             return 0
         fi
-        wizard::alert "Порт должен быть числом 1-65535 / Port must be 1-65535: ${value}" >/dev/null || true
+        utils::ignore wizard::alert "Порт должен быть числом 1-65535 / Port must be 1-65535: ${value}"
     done
 }
 
@@ -215,7 +215,7 @@ main() {
     # ---- opencode installed? / opencode установлен?
     if ! is::command opencode; then
         wizard::__enter_alt
-        wizard::alert "opencode не установлен / not installed — https://opencode.ai" >/dev/null || true
+        utils::ignore wizard::alert "opencode не установлен / not installed — https://opencode.ai"
         wizard::__restore
         exit 1
     fi

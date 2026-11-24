@@ -35,7 +35,7 @@ main() {
 
     # Без терминала stdin — не интерактив: честно пропускаем
     # Without a terminal stdin is not interactive: skip honestly
-    if ! io::streams::is_tty 0 || args::flag_get auto >/dev/null; then
+    if ! io::streams::is_tty 0 || utils::quiet_out args::flag_get auto; then
         log::warn "No interactive stdin (or --auto): answering for you"
         io::streams::feed "${QUIZ_ANSWER}" io::streams::read_line auto_answer
         io::streams::print "Auto answer: ${auto_answer} — correct!"

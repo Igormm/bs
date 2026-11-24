@@ -39,7 +39,7 @@ load "lib/integration/webserver"
 PORT="${PORT:-8080}"
 BACKEND="${BACKEND:-socat}"
 SELF="$(bs::script_dir)/http_server.sh"    # путь к себе, чтобы socat/nc перезапускали
-BS_BIN="${BS_BIN:-$(command -v bs 2>/dev/null || printf '%s/bs' "${BS_ROOT:-.}")}"
+BS_BIN="${BS_BIN:-$(utils::quiet_err command -v bs || printf '%s/bs' "${BS_ROOT:-.}")}"
 
 # ПРИЛОЖЕНИЕ / APPLICATION
 # Здесь — только маршруты. Обработчик читает __web_path и отвечает через
@@ -89,8 +89,8 @@ web::listen() {
             # -e (GNU netcat) или -c (некоторые сборки): обработчик на соединение
             # -e (GNU netcat) or -c (some builds): a handler per connection
             while true; do
-                nc -l "${PORT}" -e "${BS_BIN} run ${SELF} --serve" 2>/dev/null \
-                    || nc -l "${PORT}" -c "${BS_BIN} run ${SELF} --serve" 2>/dev/null || break
+                utils::quiet_err nc -l "${PORT}" -e "${BS_BIN} run ${SELF} --serve" \
+                    || utils::quiet_err nc -l "${PORT}" -c "${BS_BIN} run ${SELF} --serve" || break
             done ;;
         *)
             log::error "Unknown backend: ${BACKEND} (socat|nc|inetd)"

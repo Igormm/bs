@@ -428,7 +428,7 @@ obw::apply_client() {
     fi
     steplog::info "OpenBao health: ${health}"
     local sealed
-    sealed="$(printf '%s' "${health}" | "${BS_OPENBAO_JQ:-jq}" -r '.sealed' 2>/dev/null || true)"
+    sealed="$(printf '%s' "${health}" | utils::attempt "${BS_OPENBAO_JQ:-jq}" -r '.sealed')"
     if [[ "${sealed}" == "true" ]]; then
         presentation::warning "Сервер sealed — нужен unseal / Server is sealed — unseal is required"
     fi

@@ -26,7 +26,7 @@ main() {
         local ev name
         while IFS=$'\t' read -r ev name; do
             local abs
-            abs="$(utils::quiet_err cat "/sys/class/input/${ev}/device/capabilities/abs" 2>/dev/null)"
+            abs="$(utils::quiet_err cat "/sys/class/input/${ev}/device/capabilities/abs")"
             is::not_empty "${abs}" && [[ "${abs}" != "0" ]] && \
                 io::streams::print "  ${ev}  ${name}  abs=${abs}"
         done < <(sensor::devices)
@@ -40,7 +40,7 @@ main() {
         dev=""
         local ev name abs
         while IFS=$'\t' read -r ev name; do
-            abs="$(utils::quiet_err cat "${SENSOR_INPUT_DIR}/${ev}/device/capabilities/abs" 2>/dev/null)"
+            abs="$(utils::quiet_err cat "${SENSOR_INPUT_DIR}/${ev}/device/capabilities/abs")"
             if is::not_empty "${abs}" && [[ "${abs}" != "0" ]]; then
                 dev="${ev}"
                 break

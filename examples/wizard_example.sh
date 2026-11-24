@@ -199,7 +199,7 @@ CPU:  ${model}
 Cores: ${cores}    RAM: ${ram} MiB" round
 
     printf '  Enter — начать / to start'
-    wiz::__read_key >/dev/null
+    utils::quiet_out wiz::__read_key
 
     # --- Step 1: profile / Шаг 1: профиль
     local profile
@@ -225,7 +225,7 @@ Features:  ${picked:-none}" round
     printf '\n'
 
     # --- Fake install with progress bar / «Установка» с прогресс-баром
-    if args::flag_get fast >/dev/null 2>&1; then
+    if utils::quiet args::flag_get fast; then
         :
     else
         local step

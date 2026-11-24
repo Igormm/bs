@@ -58,7 +58,7 @@ netconn_cli::list() {
     if is::command ip; then
         while IFS=' ' read -r name addr; do
             [[ -n "${name}" && -z "${ip4[${name}]:-}" ]] && ip4["${name}"]="${addr}"
-        done < <(ip -o -4 addr show 2>/dev/null | awk '{print $2, $4}')
+        done < <(utils::quiet_err ip -o -4 addr show | awk '{print $2, $4}')
     fi
     printf '  %-16s %-10s %-9s %-18s %-6s %s\n' "NAME" "KIND" "STATE" "MAC" "MTU" "IPv4"
     while IFS=$'\t' read -r name kind state mac mtu; do

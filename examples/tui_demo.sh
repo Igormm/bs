@@ -116,12 +116,12 @@ demo::draw_system() {
   local st_box
   st_box="$(tui::style bold green)"
   tui::box 2 23 56 $(( TUI_LINES - 5 )) "System" "${st_box}"
-  tui::put 4 25 "kernel:  $(uname -sr 2>/dev/null)"
-  tui::put 5 25 "arch:    $(uname -m 2>/dev/null)"
-  tui::put 6 25 "cpu:     $(awk -F': ' '/^model name/{print $2; exit}' /proc/cpuinfo 2>/dev/null)"
-  tui::put 7 25 "cores:   $(nproc 2>/dev/null)"
-  tui::put 8 25 "mem:     $(free -h 2>/dev/null | awk '/Mem/{print $2}')"
-  tui::put 9 25 "uptime:  $(awk '{print int($1/3600)"h "int(($1%3600)/60)"m"}' /proc/uptime 2>/dev/null)"
+  tui::put 4 25 "kernel:  $(utils::quiet_err uname -sr)"
+  tui::put 5 25 "arch:    $(utils::quiet_err uname -m)"
+  tui::put 6 25 "cpu:     $(utils::quiet_err awk -F': ' '/^model name/{print $2; exit}' /proc/cpuinfo)"
+  tui::put 7 25 "cores:   $(utils::quiet_err nproc)"
+  tui::put 8 25 "mem:     $(utils::quiet_err free -h | awk '/Mem/{print $2}')"
+  tui::put 9 25 "uptime:  $(utils::quiet_err awk '{print int($1/3600)"h "int(($1%3600)/60)"m"}' /proc/uptime)"
 }
 
 demo::draw_about() {

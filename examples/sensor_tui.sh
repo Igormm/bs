@@ -72,7 +72,7 @@ st::on_event() {
 # @description Снять карту с fd 9 без блокировки / non-blocking drain
 st::drain_sensor() {
     local line=""
-    while IFS= read -r -t 0.05 -u 9 line 2>/dev/null; do
+    while IFS= utils::quiet_err read -r -t 0.05 -u 9 line; do
         is::not_empty "${line}" && st::on_event "${line}"
     done
     return 0
@@ -109,7 +109,7 @@ st::spawn_keys() {
 # @description Неблокирующий опрос клавиш / non-blocking key poll
 st::drain_keys() {
     local k=""
-    while IFS= read -r -t 0.05 -u "${ST_KEYS[0]}" k 2>/dev/null; do
+    while IFS= utils::quiet_err read -r -t 0.05 -u "${ST_KEYS[0]}" k; do
         k="${k#K:}"
         st::on_key "${k}"
     done

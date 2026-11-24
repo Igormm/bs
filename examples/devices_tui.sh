@@ -69,7 +69,7 @@ dtui::reload() {
     local line
     while IFS= read -r line; do
         [[ -n "${line}" ]] && DEVICES+=("${line}")
-    done < <(device::list 2>/dev/null)
+    done < <(utils::quiet_err device::list)
     (( ${#DEVICES[@]} > 0 )) || DEVICES=()
     (( SEL < ${#DEVICES[@]} )) || SEL=0
 }
@@ -83,7 +83,7 @@ dtui::collect() {
         while IFS= read -r snap; do
             [[ -z "${snap}" ]] && continue
             printf '%s\t%s\t%s\n' "${drv}" "${handle}" "${snap}"
-        done < <(device::snapshot "${drv}" "${handle}" 2>/dev/null)
+        done < <(utils::quiet_err device::snapshot "${drv}" "${handle}")
     done
 }
 
@@ -173,7 +173,7 @@ dtui::draw_review() {
             [[ -z "${snap}" ]] && continue
             tui::put "${row}" 25 "  ${label:0:20}: ${snap}" "$(tui::style bold)"
             row=$(( row + 1 ))
-        done < <(device::snapshot "${drv}" "${handle}" 2>/dev/null)
+        done < <(utils::quiet_err device::snapshot "${drv}" "${handle}")
     done
     tui::put $(( TUI_LINES - 3 )) 25 "s сохранить / save · a применить / apply" "$(tui::style dim)"
 }

@@ -20,7 +20,7 @@
 
 log() { printf '%s\n' "$1"; }
 
-backend="$(sh scripts/build_store_helper.sh 2>/dev/null || true)"
+backend="$(utils::attempt sh scripts/build_store_helper.sh)"
 if [ -z "$backend" ]; then
   log 'no C compiler — using the in-memory store / нет компилятора — хранилище в памяти'
 fi

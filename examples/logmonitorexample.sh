@@ -48,7 +48,7 @@ main() {
 
     # Крутимся, пока сервис жив или в pipe остались данные
     # Spin while the service is alive or the pipe still has data
-    while kill -0 "${service_pid}" 2>/dev/null || io::streams::can_read "${log_fd}"; do
+    while utils::pid_alive "${service_pid}" || io::streams::can_read "${log_fd}"; do
         if io::streams::can_read "${log_fd}"; then
             # Неблокирующая проверка сказала «есть данные» — читаем строку
             # The non-blocking check said "data available" — read a line

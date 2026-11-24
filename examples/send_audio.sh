@@ -240,7 +240,7 @@ send_audio::__request() {
   __map_cfg[curl_pid]="${curl_pid}"
   t_wait="$(utils::now_ms)"
   next_beat=$(( beat * 1000 ))
-  while kill -0 "${curl_pid}" 2>/dev/null; do
+  while utils::pid_alive "${curl_pid}"; do
     sleep 1
     now_ms=$(( $(utils::now_ms) - t_wait ))
     if (( beat > 0 && now_ms >= next_beat )); then

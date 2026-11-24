@@ -74,7 +74,7 @@ main() {
     fi
 
     # Сухой прогон / Dry run
-    if args::flag_get dry-run >/dev/null; then
+    if utils::quiet_out args::flag_get dry-run; then
         log::warn "DRY RUN: ${action} into ${env} — no changes will be made"
     fi
 

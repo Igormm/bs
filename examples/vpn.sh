@@ -78,7 +78,7 @@ vpn_cli::list() {
     local active="" live=""
     if vpn::core::running; then
         active="$(vpn::core::session_get id)"
-        live="$(vpn::core::current 2>/dev/null)"
+        live="$(utils::quiet_err vpn::core::current)"
         live="${live#auto:}"
     fi
     local proto name server group security transport mark ping
@@ -113,14 +113,14 @@ vpn_cli::status() {
     fi
     printf '● подключено / connected\n'
     local cur
-    cur="$(vpn::core::current 2>/dev/null)" || cur="${st[id]}"
-    printf '  сервер     %s (%s)\n' "$(vpn::tui::narrow "$(vpn::store::field "${cur#auto:}" name 2>/dev/null)")" "${cur}"
+    cur="$(utils::quiet_err vpn::core::current)" || cur="${st[id]}"
+    printf '  сервер     %s (%s)\n' "$(vpn::tui::narrow "$(utils::quiet_err vpn::store::field "${cur#auto:}" name)")" "${cur}"
     printf '  ядро       %s\n' "${st[engine]}"
     printf '  режим      %s%s\n' "${st[mode]}" "$([[ "${st[mode]}" == proxy ]] && printf ' · socks5/http %s' "${st[listen]}")"
     printf '  маршрут    %s\n' "${st[route]}"
     printf '  время      %s\n' "$(vpn::tui::duration "${st[uptime]}")"
     local up down conns
-    if IFS=' ' read -r up down conns < <(vpn::core::traffic 2>/dev/null); then
+    if IFS=' ' read -r up down conns < <(utils::quiet_err vpn::core::traffic); then
         printf '  трафик     ↓ %s  ↑ %s  · соединений %s\n' "$(vpn::tui::bytes "${down}")" "$(vpn::tui::bytes "${up}")" "${conns}"
     fi
     printf '  pid        %s\n' "${st[pid]}"
@@ -153,7 +153,7 @@ vpn_cli::test() {
         (( $# > 0 )) && ids=("$@")
         local id ms
         for id in "${ids[@]}"; do
-            if ms="$(vpn::core::test_tcp "${id}" 2>/dev/null)"; then
+            if ms="$(utils::quiet_err vpn::core::test_tcp "${id}")"; then
                 printf '%s\t%sms\n' "${id}" "${ms}"
                 vpn::core::latency_save "${id}" "${ms}"
             else
@@ -212,7 +212,7 @@ vpn_cli::core() {
                     printf '%-9s %-10s vpn.sh core install %s\n' "${engine}" "—" "${engine}"
                 fi
             done
-            if vpn::core::bin xray >/dev/null 2>&1; then
+            if utils::quiet vpn::core::bin xray; then
                 assets="$(vpn::core::xray_assets)" || assets="нет geoip.dat/geosite.dat / no geo files"
                 printf '%-9s %-10s %s\n' "" "geo" "${assets}"
             fi
@@ -266,7 +266,7 @@ main() {
             if (( $# > 0 )); then vpn::core::switch "$1" || exit $?; else vpn::core::start || exit $?; fi
             vpn_cli::status ;;
         auto)
-            vpn::settings::set auto_select 1 >/dev/null
+            utils::quiet_out vpn::settings::set auto_select 1
             if vpn::core::running; then vpn::core::switch auto; else vpn::core::start; fi
             vpn_cli::status ;;
         disconnect|down|stop) vpn::core::stop; printf 'отключено / disconnected\n' ;;
@@ -286,10 +286,10 @@ main() {
             local -a ids=()
             mapfile -t ids < <(vpn::core::config_ids "${id}" "${engine}")
             if [[ "${engine}" == "xray" ]]; then
-                vpn::core::xray_assets >/dev/null && VPN_XRAY_GEO=1
+                utils::quiet_out vpn::core::xray_assets && VPN_XRAY_GEO=1
                 vpn::xray::config "${ids[@]}"
             else
-                vpn::core::require sing-box 2>/dev/null || VPN_SINGBOX_VERSION=""
+                utils::quiet_err vpn::core::require sing-box || VPN_SINGBOX_VERSION=""
                 vpn::singbox::config "${ids[@]}"
             fi ;;
         settings) vpn::settings::list ;;

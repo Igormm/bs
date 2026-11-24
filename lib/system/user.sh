@@ -37,7 +37,7 @@ declare -g BS_LIMITS_DIR="/etc/security/limits.d"
 
 # @description User exists / Пользователь существует
 # @param $1 User name / Имя пользователя
-user::exists() { id "${1:?user name required}" >/dev/null 2>&1; }
+user::exists() { utils::quiet id "${1:?user name required}"; }
 
 # @description Create a system user: home dir, no login shell.
 # @description Создать системного пользователя: домашний каталог, без шелла.
@@ -105,7 +105,7 @@ user::write_sudoers() {
             # sudoers needs an absolute command path: "systemctl x" -> "/usr/bin/systemctl x"
             cmd="${line%% *}"
             if [[ "${cmd}" != /* && "${cmd}" != ALL ]]; then
-                abs="$(command -v -- "${cmd}" 2>/dev/null || :)"
+                abs="$(utils::attempt command -v -- "${cmd}")"
                 if [[ "${abs}" == /* ]]; then
                     line="${abs}${line#"${cmd}"}"
                 fi
@@ -114,7 +114,7 @@ user::write_sudoers() {
         done
     } > "${tmp}"
     chmod 440 "${tmp}"
-    if ! visudo -c -f "${tmp}" >/dev/null 2>&1; then
+    if ! utils::quiet visudo -c -f "${tmp}"; then
         rm -f "${tmp}"
         log::error "user::write_sudoers: visudo -c не прошёл / failed — файл откачен / reverted: ${path}"
         return 1

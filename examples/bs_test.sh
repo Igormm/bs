@@ -61,7 +61,7 @@ fi
 
 # Проверка работы с дистрибутивом / Distro check
 if load "lib/system/distro"; then
-    log::info "Дистрибутив: $(system::distro::detect 2>/dev/null || echo unknown)"
+    log::info "Дистрибутив: $(utils::quiet_err system::distro::detect || echo unknown)"
 else
     echo "Модуль дистрибутива не найден или не удалось загрузить" >&2
 fi
