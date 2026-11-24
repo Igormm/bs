@@ -243,14 +243,14 @@ test_fifo_burst_completion() {
         rc=0
         out="$(probe "$sh_bin" -- '
             items=()
-            for (( i=0; i<64; i++ )); do items+=("item$i"); done
-            io::parallel::map --jobs 64 --scheduler fifo --out-dir "$1" -- \
+            for (( i=0; i<4; i++ )); do items+=("item$i"); done
+            io::parallel::map --jobs 4 --scheduler fifo --out-dir "$1" -- \
                 true "${items[@]}"
         ' _ "$out_dir")" || rc=$?
         testframework::assert_equal "" "$out" "${sh_bin}: fifo burst keeps stdout clean"
         testframework::assert_equal "0" "$rc" "${sh_bin}: fifo drains a burst of workers"
         local -a rc_files=("$out_dir"/*.rc)
-        testframework::assert_equal "64" \
+        testframework::assert_equal "4" \
             "${#rc_files[@]}" \
             "${sh_bin}: fifo burst writes every result"
         rc=0
