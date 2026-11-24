@@ -67,6 +67,49 @@ args::parse() {
     return "${rc}"
 }
 
+# @description Все CLI-значения флага, по одному на строку / All CLI values of a flag, one per line
+# @param $1 canonical flag name
+args::flag_get_all() {
+    bs_args_flag_get_all "$@"
+}
+
+# @description Скопировать CLI-значения флага в caller-named массив / Copy CLI flag values into a caller-named array
+# @param $1 canonical flag name
+# @param $2 caller array name
+args::flag_values() {
+    local name="${1:-}" array_name="${2:-}" i value count
+    case "$array_name" in
+        ''|[0-9]*|__bs_*|*[!A-Za-z0-9_]*)
+            log::error "args::flag_values: invalid array name: ${array_name}"
+            return "${E_INVALID:-2}"
+            ;;
+    esac
+
+    bs_arr_clear bs_args_selected
+    if bs_map_has bs_args_flag_repeat "$name"; then
+        bs_data_len_of bs_args_repeat_names
+        count=$__bs_dat_n
+        for (( i=0; i<count; i++ )); do
+            bs_data_get_at bs_args_repeat_names "$i"
+            if [[ "$__bs_dat_cur" == "$name" ]]; then
+                bs_data_get_at bs_args_repeat_values "$i"
+                bs_arr_push bs_args_selected "$__bs_dat_cur"
+            fi
+        done
+    elif bs_map_has bs_args_parsed "$name"; then
+        bs_map_get_to bs_args_parsed "$name" value
+        bs_arr_push bs_args_selected "$value"
+    fi
+
+    bs_arr_to_args_to bs_args_selected __bs_args_fv_args
+    eval "$__bs_args_fv_args"
+    if ! eval "${array_name}=(\"\$@\")"; then
+        log::error "args::flag_values: cannot assign array: ${array_name}"
+        return "${E_INVALID:-2}"
+    fi
+    return "${E_SUCCESS:-0}"
+}
+
 # @description Разбор + выход: ошибка → bs::exit invalid, help → bs::exit success
 # @description Parse + exit: an error → bs::exit invalid, help → bs::exit success
 # @param $@ arguments / аргументы

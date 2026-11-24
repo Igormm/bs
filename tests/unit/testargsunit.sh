@@ -237,6 +237,31 @@ main() {
     testframework::assert_command "bs_map_has bs_args_flag_repeat port" "repeat property stored"
     testframework::assert_command "bs_map_has bs_args_flag_bool_value color" "bool-value property stored"
 
+    args::reset
+    args::flag label value
+    args::flag_repeat label
+    args::flag_short label l
+    args::parse -l "two words" --label $'line1\nline2' -l '*'
+    testframework::assert_equal "two words" "${ARGS_FLAGS[label]}" "ARGS_FLAGS keeps first repeat value"
+    local -a labels=()
+    args::flag_values label labels
+    testframework::assert_equal "3" "${#labels[@]}" "flag_values copies every occurrence"
+    testframework::assert_equal "two words" "${labels[0]}" "spaces survive flag_values"
+    testframework::assert_equal $'line1\nline2' "${labels[1]}" "newlines survive flag_values"
+    testframework::assert_equal "*" "${labels[2]}" "glob characters survive flag_values"
+    args::parse --label '$(printf injected)'
+    args::flag_values label labels
+    testframework::assert_equal '$(printf injected)' "${labels[0]}" "literal substitution is not evaluated"
+    rc=0
+    args::flag_values label 'bad-name' >/dev/null 2>&1 || rc=$?
+    testframework::assert_equal "${E_INVALID}" "$rc" "flag_values rejects invalid array names"
+    rc=0
+    args::flag_values label '__bs_evil' >/dev/null 2>&1 || rc=$?
+    testframework::assert_equal "${E_INVALID}" "$rc" "flag_values rejects internal array names"
+    args::parse
+    args::flag_values label labels
+    testframework::assert_equal "0" "${#labels[@]}" "flag_values leaves an empty array when unset"
+
     # Тест 12: Help с флагами
     testframework::section "Help with Flags / Help с флагами"
 

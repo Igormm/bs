@@ -209,6 +209,7 @@ test_aliases() {
         sh_bin="$(command -v "${sh_name}" || true)"
         [[ -n "${sh_bin}" ]] || continue
         eq "$(probe "${sh_bin}" 'args::define a b; args::flag v; args::describe a "x"; args::level 1 c; bs_args_parse c --v; echo "rc=$? $(args::get 1) $(args::flag_get v) $(args::param 1) $(args::flag_get w 5)"')" "rc=0 c 1 c 5" "${sh_name}: args::* are aliases of bs_args_*"
+        eq "$(probe "${sh_bin}" 'args::flag e value; args::flag_repeat e; bs_args_parse --e a --e b; args::flag_get_all e | tr "\n" "|"')" "a|b|" "${sh_name}: flag_get_all alias"
     done
     # kernel in bash: the old names work, the results are real bash arrays (lib/compat/args.sh)
     load "core/args"
