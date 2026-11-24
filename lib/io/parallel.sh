@@ -33,6 +33,15 @@ declare -g IO_PARALLEL_SCHED="pid"
 # @global IO_PARALLEL_ARGS — Parallel: parsed positional arguments (category: state)
 # @global IO_PARALLEL_ARGS — Parallel: позиционные аргументы (category: state)
 declare -ga IO_PARALLEL_ARGS=()
+# @global IO_PARALLEL_PIDS — Parallel: active worker PIDs (category: state)
+# @global IO_PARALLEL_PIDS — Parallel: PID активных воркеров (category: state)
+declare -ga IO_PARALLEL_PIDS=()
+# @global IO_PARALLEL_INDICES — Parallel: active task indices (category: state)
+# @global IO_PARALLEL_INDICES — Parallel: индексы активных задач (category: state)
+declare -ga IO_PARALLEL_INDICES=()
+# @global IO_PARALLEL_FAILED — Parallel: aggregate failure flag (category: state)
+# @global IO_PARALLEL_FAILED — Parallel: флаг общей ошибки (category: state)
+declare -g IO_PARALLEL_FAILED=0
 
 # @private
 # @description Parse common options without exiting the caller.
@@ -74,6 +83,72 @@ io::parallel::__result_name() {
     printf '%04d' "$1"
 }
 
+# @private
+# @description Execute one worker and persist stdout, stderr and status.
+# @description Выполнить воркер и сохранить stdout, stderr и статус.
+# @param $1 index
+# @param $2 output directory
+# @param $@ command and arguments
+# @returns always E_SUCCESS; worker status is written to NNNN.rc
+io::parallel::__worker() {
+    local idx="$1" out="$2"; shift 2
+    local name rc=0
+    name="$(io::parallel::__result_name "$idx")"
+    "$@" > "$out/$name.out" 2> "$out/$name.err" || rc=$?
+    printf '%s\n' "$rc" > "$out/$name.rc"
+    return "${E_SUCCESS:-0}"
+}
+
+# @private
+# @description Start one PID-pool worker.
+# @description Запустить одного воркера PID-pool.
+# @param $1 index
+# @param $@ command and arguments
+io::parallel::__pid_start() {
+    local idx="$1"; shift
+    io::parallel::__worker "$idx" "$IO_PARALLEL_OUT" "$@" &
+    IO_PARALLEL_PIDS+=("$!")
+    IO_PARALLEL_INDICES+=("$idx")
+}
+
+# @private
+# @description Reap the oldest active PID and aggregate its status.
+# @description Дождаться самого раннего PID и учесть его статус.
+io::parallel::__pid_reap_one() {
+    local pid="${IO_PARALLEL_PIDS[0]}" idx="${IO_PARALLEL_INDICES[0]}"
+    local name rc
+    wait "$pid" || true
+    name="$(io::parallel::__result_name "$idx")"
+    rc="$(cat "$IO_PARALLEL_OUT/$name.rc")"
+    [[ "$rc" -eq 0 ]] || IO_PARALLEL_FAILED=1
+    IO_PARALLEL_PIDS=("${IO_PARALLEL_PIDS[@]:1}")
+    IO_PARALLEL_INDICES=("${IO_PARALLEL_INDICES[@]:1}")
+}
+
+# @private
+# @description Run callback for every item with the PID scheduler.
+# @description Вызвать callback для каждого элемента через PID scheduler.
+# @param $1 callback
+# @param $@ items
+# @returns E_SUCCESS or E_ERROR
+io::parallel::__pid_map() {
+    local callback="$1"; shift
+    local idx=0 item
+    IO_PARALLEL_PIDS=(); IO_PARALLEL_INDICES=(); IO_PARALLEL_FAILED=0
+    for item in "$@"; do
+        while (( ${#IO_PARALLEL_PIDS[@]} >= IO_PARALLEL_JOBS )); do
+            io::parallel::__pid_reap_one
+        done
+        io::parallel::__pid_start "$idx" "$callback" "$item"
+        idx=$(( idx + 1 ))
+    done
+    while (( ${#IO_PARALLEL_PIDS[@]} > 0 )); do
+        io::parallel::__pid_reap_one
+    done
+    (( IO_PARALLEL_FAILED == 0 )) || return "${E_ERROR:-1}"
+    return "${E_SUCCESS:-0}"
+}
+
 # @description Run a callback once for each input element.
 # @description Вызвать callback один раз для каждого элемента.
 # @contract action
@@ -81,7 +156,14 @@ io::parallel::__result_name() {
 # @returns E_SUCCESS, E_INVALID or E_ERROR
 io::parallel::map() {
     io::parallel::__parse "$@" || return $?
-    return "${E_INVALID:-2}"
+    (( ${#IO_PARALLEL_ARGS[@]} >= 1 )) || {
+        bs_log_error "io::parallel::map: callback required"
+        return "${E_INVALID:-2}"
+    }
+    local callback="${IO_PARALLEL_ARGS[0]}"
+    local -a items=("${IO_PARALLEL_ARGS[@]:1}")
+    mkdir -p "$IO_PARALLEL_OUT" || return "${E_ERROR:-1}"
+    io::parallel::__pid_map "$callback" "${items[@]}"
 }
 
 # @description Run one shell command per non-comment line of a task file.

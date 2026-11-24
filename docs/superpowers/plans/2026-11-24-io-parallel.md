@@ -293,9 +293,9 @@ test_pid_map_concurrency_limit() {
         out_dir="$T/${sh_bin}-limit"
         out="$(probe "$sh_bin" -- '
             slow_worker() {
-                printf "start %s\n" "$$" >> "$1/events"
+                printf "start %s\n" "$$" >> "$IO_PARALLEL_OUT/events"
                 sleep 0.05
-                printf "end %s\n" "$$" >> "$1/events"
+                printf "end %s\n" "$$" >> "$IO_PARALLEL_OUT/events"
             }
             io::parallel::map --jobs 2 --out-dir "$1" -- slow_worker a b c d e
         ' _ "$out_dir")" || rc=$?

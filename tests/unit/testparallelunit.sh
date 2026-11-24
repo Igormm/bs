@@ -73,7 +73,7 @@ test_pid_map_contract() {
                 [[ "$item" != bad ]]
             }
             io::parallel::map --jobs 2 --out-dir "$1" -- \
-                parallel_test_worker -- first bad "two words"
+                parallel_test_worker first bad "two words"
             printf "aggregate=%s\n" "$?"
         ' _ "$out_dir")" || rc=$?
         testframework::assert_equal "0" "$rc" "${sh_bin}: map itself returns success"
@@ -94,9 +94,9 @@ test_pid_map_concurrency_limit() {
         out_dir="$T/${sh_bin}-limit"
         out="$(probe "$sh_bin" -- '
             slow_worker() {
-                printf "start %s\n" "$$" >> "$1/events"
+                printf "start %s\n" "$$" >> "$IO_PARALLEL_OUT/events"
                 sleep 0.05
-                printf "end %s\n" "$$" >> "$1/events"
+                printf "end %s\n" "$$" >> "$IO_PARALLEL_OUT/events"
             }
             io::parallel::map --jobs 2 --out-dir "$1" -- slow_worker a b c d e
         ' _ "$out_dir")" || rc=$?
