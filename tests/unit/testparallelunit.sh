@@ -259,6 +259,60 @@ TASKS
     done
 }
 
+test_cancel_cleans_workers() {
+    local sh_bin scheduler signal out_dir out worker_pid rc=0
+    for sh_bin in bash zsh; do
+        for scheduler in pid fifo; do
+            for signal in INT TERM; do
+                out_dir="$T/${sh_bin}-${scheduler}-${signal}-cancel"
+                rc=0
+                out="$(probe "$sh_bin" -- '
+                    pool_pid=$$
+                    export CANCEL_DIR="$3"
+                    (
+                        for (( i=0; i<100; i++ )); do
+                            [[ -f "$CANCEL_DIR/ready" ]] && break
+                            sleep 0.01
+                        done
+                        kill -"$1" "$pool_pid"
+                    ) &
+                    sender=$!
+                    slow_task() {
+                        printf "%s\n" "$IO_PARALLEL_TEMP" > "$CANCEL_DIR/temp-path"
+                        exec bash -c '\''
+                            printf "%s\\n" "$$" > "$CANCEL_DIR/worker.pid"
+                            : > "$CANCEL_DIR/ready"
+                            sleep 0.5
+                            printf "leaked\\n" > "$CANCEL_DIR/leaked"
+                        '\''
+                    }
+                    io::parallel::map --jobs 1 --scheduler "$2" --out-dir "$3" -- \
+                        slow_task unused
+                    rc=$?
+                    wait "$sender" || true
+                    printf "rc=%s temp=%s fd=%s\\n" "$rc" "$IO_PARALLEL_TEMP" "$IO_PARALLEL_FD"
+                    exit 0
+                ' _ "$signal" "$scheduler" "$out_dir")" || rc=$?
+                testframework::assert_equal "0" "$rc" "${sh_bin}/${scheduler}/${signal}: probe survives signal"
+                sleep 0.6
+                if [[ -f "$out_dir/worker.pid" ]]; then
+                    worker_pid="$(cat "$out_dir/worker.pid")"
+                    [[ "$worker_pid" =~ ^[1-9][0-9]*$ ]] && kill -TERM "$worker_pid" 2>/dev/null || true
+                fi
+                testframework::assert_false "-f '$out_dir/leaked'" \
+                    "${sh_bin}/${scheduler}/${signal}: cancellation prevents worker side effects"
+                testframework::assert_command "grep -q '^rc=1 temp= fd=$' <<< '$out'" \
+                    "${sh_bin}/${scheduler}/${signal}: cancellation returns E_ERROR and clears state"
+                if [[ "$scheduler" == "fifo" && -f "$out_dir/temp-path" ]]; then
+                    testframework::assert_false "-e '$(cat "$out_dir/temp-path")'" \
+                        "${sh_bin}/${scheduler}/${signal}: cancellation removes FIFO temporary directory"
+                fi
+                rc=0
+            done
+        done
+    done
+}
+
 main() {
     T="$(mktemp -d)"; mkdir -p "$T/home" "$T/home/no-tools"; export T
     trap 'rm -rf "$T"' EXIT
@@ -272,6 +326,7 @@ main() {
     testframework::section "FIFO task file / FIFO файл задач"; test_fifo_task_file
     testframework::section "FIFO burst / FIFO серия"; test_fifo_burst_completion
     testframework::section "xargs stub / Заглушка xargs"; test_xargs_stub
+    testframework::section "Cancellation / Отмена"; test_cancel_cleans_workers
     testframework::summary
 }
 

@@ -892,33 +892,28 @@ git commit -m "chore(io): reserve xargs scheduler stub"
 - Modify: `tests/unit/testparallelunit.sh`
 
 **Interfaces:**
-- Consumes: `IO_PARALLEL_PIDS`, `IO_PARALLEL_TEMP`, `bs_signal_on`, `bs_signal_reset`.
-- Produces: `io::parallel::cancel`, `io::parallel::__cancel_handler`, `io::parallel::__cleanup`.
+- Consumes: `IO_PARALLEL_PIDS`, `IO_PARALLEL_INDICES`, `IO_PARALLEL_FD`,
+  `IO_PARALLEL_TEMP`, `bs_signal_on`, `bs_signal_reset`.
+- Produces: `io::parallel::cancel`, `io::parallel::__install_handlers`,
+  `io::parallel::__cancel_handler`, `io::parallel::__cleanup`,
+  `IO_PARALLEL_CANCELLED`.
 
 - [ ] **Step 1: Add a failing cancellation test**
 
-Append:
+Append `test_cancel_cleans_workers`. Cover the full matrix: `bash`/`zsh`,
+`pid`/`fifo`, and `INT`/`TERM`. Each probe:
 
-```bash
-test_cancel_cleans_workers() {
-    local sh_bin marker="$T/cancelled" rc=0
-    for sh_bin in bash zsh; do
-        rm -f "$marker"
-        rc=0
-        probe "$sh_bin" -- '
-            slow_task() { sleep 5; printf "leaked\n" > "$1"; }
-            io::parallel::map --jobs 1 --out-dir "$HOME/r" -- slow_task "$1" &
-            pool_pid=$!
-            sleep 0.1
-            kill -TERM "$pool_pid"
-            wait "$pool_pid" || true
-        ' _ "$marker" >/dev/null || rc=$?
-        sleep 0.2
-        testframework::assert_false "test -f '$marker'" "${sh_bin}: SIGTERM prevents worker side effects"
-        rc=0
-    done
-}
-```
+1. exports its result directory and starts a sender subshell;
+2. the sender waits for a `ready` file, then signals the foreground probe shell
+   (background jobs can inherit SIGINT as ignored);
+3. the callback records the FIFO temp path, then `exec`s a short bash worker that
+   records its PID, creates `ready`, sleeps, and would create `leaked`;
+4. after `map` returns, the probe prints `rc`, `IO_PARALLEL_TEMP` and
+   `IO_PARALLEL_FD`, then exits zero so the harness can inspect the state.
+
+Assert probe status zero, no `leaked` marker, `rc=1 temp= fd=`, and for FIFO that
+the recorded temporary directory no longer exists. The host test kills any
+worker left by a failing implementation before checking the marker.
 
 - [ ] **Step 2: Run and verify failure**
 
@@ -928,23 +923,49 @@ Expected: FAIL because the worker survives SIGTERM.
 
 - [ ] **Step 3: Implement cancellation**
 
-Add:
+Add the cancellation-state global:
+
+```bash
+# @global IO_PARALLEL_CANCELLED — Parallel: cancellation requested flag (category: state)
+# @global IO_PARALLEL_CANCELLED — Parallel: флаг запроса отмены (category: state)
+declare -g IO_PARALLEL_CANCELLED=0
+```
+
+Reset `INT`/`TERM` inside `__worker`, so a worker cannot inherit and run the
+pool's cancellation handler when the pool sends it `TERM`.
+
+Add handler installation and cleanup helpers:
 
 ```bash
 # @private
-# @description Stop workers and remove internal temporary state without changing
-# the aggregate result. / Остановить воркеров и удалить временное состояние,
-# не меняя общий результат.
+# @description Install cancellation handlers for an active worker pool.
+# @description Установить обработчики отмены для активного пула воркеров.
+# @returns E_SUCCESS or E_ERROR
+io::parallel::__install_handlers() {
+    bs_signal_on INT io::parallel::__cancel_handler || return "${E_ERROR:-1}"
+    bs_signal_on TERM io::parallel::__cancel_handler || {
+        bs_signal_reset INT
+        return "${E_ERROR:-1}"
+    }
+    return "${E_SUCCESS:-0}"
+}
+
+# @private
+# @description Stop active workers without changing aggregate state.
+# @description Остановить активных воркеров, не меняя общий статус.
 io::parallel::__stop_workers() {
     local pid
     for pid in "${IO_PARALLEL_PIDS[@]}"; do
-        [[ "$pid" =~ ^[1-9][0-9]*$ ]] && kill -TERM "$pid" 2>/dev/null || true
+        if [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then
+            utils::quiet kill -TERM "$pid" || true
+        fi
     done
     for pid in "${IO_PARALLEL_PIDS[@]}"; do
-        [[ "$pid" =~ ^[1-9][0-9]*$ ]] && wait "$pid" 2>/dev/null || true
+        if [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then
+            utils::ignore wait "$pid"
+        fi
     done
     IO_PARALLEL_PIDS=(); IO_PARALLEL_INDICES=()
-    io::parallel::__fifo_cleanup
 }
 
 # @description Cancel active workers and remove internal temporary state.
@@ -953,7 +974,9 @@ io::parallel::__stop_workers() {
 # @returns E_SUCCESS
 io::parallel::cancel() {
     io::parallel::__stop_workers
+    IO_PARALLEL_CANCELLED=1
     IO_PARALLEL_FAILED=1
+    io::parallel::__fifo_cleanup
     return "${E_SUCCESS:-0}"
 }
 
@@ -961,7 +984,12 @@ io::parallel::cancel() {
 # @description Signal handler used during an active pool.
 # @description Обработчик сигнала для активного пула.
 io::parallel::__cancel_handler() {
-    io::parallel::cancel
+    io::parallel::__stop_workers
+    IO_PARALLEL_CANCELLED=1
+    IO_PARALLEL_FAILED=1
+    if [[ -n "$IO_PARALLEL_FD" ]]; then
+        utils::quiet_err printf '%s\n' -1 >&"$IO_PARALLEL_FD" || true
+    fi
 }
 
 # @private
@@ -971,21 +999,31 @@ io::parallel::__cleanup() {
     bs_signal_reset INT
     bs_signal_reset TERM
     io::parallel::__stop_workers
+    io::parallel::__fifo_cleanup
 }
 ```
 
-At the start of `__pid_map`, `__pid_tasks` and `__fifo_run`, install handlers:
+The signal handler deliberately leaves the FIFO descriptor open and writes a
+`-1` sentinel. Bash restarts an interrupted `read` after a trap returns; closing
+the FIFO inside the handler leaves that restarted read blocked forever. The
+scheduler consumes the sentinel, observes `IO_PARALLEL_CANCELLED`, and only then
+runs full cleanup. `utils::quiet_err` is required here: `utils::quiet` would
+redirect the sentinel's stdout to `/dev/null` before `printf` runs.
 
-```bash
-bs_signal_on INT io::parallel::__cancel_handler
-bs_signal_on TERM io::parallel::__cancel_handler
-```
+At the start of `__pid_map`, `__pid_tasks` and `__fifo_run`, reset
+`IO_PARALLEL_CANCELLED=0` with the other pool state before calling
+`io::parallel::__install_handlers || return "${E_ERROR:-1}"`.
 
-Before every successful/error return, call:
+In both PID schedulers, stop launching or reaping once cancellation is set.
+After an interrupted `wait`, `__pid_reap_one` returns `E_ERROR` before trying to
+read a result file that a killed worker may never have written. Every exit path
+calls `io::parallel::__cleanup`, and the final status is `E_ERROR` when either
+`IO_PARALLEL_FAILED` or `IO_PARALLEL_CANCELLED` is nonzero.
 
-```bash
-io::parallel::__cleanup
-```
+In the FIFO scheduler, check cancellation after every `read`, `wait`, and worker
+launch. A failed/interrupted `read`, unknown completion, or cancellation goes
+through `__cleanup` and returns `E_ERROR`; normal completion does the same
+cleanup and then checks both aggregate flags.
 
 - [ ] **Step 4: Run and verify pass**
 

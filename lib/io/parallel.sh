@@ -42,6 +42,9 @@ declare -ga IO_PARALLEL_INDICES=()
 # @global IO_PARALLEL_FAILED — Parallel: aggregate failure flag (category: state)
 # @global IO_PARALLEL_FAILED — Parallel: флаг общей ошибки (category: state)
 declare -g IO_PARALLEL_FAILED=0
+# @global IO_PARALLEL_CANCELLED — Parallel: cancellation requested flag (category: state)
+# @global IO_PARALLEL_CANCELLED — Parallel: флаг запроса отмены (category: state)
+declare -g IO_PARALLEL_CANCELLED=0
 # @global IO_PARALLEL_TEMP — Parallel: internal temporary directory (category: state)
 # @global IO_PARALLEL_TEMP — Parallel: внутренний временный каталог (category: state)
 declare -g IO_PARALLEL_TEMP=""
@@ -98,11 +101,79 @@ io::parallel::__result_name() {
 # @returns always E_SUCCESS; worker status is written to NNNN.rc
 io::parallel::__worker() {
     local idx="$1" out="$2"; shift 2
+    bs_signal_reset INT
+    bs_signal_reset TERM
     local name rc=0
     name="$(io::parallel::__result_name "$idx")"
     "$@" > "$out/$name.out" 2> "$out/$name.err" || rc=$?
     printf '%s\n' "$rc" > "$out/$name.rc"
     return "${E_SUCCESS:-0}"
+}
+
+# @private
+# @description Install cancellation handlers for an active worker pool.
+# @description Установить обработчики отмены для активного пула воркеров.
+# @returns E_SUCCESS or E_ERROR
+io::parallel::__install_handlers() {
+    bs_signal_on INT io::parallel::__cancel_handler || return "${E_ERROR:-1}"
+    bs_signal_on TERM io::parallel::__cancel_handler || {
+        bs_signal_reset INT
+        return "${E_ERROR:-1}"
+    }
+    return "${E_SUCCESS:-0}"
+}
+
+# @private
+# @description Stop workers and remove internal temporary state without changing
+# the aggregate result. / Остановить воркеров и удалить временное состояние,
+# не меняя общий результат.
+io::parallel::__stop_workers() {
+    local pid
+    for pid in "${IO_PARALLEL_PIDS[@]}"; do
+        if [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then
+            utils::quiet kill -TERM "$pid" || true
+        fi
+    done
+    for pid in "${IO_PARALLEL_PIDS[@]}"; do
+        if [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then
+            utils::ignore wait "$pid"
+        fi
+    done
+    IO_PARALLEL_PIDS=(); IO_PARALLEL_INDICES=()
+}
+
+# @description Cancel active workers and remove internal temporary state.
+# @description Отменить активных воркеров и удалить внутреннее временное состояние.
+# @contract action
+# @returns E_SUCCESS
+io::parallel::cancel() {
+    io::parallel::__stop_workers
+    IO_PARALLEL_CANCELLED=1
+    IO_PARALLEL_FAILED=1
+    io::parallel::__fifo_cleanup
+    return "${E_SUCCESS:-0}"
+}
+
+# @private
+# @description Signal handler used during an active pool.
+# @description Обработчик сигнала для активного пула.
+io::parallel::__cancel_handler() {
+    io::parallel::__stop_workers
+    IO_PARALLEL_CANCELLED=1
+    IO_PARALLEL_FAILED=1
+    if [[ -n "$IO_PARALLEL_FD" ]]; then
+        utils::quiet_err printf '%s\n' -1 >&"$IO_PARALLEL_FD" || true
+    fi
+}
+
+# @private
+# @description Restore default signal behaviour and clean internal state.
+# @description Вернуть сигналам поведение по умолчанию и очистить внутреннее состояние.
+io::parallel::__cleanup() {
+    bs_signal_reset INT
+    bs_signal_reset TERM
+    io::parallel::__stop_workers
+    io::parallel::__fifo_cleanup
 }
 
 # @private
@@ -124,6 +195,7 @@ io::parallel::__pid_reap_one() {
     local pid="${IO_PARALLEL_PIDS[0]}" idx="${IO_PARALLEL_INDICES[0]}"
     local name rc
     wait "$pid" || true
+    (( IO_PARALLEL_CANCELLED == 0 )) || return "${E_ERROR:-1}"
     name="$(io::parallel::__result_name "$idx")"
     rc="$(cat "$IO_PARALLEL_OUT/$name.rc")"
     [[ "$rc" -eq 0 ]] || IO_PARALLEL_FAILED=1
@@ -140,18 +212,22 @@ io::parallel::__pid_reap_one() {
 io::parallel::__pid_map() {
     local callback="$1"; shift
     local idx=0 item
-    IO_PARALLEL_PIDS=(); IO_PARALLEL_INDICES=(); IO_PARALLEL_FAILED=0
+    IO_PARALLEL_PIDS=(); IO_PARALLEL_INDICES=(); IO_PARALLEL_FAILED=0; IO_PARALLEL_CANCELLED=0
+    io::parallel::__install_handlers || return "${E_ERROR:-1}"
     for item in "$@"; do
-        while (( ${#IO_PARALLEL_PIDS[@]} >= IO_PARALLEL_JOBS )); do
-            io::parallel::__pid_reap_one
+        (( IO_PARALLEL_CANCELLED == 0 )) || break
+        while (( ${#IO_PARALLEL_PIDS[@]} >= IO_PARALLEL_JOBS && IO_PARALLEL_CANCELLED == 0 )); do
+            io::parallel::__pid_reap_one || break
         done
+        (( IO_PARALLEL_CANCELLED == 0 )) || break
         io::parallel::__pid_start "$idx" "$callback" "$item"
         idx=$(( idx + 1 ))
     done
-    while (( ${#IO_PARALLEL_PIDS[@]} > 0 )); do
-        io::parallel::__pid_reap_one
+    while (( ${#IO_PARALLEL_PIDS[@]} > 0 && IO_PARALLEL_CANCELLED == 0 )); do
+        io::parallel::__pid_reap_one || break
     done
-    (( IO_PARALLEL_FAILED == 0 )) || return "${E_ERROR:-1}"
+    io::parallel::__cleanup
+    (( IO_PARALLEL_FAILED == 0 && IO_PARALLEL_CANCELLED == 0 )) || return "${E_ERROR:-1}"
     return "${E_SUCCESS:-0}"
 }
 
@@ -207,18 +283,22 @@ io::parallel::map() {
 # @returns E_SUCCESS or E_ERROR
 io::parallel::__pid_tasks() {
     local idx=0 task
-    IO_PARALLEL_PIDS=(); IO_PARALLEL_INDICES=(); IO_PARALLEL_FAILED=0
+    IO_PARALLEL_PIDS=(); IO_PARALLEL_INDICES=(); IO_PARALLEL_FAILED=0; IO_PARALLEL_CANCELLED=0
+    io::parallel::__install_handlers || return "${E_ERROR:-1}"
     for task in "$@"; do
-        while (( ${#IO_PARALLEL_PIDS[@]} >= IO_PARALLEL_JOBS )); do
-            io::parallel::__pid_reap_one
+        (( IO_PARALLEL_CANCELLED == 0 )) || break
+        while (( ${#IO_PARALLEL_PIDS[@]} >= IO_PARALLEL_JOBS && IO_PARALLEL_CANCELLED == 0 )); do
+            io::parallel::__pid_reap_one || break
         done
+        (( IO_PARALLEL_CANCELLED == 0 )) || break
         io::parallel::__pid_start "$idx" bash -c "$task"
         idx=$(( idx + 1 ))
     done
-    while (( ${#IO_PARALLEL_PIDS[@]} > 0 )); do
-        io::parallel::__pid_reap_one
+    while (( ${#IO_PARALLEL_PIDS[@]} > 0 && IO_PARALLEL_CANCELLED == 0 )); do
+        io::parallel::__pid_reap_one || break
     done
-    (( IO_PARALLEL_FAILED == 0 )) || return "${E_ERROR:-1}"
+    io::parallel::__cleanup
+    (( IO_PARALLEL_FAILED == 0 && IO_PARALLEL_CANCELLED == 0 )) || return "${E_ERROR:-1}"
     return "${E_SUCCESS:-0}"
 }
 
@@ -240,37 +320,48 @@ io::parallel::__fifo_cleanup() {
 # @param $@ groups: count index command args...
 # @returns E_SUCCESS or E_ERROR
 io::parallel::__fifo_run() {
+    IO_PARALLEL_PIDS=(); IO_PARALLEL_INDICES=(); IO_PARALLEL_FAILED=0; IO_PARALLEL_CANCELLED=0
+    io::parallel::__install_handlers || return "${E_ERROR:-1}"
     utils::has mkfifo || {
         bs_log_error "io::parallel: scheduler fifo requires mkfifo"
+        io::parallel::__cleanup
         return "${E_ERROR:-1}"
     }
-    IO_PARALLEL_TEMP="$(mktemp -d)" || return "${E_ERROR:-1}"
+    IO_PARALLEL_TEMP="$(mktemp -d)" || { io::parallel::__cleanup; return "${E_ERROR:-1}"; }
+    (( IO_PARALLEL_CANCELLED == 0 )) || { io::parallel::__cleanup; return "${E_ERROR:-1}"; }
     local fifo="$IO_PARALLEL_TEMP/done"
-    mkfifo "$fifo" || { io::parallel::__fifo_cleanup; return "${E_ERROR:-1}"; }
-    exec {IO_PARALLEL_FD}<>"$fifo" || { io::parallel::__fifo_cleanup; return "${E_ERROR:-1}"; }
+    mkfifo "$fifo" || { io::parallel::__cleanup; return "${E_ERROR:-1}"; }
+    exec {IO_PARALLEL_FD}<>"$fifo" || { io::parallel::__cleanup; return "${E_ERROR:-1}"; }
+    (( IO_PARALLEL_CANCELLED == 0 )) || { io::parallel::__cleanup; return "${E_ERROR:-1}"; }
 
-    IO_PARALLEL_PIDS=(); IO_PARALLEL_INDICES=(); IO_PARALLEL_FAILED=0
-    while (( $# > 0 )); do
+    while (( $# > 0 && IO_PARALLEL_CANCELLED == 0 )); do
         local count="$1" idx="$2"; shift 2
         local -a cmd=("${@:1:$count}")
-        while (( ${#IO_PARALLEL_PIDS[@]} >= IO_PARALLEL_JOBS )); do
+        while (( ${#IO_PARALLEL_PIDS[@]} >= IO_PARALLEL_JOBS && IO_PARALLEL_CANCELLED == 0 )); do
             local done_idx pid found=0 j
-            IFS= read -r done_idx <&"$IO_PARALLEL_FD"
+            if ! IFS= read -r done_idx <&"$IO_PARALLEL_FD"; then
+                io::parallel::__cleanup
+                return "${E_ERROR:-1}"
+            fi
+            (( IO_PARALLEL_CANCELLED == 0 )) || break
             for (( j=0; j<${#IO_PARALLEL_PIDS[@]}; j++ )); do
                 if [[ "${IO_PARALLEL_INDICES[$j]}" == "$done_idx" ]]; then
                     pid="${IO_PARALLEL_PIDS[$j]}"; found=1
                     wait "$pid" || true
+                    (( IO_PARALLEL_CANCELLED == 0 )) || break
                     local name rc
                     name="$(io::parallel::__result_name "$done_idx")"
                     rc="$(cat "$IO_PARALLEL_OUT/$name.rc")"
                     [[ "$rc" -eq 0 ]] || IO_PARALLEL_FAILED=1
+                    (( IO_PARALLEL_CANCELLED == 0 )) || break
                     IO_PARALLEL_PIDS=("${IO_PARALLEL_PIDS[@]:0:$j}" "${IO_PARALLEL_PIDS[@]:$((j+1))}")
                     IO_PARALLEL_INDICES=("${IO_PARALLEL_INDICES[@]:0:$j}" "${IO_PARALLEL_INDICES[@]:$((j+1))}")
                     break
                 fi
             done
-            (( found == 1 )) || { io::parallel::__fifo_cleanup; return "${E_ERROR:-1}"; }
+            (( found == 1 && IO_PARALLEL_CANCELLED == 0 )) || { io::parallel::__cleanup; return "${E_ERROR:-1}"; }
         done
+        (( IO_PARALLEL_CANCELLED == 0 )) || break
         (
             io::parallel::__worker "$idx" "$IO_PARALLEL_OUT" "${cmd[@]}"
             printf '%s\n' "$idx" > "$fifo"
@@ -279,26 +370,32 @@ io::parallel::__fifo_run() {
         shift "$count"
     done
 
-    while (( ${#IO_PARALLEL_PIDS[@]} > 0 )); do
+    while (( ${#IO_PARALLEL_PIDS[@]} > 0 && IO_PARALLEL_CANCELLED == 0 )); do
         local done_idx pid found=0 j
-        IFS= read -r done_idx <&"$IO_PARALLEL_FD"
+        if ! IFS= read -r done_idx <&"$IO_PARALLEL_FD"; then
+            io::parallel::__cleanup
+            return "${E_ERROR:-1}"
+        fi
+        (( IO_PARALLEL_CANCELLED == 0 )) || break
         for (( j=0; j<${#IO_PARALLEL_PIDS[@]}; j++ )); do
             if [[ "${IO_PARALLEL_INDICES[$j]}" == "$done_idx" ]]; then
                 pid="${IO_PARALLEL_PIDS[$j]}"; found=1
                 wait "$pid" || true
+                (( IO_PARALLEL_CANCELLED == 0 )) || break
                 local name rc
                 name="$(io::parallel::__result_name "$done_idx")"
                 rc="$(cat "$IO_PARALLEL_OUT/$name.rc")"
                 [[ "$rc" -eq 0 ]] || IO_PARALLEL_FAILED=1
+                (( IO_PARALLEL_CANCELLED == 0 )) || break
                 IO_PARALLEL_PIDS=("${IO_PARALLEL_PIDS[@]:0:$j}" "${IO_PARALLEL_PIDS[@]:$((j+1))}")
                 IO_PARALLEL_INDICES=("${IO_PARALLEL_INDICES[@]:0:$j}" "${IO_PARALLEL_INDICES[@]:$((j+1))}")
                 break
             fi
         done
-        (( found == 1 )) || { io::parallel::__fifo_cleanup; return "${E_ERROR:-1}"; }
+        (( found == 1 && IO_PARALLEL_CANCELLED == 0 )) || { io::parallel::__cleanup; return "${E_ERROR:-1}"; }
     done
-    io::parallel::__fifo_cleanup
-    (( IO_PARALLEL_FAILED == 0 )) || return "${E_ERROR:-1}"
+    io::parallel::__cleanup
+    (( IO_PARALLEL_FAILED == 0 && IO_PARALLEL_CANCELLED == 0 )) || return "${E_ERROR:-1}"
     return "${E_SUCCESS:-0}"
 }
 
