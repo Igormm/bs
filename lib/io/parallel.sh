@@ -155,6 +155,27 @@ io::parallel::__pid_map() {
     return "${E_SUCCESS:-0}"
 }
 
+# @private
+# @description Reserved xargs scheduler stub; intentionally not implemented.
+# @description Заглушка xargs scheduler; намеренно не реализована.
+# @param $1 callback
+# @param $@ items
+# @returns E_ERROR
+io::parallel::__xargs_map() {
+    bs_log_error "io::parallel: scheduler xargs is not implemented"
+    return "${E_ERROR:-1}"
+}
+
+# @private
+# @description Reserved xargs task scheduler stub; intentionally not implemented.
+# @description Заглушка xargs task scheduler; намеренно не реализована.
+# @param $@ task strings
+# @returns E_ERROR
+io::parallel::__xargs_tasks() {
+    bs_log_error "io::parallel: scheduler xargs is not implemented"
+    return "${E_ERROR:-1}"
+}
+
 # @description Run a callback once for each input element.
 # @description Вызвать callback один раз для каждого элемента.
 # @contract action
@@ -168,11 +189,14 @@ io::parallel::map() {
     }
     local callback="${IO_PARALLEL_ARGS[0]}"
     local -a items=("${IO_PARALLEL_ARGS[@]:1}")
+    if [[ "$IO_PARALLEL_SCHED" == "xargs" ]]; then
+        io::parallel::__xargs_map "$callback" "${items[@]}" || return $?
+        return "${E_SUCCESS:-0}"
+    fi
     mkdir -p "$IO_PARALLEL_OUT" || return "${E_ERROR:-1}"
     case "$IO_PARALLEL_SCHED" in
         pid)  io::parallel::__pid_map "$callback" "${items[@]}" ;;
         fifo) io::parallel::__fifo_map "$callback" "${items[@]}" ;;
-        xargs) return "${E_INVALID:-2}" ;;
     esac
 }
 
@@ -320,10 +344,13 @@ io::parallel::run() {
         [[ -z "$line" || "$line" == \#* ]] && continue
         tasks+=("$line")
     done < "$file"
+    if [[ "$IO_PARALLEL_SCHED" == "xargs" ]]; then
+        io::parallel::__xargs_tasks "${tasks[@]}" || return $?
+        return "${E_SUCCESS:-0}"
+    fi
     mkdir -p "$IO_PARALLEL_OUT" || return "${E_ERROR:-1}"
     case "$IO_PARALLEL_SCHED" in
         pid)  io::parallel::__pid_tasks "${tasks[@]}" ;;
         fifo) io::parallel::__fifo_tasks "${tasks[@]}" ;;
-        xargs) return "${E_INVALID:-2}" ;;
     esac
 }

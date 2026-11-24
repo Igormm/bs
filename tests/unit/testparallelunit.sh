@@ -223,6 +223,42 @@ test_fifo_burst_completion() {
     done
 }
 
+test_xargs_stub() {
+    local sh_bin out_dir tasks out rc=0
+    for sh_bin in bash zsh; do
+        out_dir="$T/${sh_bin}-xargs-stub"
+        rc=0
+        out="$(probe "$sh_bin" -- '
+            io::parallel::map --jobs 2 --scheduler xargs --out-dir "$1" -- true first
+            rc=$?
+            printf "temp=%s fd=%s\n" "$IO_PARALLEL_TEMP" "$IO_PARALLEL_FD"
+            exit "$rc"
+        ' _ "$out_dir")" || rc=$?
+        testframework::assert_equal "1" "$rc" "${sh_bin}: xargs map returns E_ERROR"
+        testframework::assert_false "-e '$out_dir'" "${sh_bin}: xargs stub creates no result directory"
+        testframework::assert_command "grep -q '^temp= fd=$' <<< '$out'" \
+            "${sh_bin}: xargs map leaves no temporary state"
+
+        tasks="$T/${sh_bin}-xargs-stub-tasks.txt"
+        cat > "$tasks" <<'TASKS'
+printf 'one\n'
+TASKS
+        out_dir="$T/${sh_bin}-xargs-stub-tasks"
+        rc=0
+        out="$(probe "$sh_bin" -- '
+            io::parallel::run --jobs 2 --scheduler xargs --out-dir "$1" -- "$2"
+            rc=$?
+            printf "temp=%s fd=%s\n" "$IO_PARALLEL_TEMP" "$IO_PARALLEL_FD"
+            exit "$rc"
+        ' _ "$out_dir" "$tasks")" || rc=$?
+        testframework::assert_equal "1" "$rc" "${sh_bin}: xargs run returns E_ERROR"
+        testframework::assert_false "-e '$out_dir'" "${sh_bin}: xargs stub creates no task results"
+        testframework::assert_command "grep -q '^temp= fd=$' <<< '$out'" \
+            "${sh_bin}: xargs run leaves no temporary state"
+        rc=0
+    done
+}
+
 main() {
     T="$(mktemp -d)"; mkdir -p "$T/home" "$T/home/no-tools"; export T
     trap 'rm -rf "$T"' EXIT
@@ -235,6 +271,7 @@ main() {
     testframework::section "FIFO dependency / Зависимость FIFO"; test_fifo_requires_mkfifo
     testframework::section "FIFO task file / FIFO файл задач"; test_fifo_task_file
     testframework::section "FIFO burst / FIFO серия"; test_fifo_burst_completion
+    testframework::section "xargs stub / Заглушка xargs"; test_xargs_stub
     testframework::summary
 }
 

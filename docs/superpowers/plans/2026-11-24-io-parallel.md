@@ -791,22 +791,22 @@ test_xargs_stub() {
         out_dir="$T/${sh_bin}-xargs-stub"
         rc=0
         probe "$sh_bin" -- '
-            io::parallel::map --jobs 2 --scheduler xargs --out-dir "$1" -- \
-                printf -- "out:%s\n" -- first
+            io::parallel::map --jobs 2 --scheduler xargs --out-dir "$1" -- true first
         ' _ "$out_dir" >/dev/null || rc=$?
         testframework::assert_equal "1" "$rc" "${sh_bin}: xargs map returns E_ERROR"
-        testframework::assert_false "test -e '$out_dir'" "${sh_bin}: xargs stub creates no result directory"
+        testframework::assert_false "-e '$out_dir'" "${sh_bin}: xargs stub creates no result directory"
 
         tasks="$T/${sh_bin}-xargs-stub-tasks.txt"
-        printf "printf 'one\n'
-" > "$tasks"
+        cat > "$tasks" <<'TASKS'
+printf 'one\n'
+TASKS
         out_dir="$T/${sh_bin}-xargs-stub-tasks"
         rc=0
         probe "$sh_bin" -- '
             io::parallel::run --jobs 2 --scheduler xargs --out-dir "$1" -- "$2"
         ' _ "$out_dir" "$tasks" >/dev/null || rc=$?
         testframework::assert_equal "1" "$rc" "${sh_bin}: xargs run returns E_ERROR"
-        testframework::assert_false "test -e '$out_dir'" "${sh_bin}: xargs stub creates no task results"
+        testframework::assert_false "-e '$out_dir'" "${sh_bin}: xargs stub creates no task results"
         rc=0
     done
 }
@@ -851,8 +851,8 @@ In `map`, dispatch before `mkdir -p`:
 
 ```bash
 if [[ "$IO_PARALLEL_SCHED" == "xargs" ]]; then
-    io::parallel::__xargs_map "$callback" "${items[@]}"
-    return $?
+    io::parallel::__xargs_map "$callback" "${items[@]}" || return $?
+    return "${E_SUCCESS:-0}"
 fi
 mkdir -p "$IO_PARALLEL_OUT" || return "${E_ERROR:-1}"
 ```
@@ -862,8 +862,8 @@ In `run`, dispatch after reading and validating the task file but before
 
 ```bash
 if [[ "$IO_PARALLEL_SCHED" == "xargs" ]]; then
-    io::parallel::__xargs_tasks "${tasks[@]}"
-    return $?
+    io::parallel::__xargs_tasks "${tasks[@]}" || return $?
+    return "${E_SUCCESS:-0}"
 fi
 mkdir -p "$IO_PARALLEL_OUT" || return "${E_ERROR:-1}"
 ```
