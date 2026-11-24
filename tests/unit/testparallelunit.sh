@@ -133,14 +133,88 @@ TASKS
     done
 }
 
+test_fifo_scheduler() {
+    local sh_bin out_dir rc=0 marker="$T/home/mkfifo.called"
+    mkdir -p "$T/home/bin"
+    cat > "$T/home/bin/mkfifo" <<'WRAPPER'
+#!/bin/sh
+printf 'called\n' >> "$HOME/mkfifo.called"
+exec /usr/bin/mkfifo "$@"
+WRAPPER
+    chmod +x "$T/home/bin/mkfifo"
+    for sh_bin in bash zsh; do
+        rm -f "$marker"
+        out_dir="$T/${sh_bin}-fifo"
+        probe "$sh_bin" -- '
+            PATH="$HOME/bin:/usr/bin:/bin"
+            fifo_worker() { printf "out:%s\n" "$1"; printf "err:%s\n" "$1" >&2; [[ "$1" != bad ]]; }
+            io::parallel::map --jobs 2 --scheduler fifo --out-dir "$1" -- \
+                fifo_worker first bad third
+            printf "aggregate=%s\n" "$?"
+        ' _ "$out_dir" >/dev/null || rc=$?
+        testframework::assert_equal "0" "$rc" "${sh_bin}: fifo map does not exit the caller"
+        testframework::assert_true "-f '$marker'" "${sh_bin}: fifo scheduler invokes mkfifo"
+        testframework::assert_equal "out:first" "$(cat "$out_dir/0000.out")" "${sh_bin}: fifo first stdout"
+        testframework::assert_equal "1" "$(cat "$out_dir/0001.rc")" "${sh_bin}: fifo failure rc"
+        testframework::assert_equal "out:third" "$(cat "$out_dir/0002.out")" "${sh_bin}: fifo later task runs"
+        rc=0
+    done
+}
+
+test_fifo_requires_mkfifo() {
+    local sh_bin rc=0
+    for sh_bin in bash zsh; do
+        rc=0
+        probe "$sh_bin" -- '
+            mkdir -p "$HOME/r"
+            PATH="$HOME/no-tools"
+            io::parallel::map --jobs 1 --scheduler fifo --out-dir "$HOME/r" -- true a
+        ' >/dev/null || rc=$?
+        testframework::assert_equal "1" "$rc" "${sh_bin}: missing mkfifo returns E_ERROR"
+        rc=0
+    done
+}
+
+test_fifo_task_file() {
+    local sh_bin out_dir tasks rc=0 marker="$T/home/mkfifo-task.called"
+    mkdir -p "$T/home/bin"
+    cat > "$T/home/bin/mkfifo" <<'WRAPPER'
+#!/bin/sh
+printf 'called\n' >> "$HOME/mkfifo-task.called"
+exec /usr/bin/mkfifo "$@"
+WRAPPER
+    chmod +x "$T/home/bin/mkfifo"
+    for sh_bin in bash zsh; do
+        rm -f "$marker"
+        out_dir="$T/${sh_bin}-fifo-tasks"
+        tasks="$T/${sh_bin}-fifo-tasks.txt"
+        cat > "$tasks" <<'TASKS'
+printf 'one\n'
+printf 'two\n' >&2
+TASKS
+        probe "$sh_bin" -- '
+            PATH="$HOME/bin:/usr/bin:/bin"
+            io::parallel::run --jobs 2 --scheduler fifo --out-dir "$1" -- "$2"
+        ' _ "$out_dir" "$tasks" >/dev/null || rc=$?
+        testframework::assert_equal "0" "$rc" "${sh_bin}: fifo task file succeeds"
+        testframework::assert_true "-f '$marker'" "${sh_bin}: fifo task scheduler invokes mkfifo"
+        testframework::assert_equal "one" "$(cat "$out_dir/0000.out")" "${sh_bin}: fifo task stdout"
+        testframework::assert_equal "two" "$(cat "$out_dir/0001.err")" "${sh_bin}: fifo task stderr"
+        rc=0
+    done
+}
+
 main() {
-    T="$(mktemp -d)"; mkdir -p "$T/home"; export T
+    T="$(mktemp -d)"; mkdir -p "$T/home" "$T/home/no-tools"; export T
     trap 'rm -rf "$T"' EXIT
     testframework::section "Parser / Парсер"; test_parse_and_result_names
     testframework::section "Invalid arguments / Неверные аргументы"; test_invalid_arguments
     testframework::section "PID map / PID map"; test_pid_map_contract
     testframework::section "Concurrency / Параллелизм"; test_pid_map_concurrency_limit
     testframework::section "Task file / Файл задач"; test_run_task_file
+    testframework::section "FIFO / FIFO"; test_fifo_scheduler
+    testframework::section "FIFO dependency / Зависимость FIFO"; test_fifo_requires_mkfifo
+    testframework::section "FIFO task file / FIFO файл задач"; test_fifo_task_file
     testframework::summary
 }
 

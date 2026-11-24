@@ -576,7 +576,7 @@ test_fifo_scheduler() {
         probe "$sh_bin" -- '
             fifo_worker() { printf "out:%s\n" "$1"; printf "err:%s\n" "$1" >&2; [[ "$1" != bad ]]; }
             io::parallel::map --jobs 2 --scheduler fifo --out-dir "$1" -- \
-                fifo_worker -- first bad third
+                fifo_worker first bad third
             printf "aggregate=%s\n" "$?"
         ' _ "$out_dir" >/dev/null || rc=$?
         testframework::assert_equal "0" "$rc" "${sh_bin}: fifo map does not exit the caller"
@@ -592,6 +592,7 @@ test_fifo_requires_mkfifo() {
     for sh_bin in bash zsh; do
         rc=0
         probe "$sh_bin" -- '
+            mkdir -p "$HOME/r"
             PATH="$HOME/no-tools"
             io::parallel::map --jobs 1 --scheduler fifo --out-dir "$HOME/r" -- true a
         ' >/dev/null || rc=$?
@@ -600,6 +601,13 @@ test_fifo_requires_mkfifo() {
     done
 }
 ```
+
+Also add `test_fifo_task_file`: use a `mkfifo` wrapper that records its call,
+write two valid task lines with a quoted heredoc, invoke
+`io::parallel::run --jobs 2 --scheduler fifo --out-dir "$1" -- "$2"`, and assert
+`0000.out`, `0001.err`, both zero statuses and the wrapper marker in bash and zsh.
+This pins the distinct FIFO task group (`3 idx bash -c task`) rather than only the
+map group (`2 idx callback item`).
 
 Create `$T/home/no-tools` in `main` before the tests.
 
@@ -691,18 +699,20 @@ io::parallel::__fifo_run() {
 
 io::parallel::__fifo_map() {
     local callback="$1"; shift
-    local -a groups=() idx=0 item
+    local -a groups=()
+    local idx=0 item
     for item in "$@"; do
-        groups+=(3 "$idx" "$callback" "$item")
+        groups+=(2 "$idx" "$callback" "$item")
         idx=$(( idx + 1 ))
     done
     io::parallel::__fifo_run "${groups[@]}"
 }
 
 io::parallel::__fifo_tasks() {
-    local -a groups=() idx=0 task
+    local -a groups=()
+    local idx=0 task
     for task in "$@"; do
-        groups+=(4 "$idx" bash -c "$task")
+        groups+=(3 "$idx" bash -c "$task")
         idx=$(( idx + 1 ))
     done
     io::parallel::__fifo_run "${groups[@]}"

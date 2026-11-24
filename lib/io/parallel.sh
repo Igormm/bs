@@ -42,6 +42,9 @@ declare -ga IO_PARALLEL_INDICES=()
 # @global IO_PARALLEL_FAILED — Parallel: aggregate failure flag (category: state)
 # @global IO_PARALLEL_FAILED — Parallel: флаг общей ошибки (category: state)
 declare -g IO_PARALLEL_FAILED=0
+# @global IO_PARALLEL_TEMP — Parallel: internal temporary directory (category: state)
+# @global IO_PARALLEL_TEMP — Parallel: внутренний временный каталог (category: state)
+declare -g IO_PARALLEL_TEMP=""
 
 # @private
 # @description Parse common options without exiting the caller.
@@ -152,7 +155,7 @@ io::parallel::__pid_map() {
 # @description Run a callback once for each input element.
 # @description Вызвать callback один раз для каждого элемента.
 # @contract action
-# @param $@ common options, callback, --, items
+# @param $@ common options, --, callback, items
 # @returns E_SUCCESS, E_INVALID or E_ERROR
 io::parallel::map() {
     io::parallel::__parse "$@" || return $?
@@ -163,7 +166,11 @@ io::parallel::map() {
     local callback="${IO_PARALLEL_ARGS[0]}"
     local -a items=("${IO_PARALLEL_ARGS[@]:1}")
     mkdir -p "$IO_PARALLEL_OUT" || return "${E_ERROR:-1}"
-    io::parallel::__pid_map "$callback" "${items[@]}"
+    case "$IO_PARALLEL_SCHED" in
+        pid)  io::parallel::__pid_map "$callback" "${items[@]}" ;;
+        fifo) io::parallel::__fifo_map "$callback" "${items[@]}" ;;
+        xargs) return "${E_INVALID:-2}" ;;
+    esac
 }
 
 # @private
@@ -188,6 +195,94 @@ io::parallel::__pid_tasks() {
     return "${E_SUCCESS:-0}"
 }
 
+# @private
+# @description Run argv groups through a FIFO completion queue.
+# @description Выполнить группы argv через FIFO завершений.
+# @param $@ groups: count index command args...
+# @returns E_SUCCESS or E_ERROR
+io::parallel::__fifo_run() {
+    utils::has mkfifo || {
+        bs_log_error "io::parallel: scheduler fifo requires mkfifo"
+        return "${E_ERROR:-1}"
+    }
+    IO_PARALLEL_TEMP="$(mktemp -d)" || return "${E_ERROR:-1}"
+    local fifo="$IO_PARALLEL_TEMP/done"
+    mkfifo "$fifo" || { utils::ignore rm -rf "$IO_PARALLEL_TEMP"; IO_PARALLEL_TEMP=""; return "${E_ERROR:-1}"; }
+
+    IO_PARALLEL_PIDS=(); IO_PARALLEL_INDICES=(); IO_PARALLEL_FAILED=0
+    while (( $# > 0 )); do
+        local count="$1" idx="$2"; shift 2
+        local -a cmd=("${@:1:$count}")
+        while (( ${#IO_PARALLEL_PIDS[@]} >= IO_PARALLEL_JOBS )); do
+            local done_idx pid found=0 j
+            IFS= read -r done_idx < "$fifo"
+            for (( j=0; j<${#IO_PARALLEL_PIDS[@]}; j++ )); do
+                if [[ "${IO_PARALLEL_INDICES[$j]}" == "$done_idx" ]]; then
+                    pid="${IO_PARALLEL_PIDS[$j]}"; found=1
+                    wait "$pid" || true
+                    local name rc
+                    name="$(io::parallel::__result_name "$done_idx")"
+                    rc="$(cat "$IO_PARALLEL_OUT/$name.rc")"
+                    [[ "$rc" -eq 0 ]] || IO_PARALLEL_FAILED=1
+                    IO_PARALLEL_PIDS=("${IO_PARALLEL_PIDS[@]:0:$j}" "${IO_PARALLEL_PIDS[@]:$((j+1))}")
+                    IO_PARALLEL_INDICES=("${IO_PARALLEL_INDICES[@]:0:$j}" "${IO_PARALLEL_INDICES[@]:$((j+1))}")
+                    break
+                fi
+            done
+            (( found == 1 )) || { utils::ignore rm -rf "$IO_PARALLEL_TEMP"; IO_PARALLEL_TEMP=""; return "${E_ERROR:-1}"; }
+        done
+        (
+            io::parallel::__worker "$idx" "$IO_PARALLEL_OUT" "${cmd[@]}"
+            printf '%s\n' "$idx" > "$fifo"
+        ) &
+        IO_PARALLEL_PIDS+=("$!"); IO_PARALLEL_INDICES+=("$idx")
+        shift "$count"
+    done
+
+    while (( ${#IO_PARALLEL_PIDS[@]} > 0 )); do
+        local done_idx pid found=0 j
+        IFS= read -r done_idx < "$fifo"
+        for (( j=0; j<${#IO_PARALLEL_PIDS[@]}; j++ )); do
+            if [[ "${IO_PARALLEL_INDICES[$j]}" == "$done_idx" ]]; then
+                pid="${IO_PARALLEL_PIDS[$j]}"; found=1
+                wait "$pid" || true
+                local name rc
+                name="$(io::parallel::__result_name "$done_idx")"
+                rc="$(cat "$IO_PARALLEL_OUT/$name.rc")"
+                [[ "$rc" -eq 0 ]] || IO_PARALLEL_FAILED=1
+                IO_PARALLEL_PIDS=("${IO_PARALLEL_PIDS[@]:0:$j}" "${IO_PARALLEL_PIDS[@]:$((j+1))}")
+                IO_PARALLEL_INDICES=("${IO_PARALLEL_INDICES[@]:0:$j}" "${IO_PARALLEL_INDICES[@]:$((j+1))}")
+                break
+            fi
+        done
+        (( found == 1 )) || { utils::ignore rm -rf "$IO_PARALLEL_TEMP"; IO_PARALLEL_TEMP=""; return "${E_ERROR:-1}"; }
+    done
+    utils::ignore rm -rf "$IO_PARALLEL_TEMP"; IO_PARALLEL_TEMP=""
+    (( IO_PARALLEL_FAILED == 0 )) || return "${E_ERROR:-1}"
+    return "${E_SUCCESS:-0}"
+}
+
+io::parallel::__fifo_map() {
+    local callback="$1"; shift
+    local -a groups=()
+    local idx=0 item
+    for item in "$@"; do
+        groups+=(2 "$idx" "$callback" "$item")
+        idx=$(( idx + 1 ))
+    done
+    io::parallel::__fifo_run "${groups[@]}"
+}
+
+io::parallel::__fifo_tasks() {
+    local -a groups=()
+    local idx=0 task
+    for task in "$@"; do
+        groups+=(3 "$idx" bash -c "$task")
+        idx=$(( idx + 1 ))
+    done
+    io::parallel::__fifo_run "${groups[@]}"
+}
+
 # @description Run one shell command per non-comment line of a task file.
 # @description Выполнить одну shell-команду на строку файла задач.
 # @contract action
@@ -210,5 +305,9 @@ io::parallel::run() {
         tasks+=("$line")
     done < "$file"
     mkdir -p "$IO_PARALLEL_OUT" || return "${E_ERROR:-1}"
-    io::parallel::__pid_tasks "${tasks[@]}"
+    case "$IO_PARALLEL_SCHED" in
+        pid)  io::parallel::__pid_tasks "${tasks[@]}" ;;
+        fifo) io::parallel::__fifo_tasks "${tasks[@]}" ;;
+        xargs) return "${E_INVALID:-2}" ;;
+    esac
 }
