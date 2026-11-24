@@ -5,6 +5,15 @@
 `.agents/skills/<имя>/SKILL.md`; ярус — это метаданные `tier:` во frontmatter и
 группировка в этом каталоге, а не вложенные папки.
 
+### Вход / Entry
+
+`bs-write-code` — входная точка: **любое** «напиши скрипт/программу/модуль/компонент/
+posix-shell-скрипт/ядро/код под tier» начинается с него — он классифицирует ярус и
+место, даёт скелеты и передаёт в профильный скилл яруса. / the entry point: **any**
+"write a script/program/module/component/posix-shell script/kernel/tier code" starts
+here — it classifies tier and location, gives the skeletons and hands off to the
+per-tier skill.
+
 ## Что такое tier / What a tier is
 
 Ярус — метка `# @shell posix|bash4` в заголовке файла, задающая, какая оболочка
@@ -103,6 +112,7 @@ zsh исполняет posix-ярус: не делит `$var` на слова, `
 
 | Скилл | Назначение |
 | --- | --- |
+| `bs-write-code` | входная точка «напиши код/скрипт/модуль/компонент/ядро BS»: классификация яруса и места, скелеты posix/bash4/bash4,zsh, конвенции, валидация, делегирование |
 | `bs-validate` | обязательный цикл валидации + версия; долгие прогоны — в фон |
 | `bs-version-bump` | бамп версии: единый источник `core/version.sh`, CHANGELOG, en/ru docs, no-bash тест |
 | `bs-docs-sync` | синхронность en/ru документации и комментариев |

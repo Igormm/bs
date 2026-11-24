@@ -136,6 +136,7 @@ Skills are grouped by the project's **tier** (`@shell posix|bash4`; the doctrine
 
 **Meta — process, tier-independent**:
 
+- `bs-write-code` — the entry point for any "write a BS script / module / core component" request (classify tier + artifact + location, posix/bash4/bash4,zsh skeletons, validation, delegate to the per-tier skill). Start here.
 - `bs-validate` — the mandatory validation cycle after any change.
 - `bs-version-bump` — bump and check the framework version: single source `core/version.sh`, CHANGELOG heading, en/ru docs, hardcoded no-bash test output.
 - `bs-docs-sync` — keep `documentation/en/` and `documentation/ru/` in sync.
