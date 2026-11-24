@@ -211,12 +211,12 @@ io::parallel::__install_handlers() {
 # не меняя общий результат.
 io::parallel::__stop_workers() {
     local pid
-    for pid in "${IO_PARALLEL_PIDS[@]}"; do
+    for pid in ${IO_PARALLEL_PIDS[@]+"${IO_PARALLEL_PIDS[@]}"}; do
         if [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then
             utils::quiet kill -TERM "$pid" || true
         fi
     done
-    for pid in "${IO_PARALLEL_PIDS[@]}"; do
+    for pid in ${IO_PARALLEL_PIDS[@]+"${IO_PARALLEL_PIDS[@]}"}; do
         if [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then
             utils::ignore wait "$pid"
         fi
@@ -268,6 +268,22 @@ io::parallel::__pid_start() {
 }
 
 # @private
+# @description Remove one worker from the active PID/index arrays.
+# @description Удалить одного воркера из массивов активных PID/индексов.
+# @param $1 array position
+io::parallel::__drop_worker() {
+    local drop="$1" i
+    local -a pids=("${IO_PARALLEL_PIDS[@]}")
+    local -a indices=("${IO_PARALLEL_INDICES[@]}")
+    IO_PARALLEL_PIDS=(); IO_PARALLEL_INDICES=()
+    for (( i=0; i<${#pids[@]}; i++ )); do
+        (( i == drop )) && continue
+        IO_PARALLEL_PIDS+=("${pids[i]}")
+        IO_PARALLEL_INDICES+=("${indices[i]}")
+    done
+}
+
+# @private
 # @description Reap the oldest active PID and aggregate its status.
 # @description Дождаться самого раннего PID и учесть его статус.
 io::parallel::__pid_reap_one() {
@@ -276,8 +292,7 @@ io::parallel::__pid_reap_one() {
     wait "$pid" || worker_rc=$?
     (( IO_PARALLEL_CANCELLED == 0 )) || return "${E_ERROR:-1}"
     io::parallel::__record_result "$idx" "$worker_rc"
-    IO_PARALLEL_PIDS=("${IO_PARALLEL_PIDS[@]:1}")
-    IO_PARALLEL_INDICES=("${IO_PARALLEL_INDICES[@]:1}")
+    io::parallel::__drop_worker 0
 }
 
 # @private
@@ -343,15 +358,19 @@ io::parallel::map() {
         return "${E_INVALID:-2}"
     }
     local callback="${IO_PARALLEL_ARGS[0]}"
-    local -a items=("${IO_PARALLEL_ARGS[@]:1}")
+    local -a items=()
+    local i
+    for (( i=1; i<${#IO_PARALLEL_ARGS[@]}; i++ )); do
+        items+=("${IO_PARALLEL_ARGS[i]}")
+    done
     if [[ "$IO_PARALLEL_SCHED" == "xargs" ]]; then
-        io::parallel::__xargs_map "$callback" "${items[@]}" || return $?
+        io::parallel::__xargs_map "$callback" ${items[@]+"${items[@]}"} || return $?
         return "${E_SUCCESS:-0}"
     fi
     mkdir -p -- "$IO_PARALLEL_OUT" || return "${E_ERROR:-1}"
     case "$IO_PARALLEL_SCHED" in
-        pid)  io::parallel::__pid_map "$callback" "${items[@]}" ;;
-        fifo) io::parallel::__fifo_map "$callback" "${items[@]}" ;;
+        pid)  io::parallel::__pid_map "$callback" ${items[@]+"${items[@]}"} ;;
+        fifo) io::parallel::__fifo_map "$callback" ${items[@]+"${items[@]}"} ;;
     esac
 }
 
@@ -410,8 +429,7 @@ io::parallel::__fifo_reap_one() {
             wait "$pid" || worker_rc=$?
             (( IO_PARALLEL_CANCELLED == 0 )) || return "${E_ERROR:-1}"
             io::parallel::__record_result "$done_idx" "$worker_rc"
-            IO_PARALLEL_PIDS=("${IO_PARALLEL_PIDS[@]:0:$j}" "${IO_PARALLEL_PIDS[@]:$((j+1))}")
-            IO_PARALLEL_INDICES=("${IO_PARALLEL_INDICES[@]:0:$j}" "${IO_PARALLEL_INDICES[@]:$((j+1))}")
+            io::parallel::__drop_worker "$j"
             return "${E_SUCCESS:-0}"
         fi
     done
@@ -473,7 +491,7 @@ io::parallel::__fifo_map() {
         groups+=(2 "$idx" "$callback" "$item")
         idx=$(( idx + 1 ))
     done
-    io::parallel::__fifo_run "${groups[@]}"
+    io::parallel::__fifo_run ${groups[@]+"${groups[@]}"}
 }
 
 io::parallel::__fifo_tasks() {
@@ -483,7 +501,7 @@ io::parallel::__fifo_tasks() {
         groups+=(3 "$idx" bash -c "$task")
         idx=$(( idx + 1 ))
     done
-    io::parallel::__fifo_run "${groups[@]}"
+    io::parallel::__fifo_run ${groups[@]+"${groups[@]}"}
 }
 
 # @description Run one shell command per non-comment line of a task file.
@@ -509,12 +527,12 @@ io::parallel::run() {
         tasks+=("$line")
     done < "$file"
     if [[ "$IO_PARALLEL_SCHED" == "xargs" ]]; then
-        io::parallel::__xargs_tasks "${tasks[@]}" || return $?
+        io::parallel::__xargs_tasks ${tasks[@]+"${tasks[@]}"} || return $?
         return "${E_SUCCESS:-0}"
     fi
     mkdir -p -- "$IO_PARALLEL_OUT" || return "${E_ERROR:-1}"
     case "$IO_PARALLEL_SCHED" in
-        pid)  io::parallel::__pid_tasks "${tasks[@]}" ;;
-        fifo) io::parallel::__fifo_tasks "${tasks[@]}" ;;
+        pid)  io::parallel::__pid_tasks ${tasks[@]+"${tasks[@]}"} ;;
+        fifo) io::parallel::__fifo_tasks ${tasks[@]+"${tasks[@]}"} ;;
     esac
 }

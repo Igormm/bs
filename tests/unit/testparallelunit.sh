@@ -298,7 +298,8 @@ test_empty_and_clean_output() {
             out_dir="$T/${sh_bin}-${scheduler}-empty"
             rc=0
             out="$(probe "$sh_bin" -- '
-                io::parallel::map --jobs 2 --scheduler "$2" --out-dir "$1" -- true
+                set -euo pipefail
+            io::parallel::map --jobs 2 --scheduler "$2" --out-dir "$1" -- true
             ' _ "$out_dir" "$scheduler")" || rc=$?
             testframework::assert_equal "0" "$rc" "${sh_bin}/${scheduler}: empty map succeeds"
             testframework::assert_equal "" "$out" "${sh_bin}/${scheduler}: empty map keeps stdout clean"
@@ -309,7 +310,8 @@ test_empty_and_clean_output() {
             out_dir="$T/${sh_bin}-${scheduler}-empty-tasks"
             rc=0
             out="$(probe "$sh_bin" -- '
-                io::parallel::run --jobs 2 --scheduler "$3" --out-dir "$1" -- "$2"
+                set -euo pipefail
+            io::parallel::run --jobs 2 --scheduler "$3" --out-dir "$1" -- "$2"
             ' _ "$out_dir" "$tasks" "$scheduler")" || rc=$?
             testframework::assert_equal "0" "$rc" "${sh_bin}/${scheduler}: empty task file succeeds"
             testframework::assert_equal "" "$out" "${sh_bin}/${scheduler}: empty run keeps stdout clean"
