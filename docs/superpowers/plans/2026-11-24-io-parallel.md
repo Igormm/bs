@@ -609,6 +609,12 @@ write two valid task lines with a quoted heredoc, invoke
 This pins the distinct FIFO task group (`3 idx bash -c task`) rather than only the
 map group (`2 idx callback item`).
 
+Add `test_fifo_burst_completion`: run 64 immediate `true` callbacks with
+`--jobs 64` in bash and zsh, assert success and 64 `.rc` files. This reproduces a
+real FIFO race: reopening the queue for each completion can pair one reader with
+many blocked writers, causing the other writers to receive `SIGPIPE` and leaving
+the parent waiting for messages that will never arrive.
+
 Create `$T/home/no-tools` in `main` before the tests.
 
 - [ ] **Step 2: Run and verify failure**
@@ -625,11 +631,28 @@ Add the temp-state global:
 # @global IO_PARALLEL_TEMP — Parallel: internal temporary directory (category: state)
 # @global IO_PARALLEL_TEMP — Parallel: внутренний временный каталог (category: state)
 declare -g IO_PARALLEL_TEMP=""
+# @global IO_PARALLEL_FD — Parallel: FIFO completion descriptor (category: state)
+# @global IO_PARALLEL_FD — Parallel: дескриптор FIFO завершений (category: state)
+declare -g IO_PARALLEL_FD=""
 ```
 
-Add a generic FIFO runner:
+Add a FIFO cleanup helper and a generic FIFO runner. The parent opens the FIFO
+read-write once and keeps that descriptor for the whole pool; reopening it for
+each completion is the burst race described above.
 
 ```bash
+# @private
+# @description Close the FIFO descriptor and remove scheduler temporary state.
+# @description Закрыть дескриптор FIFO и удалить временное состояние планировщика.
+io::parallel::__fifo_cleanup() {
+    if [[ -n "$IO_PARALLEL_FD" ]]; then
+        exec {IO_PARALLEL_FD}>&-
+        IO_PARALLEL_FD=""
+    fi
+    [[ -z "$IO_PARALLEL_TEMP" ]] || utils::ignore rm -rf "$IO_PARALLEL_TEMP"
+    IO_PARALLEL_TEMP=""
+}
+
 # @private
 # @description Run argv groups through a FIFO completion queue.
 # @description Выполнить группы argv через FIFO завершений.
@@ -642,7 +665,8 @@ io::parallel::__fifo_run() {
     }
     IO_PARALLEL_TEMP="$(mktemp -d)" || return "${E_ERROR:-1}"
     local fifo="$IO_PARALLEL_TEMP/done"
-    mkfifo "$fifo" || { utils::ignore rm -rf "$IO_PARALLEL_TEMP"; IO_PARALLEL_TEMP=""; return "${E_ERROR:-1}"; }
+    mkfifo "$fifo" || { io::parallel::__fifo_cleanup; return "${E_ERROR:-1}"; }
+    exec {IO_PARALLEL_FD}<>"$fifo" || { io::parallel::__fifo_cleanup; return "${E_ERROR:-1}"; }
 
     IO_PARALLEL_PIDS=(); IO_PARALLEL_INDICES=(); IO_PARALLEL_FAILED=0
     while (( $# > 0 )); do
@@ -650,7 +674,7 @@ io::parallel::__fifo_run() {
         local -a cmd=("${@:1:$count}")
         while (( ${#IO_PARALLEL_PIDS[@]} >= IO_PARALLEL_JOBS )); do
             local done_idx pid found=0 j
-            IFS= read -r done_idx < "$fifo"
+            IFS= read -r done_idx <&"$IO_PARALLEL_FD"
             for (( j=0; j<${#IO_PARALLEL_PIDS[@]}; j++ )); do
                 if [[ "${IO_PARALLEL_INDICES[$j]}" == "$done_idx" ]]; then
                     pid="${IO_PARALLEL_PIDS[$j]}"; found=1
@@ -664,7 +688,7 @@ io::parallel::__fifo_run() {
                     break
                 fi
             done
-            (( found == 1 )) || { utils::ignore rm -rf "$IO_PARALLEL_TEMP"; IO_PARALLEL_TEMP=""; return "${E_ERROR:-1}"; }
+            (( found == 1 )) || { io::parallel::__fifo_cleanup; return "${E_ERROR:-1}"; }
         done
         (
             io::parallel::__worker "$idx" "$IO_PARALLEL_OUT" "${cmd[@]}"
@@ -676,7 +700,7 @@ io::parallel::__fifo_run() {
 
     while (( ${#IO_PARALLEL_PIDS[@]} > 0 )); do
         local done_idx pid found=0 j
-        IFS= read -r done_idx < "$fifo"
+        IFS= read -r done_idx <&"$IO_PARALLEL_FD"
         for (( j=0; j<${#IO_PARALLEL_PIDS[@]}; j++ )); do
             if [[ "${IO_PARALLEL_INDICES[$j]}" == "$done_idx" ]]; then
                 pid="${IO_PARALLEL_PIDS[$j]}"; found=1
@@ -690,9 +714,9 @@ io::parallel::__fifo_run() {
                 break
             fi
         done
-        (( found == 1 )) || { utils::ignore rm -rf "$IO_PARALLEL_TEMP"; IO_PARALLEL_TEMP=""; return "${E_ERROR:-1}"; }
+        (( found == 1 )) || { io::parallel::__fifo_cleanup; return "${E_ERROR:-1}"; }
     done
-    utils::ignore rm -rf "$IO_PARALLEL_TEMP"; IO_PARALLEL_TEMP=""
+    io::parallel::__fifo_cleanup
     (( IO_PARALLEL_FAILED == 0 )) || return "${E_ERROR:-1}"
     return "${E_SUCCESS:-0}"
 }
@@ -920,8 +944,7 @@ io::parallel::__stop_workers() {
         [[ "$pid" =~ ^[1-9][0-9]*$ ]] && wait "$pid" 2>/dev/null || true
     done
     IO_PARALLEL_PIDS=(); IO_PARALLEL_INDICES=()
-    [[ -z "$IO_PARALLEL_TEMP" ]] || utils::ignore rm -rf "$IO_PARALLEL_TEMP"
-    IO_PARALLEL_TEMP=""
+    io::parallel::__fifo_cleanup
 }
 
 # @description Cancel active workers and remove internal temporary state.

@@ -6,7 +6,6 @@ set -euo pipefail
 
 readonly TEST_SCRIPT_DIR="$(bs::script_dir)"
 readonly BS_PROJECT_ROOT="$(cd "${TEST_SCRIPT_DIR}/../.." && pwd)"
-readonly PARALLEL_SH="${BS_PROJECT_ROOT}/lib/io/parallel.sh"
 
 source "${TEST_SCRIPT_DIR}/../testframework.sh"
 
@@ -204,6 +203,26 @@ TASKS
     done
 }
 
+test_fifo_burst_completion() {
+    local sh_bin out_dir rc=0
+    for sh_bin in bash zsh; do
+        out_dir="$T/${sh_bin}-fifo-burst"
+        rc=0
+        probe "$sh_bin" -- '
+            items=()
+            for (( i=0; i<64; i++ )); do items+=("item$i"); done
+            io::parallel::map --jobs 64 --scheduler fifo --out-dir "$1" -- \
+                true "${items[@]}"
+        ' _ "$out_dir" >/dev/null || rc=$?
+        testframework::assert_equal "0" "$rc" "${sh_bin}: fifo drains a burst of workers"
+        local -a rc_files=("$out_dir"/*.rc)
+        testframework::assert_equal "64" \
+            "${#rc_files[@]}" \
+            "${sh_bin}: fifo burst writes every result"
+        rc=0
+    done
+}
+
 main() {
     T="$(mktemp -d)"; mkdir -p "$T/home" "$T/home/no-tools"; export T
     trap 'rm -rf "$T"' EXIT
@@ -215,6 +234,7 @@ main() {
     testframework::section "FIFO / FIFO"; test_fifo_scheduler
     testframework::section "FIFO dependency / Зависимость FIFO"; test_fifo_requires_mkfifo
     testframework::section "FIFO task file / FIFO файл задач"; test_fifo_task_file
+    testframework::section "FIFO burst / FIFO серия"; test_fifo_burst_completion
     testframework::summary
 }
 
