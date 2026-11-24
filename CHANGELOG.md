@@ -6,7 +6,7 @@
 - feat(args): short aliases and Docker-style clusters, repeatable value flags with lossless bash arrays, and explicit `--flag=true|false`; help and completion expose the new forms while existing declarations remain compatible.
 
 ### Fixed
-- fix(args): review hardening — caller-named arrays are no longer shadowed, an explicit `h` alias wins over built-in help, alias reassignment is rejected atomically, empty first repeat values and invalid repeat occurrences obey the reader/storage contract, bare `-` remains positional, and bash/nushell completion preserve legacy dash positionals and enum aliases.
+- fix(args): review hardening — caller-named arrays are no longer shadowed, an explicit `h` alias wins over built-in help, alias reassignment and incompatible kind changes are rejected atomically, empty first repeat values and invalid repeat occurrences obey the reader/storage contract, bare `-` remains positional, and bash/nushell completion preserve legacy dash positionals and enum aliases while filtering option-like positional names even without aliases.
 
 ## [0.26.0] - 2026-11-24 "параллель"
 

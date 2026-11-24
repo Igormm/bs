@@ -87,6 +87,8 @@ if utils::quiet args::flag_get dry-run; then ...; fi
 `args::flag_short NAME SHORT` assigns one ASCII letter or digit to a declared
 flag. `args::flag_repeat NAME` makes a `value` flag repeatable.
 `args::flag_bool_value NAME` lets a `bool` flag accept an explicit boolean value.
+A flag's kind cannot be changed while an incompatible `repeat` or `bool-value`
+property is active; the declaration returns `E_INVALID` without changing state.
 
 ```bash
 args::flag port value 8080 number
@@ -103,7 +105,8 @@ args::flag_bool_value color
 
 An explicitly declared `h` alias replaces built-in help. A bare `-` and known
 dash-prefixed positional names such as `-foo` remain positional when they do not
-activate a declared short alias.
+activate a declared short alias and do not begin with undeclared `h` (which
+requests built-in help).
 
 `args::flag_get env` returns the first CLI value, including an explicitly empty
 one. `args::flag_get_all env` prints all CLI values one per line, in input order.
@@ -251,7 +254,7 @@ args::define first middle last
 |---|---|
 | `ARGS_PARAMS` | array of validated positional parameters (0-based) |
 | `ARGS_FLAGS` | associative array of validated flags (`"1"` for bool, `"0"`/`"1"` for bool-value) |
-| `ARGS_HELP_REQUESTED` | `1` if `-h`/`--help` was passed |
+| `ARGS_HELP_REQUESTED` | `1` if help was actually requested (built-in `-h`/`--help`; a declared `h`/`help` flag suppresses it) |
 | `ARGS_VERSION` | module version |
 
 ## Names and tier

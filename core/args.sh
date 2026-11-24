@@ -322,6 +322,14 @@ bs_args_flag() {
     bs_log_warn "args::flag: type must be 'bool' or 'value', got: ${__bs_args_fl_type}"
     return "${E_ERROR:-1}"
   fi
+  bs_args_mget bs_args_flags "$__bs_args_fl_name" __bs_args_fl_existing
+  if [ -n "$__bs_args_fl_existing" ] && [ "$__bs_args_fl_existing" != "$__bs_args_fl_type" ]; then
+    if { [ "$__bs_args_fl_existing" = "value" ] && bs_map_has bs_args_flag_repeat "$__bs_args_fl_name"; } ||
+       { [ "$__bs_args_fl_existing" = "bool" ] && bs_map_has bs_args_flag_bool_value "$__bs_args_fl_name"; }; then
+      bs_log_warn "args::flag: cannot change ${__bs_args_fl_name} from ${__bs_args_fl_existing} to ${__bs_args_fl_type} while its property is active"
+      return "${E_INVALID:-2}"
+    fi
+  fi
   bs_map_set bs_args_flags "$__bs_args_fl_name" "$__bs_args_fl_type"
   # Пустая строка дефолта означает "дефолта нет" / Empty default = no default
   if [ $# -ge 3 ] && [ -n "${3-}" ]; then

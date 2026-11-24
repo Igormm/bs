@@ -122,7 +122,7 @@ bs_args_completion_bash() {
   __bs_args_cp_dash_cases=""
   __bs_args_cp_choice_cases=""
   __bs_args_cp_filter_choices=0
-  if [ "$(bs_map_count bs_args_short_flag)" -gt 0 ] && [ "$(bs_map_count bs_args_tree)" -gt 0 ]; then
+  if [ "$(bs_map_count bs_args_tree)" -gt 0 ]; then
     __bs_args_cp_dash_levels=$(bs_map_keys bs_args_tree | sort -n)
     while IFS= read -r __bs_args_cp_dash_level; do
       [ -n "$__bs_args_cp_dash_level" ] || continue

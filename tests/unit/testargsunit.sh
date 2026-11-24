@@ -252,6 +252,14 @@ main() {
     args::parse --label '$(printf injected)'
     args::flag_values label labels
     testframework::assert_equal '$(printf injected)' "${labels[0]}" "literal substitution is not evaluated"
+    args::parse -l "" -l "a'b" -l '`printf nope`' -l 'a\b' -l $'tail\n'
+    args::flag_values label labels
+    testframework::assert_equal "5" "${#labels[@]}" "flag_values preserves difficult value count"
+    testframework::assert_equal "" "${labels[0]}" "empty values survive flag_values"
+    testframework::assert_equal "a'b" "${labels[1]}" "single quotes survive flag_values"
+    testframework::assert_equal '`printf nope`' "${labels[2]}" "backticks are not evaluated"
+    testframework::assert_equal 'a\b' "${labels[3]}" "backslashes survive flag_values"
+    testframework::assert_equal $'tail\n' "${labels[4]}" "trailing newlines survive flag_values"
     rc=0
     args::flag_values label 'bad-name' >/dev/null 2>&1 || rc=$?
     testframework::assert_equal "${E_INVALID}" "$rc" "flag_values rejects invalid array names"
@@ -384,6 +392,40 @@ main() {
     ) > /tmp/args_comp_result.$$
     testframework::assert_true "\"$(cat /tmp/args_comp_result.$$)\" == *'deploy'*" "Alias-only dash tree keeps ordinary choices"
     testframework::assert_true "\"$(cat /tmp/args_comp_result.$$)\" != *'-vfoo'*" "Alias-only dash tree filters option-like positional names"
+    rm -f "${comp_file}" /tmp/args_comp_result.$$
+
+    args::reset
+    args::level 1 --foo -hello -world deploy
+    comp_file="$(mktemp)"
+    args::completion "noalias.sh" > "${comp_file}"
+    (
+        set +e
+        source "${comp_file}"
+        COMP_WORDS=(noalias.sh "")
+        COMP_CWORD=1
+        _noalias_sh_completion
+        printf '%s\n' "${COMPREPLY[*]}"
+    ) > /tmp/args_comp_result.$$
+    testframework::assert_true "\"$(cat /tmp/args_comp_result.$$)\" == *'-world deploy'*" "No-alias completion keeps ordinary dash positionals"
+    testframework::assert_true "\"$(cat /tmp/args_comp_result.$$)\" != *'--foo'*" "No-alias completion filters long-option-like positionals"
+    testframework::assert_true "\"$(cat /tmp/args_comp_result.$$)\" != *'-hello'*" "No-alias completion filters built-in-help positionals"
+    rm -f "${comp_file}" /tmp/args_comp_result.$$
+
+    args::reset
+    args::level 1 --foo -hello -hfoo deploy
+    args::flag h
+    comp_file="$(mktemp)"
+    args::completion "declaredh.sh" > "${comp_file}"
+    (
+        set +e
+        source "${comp_file}"
+        COMP_WORDS=(declaredh.sh "")
+        COMP_CWORD=1
+        _declaredh_sh_completion
+        printf '%s\n' "${COMPREPLY[*]}"
+    ) > /tmp/args_comp_result.$$
+    testframework::assert_true "\"$(cat /tmp/args_comp_result.$$)\" == *'-hello -hfoo deploy'*" "Declared h keeps help-like positionals without aliases"
+    testframework::assert_true "\"$(cat /tmp/args_comp_result.$$)\" != *'--foo'*" "Declared h still filters long-option-like positionals"
     rm -f "${comp_file}" /tmp/args_comp_result.$$
 
     # completion без объявлений / completion without declarations

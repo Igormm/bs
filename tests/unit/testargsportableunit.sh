@@ -197,6 +197,15 @@ bs_args_flag verbose; bs_args_flag_short verbose v
 bs_args_parse -; printf "declared=%s,%s\n" "$?" "$(bs_args_get 1)"
 ')" "unknown=2 declared=0,-" "${sh_name}: bare dash is positional, never an empty cluster"
         eq "$(probe "${sh_bin}" '
+bs_args_flag x value
+bs_args_flag_repeat x
+bs_args_flag x bool >/dev/null 2>&1; printf "value_to_bool=%s " "$?"
+bs_args_flag y bool
+bs_args_flag_bool_value y
+bs_args_flag y value >/dev/null 2>&1; printf "bool_to_value=%s " "$?"
+printf "kinds=%s,%s props=%s,%s\n" "$(bs_map_get bs_args_flags x)" "$(bs_map_get bs_args_flags y)" "$(bs_map_has bs_args_flag_repeat x; echo $?)" "$(bs_map_has bs_args_flag_bool_value y; echo $?)"
+')" "value_to_bool=2 bool_to_value=2 kinds=value,bool props=0,0" "${sh_name}: incompatible kind changes are rejected atomically"
+        eq "$(probe "${sh_bin}" '
 bs_args_define deploy
 bs_args_flag verbose; bs_args_flag_short verbose v
 bs_args_flag output value; bs_args_flag_short output o
@@ -210,6 +219,19 @@ bs_args_flag h value
 bs_args_flag_short h h
 bs_args_parse -h hello >/dev/null; printf "declared=%s value=%s\n" "$ARGS_HELP_REQUESTED" "$(bs_args_flag_get h)"
 ')" "declared=0 value=hello" "${sh_name}: declared h wins over built-in help"
+        eq "$(probe "${sh_bin}" '
+bs_args_flag verbose; bs_args_flag_short verbose v
+bs_args_flag host value; bs_args_flag_short host h
+bs_args_parse -vh hello; printf "value=%s,%s,%s " "$(bs_args_flag_get host)" "$(bs_args_flag_get verbose)" "$ARGS_HELP_REQUESTED"
+bs_args_reset
+bs_args_flag verbose; bs_args_flag_short verbose v
+bs_args_flag loud; bs_args_flag_short loud h
+bs_args_parse -vh; printf "bool=%s,%s,%s " "$(bs_args_flag_get loud)" "$(bs_args_flag_get verbose)" "$ARGS_HELP_REQUESTED"
+bs_args_reset
+bs_args_flag verbose; bs_args_flag_short verbose v
+bs_args_flag color bool; bs_args_flag_bool_value color; bs_args_flag_short color h
+bs_args_parse -vh=false; printf "boolv=%s,%s,%s\n" "$(bs_args_flag_get color)" "$(bs_args_flag_get verbose)" "$ARGS_HELP_REQUESTED"
+')" "value=hello,1,0 bool=1,1,0 boolv=0,1,0" "${sh_name}: clustered h aliases override built-in help"
         eq "$(probe "${sh_bin}" '
 bs_args_flag host value
 bs_args_flag_short host h
