@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.24.0] - 2026-11-24 "тишина"
+
+### Added
+- feat(core): `core/quiet.sh` gains `bs_utils_quiet_out` (`utils::quiet_out`) — suppress **stdout only**, keep stderr and the exit code; the one missing silence idiom for `cmd >/dev/null` (`quiet` = both, `quiet_err` = stderr-only). Portable test `testquietportableunit.sh` extended to 99 checks in six shells.
+- feat(examples): `examples/dripfetch.sh` — a matrix-rain terminal dashboard (`@shell bash4,zsh`: logo / sysinfo / clock / calendar / weather / net / text boxes, YAML config, zsh shim `setopt KSH_ARRAYS SH_WORD_SPLIT no_nomatch`).
+- feat(meta): `bs-write-code` skill — the entry point for any "write a BS script / module / core component" request (tier + artifact + location classification, posix/bash4/bash4,zsh skeletons, validation, delegation); registered in `.agents/skills/README.md` and `AGENTS.md`.
+- feat(examples): `examples/users_edit.sh` completes the user/group set — `id` (Enter info), `chgrp <group> <path>` (`c`), `last`/`w`/`who` (`i` sessions modal) on top of add/edit/passwd/lock/unlock/group/delete.
+
+### Changed
+- refactor: raw `/dev/null` → kernel silence idioms (`utils::has/quiet/quiet_out/quiet_err/ignore/attempt/pid_alive`) across `examples/` and `lib/system/user.sh`; docs (`code-style-guide` §6, `architecture.md`, `shell-portability.md`) now enumerate `quiet_out`.
+- fix(tests): `tests/validateshellcheck.sh` runs shellcheck in chunks on `-P` cores (`SHELLCHECK_JOBS` override); `.shellcheckrc` sets `external-sources=false` — every `.sh` is checked individually, so following `source` only re-parsed the kernel per referencing file (`bs.sh` 18s → 1.4s; full gate >300s → 104s).
+
 ## [0.23.0] - 2026-11-20 "объект да кеш"
 
 ### Added
