@@ -565,7 +565,11 @@ bs_args_help_flags() {
   bs_map_keys bs_args_flags | sort | while IFS= read -r __bs_args_hf_flag; do
     bs_args_mget bs_args_flags "$__bs_args_hf_flag" __bs_args_hf_kind
     bs_args_mget bs_args_flag_val "$__bs_args_hf_flag" __bs_args_hf_val
+    bs_args_mget bs_args_flag_short "$__bs_args_hf_flag" __bs_args_hf_short
     __bs_args_hf_label="--${__bs_args_hf_flag}"
+    if [ -n "$__bs_args_hf_short" ]; then
+      __bs_args_hf_label="-${__bs_args_hf_short}, ${__bs_args_hf_label}"
+    fi
     if [ "$__bs_args_hf_kind" = "value" ]; then
       # Хинт типа значения: number / enum:a,b / другое
       # Value type hint: number / enum:a,b / other
@@ -574,7 +578,9 @@ bs_args_help_flags() {
         number) __bs_args_hf_hint="number" ;;
         enum:*) __bs_args_hf_hint="${__bs_args_hf_val#enum:}" ;;
       esac
-      __bs_args_hf_label="--${__bs_args_hf_flag} <${__bs_args_hf_hint}>"
+      __bs_args_hf_label="${__bs_args_hf_label} <${__bs_args_hf_hint}>"
+    elif bs_map_has bs_args_flag_bool_value "$__bs_args_hf_flag"; then
+      __bs_args_hf_label="${__bs_args_hf_label}[=true|false]"
     fi
     bs_args_mget bs_args_flag_desc "$__bs_args_hf_flag" __bs_args_hf_d
     if [ -n "$__bs_args_hf_d" ]; then

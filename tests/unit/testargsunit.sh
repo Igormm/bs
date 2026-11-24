@@ -262,6 +262,17 @@ main() {
     args::flag_values label labels
     testframework::assert_equal "0" "${#labels[@]}" "flag_values leaves an empty array when unset"
 
+    args::reset
+    args::flag port value "" number
+    args::flag_short port p
+    args::flag color bool
+    args::flag_bool_value color
+    args::flag_short color c
+    local ext_help
+    ext_help="$(args::help prog)"
+    testframework::assert_true "\$ext_help == *'-p, --port <number>'*" "help shows short value alias"
+    testframework::assert_true "\$ext_help == *'-c, --color[=true|false]'*" "help shows bool-value form"
+
     # Тест 12: Help с флагами
     testframework::section "Help with Flags / Help с флагами"
 

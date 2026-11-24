@@ -96,10 +96,19 @@ bs_args_completion_bash() {
       __bs_args_cp_words="${__bs_args_cp_words} --${__bs_args_cp_n}"
       bs_args_mget bs_args_flags "$__bs_args_cp_n" __bs_args_cp_kind
       bs_args_mget bs_args_flag_val "$__bs_args_cp_n" __bs_args_cp_v
+      bs_args_mget bs_args_flag_short "$__bs_args_cp_n" __bs_args_cp_short
+      if [ -n "$__bs_args_cp_short" ]; then
+        __bs_args_cp_words="${__bs_args_cp_words} -${__bs_args_cp_short}"
+      fi
       if [ "$__bs_args_cp_kind" = "value" ]; then
         case "$__bs_args_cp_v" in
           enum:*) ;;
-          *) __bs_args_cp_vflags="${__bs_args_cp_vflags} --${__bs_args_cp_n}" ;;
+          *)
+            __bs_args_cp_vflags="${__bs_args_cp_vflags} --${__bs_args_cp_n}"
+            if [ -n "$__bs_args_cp_short" ]; then
+              __bs_args_cp_vflags="${__bs_args_cp_vflags} -${__bs_args_cp_short}"
+            fi
+            ;;
         esac
       fi
     done
@@ -142,11 +151,16 @@ EOF
           enum:*)
             __bs_args_cp_enum=$(printf '%s' "${__bs_args_cp_v#enum:}" | tr ',' ' ')
             __bs_args_cp_enum_bar=$(printf '%s' "$__bs_args_cp_enum" | tr ' ' '|')
+            __bs_args_cp_match="--${__bs_args_cp_n}"
+            bs_args_mget bs_args_flag_short "$__bs_args_cp_n" __bs_args_cp_short
+            if [ -n "$__bs_args_cp_short" ]; then
+              __bs_args_cp_match="${__bs_args_cp_match}|-${__bs_args_cp_short}"
+            fi
             cat <<EOF
 
     # enum-значения: --${__bs_args_cp_n} <${__bs_args_cp_enum_bar}>
     case "\${prev}" in
-        --${__bs_args_cp_n}) COMPREPLY=( \$(compgen -W "${__bs_args_cp_enum}" -- "\${cur}") ); return 0 ;;
+        ${__bs_args_cp_match}) COMPREPLY=( \$(compgen -W "${__bs_args_cp_enum}" -- "\${cur}") ); return 0 ;;
     esac
 EOF
             ;;
@@ -155,10 +169,19 @@ EOF
     done
   fi
 
+  # shellcheck disable=SC2016 # ${cur} belongs to generated bash code / ${cur} — часть генерируемого bash-кода
+  __bs_args_cp_curtest='"${cur}" == --*'
+  __bs_args_cp_hasshort=0
+  if [ "$(bs_map_count bs_args_short_flag)" -gt 0 ]; then
+    # shellcheck disable=SC2016 # ${cur} belongs to generated bash code / ${cur} — часть генерируемого bash-кода
+    __bs_args_cp_curtest='"${cur}" == --* || "${cur}" == -*'
+    __bs_args_cp_hasshort=1
+  fi
+
   cat <<EOF
 
     # Дополнение флагов / Flag completion
-    if [[ "\${cur}" == --* ]]; then
+    if [[ ${__bs_args_cp_curtest} ]]; then
         COMPREPLY=( \$(compgen -W "${__bs_args_cp_words}" -- "\${cur}") )
         return 0
     fi
@@ -174,6 +197,12 @@ EOF
   if [ -n "$__bs_args_cp_vflags" ]; then
     cat <<EOF
             ${__bs_args_cp_pat}) ((++i)) ;;   # пропускаем значение value-флага / skip value flag value
+EOF
+  fi
+
+  if [ "$__bs_args_cp_hasshort" -eq 1 ]; then
+    cat <<EOF
+            -?*) ;;                      # короткий флаг или cluster / short flag or cluster
 EOF
   fi
 
@@ -227,6 +256,14 @@ bs_args_completion_zsh() {
       value) bs_arr_push bs_args_specs "$(bs_quote "--${__bs_args_zs_name}=:value: ")" ;;
       *)     bs_arr_push bs_args_specs "$(bs_quote "--${__bs_args_zs_name}")" ;;
     esac
+    bs_args_mget bs_args_flag_short "$__bs_args_zs_name" __bs_args_zs_short
+    if [ -n "$__bs_args_zs_short" ]; then
+      case "$__bs_args_zs_kind" in
+        enum)  bs_arr_push bs_args_specs "$(bs_quote "-${__bs_args_zs_short}=:value:(${__bs_args_zs_vals})")" ;;
+        value) bs_arr_push bs_args_specs "$(bs_quote "-${__bs_args_zs_short}=:value: ")" ;;
+        *)     bs_arr_push bs_args_specs "$(bs_quote "-${__bs_args_zs_short}")" ;;
+      esac
+    fi
   done <<EOF
 ${__bs_args_zs_flags}
 EOF
@@ -269,10 +306,13 @@ bs_args_completion_fish() {
   __bs_args_fi_flags=$(bs_args_completion_flags)
   while IFS="$(printf '\t')" read -r __bs_args_fi_name __bs_args_fi_kind __bs_args_fi_values; do
     [ -n "$__bs_args_fi_name" ] || continue
+    bs_args_mget bs_args_flag_short "$__bs_args_fi_name" __bs_args_fi_short
+    __bs_args_fi_shortopt=""
+    if [ -n "$__bs_args_fi_short" ]; then __bs_args_fi_shortopt="-s ${__bs_args_fi_short} "; fi
     case "$__bs_args_fi_kind" in
-      enum)  printf 'complete -c %s -l %s -x -a %s\n' "$__bs_args_fi_q" "$__bs_args_fi_name" "$(bs_quote "$(printf '%s' "$__bs_args_fi_values" | tr ',' ' ')")" ;;
-      value) printf 'complete -c %s -l %s -r\n' "$__bs_args_fi_q" "$__bs_args_fi_name" ;;
-      *)     printf 'complete -c %s -l %s\n' "$__bs_args_fi_q" "$__bs_args_fi_name" ;;
+      enum)  printf 'complete -c %s %s-l %s -x -a %s\n' "$__bs_args_fi_q" "$__bs_args_fi_shortopt" "$__bs_args_fi_name" "$(bs_quote "$(printf '%s' "$__bs_args_fi_values" | tr ',' ' ')")" ;;
+      value) printf 'complete -c %s %s-l %s -r\n' "$__bs_args_fi_q" "$__bs_args_fi_shortopt" "$__bs_args_fi_name" ;;
+      *)     printf 'complete -c %s %s-l %s\n' "$__bs_args_fi_q" "$__bs_args_fi_shortopt" "$__bs_args_fi_name" ;;
     esac
   done <<EOF
 ${__bs_args_fi_flags}
@@ -310,6 +350,13 @@ bs_args_completion_nu() {
       value) bs_arr_push bs_args_decl "  --${__bs_args_nu_name}: string" ;;
       *)     bs_arr_push bs_args_decl "  --${__bs_args_nu_name}" ;;
     esac
+    bs_args_mget bs_args_flag_short "$__bs_args_nu_name" __bs_args_nu_short
+    if [ -n "$__bs_args_nu_short" ]; then
+      case "$__bs_args_nu_kind" in
+        enum|value) bs_arr_push bs_args_decl "  -${__bs_args_nu_short}: string" ;;
+        *)          bs_arr_push bs_args_decl "  -${__bs_args_nu_short}" ;;
+      esac
+    fi
   done <<EOF
 ${__bs_args_nu_flags}
 EOF

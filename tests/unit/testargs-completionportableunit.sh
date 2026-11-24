@@ -49,6 +49,21 @@ bs_args_flag_describe verbose "Chatty"
 bs_args_flag env value staging enum:dev,prod
 bs_args_flag n value "" number'
 
+readonly EXT_DECL='bs_args_flag port value "" number
+bs_args_flag_short port p
+bs_args_flag color bool
+bs_args_flag_bool_value color
+bs_args_flag_short color c'
+
+has_tokens() {
+    local text="$1" token rc=0
+    shift
+    for token in "$@"; do
+        if ! printf '%s\n' "$text" | grep -Fq -- "$token"; then rc=1; fi
+    done
+    printf '%s' "$rc"
+}
+
 test_parses_and_lints() {
     local sh_bin
     while IFS= read -r sh_bin; do
@@ -86,6 +101,14 @@ test_generators() {
         eq "env|enum|dev,prod
 n|value|
 verbose|bool|" "${out}" "${sh_name}: flags are sorted with kind and enum values"
+        eq "$(has_tokens "$(probe "${sh_bin}" "${EXT_DECL}"$'\n''bs_args_completion prog bash')" --port ' -p' --color ' -c')" \
+"0" "${sh_name}: bash completion advertises short aliases"
+        eq "$(has_tokens "$(probe "${sh_bin}" "${EXT_DECL}"$'\n''bs_args_completion prog zsh')" --port '-p=:value:' --color "'-c'")" \
+"0" "${sh_name}: zsh completion advertises aliases"
+        eq "$(has_tokens "$(probe "${sh_bin}" "${EXT_DECL}"$'\n''bs_args_completion prog fish')" '-l port' '-s p' '-l color' '-s c')" \
+"0" "${sh_name}: fish completion advertises aliases"
+        eq "$(has_tokens "$(probe "${sh_bin}" "${EXT_DECL}"$'\n''bs_args_completion prog nu')" '--port: string' '-p: string' '  --color' '  -c')" \
+"0" "${sh_name}: nu completion advertises aliases"
     done < <(testframework::posix_shells)
 }
 
