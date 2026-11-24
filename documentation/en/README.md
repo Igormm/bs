@@ -17,6 +17,7 @@ an I/O streams abstraction and a set of system modules.
 - [core/args](03-modules/args.md) — declarative argument trees: validation, auto-help, completion.
 - [core/utils](03-modules/core-utils.md) — silence idioms (`utils::has`, `utils::quiet`, `utils::quiet_err`, `utils::ignore`) and helper utilities.
 - [lib/io/streams](03-modules/io-streams.md) — output, input, redirections, FDs, pipes, buffering.
+- [lib/io/parallel](03-modules/io-parallel.md) — bounded callback maps and task files with isolated result files.
 - [Lib modules overview](03-modules/lib-modules-overview.md) — system, ui, network, data, integration, status, audit and more.
 - [Core API](04-api-reference/core-api.md) — `log::*`, `error::*`, `cleanup::*`, exit codes, version.
 

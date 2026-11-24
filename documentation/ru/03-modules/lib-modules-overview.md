@@ -28,11 +28,12 @@ load "lib/data/dataprocessor"
 - [streams.sh](../../../lib/io/streams.sh) — низкоуровневое управление потоками ввода-вывода: вывод, чтение, перенаправление файловых дескрипторов, каналы и определение TTY.
 - [files.sh](../../../lib/io/files.sh) — высокоуровневые файловые операции: копирование, перемещение, синхронизация и удаление файлов/каталогов с dry-run и единой обработкой ошибок.
 - [process.sh](../../../lib/io/process.sh) — обёртка-сторож процесса: таймаут, hang-детекция по stdout/stderr, диагностический снимок `/proc/<pid>` и `strace`.
+- [parallel.sh](../../../lib/io/parallel.sh) — ограниченные callback-map и запуск файла задач с отдельными файлами результатов `.out`/`.err`/`.rc`.
 - [tree.sh](../../../lib/io/tree.sh) — создать дерево файлов проекта из yaml/yml/txt/ini/csv.
 
-Ключевые функции: `io::streams::print`, `io::streams::read_line`, `io::streams::redirect_stdout`, `io::streams::pipe`, `io::files::copy_dir`, `io::files::sync_dir`, `io::files::copy_matching`, `io::files::move`, `io::files::remove`, `io::process::guard`, `io::tree::create`.
+Ключевые функции: `io::streams::print`, `io::streams::read_line`, `io::streams::redirect_stdout`, `io::streams::pipe`, `io::files::copy_dir`, `io::files::sync_dir`, `io::files::copy_matching`, `io::files::move`, `io::files::remove`, `io::process::guard`, `io::parallel::map`, `io::parallel::run`, `io::parallel::cancel`, `io::tree::create`.
 
-Подробнее: [io-streams.md](io-streams.md), [io-files.md](io-files.md), [io-process.md](io-process.md), [io-tree.md](io-tree.md)
+Подробнее: [io-streams.md](io-streams.md), [io-files.md](io-files.md), [io-process.md](io-process.md), [io-parallel.md](io-parallel.md), [io-tree.md](io-tree.md)
 
 ## system — `lib/system/`
 

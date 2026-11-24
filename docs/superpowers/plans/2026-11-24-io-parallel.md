@@ -1046,6 +1046,12 @@ git commit -m "feat(io): cancel parallel workers on signals"
 - Create: `examples/parallel_demo.sh`
 - Modify: `documentation/en/07-testing/README.md`
 - Modify: `documentation/ru/07-testing/README.md`
+- Create: `documentation/en/03-modules/io-parallel.md`
+- Modify: `documentation/ru/03-modules/io-parallel.md`
+- Modify: `documentation/en/03-modules/lib-modules-overview.md`
+- Modify: `documentation/ru/03-modules/lib-modules-overview.md`
+- Modify: `documentation/en/README.md`
+- Modify: `documentation/ru/README.md`
 - Modify: `.agents/skills/README.md`
 - Modify: `.agents/README.md`
 - Modify: `AGENTS.md`
@@ -1061,7 +1067,7 @@ git commit -m "feat(io): cancel parallel workers on signals"
 
 **Interfaces:**
 - Consumes: completed `io::parallel` module.
-- Produces: runnable example, user documentation, skill catalog entry, release `0.26.0`.
+- Produces: runnable example, user documentation, module-index entries, release `0.26.0`.
 
 - [ ] **Step 1: Add the example**
 
@@ -1070,11 +1076,16 @@ Create `examples/parallel_demo.sh`:
 ```bash
 #!/usr/bin/env bs
 # shellcheck shell=bash
+# @shell bash4,zsh — bounded worker pools with zero-based arrays
 # examples/parallel_demo.sh — io::parallel in bash and zsh
+# examples/parallel_demo.sh — io::parallel в bash и zsh
 
-set -euo pipefail
+if [[ -z "${BS_INITIALIZED:-}" ]]; then
+    source "$(cd "$(dirname "$0")/.." && pwd)/bootstrap/init.sh"
+fi
 
 load "lib/io/parallel"
+strict::enable
 
 demo_worker() {
     printf 'item=%s pid=%s\n' "$1" "$$"
@@ -1085,7 +1096,7 @@ results="$(mktemp -d)"
 trap 'rm -rf "$results"' EXIT
 
 io::parallel::map --jobs 3 --out-dir "$results" -- \
-    demo_worker -- alpha beta gamma delta
+    demo_worker alpha beta gamma delta
 
 printf 'results: %s\n' "$results"
 for rc_file in "$results"/*.rc; do
@@ -1114,21 +1125,20 @@ The module is `@shell bash4,zsh`. Schedulers: `pid` (default, no external
 dependency), `fifo` (`mkfifo`), `xargs` (reserved stub, returns `E_ERROR`).
 ```
 
-- [ ] **Step 3: Register the module in the skill/catalog indexes**
+- [ ] **Step 3: Register the module in documentation indexes**
 
-Add `bs-parallel` as a new `tier: bash4,zsh` skill? No: `io::parallel` is a
-library module, not a workflow skill. Add it to the `lib/io` API documentation
-only; do not create a skill entry.
-
-Update `AGENTS.md` and both `.agents` catalogs only if a new
-`bs-parallel` workflow skill is separately authored. This plan does not add
-one.
+Do not create a `bs-parallel` workflow skill: `io::parallel` is a library module.
+Add `documentation/{en,ru}/03-modules/io-parallel.md`, link it from both
+`lib-modules-overview.md` files and documentation indexes, and leave
+`AGENTS.md` / `.agents` skill catalogs unchanged.
 
 - [ ] **Step 4: Bump the release to `0.26.0 "параллель"`**
 
-Run the `bs-version-bump` procedure:
+Run the `bs-version-bump` procedure. Its `bump` command accepts only ASCII code
+names, so the approved Cyrillic `параллель` is written manually in the single
+source; `check` still verifies every repeated value.
 
-1. `core/version.sh`: `BS_VERSION="0.26.0"`, `BS_CODENAME="параллель"`.
+1. `core/version.sh`: set `BS_VERSION` to `0.26.0` and `BS_CODENAME` to `параллель`.
 2. `CHANGELOG.md`: add `## [0.26.0] - 2026-11-24 "параллель"` above `0.25.0`.
 3. Replace `0.25.0` with `0.26.0` in en/ru architecture, en/ru core-api and
    `tests/unit/testbsnobashunit.sh`.
@@ -1170,13 +1180,18 @@ Expected: all pass; only the two known environment skips may remain.
 - [ ] **Step 7: Commit and push**
 
 ```bash
-git add examples/parallel_demo.sh documentation/en/07-testing/README.md \
-    documentation/ru/07-testing/README.md core/version.sh CHANGELOG.md \
+git add examples/parallel_demo.sh tests/unit/testparallelunit.sh \
+    documentation/en/03-modules/io-parallel.md documentation/ru/03-modules/io-parallel.md \
+    documentation/en/03-modules/lib-modules-overview.md documentation/ru/03-modules/lib-modules-overview.md \
+    documentation/en/README.md documentation/ru/README.md \
+    documentation/en/07-testing/README.md documentation/ru/07-testing/README.md \
+    core/version.sh CHANGELOG.md \
     documentation/en/02-core-concepts/architecture.md \
     documentation/ru/02-core-concepts/architecture.md \
     documentation/en/04-api-reference/core-api.md \
     documentation/ru/04-api-reference/core-api.md \
-    tests/unit/testbsnobashunit.sh mtest/t_const_version.sh mtest/t_nu.nu
+    tests/unit/testbsnobashunit.sh mtest/t_const_version.sh mtest/t_nu.nu \
+    docs/superpowers/plans/2026-11-24-io-parallel.md
 git commit -m "chore(release): 0.26.0 \"параллель\""
 git push origin main
 ```

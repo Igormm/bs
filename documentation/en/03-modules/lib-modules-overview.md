@@ -28,11 +28,12 @@ Most lib modules follow the same conventions: a `<module>::init` function, a `<m
 - [streams.sh](../../../lib/io/streams.sh) — low-level I/O stream management: printing, reading, fd redirection, pipes and TTY detection.
 - [files.sh](../../../lib/io/files.sh) — high-level file operations: copying, moving, syncing, and removing files/directories with dry-run and unified error handling.
 - [process.sh](../../../lib/io/process.sh) — process guard wrapper: timeout, hang detection via stdout/stderr, diagnostic snapshot of `/proc/<pid>` and `strace`.
+- [parallel.sh](../../../lib/io/parallel.sh) — bounded callback maps and task-file execution with isolated `.out`/`.err`/`.rc` result files.
 - [tree.sh](../../../lib/io/tree.sh) — create a project file tree from yaml/yml/txt/ini/csv.
 
-Key functions: `io::streams::print`, `io::streams::read_line`, `io::streams::redirect_stdout`, `io::streams::pipe`, `io::files::copy_dir`, `io::files::sync_dir`, `io::files::copy_matching`, `io::files::move`, `io::files::remove`, `io::process::guard`, `io::tree::create`.
+Key functions: `io::streams::print`, `io::streams::read_line`, `io::streams::redirect_stdout`, `io::streams::pipe`, `io::files::copy_dir`, `io::files::sync_dir`, `io::files::copy_matching`, `io::files::move`, `io::files::remove`, `io::process::guard`, `io::parallel::map`, `io::parallel::run`, `io::parallel::cancel`, `io::tree::create`.
 
-Details: [io-streams.md](io-streams.md), [io-files.md](io-files.md), [io-process.md](io-process.md), [io-tree.md](io-tree.md)
+Details: [io-streams.md](io-streams.md), [io-files.md](io-files.md), [io-process.md](io-process.md), [io-parallel.md](io-parallel.md), [io-tree.md](io-tree.md)
 
 ## system — `lib/system/`
 

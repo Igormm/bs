@@ -55,6 +55,23 @@ Paths are resolved from the script location, so the run works from any directory
 
 The default run needs no root and writes nothing to `/etc` or the real `~/.config`: modules that touch the home directory are tested in an isolated temporary `HOME`.
 
+### Parallel task execution
+
+`lib/io/parallel` runs callback maps or task files with a bounded worker pool.
+Results are written as `NNNN.out`, `NNNN.err` and `NNNN.rc`; the function's
+stdout stays clean.
+
+```bash
+load "lib/io/parallel"
+io::parallel::map --jobs 4 --out-dir results -- my_worker item1 item2
+io::parallel::run --jobs 4 --scheduler fifo --out-dir results -- tasks.txt
+```
+
+The module is `@shell bash4,zsh`. Schedulers: `pid` (default, no
+scheduler-specific dependency), `fifo` (`mkfifo`), `xargs` (reserved stub,
+returns `E_ERROR`).
+See [io::parallel](../03-modules/io-parallel.md) for the full contract.
+
 ### Destructive / root-requiring tests
 
 Two tests are skipped by default with an explicit message:

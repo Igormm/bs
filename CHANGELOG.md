@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.26.0] - 2026-11-24 "параллель"
+
+### Added
+- feat(io): `lib/io/parallel.sh` (`@shell bash4,zsh`) — bounded callback maps and task-file execution with `pid` and `fifo` schedulers; isolated `.out`/`.err`/`.rc` result files, aggregate failure status, clean public stdout and SIGINT/SIGTERM cleanup. The `xargs` option is reserved as an explicit non-implemented stub.
+- feat(examples): `examples/parallel_demo.sh` — runnable `io::parallel` demo in bash and zsh.
+- docs(io): `documentation/{en,ru}/03-modules/io-parallel.md` — API, result files, schedulers, cancellation and trust boundary for task files.
+
+### Fixed
+- fix(io): parallel result publication now uses private staging and atomic `mv -T`; persistence failures aggregate as `E_ERROR` without losing later completions. FIFO output stays clean in zsh, programmatic/signal cancellation cannot deadlock the completion read, caller INT/TERM traps are restored in bash and zsh, callbacks are supervised so `exit`/`exec` still persist results, dash-prefixed output paths clean up correctly, and empty work succeeds without staging.
+
 ## [0.25.0] - 2026-11-24 "контракт"
 
 ### Added

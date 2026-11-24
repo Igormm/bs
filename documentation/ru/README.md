@@ -17,6 +17,7 @@ English version: [documentation/en/](../en/README.md)
 - [core/args](03-modules/args.md) — декларативное дерево параметров: валидация, авто-help, completion.
 - [core/utils](03-modules/core-utils.md) — идиомы тишины (`utils::has`, `utils::quiet`, `utils::quiet_err`, `utils::ignore`) и служебные хелперы.
 - [lib/io/streams](03-modules/io-streams.md) — вывод, ввод, перенаправления, FD, pipe, буферизация.
+- [lib/io/parallel](03-modules/io-parallel.md) — ограниченные callback-map и файлы задач с отдельными файлами результатов.
 - [Обзор lib-модулей](03-modules/lib-modules-overview.md) — system, ui, network, data, integration, status, audit и др.
 - [Core API](04-api-reference/core-api.md) — `log::*`, `error::*`, `cleanup::*`, коды ошибок, версия.
 

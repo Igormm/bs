@@ -55,6 +55,22 @@ BS_TEST_JOBS=8 bash tests/runalltests.sh  # то же через окружен�
 
 Обычный прогон не требует root и ничего не пишет в `/etc` или реальный `~/.config`: модули, работающие с домашним каталогом, тестируются в изолированном временном `HOME`.
 
+### Параллельный запуск задач
+
+`lib/io/parallel` выполняет callback-map или файл задач через ограниченный пул
+воркеров. Результаты записываются в `NNNN.out`, `NNNN.err` и `NNNN.rc`; stdout
+самой функции остаётся чистым.
+
+```bash
+load "lib/io/parallel"
+io::parallel::map --jobs 4 --out-dir results -- my_worker item1 item2
+io::parallel::run --jobs 4 --scheduler fifo --out-dir results -- tasks.txt
+```
+
+Модуль относится к ярусу `@shell bash4,zsh`. Планировщики: `pid` (по умолчанию,
+без зависимости, специфичной для планировщика), `fifo` (`mkfifo`), `xargs`
+(зарезервированная заглушка, возвращает `E_ERROR`). Полный контракт — [io::parallel](../03-modules/io-parallel.md).
+
 ### Деструктивные тесты, требующие root
 
 Два теста по умолчанию пропускаются с явным сообщением:
