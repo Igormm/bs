@@ -190,6 +190,8 @@ test_fifo_requires_mkfifo() {
     local sh_bin out rc=0
     mkdir -p "$T/home/no-mkfifo-bin"
     ln -s "$(command -v mkdir)" "$T/home/no-mkfifo-bin/mkdir"
+    ln -s "$(command -v mktemp)" "$T/home/no-mkfifo-bin/mktemp"
+    ln -s "$(command -v rm)" "$T/home/no-mkfifo-bin/rm"
     for sh_bin in bash zsh; do
         rc=0
         out="$(probe "$sh_bin" -- '
@@ -245,8 +247,8 @@ test_fifo_burst_completion() {
             io::parallel::map --jobs 64 --scheduler fifo --out-dir "$1" -- \
                 true "${items[@]}"
         ' _ "$out_dir")" || rc=$?
-        testframework::assert_equal "0" "$rc" "${sh_bin}: fifo drains a burst of workers"
         testframework::assert_equal "" "$out" "${sh_bin}: fifo burst keeps stdout clean"
+        testframework::assert_equal "0" "$rc" "${sh_bin}: fifo drains a burst of workers"
         local -a rc_files=("$out_dir"/*.rc)
         testframework::assert_equal "64" \
             "${#rc_files[@]}" \
@@ -495,7 +497,8 @@ test_result_persistence_failures() {
                     printf "rc=%s\n" "$rc"
                 ' _ "$mode" "$scheduler" "$out_dir" "$tasks")" || rc=$?
                 testframework::assert_equal "0" "$rc" "${sh_bin}/${scheduler}/${mode}: persistence failure does not hang"
-                testframework::assert_equal "rc=1" "$out" "${sh_bin}/${scheduler}/${mode}: persistence failure is E_ERROR"
+                testframework::assert_command "grep -q '^rc=1$' <<< '$out'" \
+                    "${sh_bin}/${scheduler}/${mode}: persistence failure is E_ERROR"
                 testframework::assert_equal "0" "$(cat "$out_dir/0001.rc")" \
                     "${sh_bin}/${scheduler}/${mode}: later task still persists"
                 rc=0
@@ -545,22 +548,31 @@ test_signal_handlers_restored() {
                 out="$T/${sh_bin}-${scheduler}-${disposition}-results"
                 rc=0
                 out="$(probe "$sh_bin" -- '
+                    snapshot_traps() {
+                        if [[ -n "${ZSH_VERSION:-}" ]]; then trap; else trap -p INT TERM; fi
+                    }
+                    term_seen=0; int_seen=0
+                    custom_term() { term_seen=1; }
+                    custom_int() { int_seen=1; }
                     case "$1" in
-                        custom)  trap ":" INT; trap ":" TERM ;;
+                        custom)  trap custom_int INT; trap custom_term TERM ;;
                         ignored) trap "" INT; trap "" TERM ;;
                         default) trap - INT; trap - TERM ;;
                     esac
-                    before_int="$(trap -p INT)"
-                    before_term="$(trap -p TERM)"
+                    before="$(snapshot_traps)"
                     io::parallel::map --jobs 1 --scheduler "$2" --out-dir "$3" -- true item
-                    after_int="$(trap -p INT)"
-                    after_term="$(trap -p TERM)"
-                    [[ "$before_int" == "$after_int" ]]; int_rc=$?
-                    [[ "$before_term" == "$after_term" ]]; term_rc=$?
-                    printf "int=%s term=%s\n" "$int_rc" "$term_rc"
+                    after="$(snapshot_traps)"
+                    [[ "$before" == "$after" ]]; same_rc=$?
+                    if [[ "$1" != default ]]; then
+                        kill -TERM "$$"
+                        kill -INT "$$"
+                    fi
+                    printf "same=%s term=%s int=%s\n" "$same_rc" "$term_seen" "$int_seen"
                 ' _ "$disposition" "$scheduler" "$out")" || rc=$?
-                testframework::assert_equal "0" "$rc" "${sh_bin}/${scheduler}/${disposition}: probe succeeds"
-                testframework::assert_equal "int=0 term=0" "$out" \
+                testframework::assert_equal "0" "$rc" "${sh_bin}/${scheduler}/${disposition}: probe survives"
+                local expected="same=0 term=0 int=0"
+                [[ "$disposition" == custom ]] && expected="same=0 term=1 int=1"
+                testframework::assert_equal "$expected" "$out" \
                     "${sh_bin}/${scheduler}/${disposition}: caller signal handlers are restored"
                 rc=0
             done
@@ -583,8 +595,123 @@ test_option_like_output_directory() {
                 ' _ "$base" "$dir_name" "$scheduler")" || rc=$?
                 testframework::assert_equal "0" "$rc" "${sh_bin}/${scheduler}/${dir_name}: option-like directory succeeds"
                 testframework::assert_equal "" "$out" "${sh_bin}/${scheduler}/${dir_name}: option-like directory keeps stdout clean"
+                local -a staging=("$out_dir"/.bs-parallel.*)
+                testframework::assert_false "-e '${staging[0]}'" \
+                    "${sh_bin}/${scheduler}/${dir_name}: staging directory is removed"
                 testframework::assert_equal "0" "$(cat "$out_dir/0000.rc")" \
                     "${sh_bin}/${scheduler}/${dir_name}: option-like directory receives results"
+                rc=0
+            done
+        done
+    done
+}
+
+test_callback_exit_exec() {
+    local sh_bin scheduler mode out_dir tasks out rc=0
+    local PROBE_TIMEOUT=5
+    for sh_bin in bash zsh; do
+        for scheduler in pid fifo; do
+            for mode in map run; do
+                out_dir="$T/${sh_bin}-${scheduler}-${mode}-exit-exec"
+                tasks="$T/${sh_bin}-${scheduler}-${mode}-exit-exec.txt"
+                printf 'exit 7\nexec true\n' > "$tasks"
+                rc=0
+                out="$(probe "$sh_bin" -- '
+                    set -e
+                    worker() {
+                        if [[ "$1" == exit ]]; then exit 7; else exec true; fi
+                    }
+                    if [[ "$1" == map ]]; then
+                        if io::parallel::map --jobs 1 --scheduler "$2" --out-dir "$3" -- \
+                            worker exit exec; then rc=0; else rc=$?; fi
+                    else
+                        if io::parallel::run --jobs 1 --scheduler "$2" --out-dir "$3" -- "$4"; then
+                            rc=0
+                        else
+                            rc=$?
+                        fi
+                    fi
+                    printf "rc=%s\n" "$rc"
+                ' _ "$mode" "$scheduler" "$out_dir" "$tasks")" || rc=$?
+                testframework::assert_equal "0" "$rc" "${sh_bin}/${scheduler}/${mode}: callback exit/exec probe survives"
+                testframework::assert_equal "rc=1" "$out" "${sh_bin}/${scheduler}/${mode}: callback exit is aggregated"
+                testframework::assert_equal "7" "$(cat "$out_dir/0000.rc")" \
+                    "${sh_bin}/${scheduler}/${mode}: callback exit status is persisted"
+                testframework::assert_equal "0" "$(cat "$out_dir/0001.rc")" \
+                    "${sh_bin}/${scheduler}/${mode}: exec callback still reports completion"
+                rc=0
+            done
+        done
+    done
+}
+
+test_publication_race() {
+    local sh_bin scheduler out_dir victim real_mv rc=0
+    real_mv="$(command -v mv)"
+    mkdir -p "$T/home/race-bin"
+    cat > "$T/home/race-bin/mv" <<'WRAPPER'
+#!/bin/sh
+dst=""
+for arg in "$@"; do dst="$arg"; done
+rm -f -- "$dst"
+ln -s "$RACE_VICTIM_DIR" "$dst"
+exec "$REAL_MV" "$@"
+WRAPPER
+    chmod +x "$T/home/race-bin/mv"
+    for sh_bin in bash zsh; do
+        for scheduler in pid fifo; do
+            out_dir="$T/${sh_bin}-${scheduler}-race"
+            victim="$T/${sh_bin}-${scheduler}-race-victim"
+            mkdir -p "$out_dir" "$victim"
+            printf 'keep\n' > "$victim/victim"
+            rc=0
+            probe "$sh_bin" -- '
+                export RACE_VICTIM_DIR="$2" REAL_MV="$4"
+                PATH="$HOME/race-bin:/usr/bin:/bin"
+                worker() { printf "safe\n"; }
+                io::parallel::map --jobs 1 --scheduler "$3" --out-dir "$1" -- worker item
+            ' _ "$out_dir" "$victim" "$scheduler" "$real_mv" >/dev/null || rc=$?
+            testframework::assert_true "$rc -eq 0 || $rc -eq 1" \
+                "${sh_bin}/${scheduler}: publication race succeeds safely or fails closed"
+            testframework::assert_equal "keep" "$(cat "$victim/victim")" \
+                "${sh_bin}/${scheduler}: race cannot write into victim directory"
+            local -a victim_entries=("$victim"/*)
+            testframework::assert_equal "1" "${#victim_entries[@]}" \
+                "${sh_bin}/${scheduler}: victim directory receives no result files"
+            if (( rc == 0 )); then
+                testframework::assert_false "-L '$out_dir/0000.out'" \
+                    "${sh_bin}/${scheduler}: raced destination symlink is replaced"
+                testframework::assert_equal "safe" "$(cat "$out_dir/0000.out")" \
+                    "${sh_bin}/${scheduler}: raced result is published safely"
+            else
+                testframework::assert_false "-e '$out_dir/0000.out'" \
+                    "${sh_bin}/${scheduler}: unsupported race replacement fails closed"
+            fi
+            rc=0
+        done
+    done
+}
+
+test_empty_read_only_directory() {
+    local sh_bin scheduler mode out_dir tasks rc=0
+    for sh_bin in bash zsh; do
+        for scheduler in pid fifo; do
+            for mode in map run; do
+                out_dir="$T/${sh_bin}-${scheduler}-${mode}-readonly"
+                mkdir -p "$out_dir"
+                chmod 555 "$out_dir"
+                tasks="$T/${sh_bin}-${scheduler}-${mode}-readonly.txt"
+                printf '# no work\n\n' > "$tasks"
+                rc=0
+                probe "$sh_bin" -- '
+                    if [[ "$1" == map ]]; then
+                        io::parallel::map --jobs 1 --scheduler "$2" --out-dir "$3" -- true
+                    else
+                        io::parallel::run --jobs 1 --scheduler "$2" --out-dir "$3" -- "$4"
+                    fi
+                ' _ "$mode" "$scheduler" "$out_dir" "$tasks" >/dev/null || rc=$?
+                chmod 755 "$out_dir"
+                testframework::assert_equal "0" "$rc" "${sh_bin}/${scheduler}/${mode}: empty work succeeds in read-only directory"
                 rc=0
             done
         done
@@ -606,11 +733,14 @@ main() {
     testframework::section "FIFO burst / FIFO серия"; test_fifo_burst_completion
     testframework::section "xargs stub / Заглушка xargs"; test_xargs_stub
     testframework::section "Empty input / Пустой вход"; test_empty_and_clean_output
+    testframework::section "Empty read-only / Пустой read-only"; test_empty_read_only_directory
     testframework::section "Special items / Особые элементы"; test_special_items
+    testframework::section "Callback exit/exec / Выход callback"; test_callback_exit_exec
     testframework::section "Cancellation / Отмена"; test_cancel_cleans_workers
     testframework::section "Programmatic cancel / Программная отмена"; test_programmatic_cancel
     testframework::section "Persistence failures / Ошибки записи"; test_result_persistence_failures
     testframework::section "Result symlinks / Symlink результатов"; test_result_symlinks_replaced
+    testframework::section "Publication race / Гонка публикации"; test_publication_race
     testframework::section "Signal restoration / Восстановление сигналов"; test_signal_handlers_restored
     testframework::section "Option-like out-dir / Каталог с дефисом"; test_option_like_output_directory
     testframework::summary

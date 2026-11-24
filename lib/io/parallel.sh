@@ -51,6 +51,9 @@ declare -g IO_PARALLEL_PREV_INT=""
 # @global IO_PARALLEL_PREV_TERM — Parallel: caller TERM trap snapshot (category: state)
 # @global IO_PARALLEL_PREV_TERM — Parallel: сохранённый TERM trap вызывающего (category: state)
 declare -g IO_PARALLEL_PREV_TERM=""
+# @global IO_PARALLEL_SNAPSHOT — Parallel: trap snapshot work value (category: state)
+# @global IO_PARALLEL_SNAPSHOT — Parallel: рабочее значение снимка trap (category: state)
+declare -g IO_PARALLEL_SNAPSHOT=""
 # @global IO_PARALLEL_TEMP — Parallel: internal temporary directory (category: state)
 # @global IO_PARALLEL_TEMP — Parallel: внутренний временный каталог (category: state)
 declare -g IO_PARALLEL_TEMP=""
@@ -119,12 +122,7 @@ io::parallel::__prepare_temp() {
 # @returns E_SUCCESS or E_ERROR
 io::parallel::__publish_result() {
     local src="$1" dst="$2"
-    if [[ -L "$dst" ]]; then
-        utils::quiet rm -f -- "$dst" || return "${E_ERROR:-1}"
-    elif [[ -e "$dst" && ! -f "$dst" ]]; then
-        return "${E_ERROR:-1}"
-    fi
-    mv -f -- "$src" "$dst"
+    mv -fT -- "$src" "$dst"
 }
 
 # @private
@@ -136,12 +134,26 @@ io::parallel::__publish_result() {
 # @returns E_SUCCESS or E_ERROR if a result cannot be persisted
 io::parallel::__worker() {
     local idx="$1" out="$2"; shift 2
-    bs_signal_reset INT
-    bs_signal_reset TERM
-    local name rc=0 base
+    local name rc=0 base child_pid="" worker_cancelled=0
     name="$(io::parallel::__result_name "$idx")"
     base="$IO_PARALLEL_TEMP/$name"
-    "$@" > "$base.out" 2> "$base.err" || rc=$?
+    # shellcheck disable=SC2064 # expand child_pid when the signal arrives
+    trap 'worker_cancelled=1; if [[ -n "${child_pid:-}" ]]; then utils::quiet kill -TERM "$child_pid" || true; fi' INT TERM
+    (( worker_cancelled == 0 )) || { bs_signal_reset INT; bs_signal_reset TERM; return "${E_ERROR:-1}"; }
+    (
+        bs_signal_reset INT
+        bs_signal_reset TERM
+        "$@"
+    ) > "$base.out" 2> "$base.err" &
+    child_pid=$!
+    if (( worker_cancelled != 0 )); then
+        utils::quiet kill -TERM "$child_pid" || true
+    fi
+    wait "$child_pid" || rc=$?
+    child_pid=""
+    bs_signal_reset INT
+    bs_signal_reset TERM
+    (( worker_cancelled == 0 )) || return "${E_ERROR:-1}"
     printf '%s\n' "$rc" > "$base.rc" || return "${E_ERROR:-1}"
     io::parallel::__publish_result "$base.out" "$out/$name.out" || return "${E_ERROR:-1}"
     io::parallel::__publish_result "$base.err" "$out/$name.err" || return "${E_ERROR:-1}"
@@ -188,12 +200,38 @@ io::parallel::__restore_handlers() {
 }
 
 # @private
+# @description Snapshot one caller signal disposition in bash or zsh syntax.
+# @description Сохранить обработчик сигнала в синтаксисе bash или zsh.
+# @param $1 signal name
+# @returns E_SUCCESS or E_ERROR; result is placed in IO_PARALLEL_SNAPSHOT
+io::parallel::__snapshot_handler() {
+    local sig="$1" line file
+    file="$(mktemp)" || return "${E_ERROR:-1}"
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
+        trap > "$file"
+    else
+        trap -p "$sig" > "$file"
+    fi
+    IO_PARALLEL_SNAPSHOT=""
+    while IFS= read -r line; do
+        if [[ -n "${ZSH_VERSION:-}" ]]; then
+            [[ "$line" == *" $sig" ]] && IO_PARALLEL_SNAPSHOT="$line"
+        else
+            IO_PARALLEL_SNAPSHOT="$line"
+        fi
+    done < "$file"
+    utils::quiet rm -f -- "$file"
+}
+
+# @private
 # @description Install cancellation handlers for an active worker pool.
 # @description Установить обработчики отмены для активного пула воркеров.
 # @returns E_SUCCESS or E_ERROR
 io::parallel::__install_handlers() {
-    IO_PARALLEL_PREV_INT="$(trap -p INT)" || true
-    IO_PARALLEL_PREV_TERM="$(trap -p TERM)" || true
+    io::parallel::__snapshot_handler INT || return "${E_ERROR:-1}"
+    IO_PARALLEL_PREV_INT="$IO_PARALLEL_SNAPSHOT"
+    io::parallel::__snapshot_handler TERM || return "${E_ERROR:-1}"
+    IO_PARALLEL_PREV_TERM="$IO_PARALLEL_SNAPSHOT"
     bs_signal_on INT io::parallel::__cancel_handler || {
         io::parallel::__restore_handlers
         return "${E_ERROR:-1}"
@@ -368,6 +406,7 @@ io::parallel::map() {
         return "${E_SUCCESS:-0}"
     fi
     mkdir -p -- "$IO_PARALLEL_OUT" || return "${E_ERROR:-1}"
+    (( ${#items[@]} > 0 )) || return "${E_SUCCESS:-0}"
     case "$IO_PARALLEL_SCHED" in
         pid)  io::parallel::__pid_map "$callback" ${items[@]+"${items[@]}"} ;;
         fifo) io::parallel::__fifo_map "$callback" ${items[@]+"${items[@]}"} ;;
@@ -409,7 +448,7 @@ io::parallel::__fifo_cleanup() {
         exec {IO_PARALLEL_FD}>&-
         IO_PARALLEL_FD=""
     fi
-    [[ -z "$IO_PARALLEL_TEMP" ]] || utils::ignore rm -rf "$IO_PARALLEL_TEMP"
+    [[ -z "$IO_PARALLEL_TEMP" ]] || utils::ignore rm -rf -- "$IO_PARALLEL_TEMP"
     IO_PARALLEL_TEMP=""
 }
 
@@ -531,6 +570,7 @@ io::parallel::run() {
         return "${E_SUCCESS:-0}"
     fi
     mkdir -p -- "$IO_PARALLEL_OUT" || return "${E_ERROR:-1}"
+    (( ${#tasks[@]} > 0 )) || return "${E_SUCCESS:-0}"
     case "$IO_PARALLEL_SCHED" in
         pid)  io::parallel::__pid_tasks ${tasks[@]+"${tasks[@]}"} ;;
         fifo) io::parallel::__fifo_tasks ${tasks[@]+"${tasks[@]}"} ;;
