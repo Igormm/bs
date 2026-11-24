@@ -174,6 +174,20 @@ bs_args_flag port value
 bs_args_flag_short port p
 bs_args_parse -foo; printf "rc=%s value=%s\n" "$?" "$(bs_args_get 1)"
 ')" "rc=0 value=-foo" "${sh_name}: legacy dash positional survives short aliases"
+        eq "$(probe "${sh_bin}" '
+bs_args_define deploy
+bs_args_flag verbose; bs_args_flag_short verbose v
+bs_args_flag output value; bs_args_flag_short output o
+bs_args_parse -vh >/dev/null; printf "group=%s " "$ARGS_HELP_REQUESTED"
+bs_args_parse -o -h >/dev/null; printf "value=%s " "$ARGS_HELP_REQUESTED"
+bs_args_parse -vo report -h >/dev/null; printf "after=%s " "$ARGS_HELP_REQUESTED"
+bs_args_parse -- -h >/dev/null 2>&1; printf "raw=%s\n" "$ARGS_HELP_REQUESTED"
+')" "group=1 value=0 after=1 raw=0" "${sh_name}: short help scan boundaries"
+        eq "$(probe "${sh_bin}" '
+bs_args_flag h value
+bs_args_flag_short h h
+bs_args_parse -h hello >/dev/null; printf "declared=%s value=%s\n" "$ARGS_HELP_REQUESTED" "$(bs_args_flag_get h)"
+')" "declared=0 value=hello" "${sh_name}: declared h wins over built-in help"
     done < <(testframework::posix_shells)
 }
 

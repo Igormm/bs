@@ -622,6 +622,29 @@ bs_args_parse_help_requested() {
           continue
         fi
         ;;
+      -?*)
+        __bs_args_ph_cluster=${__bs_args_ph_arg#-}
+        while [ -n "$__bs_args_ph_cluster" ]; do
+          __bs_args_ph_char=${__bs_args_ph_cluster%"${__bs_args_ph_cluster#?}"}
+          __bs_args_ph_cluster=${__bs_args_ph_cluster#?}
+          if ! bs_map_has bs_args_short_flag "$__bs_args_ph_char"; then
+            if [ "$__bs_args_ph_char" = h ]; then
+              bs_args_mget bs_args_flags h __bs_args_ph_hkind
+              [ -z "$__bs_args_ph_hkind" ] && return 0
+            fi
+            break
+          fi
+          bs_map_get_to bs_args_short_flag "$__bs_args_ph_char" __bs_args_ph_long
+          bs_args_mget bs_args_flags "$__bs_args_ph_long" __bs_args_ph_t
+          if [ "$__bs_args_ph_t" = value ]; then
+            if [ -z "$__bs_args_ph_cluster" ]; then __bs_args_ph_skip=1; fi
+            break
+          fi
+          case "$__bs_args_ph_cluster" in
+            '=*') break ;;
+          esac
+        done
+        ;;
     esac
     if [ "$__bs_args_ph_arg" = "-h" ] || [ "$__bs_args_ph_arg" = "--help" ]; then
       __bs_args_ph_key=${__bs_args_ph_arg#--}
