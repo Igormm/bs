@@ -109,6 +109,14 @@ verbose|bool|" "${out}" "${sh_name}: flags are sorted with kind and enum values"
 "0" "${sh_name}: fish completion advertises aliases"
         eq "$(has_tokens "$(probe "${sh_bin}" "${EXT_DECL}"$'\n''bs_args_completion prog nu')" '--port: string' '-p: string' '  --color' '  -c')" \
 "0" "${sh_name}: nu completion advertises aliases"
+        out="$(probe "${sh_bin}" 'bs_args_level 1 -foo -vfoo deploy; bs_args_level 2 now later; bs_args_flag verbose; bs_args_flag_short verbose v; bs_args_completion prog bash')"
+        eq "$(has_tokens "$out" "'-foo') ((++positional))")" \
+"0" "${sh_name}: bash completion counts legacy dash positionals"
+        eq "$(printf '%s\n' "$out" | grep -Fq -- '-vfoo'; echo $?)" \
+"1" "${sh_name}: bash completion filters alias-activated positional names"
+        out="$(probe "${sh_bin}" 'bs_args_flag env value "" enum:dev,prod; bs_args_flag_short env e; bs_args_completion prog nu')"
+        eq "$(has_tokens "$out" '--env: string@"nu-complete prog --env"' '-e: string@"nu-complete prog --env"')" \
+"0" "${sh_name}: nu enum aliases keep value completion"
     done < <(testframework::posix_shells)
 }
 

@@ -103,14 +103,18 @@ bs_args_flag_bool_value color; printf "boolv=%s " "$?"
 bs_args_flag_repeat verbose >/dev/null 2>&1; printf "repeatbool=%s " "$?"
 bs_args_flag_bool_value port >/dev/null 2>&1; printf "boolvalue=%s " "$?"
 bs_args_flag_short verbose p >/dev/null 2>&1; printf "dup=%s " "$?"
+bs_args_flag_short port q >/dev/null 2>&1; printf "reassign=%s " "$?"
 bs_args_flag_short missing m >/dev/null 2>&1; printf "unknown=%s " "$?"
-printf "map=%s,%s repeat=%s boolv=%s\n" \
+printf "map=%s,%s repeat=%s boolv=%s stored=%s,%s,%s\n" \
   "$(bs_map_get bs_args_flag_short port)" \
   "$(bs_map_get bs_args_short_flag p)" \
   "$(bs_map_get bs_args_flag_repeat port)" \
-  "$(bs_map_get bs_args_flag_bool_value color)"
+  "$(bs_map_get bs_args_flag_bool_value color)" \
+  "$(bs_map_get bs_args_flag_short port)" \
+  "$(bs_map_get bs_args_short_flag p)" \
+  "$(bs_map_get bs_args_short_flag q; echo rc=$?)"
 ')" \
-"short=0 shortv=0 repeat=0 boolv=0 repeatbool=2 boolvalue=2 dup=2 unknown=2 map=p,port repeat=1 boolv=1" \
+"short=0 shortv=0 repeat=0 boolv=0 repeatbool=2 boolvalue=2 dup=2 reassign=2 unknown=2 map=p,port repeat=1 boolv=1 stored=p,port,rc=1" \
 "${sh_name}: flag property declarations"
         eq "$(probe "${sh_bin}" '
 bs_args_flag env value
@@ -129,11 +133,21 @@ printf "rc=%s count=%s\n" "$?" "$(bs_arr_len bs_args_repeat_values)"
 rc=0 count=3" \
 "${sh_name}: repeat values keep order"
         eq "$(probe "${sh_bin}" '
+bs_args_flag env value fallback
+bs_args_flag_repeat env
+bs_args_parse --env= --env=x
+printf "first=<%s> set=%s all=" "$(bs_args_flag_get env)" "$(bs_args_flag_is_set env; echo $?)"
+bs_args_flag_get_all env | tr "\n" "|"
+printf "\n"
+')" "first=<> set=0 all=|x|" "${sh_name}: empty first repeat value wins over default"
+        eq "$(probe "${sh_bin}" '
 bs_args_flag n value "" number
 bs_args_flag_repeat n
 bs_args_parse --n 1 --n bad --n 3 >/dev/null 2>&1
-printf "rc=%s\n" "$?"
-')" "rc=2" "${sh_name}: invalid repeat occurrence is refused"
+printf "rc=%s count=%s first=%s all=" "$?" "$(bs_arr_len bs_args_repeat_values)" "$(bs_args_flag_get n)"
+bs_args_flag_get_all n | tr "\n" "|"
+printf "\n"
+')" "rc=2 count=1 first=1 all=1|" "${sh_name}: invalid repeat occurrence is refused before storage"
         eq "$(probe "${sh_bin}" '
 bs_args_flag color bool
 bs_args_flag_bool_value color
@@ -175,6 +189,14 @@ bs_args_flag_short port p
 bs_args_parse -foo; printf "rc=%s value=%s\n" "$?" "$(bs_args_get 1)"
 ')" "rc=0 value=-foo" "${sh_name}: legacy dash positional survives short aliases"
         eq "$(probe "${sh_bin}" '
+bs_args_flag verbose; bs_args_flag_short verbose v
+bs_args_parse - >/dev/null 2>&1; printf "unknown=%s " "$?"
+bs_args_reset
+bs_args_define -
+bs_args_flag verbose; bs_args_flag_short verbose v
+bs_args_parse -; printf "declared=%s,%s\n" "$?" "$(bs_args_get 1)"
+')" "unknown=2 declared=0,-" "${sh_name}: bare dash is positional, never an empty cluster"
+        eq "$(probe "${sh_bin}" '
 bs_args_define deploy
 bs_args_flag verbose; bs_args_flag_short verbose v
 bs_args_flag output value; bs_args_flag_short output o
@@ -188,6 +210,16 @@ bs_args_flag h value
 bs_args_flag_short h h
 bs_args_parse -h hello >/dev/null; printf "declared=%s value=%s\n" "$ARGS_HELP_REQUESTED" "$(bs_args_flag_get h)"
 ')" "declared=0 value=hello" "${sh_name}: declared h wins over built-in help"
+        eq "$(probe "${sh_bin}" '
+bs_args_flag host value
+bs_args_flag_short host h
+bs_args_parse -h hello; printf "value=%s,%s\n" "$ARGS_HELP_REQUESTED" "$(bs_args_flag_get host)"
+')" "value=0,hello" "${sh_name}: short h alias wins for a value flag"
+        eq "$(probe "${sh_bin}" '
+bs_args_flag verbose
+bs_args_flag_short verbose h
+bs_args_parse -h; printf "bool=%s,%s\n" "$ARGS_HELP_REQUESTED" "$(bs_args_flag_get verbose)"
+')" "bool=0,1" "${sh_name}: short h alias wins for a bool flag"
     done < <(testframework::posix_shells)
 }
 

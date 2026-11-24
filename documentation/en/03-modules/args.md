@@ -101,10 +101,14 @@ args::flag_bool_value color
 # Explicit long bool value: --color=false
 ```
 
-`args::flag_get env` returns the first CLI value. `args::flag_get_all env`
-prints all CLI values one per line, in input order. That output is
-line-oriented, so it cannot unambiguously represent embedded newlines. In bash,
-use the lossless reader:
+An explicitly declared `h` alias replaces built-in help. A bare `-` and known
+dash-prefixed positional names such as `-foo` remain positional when they do not
+activate a declared short alias.
+
+`args::flag_get env` returns the first CLI value, including an explicitly empty
+one. `args::flag_get_all env` prints all CLI values one per line, in input order.
+That output is line-oriented, so it cannot unambiguously represent embedded
+newlines. In bash, use the lossless reader:
 
 ```bash
 local -a environments=()
@@ -176,7 +180,8 @@ port="$(args::flag_get port 8080)" # 8080  — no --port given, so the fallback
 `args::param N [default]` is a readable name for `args::get N [default]`:
 both stay. `args::flag_get NAME [fallback]` picks the first that exists:
 the value from the command line, the default from `args::flag`, the
-fallback. A bool flag that was given reads as `1`; to test it, use
+fallback. An ordinary bool flag that was given reads as `1`; a bool-value flag
+reads as `0` or `1`. To test whether either was given, use
 `args::flag_is_set NAME`.
 
 The arrays `ARGS_PARAMS` and `ARGS_FLAGS` keep working for old scripts.
@@ -204,8 +209,8 @@ args::completion "deploy.sh" > /etc/bash_completion.d/deploy.sh
 source <(args::completion "deploy.sh")
 ```
 
-Completion knows the per-level choices and the declared flags; values of
-`value` flags are not completed.
+Completion knows the per-level choices and the declared flags. Values of
+non-enum `value` flags are not completed; enum flags offer their declared values.
 
 ## Reset: `args::reset`
 
@@ -245,13 +250,13 @@ args::define first middle last
 | Variable | Contents |
 |---|---|
 | `ARGS_PARAMS` | array of validated positional parameters (0-based) |
-| `ARGS_FLAGS` | associative array of validated flags (`"1"` for bool) |
+| `ARGS_FLAGS` | associative array of validated flags (`"1"` for bool, `"0"`/`"1"` for bool-value) |
 | `ARGS_HELP_REQUESTED` | `1` if `-h`/`--help` was passed |
 | `ARGS_VERSION` | module version |
 
 ## Names and tier
 
-`core/args.sh` is `@shell posix`: the real functions are named `bs_args_*` (`bs_args_parse`, `bs_args_get`, `bs_args_flag_get`, …) and work in dash, ash, ksh, mksh, zsh and bash. The state (tree, flags, parse result) lives in the data layer `core/data.sh`. In bash and zsh the old `args::*` names stay. Messages and help are unchanged.
+`core/args.sh` is `@shell posix`: the real functions are named `bs_args_*` (`bs_args_parse`, `bs_args_get`, `bs_args_flag_get`, …) and work in dash, ash, ksh, mksh, zsh and bash. The state (tree, flags, parse result) lives in the data layer `core/data.sh`. In bash and zsh the old `args::*` names stay. Messages and help remain unchanged for declarations that do not use the new properties; short aliases and bool-value forms appear when declared.
 
 The bash arrays `ARGS_PARAMS`, `ARGS_FLAGS` and `ARGS_REST` are filled by the bridge `lib/compat/args.sh` (loaded by `init.sh`): `args::parse`, `args::reset` and `args::require` call the kernel and copy the result into those arrays. From other shells read the result with `bs_args_get N`, `bs_args_flag_get NAME` and `bs_args_rest`.
 

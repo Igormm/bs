@@ -357,6 +357,12 @@ bs_args_flag_short() {
       return "${E_INVALID:-2}"
       ;;
   esac
+  if bs_map_has bs_args_flag_short "$__bs_args_fsh_name"; then
+    bs_map_get_to bs_args_flag_short "$__bs_args_fsh_name" __bs_args_fsh_existing
+    [ "$__bs_args_fsh_existing" = "$__bs_args_fsh_short" ] && return "${E_SUCCESS:-0}"
+    bs_log_warn "args::flag_short: flag already has alias: -${__bs_args_fsh_existing}"
+    return "${E_INVALID:-2}"
+  fi
   if bs_map_has bs_args_short_flag "$__bs_args_fsh_short"; then
     bs_map_get_to bs_args_short_flag "$__bs_args_fsh_short" __bs_args_fsh_existing
     [ "$__bs_args_fsh_existing" = "$__bs_args_fsh_name" ] && return "${E_SUCCESS:-0}"
@@ -428,21 +434,24 @@ bs_args_flag_describe() {
 bs_args_flag_get() {
   __bs_args_fg_name=${1:-}
   __bs_args_fg_name=${__bs_args_fg_name#--}
-  bs_args_mget bs_args_parsed "$__bs_args_fg_name" __bs_args_fg_v
-  if [ -z "$__bs_args_fg_v" ]; then
-    # Объявленный дефолт / Declared default
-    if bs_map_has bs_args_flag_def "$__bs_args_fg_name"; then
-      bs_map_get bs_args_flag_def "$__bs_args_fg_name"
+  if bs_map_has bs_args_parsed "$__bs_args_fg_name"; then
+    bs_map_get_to bs_args_parsed "$__bs_args_fg_name" __bs_args_fg_v
+    if [ -n "$__bs_args_fg_v" ] || bs_map_has bs_args_flag_repeat "$__bs_args_fg_name"; then
+      printf '%s\n' "$__bs_args_fg_v"
       return "${E_SUCCESS:-0}"
     fi
-    # Запасное значение из вызова / Fallback given by the caller
-    if [ $# -ge 2 ]; then
-      printf '%s\n' "$2"
-      return "${E_SUCCESS:-0}"
-    fi
-    return "${E_ERROR:-1}"
   fi
-  printf '%s\n' "$__bs_args_fg_v"
+  # Объявленный дефолт / Declared default
+  if bs_map_has bs_args_flag_def "$__bs_args_fg_name"; then
+    bs_map_get bs_args_flag_def "$__bs_args_fg_name"
+    return "${E_SUCCESS:-0}"
+  fi
+  # Запасное значение из вызова / Fallback given by the caller
+  if [ $# -ge 2 ]; then
+    printf '%s\n' "$2"
+    return "${E_SUCCESS:-0}"
+  fi
+  return "${E_ERROR:-1}"
 }
 
 # @description Передан ли флаг в разборе (даже с пустым значением) / Was the flag given in the parse (even with an empty value)
@@ -652,10 +661,13 @@ bs_args_parse_help_requested() {
         done
         ;;
     esac
-    if [ "$__bs_args_ph_arg" = "-h" ] || [ "$__bs_args_ph_arg" = "--help" ]; then
-      __bs_args_ph_key=${__bs_args_ph_arg#--}
-      if [ "$__bs_args_ph_arg" = "-h" ]; then __bs_args_ph_key=h; fi
-      bs_args_mget bs_args_flags "$__bs_args_ph_key" __bs_args_ph_t
+    if [ "$__bs_args_ph_arg" = "-h" ]; then
+      if ! bs_map_has bs_args_short_flag h; then
+        bs_args_mget bs_args_flags h __bs_args_ph_t
+        if [ -z "$__bs_args_ph_t" ]; then return 0; fi
+      fi
+    elif [ "$__bs_args_ph_arg" = "--help" ]; then
+      bs_args_mget bs_args_flags help __bs_args_ph_t
       if [ -z "$__bs_args_ph_t" ]; then return 0; fi
     fi
   done
@@ -773,11 +785,11 @@ bs_args_parse_value_flag() {
     __bs_args_ps_val=$1
     __bs_args_ps_used=1
   fi
-  bs_args_store_flag_value "$__bs_args_ps_name" "$__bs_args_ps_val"
   if ! bs_args_validate_flag_value "$__bs_args_ps_name" "$__bs_args_ps_val"; then
     bs_args_parse_refuse "flag \"--${__bs_args_ps_name}\" has an invalid value: \"${__bs_args_ps_val}\" (expected $(bs_args_flag_value_hint "$__bs_args_ps_name"))"
     return "${E_INVALID:-2}"
   fi
+  bs_args_store_flag_value "$__bs_args_ps_name" "$__bs_args_ps_val"
   return "${E_SUCCESS:-0}"
 }
 
@@ -863,6 +875,7 @@ bs_args_parse_positional() {
 # @returns 0 short options, 1 positional
 bs_args_use_short() {
   __bs_args_us_token=$1
+  if [ "$__bs_args_us_token" = "-" ]; then return 1; fi
   __bs_args_us_first=${__bs_args_us_token#-}
   __bs_args_us_first=${__bs_args_us_first%"${__bs_args_us_first#?}"}
   if [ -n "$__bs_args_us_first" ] && bs_map_has bs_args_short_flag "$__bs_args_us_first"; then

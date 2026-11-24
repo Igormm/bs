@@ -77,34 +77,35 @@ args::flag_get_all() {
 # @param $1 canonical flag name
 # @param $2 caller array name
 args::flag_values() {
-    local name="${1:-}" array_name="${2:-}" i value count
-    case "$array_name" in
+    local __bs_args_fv_name="${1:-}" __bs_args_fv_array="${2:-}"
+    local __bs_args_fv_i __bs_args_fv_value __bs_args_fv_count __bs_args_fv_args
+    case "$__bs_args_fv_array" in
         ''|[0-9]*|__bs_*|*[!A-Za-z0-9_]*)
-            log::error "args::flag_values: invalid array name: ${array_name}"
+            log::error "args::flag_values: invalid array name: ${__bs_args_fv_array}"
             return "${E_INVALID:-2}"
             ;;
     esac
 
     bs_arr_clear bs_args_selected
-    if bs_map_has bs_args_flag_repeat "$name"; then
+    if bs_map_has bs_args_flag_repeat "$__bs_args_fv_name"; then
         bs_data_len_of bs_args_repeat_names
-        count=$__bs_dat_n
-        for (( i=0; i<count; i++ )); do
-            bs_data_get_at bs_args_repeat_names "$i"
-            if [[ "$__bs_dat_cur" == "$name" ]]; then
-                bs_data_get_at bs_args_repeat_values "$i"
+        __bs_args_fv_count=$__bs_dat_n
+        for (( __bs_args_fv_i=0; __bs_args_fv_i<__bs_args_fv_count; __bs_args_fv_i++ )); do
+            bs_data_get_at bs_args_repeat_names "$__bs_args_fv_i"
+            if [[ "$__bs_dat_cur" == "$__bs_args_fv_name" ]]; then
+                bs_data_get_at bs_args_repeat_values "$__bs_args_fv_i"
                 bs_arr_push bs_args_selected "$__bs_dat_cur"
             fi
         done
-    elif bs_map_has bs_args_parsed "$name"; then
-        bs_map_get_to bs_args_parsed "$name" value
-        bs_arr_push bs_args_selected "$value"
+    elif bs_map_has bs_args_parsed "$__bs_args_fv_name"; then
+        bs_map_get_to bs_args_parsed "$__bs_args_fv_name" __bs_args_fv_value
+        bs_arr_push bs_args_selected "$__bs_args_fv_value"
     fi
 
     bs_arr_to_args_to bs_args_selected __bs_args_fv_args
     eval "$__bs_args_fv_args"
-    if ! eval "${array_name}=(\"\$@\")"; then
-        log::error "args::flag_values: cannot assign array: ${array_name}"
+    if ! eval "${__bs_args_fv_array}=(\"\$@\")"; then
+        log::error "args::flag_values: cannot assign array: ${__bs_args_fv_array}"
         return "${E_INVALID:-2}"
     fi
     return "${E_SUCCESS:-0}"

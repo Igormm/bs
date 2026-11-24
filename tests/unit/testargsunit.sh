@@ -261,6 +261,18 @@ main() {
     args::parse
     args::flag_values label labels
     testframework::assert_equal "0" "${#labels[@]}" "flag_values leaves an empty array when unset"
+    args::parse -l one -l two -l three
+    local -a name=() value=() i=() count=() array_name=()
+    args::flag_values label name
+    testframework::assert_equal "3" "${#name[@]}" "flag_values does not shadow caller array name"
+    args::flag_values label value
+    testframework::assert_equal "3" "${#value[@]}" "flag_values does not shadow caller array value"
+    args::flag_values label i
+    testframework::assert_equal "3" "${#i[@]}" "flag_values does not shadow caller array i"
+    args::flag_values label count
+    testframework::assert_equal "3" "${#count[@]}" "flag_values does not shadow caller array count"
+    args::flag_values label array_name
+    testframework::assert_equal "3" "${#array_name[@]}" "flag_values does not shadow caller array array_name"
 
     args::reset
     args::flag port value "" number
@@ -314,6 +326,64 @@ main() {
         printf '%s\n' "${COMPREPLY[*]}"
     ) > /tmp/args_comp_result.$$
     testframework::assert_true "\"$(cat /tmp/args_comp_result.$$)\" == *'deploy rollback'*" "Completion offers level 1"
+    rm -f "${comp_file}" /tmp/args_comp_result.$$
+
+    # Legacy dash positional names remain positionals when short aliases exist.
+    args::reset
+    args::level 1 -foo -vfoo deploy
+    args::level 2 now later
+    args::flag verbose
+    args::flag_short verbose v
+    comp_file="$(mktemp)"
+    args::completion "dash.sh" > "${comp_file}"
+    (
+        source "${comp_file}"
+        COMP_WORDS=(dash.sh -foo "")
+        COMP_CWORD=2
+        _dash_sh_completion
+        printf '%s\n' "${COMPREPLY[*]}"
+    ) > /tmp/args_comp_result.$$
+    testframework::assert_true "\"$(cat /tmp/args_comp_result.$$)\" == *'now later'*" "Completion counts a legacy dash positional"
+
+    (
+        set +e
+        source "${comp_file}"
+        COMP_WORDS=(dash.sh -f)
+        COMP_CWORD=1
+        _dash_sh_completion
+        printf '%s\n' "${COMPREPLY[*]}"
+    ) > /tmp/args_comp_result.$$
+    testframework::assert_true "\"$(cat /tmp/args_comp_result.$$)\" == *'-foo'*" "Completion offers a legacy dash positional candidate"
+    testframework::assert_true "\"$(cat /tmp/args_comp_result.$$)\" != *'-vfoo'*" "Completion does not offer an alias-activated name as positional"
+
+    (
+        set +e
+        source "${comp_file}"
+        COMP_WORDS=(dash.sh "")
+        COMP_CWORD=1
+        _dash_sh_completion
+        printf '%s\n' "${COMPREPLY[*]}"
+    ) > /tmp/args_comp_result.$$
+    testframework::assert_true "\"$(cat /tmp/args_comp_result.$$)\" == *'-foo'*" "Completion offers dash positionals at an empty prompt"
+    testframework::assert_true "\"$(cat /tmp/args_comp_result.$$)\" != *'-vfoo'*" "Completion filters alias-activated names from positional choices"
+    rm -f "${comp_file}" /tmp/args_comp_result.$$
+
+    args::reset
+    args::level 1 -vfoo deploy
+    args::flag verbose
+    args::flag_short verbose v
+    comp_file="$(mktemp)"
+    args::completion "alias-only.sh" > "${comp_file}"
+    (
+        set +e
+        source "${comp_file}"
+        COMP_WORDS=(alias-only.sh "")
+        COMP_CWORD=1
+        _alias_only_sh_completion
+        printf '%s\n' "${COMPREPLY[*]}"
+    ) > /tmp/args_comp_result.$$
+    testframework::assert_true "\"$(cat /tmp/args_comp_result.$$)\" == *'deploy'*" "Alias-only dash tree keeps ordinary choices"
+    testframework::assert_true "\"$(cat /tmp/args_comp_result.$$)\" != *'-vfoo'*" "Alias-only dash tree filters option-like positional names"
     rm -f "${comp_file}" /tmp/args_comp_result.$$
 
     # completion без объявлений / completion without declarations
