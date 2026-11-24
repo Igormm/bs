@@ -13,8 +13,9 @@
 #   ↑↓ j k      выбор / select
 #   Пользователи: a добавить, e изменить (name/home/shell/gecos/group),
 #                p пароль, l блокировать, u разблокировать, g добавить в группу,
-#                d удалить, Enter инфо
-#   Группы: a добавить, d удалить, Enter участники
+#                d удалить, Enter инфо (id + /etc/passwd)
+#   Группы: a добавить, d удалить, c chgrp <группу> <путь>, Enter участники
+#   i           сессии системы: who / w / last
 #   q           выход / quit
 
 load "lib/tui/tui"
@@ -51,7 +52,7 @@ usersedit::reload() {
     USERS=()
     while IFS= read -r u; do
         [[ -z "${u}" ]] && continue
-        shell="$(getent passwd "${u}" 2>/dev/null | cut -d: -f7)"
+        shell="$(utils::quiet_err getent passwd "${u}" | cut -d: -f7)"
         case "${shell}" in
             *nologin|/bin/false) continue ;;
         esac
@@ -119,7 +120,7 @@ usersedit::draw_title() {
 }
 
 usersedit::draw_status() {
-    tui::statusbar "  ←→ panel  ↑↓ select  a add  e edit  p passwd  l lock  u unlock  g group  d delete  q quit" "$(tui::style bg_black white)"
+    tui::statusbar "  ←→ panel ↑↓ select · a add · e edit · p passwd · l lock · u unlock · g group · d delete · i sessions · c chgrp · q quit" "$(tui::style bg_black white)"
 }
 
 usersedit::draw_input() {
@@ -184,7 +185,24 @@ usersedit::open_confirm() {
 
 usersedit::open_info() {
     INFO_TITLE="$1"
-    mapfile -t INFO_LINES < <("$2" "$3" 2>/dev/null)
+    mapfile -t INFO_LINES < <(utils::quiet_err "$2" "$3")
+    tui::modal::open info usersedit::draw_info
+}
+
+# Сессии системы: who (кто в системе), w (нагрузка), last (последние логины).
+# System sessions: who (logged in), w (load), last (recent logins).
+usersedit::sessions_info() {
+    INFO_TITLE="Sessions • who / w / last"
+    INFO_LINES=()
+    local line
+    while IFS= read -r line; do INFO_LINES+=("${line}"); done < <(
+        printf '%s\n' "== who =="
+        utils::quiet_err who
+        printf '%s\n' "== w =="
+        utils::quiet_err w
+        printf '%s\n' "== last =="
+        utils::quiet_err last -8
+    )
     tui::modal::open info usersedit::draw_info
 }
 
@@ -197,6 +215,7 @@ usersedit::apply_input() {
         add_group)    system::users::group_create "${v}" || true ;;
         add_to_group) system::users::add_to_group "$(usersedit::cur_user)" "${v}" || true ;;
         edit)         system::users::modify "$(usersedit::cur_user)" "${EDIT_FIELD}" "${v}" || true ;;
+        chgrp)        utils::quiet chgrp -- "$(usersedit::cur_group)" "${v}" || true ;;
     esac
     usersedit::reload
 }
@@ -296,12 +315,16 @@ main() {
                         (( PANEL == 0 )) && system::users::unlock "$(usersedit::cur_user)" || true ;;
                     g|G|п|П)
                         (( PANEL == 0 )) && [[ -n "$(usersedit::cur_user)" ]] && usersedit::open_input "Add to group" add_to_group ;;
+                    c|C|с|С)
+                        (( PANEL == 1 )) && [[ -n "$(usersedit::cur_group)" ]] && usersedit::open_input "chgrp $(usersedit::cur_group) — path" chgrp ;;
                     d|D|в|В)
                         if (( PANEL == 0 )); then
                             [[ -n "$(usersedit::cur_user)" ]] && usersedit::open_confirm "Delete user" "$(usersedit::cur_user)" delete_user
                         else
                             [[ -n "$(usersedit::cur_group)" ]] && usersedit::open_confirm "Delete group" "$(usersedit::cur_group)" delete_group
                         fi ;;
+                    i|I|ш|Ш)
+                        usersedit::sessions_info ;;
                     ENTER)
                         if (( PANEL == 0 )); then
                             [[ -n "$(usersedit::cur_user)" ]] && usersedit::open_info "User" system::users::info "$(usersedit::cur_user)"
