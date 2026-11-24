@@ -8,11 +8,10 @@
 # core/quiet.sh — the "quiet" idioms: command check and output suppression
 #
 # ИМЕНА / NAMES
-#   Real functions: bs_utils_has, bs_utils_quiet, bs_utils_quiet_err, bs_utils_ignore,
-#   bs_utils_attempt; in bash and zsh also utils::* (the old names, they live in
-#   core/utils.sh as aliases of these).
-#   Настоящие функции: bs_utils_has, bs_utils_quiet, bs_utils_quiet_err, bs_utils_ignore,
-#   bs_utils_attempt; в bash и zsh — ещё и utils::* (прежние имена).
+#   Real functions: bs_utils_has, bs_utils_quiet, bs_utils_quiet_out, bs_utils_quiet_err,
+#   bs_utils_ignore, bs_utils_attempt; in bash and zsh also utils::* (the old names).
+#   Настоящие функции: bs_utils_has, bs_utils_quiet, bs_utils_quiet_out, bs_utils_quiet_err,
+#   bs_utils_ignore, bs_utils_attempt; в bash и zsh — ещё и utils::* (прежние имена).
 
 # Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points
@@ -41,6 +40,16 @@ bs_utils_has() {
 # @returns код возврата команды
 bs_utils_quiet() {
   "$@" >/dev/null 2>&1
+}
+
+# Выполняет команду, подавляя только stdout; stderr остаётся видимым.
+# Заменяет идиому: cmd >/dev/null
+# @description Run command suppressing stdout only (stderr stays visible).
+# @description Выполнить команду, подавляя только stdout (stderr остаётся видимым).
+# @param $@ {string} Команда и её аргументы
+# @returns код возврата команды
+bs_utils_quiet_out() {
+  "$@" >/dev/null
 }
 
 # Выполняет команду, подавляя только stderr. Код возврата сохраняется.
@@ -98,6 +107,7 @@ bs_utils_attempt() {
 
 bs_shell_alias bs_utils_has utils::has
 bs_shell_alias bs_utils_quiet utils::quiet
+bs_shell_alias bs_utils_quiet_out utils::quiet_out
 bs_shell_alias bs_utils_quiet_err utils::quiet_err
 bs_shell_alias bs_utils_ignore utils::ignore
 bs_shell_alias bs_utils_attempt utils::attempt

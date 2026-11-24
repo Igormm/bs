@@ -288,8 +288,8 @@ source**, а не запускаться (при прямом запуске о�
    - `core/version` — экспорт `BS_VERSION` / `BS_NAME` и помощники
      `bs::version::*`;
    - `core/quiet` (`@shell posix`) — идиомы тишины `utils::has`,
-     `utils::quiet`, `utils::quiet_err`, `utils::ignore`, `utils::attempt`
-     (замены для `command -v … >/dev/null 2>&1`, `>/dev/null 2>&1`,
+     `utils::quiet`, `utils::quiet_out`, `utils::quiet_err`, `utils::ignore`, `utils::attempt`
+     (замены для `command -v … >/dev/null 2>&1`, `>/dev/null 2>&1`, `>/dev/null`,
      `2>/dev/null`, `>/dev/null 2>&1 || true` и `2>/dev/null || true`
      соответственно); настоящие имена `bs_utils_has`, `bs_utils_quiet`, …;
    - `core/fmt` (`@shell posix`) — размеры и метки времени: `utils::human_size`,

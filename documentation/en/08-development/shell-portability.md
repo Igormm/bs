@@ -215,7 +215,7 @@ additionally reads it from the call stack.
 shells without arrays; `const::*` names are aliases of `const_*`.
 
 `core/quiet.sh` (`@shell posix`) — the "quiet" idioms: `bs_utils_has`, `bs_utils_quiet`,
-`bs_utils_quiet_err`, `bs_utils_ignore`, `bs_utils_attempt` (the old `utils::*` in bash
+`bs_utils_quiet_out`, `bs_utils_quiet_err`, `bs_utils_ignore`, `bs_utils_attempt` (the old `utils::*` in bash
 and zsh). It loads before `core/utils.sh`; verified in bash, zsh, dash, busybox
 ash, ksh93 and mksh (`unit/testquietportableunit.sh`).
 

@@ -216,7 +216,7 @@ POSIX-команда (`bs version`, `bs help`, …) остаётся в dash и 
 имена `const::*` — псевдонимы `const_*`.
 
 `core/quiet.sh` (`@shell posix`) — идиомы «тишины»: `bs_utils_has`, `bs_utils_quiet`,
-`bs_utils_quiet_err`, `bs_utils_ignore`, `bs_utils_attempt` (в bash и zsh — прежние
+`bs_utils_quiet_out`, `bs_utils_quiet_err`, `bs_utils_ignore`, `bs_utils_attempt` (в bash и zsh — прежние
 `utils::*`). Загружается перед `core/utils.sh`; проверен в bash, zsh, dash,
 busybox ash, ksh93 и mksh (`unit/testquietportableunit.sh`).
 

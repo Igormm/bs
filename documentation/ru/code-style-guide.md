@@ -365,7 +365,7 @@ connect() {
 | `cmd 2>/dev/null \|\| true`      | `utils::attempt cmd` | best-effort, stdout виден, неудача игнорируется |
 
 **Ярус `posix`:** идиомы те же, имена настоящие: `bs_utils_has`,
-`bs_utils_quiet`, `bs_utils_quiet_err`, `bs_utils_ignore`, `bs_utils_attempt`
+`bs_utils_quiet`, `bs_utils_quiet_out`, `bs_utils_quiet_err`, `bs_utils_ignore`, `bs_utils_attempt`
 ([core/quiet.sh](../../core/quiet.sh)).
 
 Для условий используйте предикаты `is::*` из [core/lang.sh](../../core/lang.sh)

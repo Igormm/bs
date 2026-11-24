@@ -286,8 +286,8 @@ Its steps:
    - `core/version` — `BS_VERSION` / `BS_NAME` exports and
      `bs::version::*` helpers;
    - `core/quiet` (`@shell posix`) — the silence idioms `utils::has`,
-     `utils::quiet`, `utils::quiet_err`, `utils::ignore`, `utils::attempt`
-     (replacements for `command -v … >/dev/null 2>&1`, `>/dev/null 2>&1`,
+     `utils::quiet`, `utils::quiet_out`, `utils::quiet_err`, `utils::ignore`, `utils::attempt`
+     (replacements for `command -v … >/dev/null 2>&1`, `>/dev/null 2>&1`, `>/dev/null`,
      `2>/dev/null`, `>/dev/null 2>&1 || true` and `2>/dev/null || true`
      respectively); the real names are `bs_utils_has`, `bs_utils_quiet`, …;
    - `core/fmt` (`@shell posix`) — sizes and timestamps: `utils::human_size`,

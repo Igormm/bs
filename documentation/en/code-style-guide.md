@@ -361,7 +361,7 @@ preserve the exit code:
 | `cmd 2>/dev/null \|\| true`     | `utils::attempt cmd` | best-effort run, keep stdout, ignore failure |
 
 **`posix` tier:** the idioms are the same, the names are the real ones:
-`bs_utils_has`, `bs_utils_quiet`, `bs_utils_quiet_err`, `bs_utils_ignore`,
+`bs_utils_has`, `bs_utils_quiet`, `bs_utils_quiet_out`, `bs_utils_quiet_err`, `bs_utils_ignore`,
 `bs_utils_attempt` ([core/quiet.sh](../../core/quiet.sh)).
 
 For conditions, use the `is::*` predicates from [core/lang.sh](../../core/lang.sh)

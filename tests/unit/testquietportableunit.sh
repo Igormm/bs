@@ -3,10 +3,10 @@
 # tests/unit/testquietportableunit.sh — core/quiet.sh as POSIX code under dash, ash, ksh, mksh, zsh and bash
 # tests/unit/testquietportableunit.sh — core/quiet.sh как POSIX-код под dash, ash, ksh, mksh, zsh и bash
 #
-# core/quiet.sh is "@shell posix": bs_utils_has / bs_utils_quiet / bs_utils_quiet_err /
-# bs_utils_ignore / bs_utils_attempt / bs_utils_pid_alive must give the same answers in
+# core/quiet.sh is "@shell posix": bs_utils_has / bs_utils_quiet / bs_utils_quiet_out /
+# bs_utils_quiet_err / bs_utils_ignore / bs_utils_attempt / bs_utils_pid_alive must give the same answers in
 # every shell.
-# core/quiet.sh — "@shell posix": эти шесть функций обязаны давать одинаковые
+# core/quiet.sh — "@shell posix": эти семь функций обязаны давать одинаковые
 # ответы в любой оболочке.
 
 set -euo pipefail
@@ -53,6 +53,8 @@ test_behaviour() {
         eq "$(probe "${sh_bin}" -- 'bs_utils_quiet sh -c "echo out; echo err >&2; exit 3"; echo "rc=$?"')" "rc=3" "${sh_name}: bs_utils_quiet hides all output, keeps rc"
         out="$(probe "${sh_bin}" -- 'bs_utils_quiet_err sh -c "echo out; echo err >&2; exit 2"; echo "rc=$?"' | tr '\n' ' ')"
         eq "${out}" "out rc=2 " "${sh_name}: bs_utils_quiet_err keeps stdout and rc, hides stderr"
+        out="$(probe "${sh_bin}" -- 'bs_utils_quiet_out sh -c "echo out; echo err >&2; exit 4"; echo "rc=$?"' | tr '\n' ' ')"
+        eq "${out}" "err rc=4 " "${sh_name}: bs_utils_quiet_out hides stdout, keeps stderr and rc"
         eq "$(probe "${sh_bin}" -- 'bs_utils_ignore false; echo "rc=$?"')" "rc=0" "${sh_name}: bs_utils_ignore always succeeds"
         out="$(probe "${sh_bin}" -- 'bs_utils_attempt sh -c "echo out; echo err >&2; exit 1"; echo "rc=$?"' | tr '\n' ' ')"
         eq "${out}" "out rc=0 " "${sh_name}: bs_utils_attempt keeps stdout, hides stderr, succeeds"
@@ -72,11 +74,13 @@ test_aliases() {
         eq "$(probe "${sh_bin}" -- 'utils::has ls && echo y')" "y" "${sh_name}: utils::has is an alias of bs_utils_has"
         eq "$(probe "${sh_bin}" -- 'utils::ignore false; echo "rc=$?"')" "rc=0" "${sh_name}: utils::ignore is an alias of bs_utils_ignore"
         eq "$(probe "${sh_bin}" -- 'utils::pid_alive $$ && echo y')" "y" "${sh_name}: utils::pid_alive is an alias of bs_utils_pid_alive"
+        eq "$(probe "${sh_bin}" -- 'utils::quiet_out sh -c "echo out; echo err >&2"; echo "rc=$?"' | tr '\n' ' ')" "err rc=0 " "${sh_name}: utils::quiet_out is an alias of bs_utils_quiet_out"
     done
     # kernel in bash: the old names still work after the real load
     eq "$(utils::has ls && echo y)" "y" "kernel: utils::has works"
     eq "$(utils::attempt false; echo "rc=$?")" "rc=0" "kernel: utils::attempt works"
     eq "$(utils::pid_alive $$ && echo y)" "y" "kernel: utils::pid_alive works"
+    eq "$(utils::quiet_out true; echo "rc=$?")" "rc=0" "kernel: utils::quiet_out works"
 }
 
 main() {
