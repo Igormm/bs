@@ -41,7 +41,7 @@
 #
 # ИМЕНА / NAMES
 #   Real functions: bs_args_define, bs_args_level, bs_args_required, bs_args_describe,
-#   bs_args_flag, bs_args_flag_describe, bs_args_flag_get, bs_args_flag_is_set, bs_args_has,
+#   bs_args_flag, bs_args_flag_describe, bs_args_flag_get, bs_args_flag_get_all, bs_args_flag_is_set, bs_args_has,
 #   bs_args_flag_short, bs_args_flag_repeat, bs_args_flag_bool_value,
 #   bs_args_rest, bs_args_help, bs_args_parse, bs_args_reset, bs_args_require, bs_args_get, bs_args_param,
 #   bs_args_completion; in bash and zsh also args::* (the old names, aliases). args::parse,
@@ -60,9 +60,10 @@
 #   maps bs_args_tree (level → names), bs_args_desc, bs_args_flags (name → bool|value),
 #   bs_args_flag_desc, bs_args_flag_def, bs_args_flag_val, bs_args_parsed (the parsed flags);
 #   maps bs_args_flag_short, bs_args_short_flag, bs_args_flag_repeat, bs_args_flag_bool_value;
-#   arrays bs_args_params and bs_args_rest.
+#   arrays bs_args_params, bs_args_rest, bs_args_repeat_names, bs_args_repeat_values and scratch bs_args_selected.
 #   Дерево, описания, флаги и результат разбора живут в слое данных (core/data.sh).
 #   Карты свойств: bs_args_flag_short, bs_args_short_flag, bs_args_flag_repeat, bs_args_flag_bool_value.
+#   Массивы повторов: bs_args_repeat_names, bs_args_repeat_values; черновик: bs_args_selected.
 #
 # Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points
@@ -216,6 +217,9 @@ bs_args_reset() {
   bs_map_clear bs_args_flag_bool_value
   bs_arr_clear bs_args_params
   bs_arr_clear bs_args_rest
+  bs_arr_clear bs_args_repeat_names
+  bs_arr_clear bs_args_repeat_values
+  bs_arr_clear bs_args_selected
   __bs_args_required=0
   __bs_args_variadic=0
   ARGS_HELP_REQUESTED=0
@@ -671,6 +675,53 @@ bs_args_parse_flag_spec() {
 }
 
 # @private
+# @description Сохранить значение флага, накапливая повторения / Store a flag value, accumulating repeats
+# @param $1 canonical name  $2 value
+bs_args_store_flag_value() {
+  __bs_args_sfv_name=$1
+  __bs_args_sfv_value=$2
+  if bs_map_has bs_args_flag_repeat "$__bs_args_sfv_name"; then
+    if ! bs_map_has bs_args_parsed "$__bs_args_sfv_name"; then
+      bs_map_set bs_args_parsed "$__bs_args_sfv_name" "$__bs_args_sfv_value"
+    fi
+    bs_arr_push bs_args_repeat_names "$__bs_args_sfv_name"
+    bs_arr_push bs_args_repeat_values "$__bs_args_sfv_value"
+  else
+    bs_map_set bs_args_parsed "$__bs_args_sfv_name" "$__bs_args_sfv_value"
+  fi
+}
+
+# @description Все CLI-значения флага, по одному на строку / All CLI values of a flag, one per line
+# @param $1 canonical flag name
+# @returns E_SUCCESS; empty output when the flag was not given
+bs_args_flag_get_all() {
+  __bs_args_fga_name=${1:-}
+  bs_arr_clear bs_args_selected
+  if bs_map_has bs_args_flag_repeat "$__bs_args_fga_name"; then
+    bs_data_len_of bs_args_repeat_names
+    __bs_args_fga_count=$__bs_dat_n
+    __bs_args_fga_i=0
+    while [ "$__bs_args_fga_i" -lt "$__bs_args_fga_count" ]; do
+      bs_data_get_at bs_args_repeat_names "$__bs_args_fga_i"
+      if [ "$__bs_dat_cur" = "$__bs_args_fga_name" ]; then
+        bs_data_get_at bs_args_repeat_values "$__bs_args_fga_i"
+        bs_arr_push bs_args_selected "$__bs_dat_cur"
+      fi
+      __bs_args_fga_i=$((__bs_args_fga_i + 1))
+    done
+  elif bs_map_has bs_args_parsed "$__bs_args_fga_name"; then
+    bs_map_get_to bs_args_parsed "$__bs_args_fga_name" __bs_args_fga_value
+    bs_arr_push bs_args_selected "$__bs_args_fga_value"
+  fi
+  bs_arr_to_args_to bs_args_selected __bs_args_fga_args
+  eval "$__bs_args_fga_args"
+  for __bs_args_fga_value in "$@"; do
+    printf '%s\n' "$__bs_args_fga_value"
+  done
+  return "${E_SUCCESS:-0}"
+}
+
+# @private
 # @description Флаг со значением: --name=value или --name value; проверка значения /
 #   Value flag: --name=value or --name value; the value is validated
 # @param $@ arguments after the flag / аргументы после флага
@@ -679,7 +730,7 @@ bs_args_parse_flag_spec() {
 #   __bs_args_ps_used (written: 1 when the next argument was taken), __bs_args_ps_val (written)
 bs_args_parse_value_flag() {
   if [ "$__bs_args_ps_has_inline" -eq 1 ]; then
-    bs_map_set bs_args_parsed "$__bs_args_ps_name" "$__bs_args_ps_inline"
+    __bs_args_ps_val=$__bs_args_ps_inline
   elif [ $# -eq 0 ]; then
     bs_args_parse_refuse "flag \"--${__bs_args_ps_name}\" requires a value"
     return "${E_INVALID:-2}"
@@ -688,12 +739,12 @@ bs_args_parse_value_flag() {
     # "--" обработает ветка разделителя на следующем шаге
     # Do not eat the "--" separator: the value is missing (empty);
     # the separator branch handles "--" on the next step
-    bs_map_set bs_args_parsed "$__bs_args_ps_name" ""
+    __bs_args_ps_val=""
   else
-    bs_map_set bs_args_parsed "$__bs_args_ps_name" "$1"
+    __bs_args_ps_val=$1
     __bs_args_ps_used=1
   fi
-  bs_args_mget bs_args_parsed "$__bs_args_ps_name" __bs_args_ps_val
+  bs_args_store_flag_value "$__bs_args_ps_name" "$__bs_args_ps_val"
   if ! bs_args_validate_flag_value "$__bs_args_ps_name" "$__bs_args_ps_val"; then
     bs_args_parse_refuse "flag \"--${__bs_args_ps_name}\" has an invalid value: \"${__bs_args_ps_val}\" (expected $(bs_args_flag_value_hint "$__bs_args_ps_name"))"
     return "${E_INVALID:-2}"
@@ -775,6 +826,9 @@ bs_args_parse_positional() {
 bs_args_parse() {
   bs_arr_clear bs_args_params
   bs_arr_clear bs_args_rest
+  bs_arr_clear bs_args_repeat_names
+  bs_arr_clear bs_args_repeat_values
+  bs_arr_clear bs_args_selected
   bs_map_clear bs_args_parsed
   ARGS_HELP_REQUESTED=0
 
@@ -901,6 +955,7 @@ bs_shell_alias bs_args_flag_repeat args::flag_repeat
 bs_shell_alias bs_args_flag_bool_value args::flag_bool_value
 bs_shell_alias bs_args_flag_describe args::flag_describe
 bs_shell_alias bs_args_flag_get args::flag_get
+bs_shell_alias bs_args_flag_get_all args::flag_get_all
 bs_shell_alias bs_args_flag_is_set args::flag_is_set
 bs_shell_alias bs_args_has args::has
 bs_shell_alias bs_args_rest args::rest

@@ -112,6 +112,28 @@ printf "map=%s,%s repeat=%s boolv=%s\n" \
 ')" \
 "short=0 shortv=0 repeat=0 boolv=0 repeatbool=2 boolvalue=2 dup=2 unknown=2 map=p,port repeat=1 boolv=1" \
 "${sh_name}: flag property declarations"
+        eq "$(probe "${sh_bin}" '
+bs_args_flag env value
+bs_args_flag_repeat env
+bs_args_parse --env dev --env=prod --env ""
+printf "first=%s set=%s all=" "$(bs_args_flag_get env)" "$(bs_args_flag_is_set env; echo $?)"
+bs_args_flag_get_all env | tr "\n" "|"
+printf "\n"
+bs_args_reset
+bs_args_flag env value
+bs_args_flag_repeat env
+bs_args_parse --env dev --env bad --env prod >/dev/null 2>&1
+printf "rc=%s count=%s\n" "$?" "$(bs_arr_len bs_args_repeat_values)"
+')" \
+"first=dev set=0 all=dev|prod||
+rc=0 count=3" \
+"${sh_name}: repeat values keep order"
+        eq "$(probe "${sh_bin}" '
+bs_args_flag n value "" number
+bs_args_flag_repeat n
+bs_args_parse --n 1 --n bad --n 3 >/dev/null 2>&1
+printf "rc=%s\n" "$?"
+')" "rc=2" "${sh_name}: invalid repeat occurrence is refused"
     done < <(testframework::posix_shells)
 }
 
