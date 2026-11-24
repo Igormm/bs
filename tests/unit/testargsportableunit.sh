@@ -134,6 +134,16 @@ bs_args_flag_repeat n
 bs_args_parse --n 1 --n bad --n 3 >/dev/null 2>&1
 printf "rc=%s\n" "$?"
 ')" "rc=2" "${sh_name}: invalid repeat occurrence is refused"
+        eq "$(probe "${sh_bin}" '
+bs_args_flag color bool
+bs_args_flag_bool_value color
+bs_args_parse --color; printf "bare=%s set=%s " "$(bs_args_flag_get color)" "$(bs_args_flag_is_set color; echo $?)"
+bs_args_parse --color=false; printf "false=%s set=%s " "$(bs_args_flag_get color)" "$(bs_args_flag_is_set color; echo $?)"
+bs_args_parse --color=true; printf "true=%s " "$(bs_args_flag_get color)"
+bs_args_parse --color=yes >/dev/null 2>&1; printf "bad=%s\n" "$?"
+')" \
+"bare=1 set=0 false=0 set=0 true=1 bad=2" \
+"${sh_name}: bool-value long forms"
     done < <(testframework::posix_shells)
 }
 

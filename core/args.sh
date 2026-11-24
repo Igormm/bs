@@ -773,12 +773,26 @@ bs_args_parse_flag() {
     bs_args_parse_value_flag "$@"
     return $?
   fi
-  # bool-флаг не принимает значение / bool flag takes no value
-  if [ "$__bs_args_ps_has_inline" -eq 1 ]; then
-    bs_args_parse_refuse "flag \"--${__bs_args_ps_name}\" does not take a value"
-    return "${E_INVALID:-2}"
+  if bs_map_has bs_args_flag_bool_value "$__bs_args_ps_name"; then
+    if [ "$__bs_args_ps_has_inline" -eq 1 ]; then
+      case "$__bs_args_ps_inline" in
+        true)  bs_args_store_flag_value "$__bs_args_ps_name" 1 ;;
+        false) bs_args_store_flag_value "$__bs_args_ps_name" 0 ;;
+        *)
+          bs_args_parse_refuse "flag \"--${__bs_args_ps_name}\" accepts only true or false"
+          return "${E_INVALID:-2}"
+          ;;
+      esac
+    else
+      bs_args_store_flag_value "$__bs_args_ps_name" 1
+    fi
+  else
+    if [ "$__bs_args_ps_has_inline" -eq 1 ]; then
+      bs_args_parse_refuse "flag \"--${__bs_args_ps_name}\" does not take a value"
+      return "${E_INVALID:-2}"
+    fi
+    bs_args_store_flag_value "$__bs_args_ps_name" 1
   fi
-  bs_map_set bs_args_parsed "$__bs_args_ps_name" 1
   return "${E_SUCCESS:-0}"
 }
 
