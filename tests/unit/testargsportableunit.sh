@@ -92,6 +92,26 @@ rc=0" "${sh_name}: required positionals"
         eq "$(probe "${sh_bin}" 'bs_args_level 0 a; echo "rc=$?"; bs_args_level x a; echo "rc=$?"; bs_args_level 1; echo "rc=$?"; bs_args_define; echo "rc=$?"; bs_args_flag f weird; echo "rc=$?"' | grep '^rc=' | tr '\n' ' ')" "rc=1 rc=1 rc=1 rc=1 rc=1 " "${sh_name}: bad declarations are refused"
         eq "$(probe "${sh_bin}" 'bs_args_level 1 a b; bs_args_parse "a b" >/dev/null 2>&1; echo "rc=$?"; bs_args_parse b >/dev/null 2>&1; echo "rc=$?"; bs_args_parse "a  b" >/dev/null 2>&1; echo "rc=$?"' | tr '\n' ' ')" "rc=2 rc=0 rc=2 " "${sh_name}: one word with a blank is not two neighbouring names"
         eq "$(probe "${sh_bin}" 'bs_args_define "dash-name" under_name; bs_args_flag "dry-run"; bs_args_flag "a b" value; bs_args_parse dash-name under_name --dry-run --"a b"=1 >/dev/null 2>&1; echo "rc=$? f=$(bs_args_flag_get dry-run)"')" "rc=0 f=1" "${sh_name}: names with dashes and spaces"
+        eq "$(probe "${sh_bin}" '
+bs_args_flag port value 80 number
+bs_args_flag verbose
+bs_args_flag color bool
+bs_args_flag_short port p; printf "short=%s " "$?"
+bs_args_flag_short verbose v; printf "shortv=%s " "$?"
+bs_args_flag_repeat port; printf "repeat=%s " "$?"
+bs_args_flag_bool_value color; printf "boolv=%s " "$?"
+bs_args_flag_repeat verbose >/dev/null 2>&1; printf "repeatbool=%s " "$?"
+bs_args_flag_bool_value port >/dev/null 2>&1; printf "boolvalue=%s " "$?"
+bs_args_flag_short verbose p >/dev/null 2>&1; printf "dup=%s " "$?"
+bs_args_flag_short missing m >/dev/null 2>&1; printf "unknown=%s " "$?"
+printf "map=%s,%s repeat=%s boolv=%s\n" \
+  "$(bs_map_get bs_args_flag_short port)" \
+  "$(bs_map_get bs_args_short_flag p)" \
+  "$(bs_map_get bs_args_flag_repeat port)" \
+  "$(bs_map_get bs_args_flag_bool_value color)"
+')" \
+"short=0 shortv=0 repeat=0 boolv=0 repeatbool=2 boolvalue=2 dup=2 unknown=2 map=p,port repeat=1 boolv=1" \
+"${sh_name}: flag property declarations"
     done < <(testframework::posix_shells)
 }
 

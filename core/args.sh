@@ -42,12 +42,14 @@
 # ИМЕНА / NAMES
 #   Real functions: bs_args_define, bs_args_level, bs_args_required, bs_args_describe,
 #   bs_args_flag, bs_args_flag_describe, bs_args_flag_get, bs_args_flag_is_set, bs_args_has,
+#   bs_args_flag_short, bs_args_flag_repeat, bs_args_flag_bool_value,
 #   bs_args_rest, bs_args_help, bs_args_parse, bs_args_reset, bs_args_require, bs_args_get, bs_args_param,
 #   bs_args_completion; in bash and zsh also args::* (the old names, aliases). args::parse,
 #   args::reset and args::require come from lib/compat/args.sh: they also fill the bash arrays
 #   ARGS_PARAMS, ARGS_FLAGS and ARGS_REST that scripts read after parsing. The completion
 #   generators (bs_args_completion*) live in core/args-completion.sh, sourced at the end.
 #   Настоящие функции — bs_args_*; в bash и zsh — ещё и args::* (прежние имена, псевдонимы).
+#   Свойства флагов: bs_args_flag_short, bs_args_flag_repeat, bs_args_flag_bool_value.
 #   Генераторы автодополнения (bs_args_completion*) лежат в core/args-completion.sh и
 #   подключаются в конце.
 #   args::parse, args::reset и args::require приходят из lib/compat/args.sh: они ещё заполняют
@@ -57,8 +59,10 @@
 #   The tree, descriptions, flags and the parse result live in the data layer (core/data.sh):
 #   maps bs_args_tree (level → names), bs_args_desc, bs_args_flags (name → bool|value),
 #   bs_args_flag_desc, bs_args_flag_def, bs_args_flag_val, bs_args_parsed (the parsed flags);
+#   maps bs_args_flag_short, bs_args_short_flag, bs_args_flag_repeat, bs_args_flag_bool_value;
 #   arrays bs_args_params and bs_args_rest.
 #   Дерево, описания, флаги и результат разбора живут в слое данных (core/data.sh).
+#   Карты свойств: bs_args_flag_short, bs_args_short_flag, bs_args_flag_repeat, bs_args_flag_bool_value.
 #
 # Примечание: строгий режим (set -euo pipefail) и IFS задаются только в точках входа
 # Note: strict mode (set -euo pipefail) and IFS are set only in entry points
@@ -206,6 +210,10 @@ bs_args_reset() {
   bs_map_clear bs_args_flag_def
   bs_map_clear bs_args_flag_val
   bs_map_clear bs_args_parsed
+  bs_map_clear bs_args_flag_short
+  bs_map_clear bs_args_short_flag
+  bs_map_clear bs_args_flag_repeat
+  bs_map_clear bs_args_flag_bool_value
   bs_arr_clear bs_args_params
   bs_arr_clear bs_args_rest
   __bs_args_required=0
@@ -318,6 +326,78 @@ bs_args_flag() {
   if [ $# -ge 4 ]; then
     bs_map_set bs_args_flag_val "$__bs_args_fl_name" "$4"
   fi
+}
+
+# @private
+# @description Объявлен ли флаг / Is the flag declared
+# @param $1 canonical flag name
+bs_args_flag_known() {
+  bs_args_mget bs_args_flags "$1" __bs_args_fk_kind
+  [ -n "$__bs_args_fk_kind" ]
+}
+
+# @description Задать короткий alias флага / Assign a short alias to a flag
+# @param $1 canonical flag name  $2 one-letter alias
+# @returns E_SUCCESS or E_INVALID
+bs_args_flag_short() {
+  __bs_args_fsh_name=${1:-}
+  __bs_args_fsh_short=${2:-}
+  bs_args_flag_known "$__bs_args_fsh_name" || {
+    bs_log_warn "args::flag_short: unknown flag: ${__bs_args_fsh_name}"
+    return "${E_INVALID:-2}"
+  }
+  case "$__bs_args_fsh_short" in
+    [A-Za-z0-9]) ;;
+    *)
+      bs_log_warn "args::flag_short: alias must be one ASCII letter or digit: ${__bs_args_fsh_short}"
+      return "${E_INVALID:-2}"
+      ;;
+  esac
+  if bs_map_has bs_args_short_flag "$__bs_args_fsh_short"; then
+    bs_map_get_to bs_args_short_flag "$__bs_args_fsh_short" __bs_args_fsh_existing
+    [ "$__bs_args_fsh_existing" = "$__bs_args_fsh_name" ] && return "${E_SUCCESS:-0}"
+    bs_log_warn "args::flag_short: alias already used: -${__bs_args_fsh_short}"
+    return "${E_INVALID:-2}"
+  fi
+  bs_map_set bs_args_flag_short "$__bs_args_fsh_name" "$__bs_args_fsh_short"
+  bs_map_set bs_args_short_flag "$__bs_args_fsh_short" "$__bs_args_fsh_name"
+  return "${E_SUCCESS:-0}"
+}
+
+# @description Разрешить повторение value-флага / Make a value flag repeatable
+# @param $1 canonical flag name
+# @returns E_SUCCESS or E_INVALID
+bs_args_flag_repeat() {
+  __bs_args_frp_name=${1:-}
+  bs_args_flag_known "$__bs_args_frp_name" || {
+    bs_log_warn "args::flag_repeat: unknown flag: ${__bs_args_frp_name}"
+    return "${E_INVALID:-2}"
+  }
+  bs_args_mget bs_args_flags "$__bs_args_frp_name" __bs_args_frp_kind
+  [ "$__bs_args_frp_kind" = value ] || {
+    bs_log_warn "args::flag_repeat: only value flags may repeat: ${__bs_args_frp_name}"
+    return "${E_INVALID:-2}"
+  }
+  bs_map_set bs_args_flag_repeat "$__bs_args_frp_name" 1
+  return "${E_SUCCESS:-0}"
+}
+
+# @description Разрешить bool-флагу true/false / Allow explicit true/false for a bool flag
+# @param $1 canonical flag name
+# @returns E_SUCCESS or E_INVALID
+bs_args_flag_bool_value() {
+  __bs_args_fbv_name=${1:-}
+  bs_args_flag_known "$__bs_args_fbv_name" || {
+    bs_log_warn "args::flag_bool_value: unknown flag: ${__bs_args_fbv_name}"
+    return "${E_INVALID:-2}"
+  }
+  bs_args_mget bs_args_flags "$__bs_args_fbv_name" __bs_args_fbv_kind
+  [ "$__bs_args_fbv_kind" = bool ] || {
+    bs_log_warn "args::flag_bool_value: only bool flags accept true/false: ${__bs_args_fbv_name}"
+    return "${E_INVALID:-2}"
+  }
+  bs_map_set bs_args_flag_bool_value "$__bs_args_fbv_name" 1
+  return "${E_SUCCESS:-0}"
 }
 
 # @description Описать флаг для help / Describe a flag for help
@@ -816,6 +896,9 @@ bs_shell_alias bs_args_level args::level
 bs_shell_alias bs_args_required args::required
 bs_shell_alias bs_args_describe args::describe
 bs_shell_alias bs_args_flag args::flag
+bs_shell_alias bs_args_flag_short args::flag_short
+bs_shell_alias bs_args_flag_repeat args::flag_repeat
+bs_shell_alias bs_args_flag_bool_value args::flag_bool_value
 bs_shell_alias bs_args_flag_describe args::flag_describe
 bs_shell_alias bs_args_flag_get args::flag_get
 bs_shell_alias bs_args_flag_is_set args::flag_is_set

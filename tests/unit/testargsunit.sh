@@ -226,6 +226,17 @@ main() {
     args::parse anything 2>/dev/null || rc=$?
     testframework::assert_equal "${E_INVALID}" "${rc}" "Positional rejected with flags-only tree"
 
+    args::reset
+    args::flag port value 80 number
+    args::flag_short port p
+    args::flag_repeat port
+    args::flag color bool
+    args::flag_bool_value color
+    testframework::assert_equal "p" "$(bs_map_get bs_args_flag_short port)" "short alias stored"
+    testframework::assert_equal "port" "$(bs_map_get bs_args_short_flag p)" "reverse short alias stored"
+    testframework::assert_command "bs_map_has bs_args_flag_repeat port" "repeat property stored"
+    testframework::assert_command "bs_map_has bs_args_flag_bool_value color" "bool-value property stored"
+
     # Тест 12: Help с флагами
     testframework::section "Help with Flags / Help с флагами"
 
