@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.28.0] - 2026-11-25 "clear"
+
+### Changed
+- perf(examples): `examples/dripfetch.sh` removes subprocesses from its hot path — ANSI stripping, colour conversion, weighted rain picks and clock/calendar formatting now run in the shell; a default 80×24 first frame no longer forks `sed`/`awk` per line or cell.
+
+### Fixed
+- fix(examples): dripfetch uses a responsive non-overlapping shelf layout, clips long content to its allocated box, and draws matrix rain behind opaque boxes. Small terminals automatically use the compact clock and reserve the status row; legacy positions migrate safely, hidden boxes no longer break selection/persistence, and 12-hour clocks plus calendar alignment work in Bash 4.2 and zsh.
+
 ## [0.27.1] - 2026-11-25 "rain"
 
 ### Fixed
