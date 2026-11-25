@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.27.1] - 2026-11-25 "rain"
+
+### Fixed
+- fix(examples): `examples/dripfetch.sh` starts under `bs` again — colour, config and network parsing no longer depend on space-aware ambient `IFS`; the TUI opts out of inherited `errexit`/`pipefail`; zsh key input reads explicitly from stdin; empty rain lists retain defaults and net sampling is safe on Bash 4.2/zsh. Added startup and sampling regressions for `bs`, bash and zsh.
+
 ## [0.27.0] - 2026-11-25 "ключи"
 
 ### Added
