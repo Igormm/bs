@@ -62,6 +62,10 @@ if ! type utils::has >/dev/null 2>&1; then
     utils::attempt()   { "$@" 2>/dev/null || :; }
 fi
 
+# bs run включает errexit/pipefail до source; TUI сама обрабатывает статусы.
+# bs run enables errexit/pipefail before sourcing; the TUI handles statuses itself.
+set +e
+set +o pipefail
 set -u
 
 readonly VERSION="0.5.0-bash"
@@ -111,11 +115,14 @@ dripfetch::bgb() { local r=$1 g=$2 b=$3
 # palette arrays (r g b)
 declare -a C_BORDER C_TEXT C_ACCENT C_BG
 declare -i BG_SET=0
-dripfetch::set_colour() { case "$1" in
-        border) C_BORDER=( "$2" "$3" "$4" ) ;;
-        text)   C_TEXT=( "$2" "$3" "$4" ) ;;
-        accent) C_ACCENT=( "$2" "$3" "$4" ) ;;
-        bg)     C_BG=( "$2" "$3" "$4" ); BG_SET=1 ;;
+dripfetch::set_colour() {
+    local r g b
+    IFS=' ' read -r r g b <<< "$(dripfetch::hex2rgb "$2")"
+    case "$1" in
+        border) C_BORDER=( "$r" "$g" "$b" ) ;;
+        text)   C_TEXT=( "$r" "$g" "$b" ) ;;
+        accent) C_ACCENT=( "$r" "$g" "$b" ) ;;
+        bg)     C_BG=( "$r" "$g" "$b" ); BG_SET=1 ;;
     esac; }
 
 # --- terminal control -----------------------------------------------------------
@@ -273,7 +280,7 @@ UPTIME_S=""; CPU_S=""; MEM_S=""; DISK_S=""; IP_S=""
 dripfetch::sysinfo_collect() {
     if [ -r /proc/uptime ]; then
         local up _ s d h m
-        read -r up _ </proc/uptime
+        IFS=' ' read -r up _ </proc/uptime
         s=${up%.*}
         d=$(( s/86400 )); h=$(( (s%86400)/3600 )); m=$(( (s%3600)/60 ))
         UPTIME_S="${d}d ${h}h ${m}m"
@@ -430,20 +437,34 @@ dripfetch::net_sample_bytes() { [ -r /proc/net/dev ] || { echo "0 0"; return; }
     awk 'NR>2 { gsub(/:/," ",$1); rx+=$2; tx+=$10 } END { printf "%d %d", rx, tx }' /proc/net/dev; }
 
 dripfetch::net_lines() {
+    local IFS=' '
     NET_T=$(( NET_T + 1 ))
     if (( NET_T >= NET_INTERVAL )); then
         NET_T=0
         local rx tx
-        read -r rx tx <<<"$(dripfetch::net_sample_bytes)"
+        IFS=' ' read -r rx tx <<<"$(dripfetch::net_sample_bytes)"
         if (( NET_LAST_RX > 0 )); then
             NET_SAMPLES+="$(( (rx-NET_LAST_RX)/NET_INTERVAL )):$(( (tx-NET_LAST_TX)/NET_INTERVAL )) "
         fi
         NET_LAST_RX=$rx; NET_LAST_TX=$tx
-        local -a arr; arr=($NET_SAMPLES)
+        local -a arr
+        if [[ -n "${ZSH_VERSION:-}" ]]; then
+            # zsh: split on spaces without keeping a trailing empty sample.
+            # shellcheck disable=SC2206
+            arr=( ${=NET_SAMPLES} )
+        else
+            IFS=' ' read -r -a arr <<<"$NET_SAMPLES"
+        fi
         while (( ${#arr[@]} > NET_WIDTH )); do arr=("${arr[@]:1}"); done
-        NET_SAMPLES="${arr[*]}"
+        if (( ${#arr[@]} )); then NET_SAMPLES="${arr[*]}"; else NET_SAMPLES=""; fi
     fi
-    local -a arr; arr=($NET_SAMPLES)
+    local -a arr
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
+        # shellcheck disable=SC2206
+        arr=( ${=NET_SAMPLES} )
+    else
+        IFS=' ' read -r -a arr <<<"$NET_SAMPLES"
+    fi
     if (( ${#arr[@]} == 0 )); then printf '%s\n' "down -" "up -"; return; fi
     local v d u max=1
     for v in "${arr[@]}"; do d=${v%%:*}; u=${v##*:}; (( d>max )) && max=$d; (( u>max )) && max=$u; done
@@ -598,15 +619,15 @@ dripfetch::rain_step() {
 }
 
 dripfetch::rain_draw() {
-    local x head len rgbstr ch rgb y i fgstr headstr s
+    local x head len rgbstr ch r g b y i fgstr headstr s
     for (( x=0; x<RAIN_NCOL; x++ )); do
         head=${RAIN_HEAD[$x]}; (( head < 0 )) && continue
         len=${RAIN_LEN[$x]}; rgbstr=${RAIN_COLOR_STR[$x]}; ch=${RAIN_CHAR_X[$x]}
-        rgb=($(dripfetch::hex2rgb "$rgbstr"))
+        IFS=' ' read -r r g b <<< "$(dripfetch::hex2rgb "$rgbstr")"
         if (( EMIT_TRUECOLOR )); then
-            fgstr=$(printf '%s[38;2;%d;%d;%dm' "$ESC" "${rgb[0]}" "${rgb[1]}" "${rgb[2]}")
+            fgstr=$(printf '%s[38;2;%d;%d;%dm' "$ESC" "$r" "$g" "$b")
         else
-            fgstr=$(printf '%s[38;5;%dm' "$ESC" "$(dripfetch::rgb256 "${rgb[0]}" "${rgb[1]}" "${rgb[2]}")")
+            fgstr=$(printf '%s[38;5;%dm' "$ESC" "$(dripfetch::rgb256 "$r" "$g" "$b")")
         fi
         headstr="${BOLD}$(printf '%s[38;2;255;255;255m' "$ESC")"
         s=""
@@ -688,7 +709,7 @@ dripfetch::render_frame() {
 # --- keyboard ----------------------------------------------------------------------------
 dripfetch::read_char() { # varname timeout -> 0 on success, 1 on timeout/EOF (portable bash/zsh)
     if [[ -n "${ZSH_VERSION:-}" ]]; then
-        IFS= read -rs -k 1 -t "$2" "$1"
+        IFS= read -rs -k 1 -t "$2" -u 0 "$1"
     else
         IFS= read -rs -t "$2" -n 1 "$1"
     fi
@@ -741,7 +762,8 @@ declare -A BOX_W BOX_H
 
 # --- config apply --------------------------------------------------------------------------
 dripfetch::apply_config() {
-    local raw
+    local raw __c
+    local -a __list=()
     raw=$(dripfetch::cfg_get "background" ""); [ -n "$raw" ] && BG_HEX="$raw"
     raw=$(dripfetch::cfg_get "boxes.border_color" ""); [ -n "$raw" ] && BORDER_HEX="$raw"
     raw=$(dripfetch::cfg_get "boxes.text_color" ""); [ -n "$raw" ] && TEXT_HEX="$raw"
@@ -752,13 +774,25 @@ dripfetch::apply_config() {
 
     raw=$(dripfetch::cfg_get "rain.intensity" ""); [ -n "$raw" ] && RAIN_INTENSITY="$raw"
     raw=$(dripfetch::cfg_get "rain.character" "")
-    if [ -n "$raw" ]; then RAIN_CHARS=(); local __c; while IFS= read -r __c; do [ -n "$__c" ] && RAIN_CHARS+=("$__c"); done < <(printf '%s\n' "$raw" | tr -d '[]" ' | tr ',' '\n'); fi
+    if [ -n "$raw" ]; then
+        __list=(); while IFS= read -r __c; do [ -n "$__c" ] && __list+=("$__c"); done < <(printf '%s\n' "$raw" | tr -d '[]" ' | tr ',' '\n')
+        if (( ${#__list[@]} )); then RAIN_CHARS=("${__list[@]}"); fi
+    fi
     raw=$(dripfetch::cfg_get "rain.colors" "")
-    if [ -n "$raw" ]; then RAIN_COLORS=( $(printf '%s\n' "$raw" | tr -d '[]"' | tr ',' ' ') ); fi
+    if [ -n "$raw" ]; then
+        __list=(); while IFS= read -r __c; do [ -n "$__c" ] && __list+=("$__c"); done < <(printf '%s\n' "$raw" | tr -d '[]" ' | tr ',' '\n')
+        if (( ${#__list[@]} )); then RAIN_COLORS=("${__list[@]}"); fi
+    fi
     raw=$(dripfetch::cfg_get "rain.speeds" "")
-    if [ -n "$raw" ]; then RAIN_SPEEDS=( $(printf '%s\n' "$raw" | tr -d '[]"' | tr ',' ' ') ); fi
+    if [ -n "$raw" ]; then
+        __list=(); while IFS= read -r __c; do [ -n "$__c" ] && __list+=("$__c"); done < <(printf '%s\n' "$raw" | tr -d '[]" ' | tr ',' '\n')
+        if (( ${#__list[@]} )); then RAIN_SPEEDS=("${__list[@]}"); fi
+    fi
     raw=$(dripfetch::cfg_get "rain.lengths" "")
-    if [ -n "$raw" ]; then RAIN_LENGTHS=( $(printf '%s\n' "$raw" | tr -d '[]"' | tr ',' ' ') ); fi
+    if [ -n "$raw" ]; then
+        __list=(); while IFS= read -r __c; do [ -n "$__c" ] && __list+=("$__c"); done < <(printf '%s\n' "$raw" | tr -d '[]" ' | tr ',' '\n')
+        if (( ${#__list[@]} )); then RAIN_LENGTHS=("${__list[@]}"); fi
+    fi
 
     raw=$(dripfetch::cfg_get "calendar.starting_day" ""); [ -n "$raw" ] && CAL_START="$raw"
     raw=$(dripfetch::cfg_get "weather.location" "");  [ -n "$raw" ] && WEATHER_LOC="$raw"
@@ -771,11 +805,12 @@ dripfetch::apply_config() {
     raw=$(dripfetch::cfg_get "text.alignment" "");    [ -n "$raw" ] && TEXT_ALIGN="$raw"
 
     # items
-    local i=0 ty types=""
+    local i=0 ty
+    local -a types=()
     while :; do
         ty=$(dripfetch::cfg_get "boxes.items.$i.type" "")
         [ -z "$ty" ] && break
-        types+="$ty "
+        types+=("$ty")
         case "$ty" in
             clock)    raw=$(dripfetch::cfg_get "boxes.items.$i.clock_size" ""); [ -n "$raw" ] && CLOCK_SIZE="$raw"
                       raw=$(dripfetch::cfg_get "boxes.items.$i.clock_24h" "true");   [[ "$raw" == false ]] && CLOCK_24H=0 || CLOCK_24H=1
@@ -796,8 +831,8 @@ dripfetch::apply_config() {
         esac
         i=$(( i + 1 ))
     done
-    if [ -n "$types" ]; then
-        BOX_TYPES=(); local t; for t in $types; do BOX_TYPES+=("$t"); done
+    if (( ${#types[@]} )); then
+        BOX_TYPES=("${types[@]}")
     fi
 }
 
@@ -909,10 +944,10 @@ main() {
 
     if (( loadfile )); then dripfetch::yaml_flatten "$cfgfile"; dripfetch::apply_config; fi
 
-    dripfetch::set_colour border $(dripfetch::hex2rgb "$BORDER_HEX")
-    dripfetch::set_colour text   $(dripfetch::hex2rgb "$TEXT_HEX")
-    dripfetch::set_colour accent $(dripfetch::hex2rgb "$ACCENT_HEX")
-    if [ -n "$BG_HEX" ] && [ "$BG_HEX" != "nil" ]; then dripfetch::set_colour bg $(dripfetch::hex2rgb "$BG_HEX"); fi
+    dripfetch::set_colour border "$BORDER_HEX"
+    dripfetch::set_colour text   "$TEXT_HEX"
+    dripfetch::set_colour accent "$ACCENT_HEX"
+    if [ -n "$BG_HEX" ] && [ "$BG_HEX" != "nil" ]; then dripfetch::set_colour bg "$BG_HEX"; fi
 
     dripfetch::detect_logo
     dripfetch::detect_colour
