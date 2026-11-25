@@ -91,33 +91,41 @@ dripfetch::detect_colour() {
     else EMIT_TRUECOLOR=0; fi
 }
 
-dripfetch::hex2rgb() { # "#RRGGBB" -> "r g b" (fallback grey)
+dripfetch::__hex2rgb() { # "#RRGGBB" -> HEX_R HEX_G HEX_B (fallback grey)
     local h="${1#\#}"
     case ${#h} in
         3) h="${h:0:1}${h:0:1}${h:1:1}${h:1:1}${h:2:1}${h:2:1}" ;;
         8) h="${h:0:6}" ;;
         6) : ;;
-        *) printf '128 128 128'; return ;;
+        *) HEX_R=128; HEX_G=128; HEX_B=128; return ;;
     esac
-    printf '%d %d %d' $((16#${h:0:2})) $((16#${h:2:2})) $((16#${h:4:2}))
+    HEX_R=$((16#${h:0:2})); HEX_G=$((16#${h:2:2})); HEX_B=$((16#${h:4:2}))
 }
 
-dripfetch::rgb256() { printf '%d' $(( 16 + 36*(($1*5)/255) + 6*(($2*5)/255) + (($3*5)/255) )); }
+dripfetch::hex2rgb() { # "#RRGGBB" -> "r g b" (fallback grey)
+    dripfetch::__hex2rgb "$1"
+    printf '%d %d %d' "$HEX_R" "$HEX_G" "$HEX_B"
+}
+
+dripfetch::__rgb256() { RGB256=$(( 16 + 36*(($1*5)/255) + 6*(($2*5)/255) + (($3*5)/255) )); }
+dripfetch::rgb256() { dripfetch::__rgb256 "$1" "$2" "$3"; printf '%d' "$RGB256"; }
 
 # fg / bg emit helpers append raw ANSI to the global OUT buffer.
-dripfetch::fgb() { local r=$1 g=$2 b=$3
-    if (( EMIT_TRUECOLOR )); then OUT+="$(printf '%s[38;2;%d;%d;%dm' "$ESC" "$r" "$g" "$b")"
-    else OUT+="$(printf '%s[38;5;%dm' "$ESC" "$(dripfetch::rgb256 "$r" "$g" "$b")")"; fi; }
-dripfetch::bgb() { local r=$1 g=$2 b=$3
-    if (( EMIT_TRUECOLOR )); then OUT+="$(printf '%s[48;2;%d;%d;%dm' "$ESC" "$r" "$g" "$b")"
-    else OUT+="$(printf '%s[48;5;%dm' "$ESC" "$(dripfetch::rgb256 "$r" "$g" "$b")")"; fi; }
+dripfetch::fgb() { local r=$1 g=$2 b=$3 code
+    if (( EMIT_TRUECOLOR )); then printf -v code '%s[38;2;%d;%d;%dm' "$ESC" "$r" "$g" "$b"
+    else dripfetch::__rgb256 "$r" "$g" "$b"; printf -v code '%s[38;5;%dm' "$ESC" "$RGB256"; fi
+    OUT+="$code"; }
+dripfetch::bgb() { local r=$1 g=$2 b=$3 code
+    if (( EMIT_TRUECOLOR )); then printf -v code '%s[48;2;%d;%d;%dm' "$ESC" "$r" "$g" "$b"
+    else dripfetch::__rgb256 "$r" "$g" "$b"; printf -v code '%s[48;5;%dm' "$ESC" "$RGB256"; fi
+    OUT+="$code"; }
 
 # palette arrays (r g b)
 declare -a C_BORDER C_TEXT C_ACCENT C_BG
 declare -i BG_SET=0
 dripfetch::set_colour() {
     local r g b
-    IFS=' ' read -r r g b <<< "$(dripfetch::hex2rgb "$2")"
+    dripfetch::__hex2rgb "$2"; r=$HEX_R; g=$HEX_G; b=$HEX_B
     case "$1" in
         border) C_BORDER=( "$r" "$g" "$b" ) ;;
         text)   C_TEXT=( "$r" "$g" "$b" ) ;;
@@ -329,11 +337,32 @@ dripfetch::big_clock_lines() { # hh mm [ss] -> 5 lines
     done
 }
 
+dripfetch::__time_parts() {
+    local stamp
+    if [[ -n "${ZSH_VERSION:-}" ]] && zmodload -F zsh/datetime b:strftime 2>/dev/null; then
+        strftime -s NOW_STAMP '%H:%M:%S'
+        strftime -s NOW_DATE '%a %d %b %Y'
+        strftime -s TODAY '%Y-%m-%d'
+        strftime -s MONTH_YEAR '%B %Y'
+        strftime -s FIRST_DOW '%u'
+    elif [[ -n "${ZSH_VERSION:-}" ]]; then
+        stamp=$(utils::quiet_err date '+%H:%M:%S|%a %d %b %Y|%Y-%m-%d|%B %Y|%u') || stamp='00:00:00|Thu 01 Jan 1970|1970-01-01|January 1970|4'
+        IFS='|' read -r NOW_STAMP NOW_DATE TODAY MONTH_YEAR FIRST_DOW <<< "$stamp"
+    else
+        printf -v NOW_STAMP '%(%H:%M:%S)T' -1
+        printf -v NOW_DATE '%(%a %d %b %Y)T' -1
+        printf -v TODAY '%(%Y-%m-%d)T' -1
+        printf -v MONTH_YEAR '%(%B %Y)T' -1
+        printf -v FIRST_DOW '%(%u)T' -1
+    fi
+}
+
 dripfetch::clock_lines() {
-    local ts; ts=$(utils::quiet_err date +%H:%M:%S)
+    dripfetch::__time_parts
+    local ts=$NOW_STAMP
     local hh=${ts:0:2} mm=${ts:3:2} ss=${ts:6:2}
     local h12=$(( 10#$hh % 12 )); [ "$h12" -eq 0 ] && h12=12
-    local ampm=""; (( CLOCK_24H )) || ampm=$(( 10#$hh >= 12 ? "PM" : "AM" ))
+    local ampm=""; if (( ! CLOCK_24H )); then if (( 10#$hh >= 12 )); then ampm=PM; else ampm=AM; fi; fi
     local hdisp=$(( CLOCK_24H ? 10#$hh : h12 ))
 
     if [[ "$CLOCK_SIZE" == "small" ]]; then
@@ -344,32 +373,37 @@ dripfetch::clock_lines() {
     else
         (( CLOCK_BLINK )) && { if (( (FRAME/12)%2==0 )); then FONT[:]="   | █ |   | █ |   "; else FONT[:]="   |   |   |   |   "; fi; }
         local hhs mmss extra=""
-        hhs=$(printf '%02d' "$hdisp")
+        printf -v hhs '%02d' "$hdisp"
         mmss="$mm"; (( CLOCK_SECONDS )) && extra="$ss"
         dripfetch::big_clock_lines "$hhs" "$mmss" "$extra"
         (( ! CLOCK_24H && CLOCK_AMPM )) && printf '%s\n' "$ampm"
     fi
-    (( CLOCK_DATE )) && printf '%s\n' "$(date '+%a %d %b %Y')"
+    (( CLOCK_DATE )) && printf '%s\n' "$NOW_DATE"
 }
 
 dripfetch::calendar_lines() {
-    local Y M D dim firstdow
-    Y=$(date +%Y); M=$(date +%m); D=$(date +%d)
-    dim=$(utils::quiet_err date -d "$Y-$M-01 +1 month -1 day" +%d); dim=${dim:-30}
-    firstdow=$(utils::quiet_err date -d "$Y-$M-01" +%u); firstdow=${firstdow:-1}
+    dripfetch::__time_parts
+    local Y=${TODAY:0:4} M=${TODAY:5:2} D=${TODAY:8:2} dim firstdow=$FIRST_DOW
+    case "$M" in
+        01|03|05|07|08|10|12) dim=31 ;;
+        04|06|09|11) dim=30 ;;
+        02) if (( 10#$Y % 400 == 0 || (10#$Y % 4 == 0 && 10#$Y % 100 != 0) )); then dim=29; else dim=28; fi ;;
+        *) dim=30 ;;
+    esac
     local off hdr
     case "$CAL_START" in
         sunday)   off=$(( firstdow % 7 )); hdr="Su Mo Tu We Th Fr Sa" ;;
         saturday) off=$(( (firstdow % 7 + 1) % 7 )); hdr="Sa Su Mo Tu We Th Fr" ;;
         monday|*) off=$(( firstdow - 1 )); hdr="Mo Tu We Th Fr Sa Su" ;;
     esac
-    printf '%s\n' "$(date +'%B %Y')" "$hdr"
+    printf '%s\n' "$MONTH_YEAR" "$hdr"
     local day cell row="" idx
-    for day in $(seq 1 "$dim"); do
+    printf -v row '%*s' "$(( off * 3 ))" ''
+    for (( day=1; day<=dim; day++ )); do
         idx=$(( off + day - 1 ))
         if (( idx % 7 == 0 && day > 1 )); then printf '%s\n' "$row"; row=""; fi
-        cell=$(printf '%2d' "$day")
-        if (( day == D )); then row+="$REVERSE$BOLD$cell$RESET "
+        printf -v cell '%2d' "$day"
+        if (( 10#$day == 10#$D )); then row+="$REVERSE$BOLD$cell$RESET "
         else row+="$cell "; fi
     done
     [ -n "$row" ] && printf '%s\n' "$row"
@@ -486,15 +520,48 @@ dripfetch::box_content() { case "$1" in
         logo) dripfetch::logo_text "$LOGO_NAME" ;; *) printf '%s\n' "?" ;;
     esac; }
 
-dripfetch::strip_ansi() { sed -e 's/\x1b\[[0-9;]*m//g'; }
+dripfetch::__strip_ansi() { # text -> PLAIN
+    local text="$1" out="" ch rest
+    while [[ -n "$text" ]]; do
+        if [[ "$text" == "$ESC"* ]]; then
+            rest=${text#"$ESC"}
+            if [[ "$rest" == '['*m* ]]; then text=${rest#*m}; continue; fi
+        fi
+        ch=${text:0:1}; text=${text:1}; out+="$ch"
+    done
+    PLAIN="$out"
+}
+
+dripfetch::strip_ansi() {
+    local line
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        dripfetch::__strip_ansi "$line"
+        printf '%s\n' "$PLAIN"
+    done
+}
+
+dripfetch::__clip_ansi() { # text max_width -> CLIPPED
+    local text="$1" max_w="$2" out="" ch seq visible=0
+    while [[ -n "$text" ]]; do
+        if [[ "$text" == "$ESC"* && "$text" == *m* ]]; then
+            seq="${text%%m*}m"; out+="$seq"; text="${text#*m}"; continue
+        fi
+        (( visible >= max_w )) && break
+        ch=${text:0:1}; text=${text:1}; out+="$ch"; visible=$(( visible + 1 ))
+    done
+    CLIPPED="$out"
+    [[ "$out" == *"$ESC"* ]] && CLIPPED+="$RESET"
+    return 0
+}
 
 # return width/height of a box's content via globals BX_W/BX_H
 dripfetch::box_measure() {
     local -a lines; lines=()
-    local l w
-    while IFS= read -r l; do lines+=("$l"); done < <(dripfetch::box_content "$1")
+    local l w content
+    content=$(dripfetch::box_content "$1")
+    while IFS= read -r l; do lines+=("$l"); done <<< "$content"
     BX_H=${#lines[@]}; BX_W=0
-    while IFS= read -r l; do w=${#l}; (( w > BX_W )) && BX_W=$w; done < <(printf '%s\n' "${lines[@]}" | dripfetch::strip_ansi)
+    for l in "${lines[@]}"; do dripfetch::__strip_ansi "$l"; w=${#PLAIN}; (( w > BX_W )) && BX_W=$w; done
     [[ "$BX_W" -eq 0 ]] && BX_W=1
 }
 
@@ -502,18 +569,31 @@ OUT=""
 dripfetch::at() { OUT+="${ESC}[$1;$2H"; }
 
 dripfetch::draw_box() {
-    local type="$1" row="$2" col="$3"
+    local type="$1" row="$2" col="$3" slot_w="${4:-0}" slot_h="${5:-0}"
     local -a lines; lines=()
-    local l
-    while IFS= read -r l; do lines+=("$l"); done < <(dripfetch::box_content "$type")
-    local BX_H=${#lines[@]} BX_W=0 plain w
-    while IFS= read -r l; do w=${#l}; (( w > BX_W )) && BX_W=$w; done < <(printf '%s\n' "${lines[@]}" | dripfetch::strip_ansi)
+    local l content
+    content=$(dripfetch::box_content "$type")
+    while IFS= read -r l; do lines+=("$l"); done <<< "$content"
+    local BX_H=${#lines[@]} BX_W=0 w
+    for l in "${lines[@]}"; do dripfetch::__strip_ansi "$l"; w=${#PLAIN}; (( w > BX_W )) && BX_W=$w; done
     [[ "$BX_W" -eq 0 ]] && BX_W=1
 
     local inner_w=$(( BX_W + 2*PAD_H )) inner_h=$(( BX_H + 2*PAD_V ))
     local total_w=$(( inner_w + 2 )) total_h=$(( inner_h + 2 ))
-    (( total_w > TERM_W - 1 )) && total_w=$(( TERM_W - 1 ))
-    (( total_h > TERM_H - 1 )) && total_h=$(( TERM_H - 1 ))
+    if (( slot_w > 0 )); then
+        (( inner_w + 2 > slot_w )) && inner_w=$(( slot_w - 2 ))
+        total_w=$(( inner_w + 2 ))
+    else
+        (( total_w > TERM_W - 1 )) && total_w=$(( TERM_W - 1 ))
+        (( inner_w > total_w - 2 )) && inner_w=$(( total_w - 2 ))
+    fi
+    if (( slot_h > 0 )); then
+        (( inner_h + 2 > slot_h )) && inner_h=$(( slot_h - 2 ))
+        total_h=$(( inner_h + 2 ))
+    else
+        (( total_h > TERM_H - 1 )) && total_h=$(( TERM_H - 1 ))
+        (( inner_h > total_h - 2 )) && inner_h=$(( total_h - 2 ))
+    fi
     (( row < 1 )) && row=1; (( col < 1 )) && col=1
     (( row + total_h - 1 > TERM_H )) && row=$(( TERM_H - total_h + 1 ))
     (( col + total_w - 1 > TERM_W )) && col=$(( TERM_W - total_w + 1 ))
@@ -547,12 +627,16 @@ dripfetch::draw_box() {
         OUT+="$vt"
         dripfetch::fgb "${C_TEXT[0]}" "${C_TEXT[1]}" "${C_TEXT[2]}"
         local linetxt=""
-        if (( i > PAD_V && i <= PAD_V+BX_H )); then linetxt="${lines[$((i-PAD_V-1))]}"; fi
+        if (( i > PAD_V && i <= PAD_V+BX_H )); then
+            linetxt="${lines[$((i-PAD_V-1))]}"
+            local text_w=$(( inner_w - 2*PAD_H )); (( text_w < 0 )) && text_w=0
+            if [[ "$linetxt" == *"$ESC"* ]]; then dripfetch::__clip_ansi "$linetxt" "$text_w"; linetxt="$CLIPPED"; else linetxt=${linetxt:0:$text_w}; fi
+        fi
         OUT+="$linetxt"
-        plain=$(printf '%s' "$linetxt" | dripfetch::strip_ansi)
+        dripfetch::__strip_ansi "$linetxt"
         local w padn p
-        w=${#plain}; padn=$(( inner_w - w ))
-        p=$(printf '%*s' "$padn" '')
+        w=${#PLAIN}; padn=$(( inner_w - w ))
+        printf -v p '%*s' "$padn" ''
         OUT+="$p"
         dripfetch::fgb "${C_BORDER[0]}" "${C_BORDER[1]}" "${C_BORDER[2]}"
         OUT+="$vt"
@@ -571,23 +655,32 @@ dripfetch::draw_box() {
 declare -a RAIN_HEAD RAIN_LEN RAIN_COLOR_STR RAIN_CHAR_X
 RAIN_NCOL=0
 
-dripfetch::weighted_pick() { # p1 v1 p2 v2 … -> echoes a value
-    local r=$(( RANDOM % 1000 )) acc=0 p v pi last=""
+dripfetch::__weighted_pick() { # p1 v1 p2 v2 … -> PICKED
+    local r=$(( RANDOM % 1000 )) acc=0 p v pi last="" whole frac
     while [[ $# -ge 2 ]]; do
         p="$1"; v="$2"; shift 2
-        pi=$(awk -v p="$p" 'BEGIN{printf "%d", p*1000}')
+        whole=${p%%.*}
+        if [[ "$p" == *.* ]]; then frac=${p#*.}; else frac=0; fi
+        [[ "$whole" == *[!0-9]* || "$frac" == *[!0-9]* ]] && continue
+        frac="${frac}000"; frac=${frac:0:3}
+        pi=$(( 10#${whole:-0}*1000 + 10#${frac:-0} ))
         acc=$(( acc + pi ))
-        if (( r < acc )); then printf '%s' "$v"; return 0; fi
+        if (( r < acc )); then PICKED="$v"; return 0; fi
         last="$v"
     done
-    printf '%s' "$last"
+    PICKED="$last"
+}
+
+dripfetch::weighted_pick() { # p1 v1 p2 v2 … -> echoes a value
+    dripfetch::__weighted_pick "$@"
+    printf '%s' "$PICKED"
 }
 
 dripfetch::rain_respawn() { local x=$1 len speed ch color
-    len=$(dripfetch::weighted_pick "${RAIN_LENGTHS[@]}");   len=${len:-6}
-    speed=$(dripfetch::weighted_pick "${RAIN_SPEEDS[@]}");  speed=${speed:-40}
+    dripfetch::__weighted_pick "${RAIN_LENGTHS[@]}";   len=${PICKED:-6}
+    dripfetch::__weighted_pick "${RAIN_SPEEDS[@]}";  speed=${PICKED:-40}
     ch="${RAIN_CHARS[$((RANDOM % ${#RAIN_CHARS[@]}))]}"
-    color=$(dripfetch::weighted_pick "${RAIN_COLORS[@]}");  color=${color:-#21F7A8}
+    dripfetch::__weighted_pick "${RAIN_COLORS[@]}";  color=${PICKED:-#21F7A8}
     RAIN_HEAD[$x]=-1
     RAIN_LEN[$x]=$len
     RAIN_COLOR_STR[$x]=$color
@@ -620,16 +713,16 @@ dripfetch::rain_step() {
 
 dripfetch::rain_draw() {
     local x head len rgbstr ch r g b y i fgstr headstr s
+    printf -v headstr '%s[1m%s[38;2;255;255;255m' "$ESC" "$ESC"
     for (( x=0; x<RAIN_NCOL; x++ )); do
         head=${RAIN_HEAD[$x]}; (( head < 0 )) && continue
         len=${RAIN_LEN[$x]}; rgbstr=${RAIN_COLOR_STR[$x]}; ch=${RAIN_CHAR_X[$x]}
-        IFS=' ' read -r r g b <<< "$(dripfetch::hex2rgb "$rgbstr")"
+        dripfetch::__hex2rgb "$rgbstr"; r=$HEX_R; g=$HEX_G; b=$HEX_B
         if (( EMIT_TRUECOLOR )); then
-            fgstr=$(printf '%s[38;2;%d;%d;%dm' "$ESC" "$r" "$g" "$b")
+            printf -v fgstr '%s[38;2;%d;%d;%dm' "$ESC" "$r" "$g" "$b"
         else
-            fgstr=$(printf '%s[38;5;%dm' "$ESC" "$(dripfetch::rgb256 "$r" "$g" "$b")")
+            dripfetch::__rgb256 "$r" "$g" "$b"; printf -v fgstr '%s[38;5;%dm' "$ESC" "$RGB256"
         fi
-        headstr="${BOLD}$(printf '%s[38;2;255;255;255m' "$ESC")"
         s=""
         for (( i=0; i<len && i<TERM_H; i++ )); do
             y=$(( head - i )); (( y < 0 )) && continue
@@ -644,31 +737,99 @@ dripfetch::rain_draw() {
 SEL_INDEX=-1
 declare -A BOX_META BOX_TITLE
 
-dripfetch::sel_box() { local n=${#BOX_TYPES[@]}; (( n )) && SEL_INDEX=$(( (SEL_INDEX + 1) % n )); }
+dripfetch::sel_box() {
+    local n=${#BOX_TYPES[@]} i=$SEL_INDEX t tries=0
+    (( n )) || return
+    while (( tries < n )); do
+        i=$(( (i + 1) % n )); t=${BOX_TYPES[$i]}; tries=$(( tries + 1 ))
+        if (( ${BOX_VISIBLE[$t]:-0} )); then SEL_INDEX=$i; return; fi
+    done
+    SEL_INDEX=-1
+}
 
 dripfetch::move_sel() { local dx=$1 dy=$2
     [[ $SEL_INDEX -lt 0 ]] && return
     local t m col row
-    t=${BOX_TYPES[$SEL_INDEX]}; m=${BOX_META[$t]}
+    t=${BOX_TYPES[$SEL_INDEX]}
+    (( ${BOX_VISIBLE[$t]:-0} )) || return
+    m=${BOX_META[$t]:-}; [[ -n "$m" ]] || return
     col=${m%% *}; row=${m#* }
-    BOX_META[$t]="$(( col + dx )) $(( row + dy ))"
+    local sw=${BOX_SLOT_W[$t]} sh=${BOX_SLOT_H[$t]} new_col new_row other om other_col other_row other_sw other_sh
+    new_col=$(( col + dx )); new_row=$(( row + dy ))
+    (( new_col < 1 )) && new_col=1; (( new_col > TERM_W - sw + 1 )) && new_col=$(( TERM_W - sw + 1 ))
+    (( new_row < 1 )) && new_row=1; (( new_row > TERM_H - sh )) && new_row=$(( TERM_H - sh ))
+    for other in "${BOX_TYPES[@]}"; do
+        [[ "$other" == "$t" ]] && continue
+        (( ${BOX_VISIBLE[$other]:-0} )) || continue
+        om=${BOX_META[$other]:-}; [[ -n "$om" ]] || continue
+        other_col=${om%% *}; other_row=${om#* }
+        other_sw=${BOX_SLOT_W[$other]}; other_sh=${BOX_SLOT_H[$other]}
+        if (( new_col < other_col + other_sw && new_col + sw > other_col && new_row < other_row + other_sh && new_row + sh > other_row )); then return; fi
+    done
+    BOX_META[$t]="$new_col $new_row"
     dripfetch::persist_positions; }
 
 dripfetch::persist_positions() {
     utils::quiet mkdir -p "$CONFIG_DIR" || return
-    : > "$POS_FILE"
-    local t m col row
+    local tmp t m col row
+    tmp=$(utils::quiet_err mktemp "${POS_FILE}.XXXXXX") || return
+    printf '# dripfetch-positions-v2\n' > "$tmp" || { rm -f "$tmp"; return; }
     for t in "${BOX_TYPES[@]}"; do
-        m=${BOX_META[$t]}; col=${m%% *}; row=${m#* }
-        printf '%s=%s=%s\n' "$t" "$col" "$row" >> "$POS_FILE"
+        (( ${BOX_VISIBLE[$t]:-0} )) || continue
+        m=${BOX_META[$t]:-}; [[ -n "$m" ]] || continue
+        col=${m%% *}; row=${m#* }
+        printf '%s=%s=%s\n' "$t" "$col" "$row" >> "$tmp" || { rm -f "$tmp"; return; }
     done
+    mv -f -- "$tmp" "$POS_FILE" || { rm -f "$tmp"; return; }
 }
 
-dripfetch::load_positions() { local t col row
+dripfetch::load_positions() {
     [ -r "$POS_FILE" ] || return
-    while IFS='=' read -r t col row; do
-        [ -n "$t" ] && BOX_META[$t]="$col $row"
-    done < "$POS_FILE"; }
+    local line t col row sw sh legacy=1 first=1 idx found overlap tmp
+    local -a rect_types=() rect_cols=() rect_rows=() rect_ws=() rect_hs=()
+    for t in "${BOX_TYPES[@]}"; do
+        (( ${BOX_VISIBLE[$t]:-0} )) || continue
+        col=${BOX_META[$t]:-}; [[ -n "$col" ]] || continue
+        row=${col#* }; col=${col%% *}
+        rect_types+=("$t"); rect_cols+=("$col"); rect_rows+=("$row")
+        rect_ws+=("${BOX_SLOT_W[$t]}"); rect_hs+=("${BOX_SLOT_H[$t]}")
+    done
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        if (( first )); then
+            first=0
+            [[ "$line" == '# dripfetch-positions-v2' ]] && legacy=0
+            [[ "$line" == \#* ]] && continue
+        fi
+        IFS='=' read -r t col row <<< "$line"
+        [[ -n "$t" ]] && (( ${BOX_VISIBLE[$t]:-0} )) || continue
+        [[ "$col" =~ ^[0-9]+$ && "$row" =~ ^[0-9]+$ ]] || continue
+        col=$((10#$col)); row=$((10#$row))
+        if (( legacy )); then tmp=$col; col=$row; row=$tmp; fi
+        sw=${BOX_SLOT_W[$t]}; sh=${BOX_SLOT_H[$t]}
+        (( col < 1 )) && col=1; (( col > TERM_W - sw + 1 )) && col=$(( TERM_W - sw + 1 ))
+        (( row < 1 )) && row=1; (( row > TERM_H - sh )) && row=$(( TERM_H - sh ))
+        overlap=0
+        if (( ${#rect_types[@]} )); then
+            for (( idx=0; idx<${#rect_types[@]}; idx++ )); do
+                [[ "${rect_types[$idx]}" == "$t" ]] && continue
+                if (( col < rect_cols[idx] + rect_ws[idx] && col + sw > rect_cols[idx] && row < rect_rows[idx] + rect_hs[idx] && row + sh > rect_rows[idx] )); then overlap=1; break; fi
+            done
+        fi
+        (( overlap )) && continue
+        found=-1
+        if (( ${#rect_types[@]} )); then
+            for (( idx=0; idx<${#rect_types[@]}; idx++ )); do
+                if [[ "${rect_types[$idx]}" == "$t" ]]; then found=$idx; break; fi
+            done
+        fi
+        if (( found >= 0 )); then
+            rect_cols[$found]=$col; rect_rows[$found]=$row
+        else
+            rect_types+=("$t"); rect_cols+=("$col"); rect_rows+=("$row"); rect_ws+=("$sw"); rect_hs+=("$sh")
+        fi
+        BOX_META[$t]="$col $row"
+    done < "$POS_FILE"
+}
 
 # --- frame composer --------------------------------------------------------------------
 declare -i QUIT=0 PAUSED=0 FRAME=0
@@ -679,7 +840,7 @@ dripfetch::render_frame() {
 
     if (( BG_SET )); then
         local y pad
-        pad=$(printf '%*s' "$TERM_W" '')
+        printf -v pad '%*s' "$TERM_W" ''
         for (( y=1; y<=TERM_H; y++ )); do
             dripfetch::at "$y" 1
             dripfetch::bgb "${C_BG[0]}" "${C_BG[1]}" "${C_BG[2]}"
@@ -688,13 +849,14 @@ dripfetch::render_frame() {
         OUT+="$RESET"
     fi
 
+    (( PAUSED )) || dripfetch::rain_draw
+
     local t m col row
     for t in "${BOX_TYPES[@]}"; do
+        (( ${BOX_VISIBLE[$t]:-0} )) || continue
         m=${BOX_META[$t]}; col=${m%% *}; row=${m#* }
-        dripfetch::draw_box "$t" "${row:-1}" "${col:-1}"
+        dripfetch::draw_box "$t" "${row:-1}" "${col:-1}" "${BOX_SLOT_W[$t]:-0}" "${BOX_SLOT_H[$t]:-0}"
     done
-
-    (( PAUSED )) || dripfetch::rain_draw
 
     if (( SEL_INDEX >= 0 )); then
         local t=${BOX_TYPES[$SEL_INDEX]}
@@ -742,18 +904,45 @@ dripfetch::handle_key() { case "$1" in
     esac; }
 
 # --- layout -------------------------------------------------------------------------------
+declare -A BOX_SLOT_W BOX_SLOT_H BOX_VISIBLE
+
 dripfetch::layout_boxes() {
-    local t; for t in "${BOX_TYPES[@]}"; do dripfetch::box_measure "$t"; BOX_W[$t]=$BX_W; BOX_H[$t]=$BX_H; done
-    local lw=${BOX_W[logo]:-10} lh=${BOX_H[logo]:-6} cw=${BOX_W[calendar]:-20} ch=${BOX_H[calendar]:-8}
-    local top_row=2
-    BOX_META[logo]="$top_row 2"
-    BOX_META[sysinfo]="$top_row $(( 2 + lw + 2 ))"
-    BOX_META[clock]="$top_row $(( TERM_W - BOX_W[clock] - 2 ))"
-    local bottom=$(( top_row + lh + 2 ))
-    BOX_META[calendar]="$bottom 2"
-    BOX_META[text]="$bottom $(( 2 + cw + 2 ))"
-    BOX_META[weather]="$bottom $(( TERM_W - BOX_W[weather] - 2 ))"
-    BOX_META[net]="$(( bottom + ch + 2 )) 2"
+    local t is_known known
+    local -A wanted=()
+    for t in "${BOX_TYPES[@]}"; do wanted[$t]=1; done
+    if (( TERM_W < 100 || TERM_H < 32 )) && (( ${wanted[clock]:-0} )); then CLOCK_SIZE=small; fi
+    for t in "${BOX_TYPES[@]}"; do dripfetch::box_measure "$t"; BOX_W[$t]=$BX_W; BOX_H[$t]=$BX_H; done
+
+    local -a order=( logo clock sysinfo calendar text weather net )
+    for t in "${BOX_TYPES[@]}"; do
+        is_known=0
+        for known in "${order[@]}"; do [[ "$t" == "$known" ]] && { is_known=1; break; }; done
+        (( is_known )) || order+=("$t")
+    done
+
+    BOX_SLOT_W=(); BOX_SLOT_H=(); BOX_VISIBLE=()
+    local margin=1 gap=1 min_w=16 x=1 y=1 row_h=0 w h remaining remaining_h
+    local max_row=$(( TERM_H - 1 ))
+    for t in "${order[@]}"; do
+        (( ${wanted[$t]:-0} )) || continue
+        w=$(( BOX_W[$t] + 2*PAD_H + 2 )); h=$(( BOX_H[$t] + 2*PAD_V + 2 ))
+        remaining=$(( TERM_W - x + 1 ))
+        if (( x > margin && w > remaining )); then
+            if (( remaining >= min_w )); then
+                w=$remaining
+            else
+                y=$(( y + row_h + gap )); x=$margin; row_h=0
+                remaining=$(( TERM_W - x + 1 ))
+            fi
+        fi
+        (( w > remaining )) && w=$remaining
+        remaining_h=$(( max_row - y + 1 ))
+        if (( w < 4 || remaining_h < 4 )); then BOX_VISIBLE[$t]=0; continue; fi
+        (( h > remaining_h )) && h=$remaining_h
+        BOX_META[$t]="$x $y"
+        BOX_SLOT_W[$t]=$w; BOX_SLOT_H[$t]=$h; BOX_VISIBLE[$t]=1
+        x=$(( x + w + gap )); (( h > row_h )) && row_h=$h
+    done
 
     BOX_TITLE[logo]=""; BOX_TITLE[sysinfo]="sysinfo"; BOX_TITLE[clock]="clock"
     BOX_TITLE[calendar]=""; BOX_TITLE[weather]="weather"; BOX_TITLE[text]=""; BOX_TITLE[net]="net"

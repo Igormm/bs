@@ -106,6 +106,9 @@ io::streams::print "hello from BS"
   sysinfo, clock, calendar, weather, net, text boxes, YAML config) /
   терминальный дашборд с «матричным» дождём (`@shell bash4,zsh`: боксы logo,
   sysinfo, clock, calendar, weather, net, text, YAML-конфиг)
+  > Ограничение: обрезка считает Unicode-кодовые точки, а не клетки терминала;
+  > CJK и emoji могут занимать две клетки. / Limitation: clipping counts Unicode
+  > code points rather than terminal cells; CJK and emoji may occupy two cells.
 - `todo.sh` — terminal todo list on `lib/tui/app` /
   терминальный список задач
 - `wizard_example.sh` — interactive setup wizard with Unicode frames /

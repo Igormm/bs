@@ -21,7 +21,7 @@ T=""
 run_dashboard() {
     local log="$1" keys="$2" rc=0
     shift 2
-    (sleep 0.2; printf '%s' "$keys") | HOME="${T}/home" XDG_CONFIG_HOME="${T}/config" TERM=xterm-256color COLUMNS=20 LINES=8 \
+    (sleep 0.2; printf '%s' "$keys") | HOME="${T}/home" XDG_CONFIG_HOME="${T}/config" TERM=xterm-256color COLUMNS=80 LINES=24 \
         timeout -k 2 15 "$@" > "${log}" 2>&1 || rc=$?
     printf '%s' "$rc"
 }
