@@ -165,6 +165,368 @@ assert_hotpath() {
     testframework::assert_equal "0" "$dates" "$label formats clock and calendar without date subprocesses"
 }
 
+run_frame_budget_probe() {
+    local shell_bin="$1" prefix="$2" rc=0
+    mkdir -p "$prefix"
+    HOME="${T}/home" XDG_CONFIG_HOME="${T}/config" "$shell_bin" -c '
+        source <(sed "\$d" "$1")
+        TERM_W=80; TERM_H=24; LOGO_NAME=fedora
+        BOX_TYPES=(logo sysinfo clock calendar text)
+        dripfetch::detect_colour
+        dripfetch::set_colour border "#50FFC1"
+        dripfetch::set_colour text "#D9E5F4"
+        dripfetch::set_colour accent "#50FFC1"
+        dripfetch::set_colour bg "#080B12"
+        dripfetch::layout_boxes
+        dripfetch::rain_init
+        BG_SET=1; SEL_INDEX=-1
+        start=$(date +%s%N)
+        i=0
+        while (( i < 20 )); do dripfetch::render_frame >/dev/null; i=$(( i + 1 )); done
+        end=$(date +%s%N)
+        printf "%s\n" "$(( (end - start) / 1000000 ))"
+    ' _ "$DRIPFETCH_SCRIPT" > "${prefix}/out" 2> "${prefix}/stderr" || rc=$?
+    printf '%s' "$rc"
+}
+
+assert_frame_budget() {
+    local shell_bin="$1" label="$2" rc elapsed
+    local prefix="${T}/${label}-frame-budget"
+    rc="$(run_frame_budget_probe "$shell_bin" "$prefix")"
+    testframework::assert_equal "0" "$rc" "$label frame-budget probe runs"
+    testframework::assert_command "[[ ! -s '$prefix/stderr' ]]" "$label frame-budget probe has no diagnostics"
+    elapsed="$(<"${prefix}/out")"
+    testframework::assert_command "(( $elapsed < 2000 ))" "$label renders 20 frames in under two seconds"
+}
+
+test_bash_frame_budget() {
+    assert_frame_budget "$(bs::shell::host)" "bash"
+}
+
+test_zsh_frame_budget() {
+    local zsh_bin
+    zsh_bin="$(command -v zsh || true)"
+    if [[ -z "$zsh_bin" ]]; then
+        testframework::skip "zsh frame budget" "zsh is not installed / zsh не установлен"
+        return 0
+    fi
+    assert_frame_budget "$zsh_bin" "zsh"
+}
+
+run_rain_respawn_probe() {
+    local shell_bin="$1" prefix="$2" rc=0
+    mkdir -p "$prefix"
+    HOME="${T}/home" XDG_CONFIG_HOME="${T}/config" "$shell_bin" -c '
+        source <(sed "\$d" "$1")
+        TERM_W=4; TERM_H=8; RAIN_INTENSITY=100
+        dripfetch::rain_init
+        x=0
+        while (( x < RAIN_NCOL )); do RAIN_HEAD[$x]=-1; x=$(( x + 1 )); done
+        dripfetch::rain_step
+        x=0
+        while (( x < RAIN_NCOL )); do printf "%s\n" "${RAIN_HEAD[$x]}"; x=$(( x + 1 )); done
+        :
+    ' _ "$DRIPFETCH_SCRIPT" > "${prefix}/out" 2> "${prefix}/stderr" || rc=$?
+    printf '%s' "$rc"
+}
+
+assert_rain_respawn() {
+    local shell_bin="$1" label="$2" rc head count=0
+    local prefix="${T}/${label}-rain-respawn"
+    rc="$(run_rain_respawn_probe "$shell_bin" "$prefix")"
+    testframework::assert_equal "0" "$rc" "$label rain-respawn probe runs"
+    testframework::assert_command "[[ ! -s '$prefix/stderr' ]]" "$label rain-respawn probe has no diagnostics"
+    while IFS= read -r head; do
+        count=$(( count + 1 ))
+        testframework::assert_command "(( $head >= 0 && $head < 8 ))" "$label respawned drops re-enter the visible screen"
+    done < "${prefix}/out"
+    testframework::assert_equal "4" "$count" "$label emits one respawn position per column"
+}
+
+test_bash_rain_respawn() {
+    assert_rain_respawn "$(bs::shell::host)" "bash"
+}
+
+test_zsh_rain_respawn() {
+    local zsh_bin
+    zsh_bin="$(command -v zsh || true)"
+    if [[ -z "$zsh_bin" ]]; then
+        testframework::skip "zsh rain respawn" "zsh is not installed / zsh не установлен"
+        return 0
+    fi
+    assert_rain_respawn "$zsh_bin" "zsh"
+}
+
+run_incremental_probe() {
+    local shell_bin="$1" prefix="$2" rc=0
+    mkdir -p "$prefix"
+    HOME="${T}/home" XDG_CONFIG_HOME="${T}/config" "$shell_bin" -c '
+        source <(sed "\$d" "$1")
+        TERM_W=40; TERM_H=12; LOGO_NAME=fedora; BOX_TYPES=(logo)
+        dripfetch::detect_colour
+        dripfetch::set_colour border "#50FFC1"
+        dripfetch::set_colour text "#D9E5F4"
+        dripfetch::set_colour accent "#50FFC1"
+        dripfetch::set_colour bg "#080B12"
+        dripfetch::layout_boxes
+        dripfetch::rain_init
+        BG_SET=1; SEL_INDEX=-1
+        dripfetch::render_frame > "$2/first"
+        dripfetch::rain_step
+        dripfetch::render_frame > "$2/second"
+        esc=$(printf "\033")
+        first_clear=0; second_clear=0
+        [[ "$(<"$2/first")" == *"${esc}[2J"* ]] && first_clear=1
+        [[ "$(<"$2/second")" == *"${esc}[2J"* ]] && second_clear=1
+        printf "%s %s %s %s\n" "$first_clear" "$second_clear" "$(wc -c < "$2/first")" "$(wc -c < "$2/second")"
+    ' _ "$DRIPFETCH_SCRIPT" "$prefix" > "${prefix}/out" 2> "${prefix}/stderr" || rc=$?
+    printf '%s' "$rc"
+}
+
+assert_incremental_render() {
+    local shell_bin="$1" label="$2" rc first_clear second_clear first_size second_size
+    local prefix="${T}/${label}-incremental"
+    rc="$(run_incremental_probe "$shell_bin" "$prefix")"
+    testframework::assert_equal "0" "$rc" "$label incremental probe runs"
+    testframework::assert_command "[[ ! -s '$prefix/stderr' ]]" "$label incremental probe has no diagnostics"
+    IFS=' ' read -r first_clear second_clear first_size second_size < "${prefix}/out"
+    testframework::assert_equal "1" "$first_clear" "$label draws the first frame completely"
+    testframework::assert_equal "0" "$second_clear" "$label does not clear the screen on later frames"
+    testframework::assert_command "(( $second_size < $first_size ))" "$label emits less data on later frames"
+}
+
+test_bash_incremental_render() {
+    assert_incremental_render "$(bs::shell::host)" "bash"
+}
+
+test_zsh_incremental_render() {
+    local zsh_bin
+    zsh_bin="$(command -v zsh || true)"
+    if [[ -z "$zsh_bin" ]]; then
+        testframework::skip "zsh incremental render" "zsh is not installed / zsh не установлен"
+        return 0
+    fi
+    assert_incremental_render "$zsh_bin" "zsh"
+}
+
+run_rain_direction_probe() {
+    local shell_bin="$1" prefix="$2" rc=0
+    mkdir -p "$prefix"
+    HOME="${T}/home" XDG_CONFIG_HOME="${T}/config" "$shell_bin" -c '
+        source <(sed "\$d" "$1")
+        TERM_W=1; TERM_H=8; RAIN_NCOL=1
+        RAIN_HEAD[0]=5; RAIN_LEN[0]=3; RAIN_CHAR_X[0]="|"; RAIN_FG[0]=""
+        RAIN_BLOCK_TOP[1]=9; RAIN_BLOCK_BOTTOM[1]=0
+        OUT=""; dripfetch::rain_draw
+        printf "%s" "$OUT"
+    ' _ "$DRIPFETCH_SCRIPT" > "${prefix}/out" 2> "${prefix}/stderr" || rc=$?
+    printf '%s' "$rc"
+}
+
+assert_rain_direction() {
+    local shell_bin="$1" label="$2" rc out esc
+    local prefix="${T}/${label}-rain-direction"
+    rc="$(run_rain_direction_probe "$shell_bin" "$prefix")"
+    testframework::assert_equal "0" "$rc" "$label rain-direction probe runs"
+    out="$(<"${prefix}/out")"; esc=$'\033'
+    testframework::assert_command "[[ '$out' == *'${esc}[6;1H'* ]]" "$label positions the drop head absolutely"
+    testframework::assert_command "[[ '$out' == *'${esc}[5;1H'* && '$out' == *'${esc}[4;1H'* ]]" "$label positions every tail cell absolutely"
+    testframework::assert_command "[[ '$out' != *'${esc}[A'* && '$out' != *'${esc}[B'* ]]" "$label avoids relative cursor drift"
+}
+
+test_bash_rain_direction() {
+    assert_rain_direction "$(bs::shell::host)" "bash"
+}
+
+test_zsh_rain_direction() {
+    local zsh_bin
+    zsh_bin="$(command -v zsh || true)"
+    if [[ -z "$zsh_bin" ]]; then
+        testframework::skip "zsh rain direction" "zsh is not installed / zsh не установлен"
+        return 0
+    fi
+    assert_rain_direction "$zsh_bin" "zsh"
+}
+
+run_wrap_mode_probe() {
+    local shell_bin="$1" prefix="$2" rc=0
+    mkdir -p "$prefix"
+    HOME="${T}/home" XDG_CONFIG_HOME="${T}/config" "$shell_bin" -c '
+        source <(sed "\$d" "$1")
+        TERM_ACTIVE=1; ORIG_STTY=""
+        dripfetch::term_init
+        dripfetch::term_restore
+    ' _ "$DRIPFETCH_SCRIPT" > "${prefix}/out" 2> "${prefix}/stderr" || rc=$?
+    printf '%s' "$rc"
+}
+
+assert_wrap_mode() {
+    local shell_bin="$1" label="$2" rc out esc
+    local prefix="${T}/${label}-wrap-mode"
+    rc="$(run_wrap_mode_probe "$shell_bin" "$prefix")"
+    testframework::assert_equal "0" "$rc" "$label wrap-mode probe runs"
+    out="$(<"${prefix}/out")"; esc=$'\033'
+    testframework::assert_command "[[ '$out' == *'${esc}[?7l'* ]]" "$label disables terminal autowrap while drawing"
+    testframework::assert_command "[[ '$out' == *'${esc}[?7h'* ]]" "$label restores terminal autowrap on exit"
+}
+
+test_bash_wrap_mode() {
+    assert_wrap_mode "$(bs::shell::host)" "bash"
+}
+
+test_zsh_wrap_mode() {
+    local zsh_bin
+    zsh_bin="$(command -v zsh || true)"
+    if [[ -z "$zsh_bin" ]]; then
+        testframework::skip "zsh wrap mode" "zsh is not installed / zsh не установлен"
+        return 0
+    fi
+    assert_wrap_mode "$zsh_bin" "zsh"
+}
+
+run_rain_erase_probe() {
+    local shell_bin="$1" prefix="$2" rc=0
+    mkdir -p "$prefix"
+    HOME="${T}/home" XDG_CONFIG_HOME="${T}/config" "$shell_bin" -c '
+        source <(sed "\$d" "$1")
+        TERM_W=1; TERM_H=8; RAIN_NCOL=1
+        RAIN_HEAD[0]=5; RAIN_LEN[0]=3; RAIN_OLD_HEAD[0]=4; RAIN_OLD_LEN[0]=3
+        RAIN_CHAR_X[0]="|"; RAIN_FG[0]=""; RAIN_BLOCK_TOP[1]=9; RAIN_BLOCK_BOTTOM[1]=0
+        OUT=""; dripfetch::rain_draw incremental
+        printf "%s" "$OUT"
+    ' _ "$DRIPFETCH_SCRIPT" > "${prefix}/out" 2> "${prefix}/stderr" || rc=$?
+    printf '%s' "$rc"
+}
+
+assert_rain_erase() {
+    local shell_bin="$1" label="$2" rc out esc
+    local prefix="${T}/${label}-rain-erase"
+    rc="$(run_rain_erase_probe "$shell_bin" "$prefix")"
+    testframework::assert_equal "0" "$rc" "$label rain-erase probe runs"
+    out="$(<"${prefix}/out")"; esc=$'\033'
+    testframework::assert_command "[[ '$out' == *'${esc}[3;1H '* ]]" "$label erases the old tail cell when a drop moves"
+}
+
+run_mask_move_probe() {
+    local shell_bin="$1" prefix="$2" rc=0
+    mkdir -p "$prefix"
+    HOME="${T}/home" XDG_CONFIG_HOME="${T}/config" "$shell_bin" -c '
+        source <(sed "\$d" "$1")
+        TERM_W=40; TERM_H=12; BOX_TYPES=(logo); LOGO_NAME=fedora
+        dripfetch::detect_colour
+        dripfetch::layout_boxes
+        dripfetch::sel_box
+        dripfetch::move_sel 20 0
+        printf "%s|%s|%s\n" "${BOX_META[logo]}" "${RAIN_BLOCK_TOP[21]}" "${RAIN_BLOCK_BOTTOM[21]}"
+    ' _ "$DRIPFETCH_SCRIPT" > "${prefix}/out" 2> "${prefix}/stderr" || rc=$?
+    printf '%s' "$rc"
+}
+
+assert_mask_move() {
+    local shell_bin="$1" label="$2" rc meta top bottom
+    local prefix="${T}/${label}-mask-move"
+    rc="$(run_mask_move_probe "$shell_bin" "$prefix")"
+    testframework::assert_equal "0" "$rc" "$label mask-move probe runs"
+    IFS='|' read -r meta top bottom < "${prefix}/out"
+    testframework::assert_equal "21 1" "$meta" "$label moves the box"
+    testframework::assert_equal "1" "$top" "$label rebuilds the rain mask at the new column"
+    testframework::assert_equal "11" "$bottom" "$label rebuilds the rain mask height"
+}
+
+test_bash_rain_erase() {
+    assert_rain_erase "$(bs::shell::host)" "bash"
+}
+
+test_zsh_rain_erase() {
+    local zsh_bin
+    zsh_bin="$(command -v zsh || true)"
+    if [[ -z "$zsh_bin" ]]; then
+        testframework::skip "zsh rain erase" "zsh is not installed / zsh не установлен"
+        return 0
+    fi
+    assert_rain_erase "$zsh_bin" "zsh"
+}
+
+test_bash_mask_move() {
+    assert_mask_move "$(bs::shell::host)" "bash"
+}
+
+test_zsh_mask_move() {
+    local zsh_bin
+    zsh_bin="$(command -v zsh || true)"
+    if [[ -z "$zsh_bin" ]]; then
+        testframework::skip "zsh mask move" "zsh is not installed / zsh не установлен"
+        return 0
+    fi
+    assert_mask_move "$zsh_bin" "zsh"
+}
+
+run_status_rain_probe() {
+    local shell_bin="$1" prefix="$2" rc=0
+    mkdir -p "$prefix"
+    HOME="${T}/home" XDG_CONFIG_HOME="${T}/config" "$shell_bin" -c '
+        source <(sed "\$d" "$1")
+        TERM_W=20; TERM_H=8; BOX_TYPES=(logo); LOGO_NAME=fedora
+        dripfetch::detect_colour
+        dripfetch::layout_boxes
+        dripfetch::rain_init
+        x=0
+        while (( x < RAIN_NCOL )); do RAIN_HEAD[$x]=-1; x=$(( x + 1 )); done
+        RAIN_HEAD[19]=7; RAIN_LEN[19]=1; RAIN_CHAR_X[19]="|"; RAIN_FG[19]=""
+        RAIN_HEAD[18]=8; RAIN_LEN[18]=1; RAIN_CHAR_X[18]="|"; RAIN_FG[18]=""
+        OUT=""; dripfetch::rain_draw incremental
+        printf "%s" "$OUT"
+    ' _ "$DRIPFETCH_SCRIPT" > "${prefix}/out" 2> "${prefix}/stderr" || rc=$?
+    printf '%s' "$rc"
+}
+
+assert_status_rain() {
+    local shell_bin="$1" label="$2" rc out esc
+    local prefix="${T}/${label}-status-rain"
+    rc="$(run_status_rain_probe "$shell_bin" "$prefix")"
+    testframework::assert_equal "0" "$rc" "$label status-rain probe runs"
+    out="$(<"${prefix}/out")"; esc=$'\033'
+    testframework::assert_command "[[ '$out' != *'${esc}[8;20H'* ]]" "$label never draws rain on the status row"
+    testframework::assert_command "[[ '$out' != *'${esc}[9;19H'* ]]" "$label never draws off-screen rain rows"
+}
+
+test_bash_status_rain() {
+    assert_status_rain "$(bs::shell::host)" "bash"
+}
+
+test_zsh_status_rain() {
+    local zsh_bin
+    zsh_bin="$(command -v zsh || true)"
+    if [[ -z "$zsh_bin" ]]; then
+        testframework::skip "zsh status rain" "zsh is not installed / zsh не установлен"
+        return 0
+    fi
+    assert_status_rain "$zsh_bin" "zsh"
+}
+
+run_weather_cache_probe() {
+    local shell_bin="$1" prefix="$2" rc=0
+    mkdir -p "$prefix"
+    HOME="${T}/home" XDG_CONFIG_HOME="${T}/config" "$shell_bin" -c '
+        source <(sed "\$d" "$1")
+        TERM_W=80; TERM_H=24; BOX_TYPES=(weather)
+        calls=$2/calls; : > "$calls"
+        dripfetch::weather_lines() { printf "call\n" >> "$calls"; printf "sunny\n"; }
+        dripfetch::layout_boxes
+        dripfetch::__weather_refresh
+        wc -l < "$calls"
+    ' _ "$DRIPFETCH_SCRIPT" "$prefix" > "${prefix}/out" 2> "${prefix}/stderr" || rc=$?
+    printf '%s' "$rc"
+}
+
+test_bash_weather_cache() {
+    local prefix="${T}/bash-weather-cache" rc count
+    rc="$(run_weather_cache_probe "$(bs::shell::host)" "$prefix")"
+    testframework::assert_equal "0" "$rc" "bash weather-cache probe runs"
+    count="$(<"${prefix}/out")"
+    testframework::assert_equal "1" "$count" "bash reuses weather measured during layout"
+}
+
 test_bash_hotpath() {
     assert_hotpath "$(bs::shell::host)" "bash"
 }
@@ -235,6 +597,25 @@ main() {
     T="$(mktemp -d)"
     trap 'rm -rf "${T:?}"' EXIT
     mkdir -p "${T}/home" "${T}/config"
+
+    testframework::section "Frame budget / Бюджет кадра"
+    test_bash_frame_budget
+    test_zsh_frame_budget
+    test_bash_rain_respawn
+    test_zsh_rain_respawn
+    test_bash_rain_direction
+    test_zsh_rain_direction
+    test_bash_wrap_mode
+    test_zsh_wrap_mode
+    test_bash_rain_erase
+    test_zsh_rain_erase
+    test_bash_mask_move
+    test_zsh_mask_move
+    test_bash_status_rain
+    test_zsh_status_rain
+    test_bash_weather_cache
+    test_bash_incremental_render
+    test_zsh_incremental_render
 
     testframework::section "Hot path / Горячий путь"
     test_bash_hotpath

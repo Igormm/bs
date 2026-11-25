@@ -282,19 +282,22 @@ run_status_row_probe() {
         dripfetch::detect_colour
         dripfetch::layout_boxes
         m=${BOX_META[logo]}; col=${m%% *}; row=${m#* }
-        printf "%s\n" "$(( row + BOX_SLOT_H[logo] - 1 ))"
+        printf "%s\n%s\n%s %s\n" "$(( row + BOX_SLOT_H[logo] - 1 ))" "${RAIN_BLOCK_BOTTOM[1]}" "${RAIN_BLOCK_TOP[20]}" "${RAIN_BLOCK_BOTTOM[20]}"
         :
     ' _ "$DRIPFETCH_SCRIPT" > "${prefix}/out" 2> "${prefix}/stderr" || rc=$?
     printf '%s' "$rc"
 }
 
 assert_status_row() {
-    local shell_bin="$1" label="$2" rc bottom
+    local shell_bin="$1" label="$2" rc bottom block_bottom empty_top empty_bottom
     local prefix="${T}/${label}-status-row"
     rc="$(run_status_row_probe "$shell_bin" "$prefix")"
     testframework::assert_equal "0" "$rc" "$label status-row probe runs"
-    bottom="$(<"${prefix}/out")"
+    { IFS= read -r bottom; IFS= read -r block_bottom; IFS=' ' read -r empty_top empty_bottom; } < "${prefix}/out"
     testframework::assert_command "(( $bottom < 8 ))" "$label reserves the last terminal row for status"
+    testframework::assert_equal "7" "$block_bottom" "$label keeps the box mask separate from the status row"
+    testframework::assert_equal "9" "$empty_top" "$label leaves an empty column unblocked above the status row"
+    testframework::assert_equal "0" "$empty_bottom" "$label leaves an empty column with no box mask"
 }
 
 test_bash_status_row() {

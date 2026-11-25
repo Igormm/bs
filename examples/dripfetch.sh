@@ -151,12 +151,12 @@ dripfetch::get_size() {
 dripfetch::term_init() {
     ORIG_STTY=$(utils::attempt stty -g)
     utils::attempt stty -echo -icanon
-    printf '%b' "${ESC}[?25l" "${ESC}[?1049h" "${ESC}[2J"
+    printf '%b' "${ESC}[?25l" "${ESC}[?1049h" "${ESC}[?7l" "${ESC}[2J"
 }
 TERM_ACTIVE=0
 dripfetch::term_restore() {
     [[ "$TERM_ACTIVE" -eq 1 ]] || return 0
-    printf '%b' "${ESC}[?1049l" "${ESC}[?25h" "$RESET"
+    printf '%b' "${ESC}[?7h" "${ESC}[?1049l" "${ESC}[?25h" "$RESET"
     if [[ -n "$ORIG_STTY" ]]; then utils::quiet_err stty "$ORIG_STTY"; else utils::quiet_err stty sane; fi || true
 }
 
@@ -522,6 +522,7 @@ dripfetch::box_content() { case "$1" in
 
 dripfetch::__strip_ansi() { # text -> PLAIN
     local text="$1" out="" ch rest
+    if [[ "$text" != *"$ESC"* ]]; then PLAIN="$text"; return 0; fi
     while [[ -n "$text" ]]; do
         if [[ "$text" == "$ESC"* ]]; then
             rest=${text#"$ESC"}
@@ -559,6 +560,8 @@ dripfetch::box_measure() {
     local -a lines; lines=()
     local l w content
     content=$(dripfetch::box_content "$1")
+    BOX_CONTENT[$1]=$content
+    if [[ "$1" == weather ]]; then WEATHER_CACHE_TIME=$SECONDS; fi
     while IFS= read -r l; do lines+=("$l"); done <<< "$content"
     BX_H=${#lines[@]}; BX_W=0
     for l in "${lines[@]}"; do dripfetch::__strip_ansi "$l"; w=${#PLAIN}; (( w > BX_W )) && BX_W=$w; done
@@ -572,10 +575,18 @@ dripfetch::draw_box() {
     local type="$1" row="$2" col="$3" slot_w="${4:-0}" slot_h="${5:-0}"
     local -a lines; lines=()
     local l content
-    content=$(dripfetch::box_content "$type")
+    case "$type" in
+        clock|net) content=$(dripfetch::box_content "$type") ;;
+        weather) content=${BOX_CONTENT[$type]:-}
+                 if [[ -z "$content" ]]; then content=$(dripfetch::box_content "$type"); BOX_CONTENT[$type]=$content; fi ;;
+        *) if [[ -n "${BOX_CONTENT[$type]+x}" ]]; then content=${BOX_CONTENT[$type]}; else content=$(dripfetch::box_content "$type"); BOX_CONTENT[$type]=$content; fi ;;
+    esac
     while IFS= read -r l; do lines+=("$l"); done <<< "$content"
-    local BX_H=${#lines[@]} BX_W=0 w
-    for l in "${lines[@]}"; do dripfetch::__strip_ansi "$l"; w=${#PLAIN}; (( w > BX_W )) && BX_W=$w; done
+    local BX_H=${BOX_H[$type]:-0} BX_W=${BOX_W[$type]:-0} w
+    if (( BX_H == 0 || BX_W == 0 )); then
+        BX_H=${#lines[@]}; BX_W=0
+        for l in "${lines[@]}"; do dripfetch::__strip_ansi "$l"; w=${#PLAIN}; (( w > BX_W )) && BX_W=$w; done
+    fi
     [[ "$BX_W" -eq 0 ]] && BX_W=1
 
     local inner_w=$(( BX_W + 2*PAD_H )) inner_h=$(( BX_H + 2*PAD_V ))
@@ -651,9 +662,27 @@ dripfetch::draw_box() {
     OUT+="$br$RESET"
 }
 
+dripfetch::__cache_box() {
+    local t="$1" m col row saved
+    m=${BOX_META[$t]}; col=${m%% *}; row=${m#* }
+    saved=$OUT; OUT=""
+    dripfetch::draw_box "$t" "$row" "$col" "${BOX_SLOT_W[$t]:-0}" "${BOX_SLOT_H[$t]:-0}"
+    BOX_RENDER[$t]=$OUT
+    OUT=$saved
+}
+
+dripfetch::__weather_refresh() {
+    if [[ -z "${BOX_CONTENT[weather]:-}" ]] || (( SECONDS - WEATHER_CACHE_TIME >= 60 )); then
+        BOX_CONTENT[weather]=$(dripfetch::box_content weather)
+        WEATHER_CACHE_TIME=$SECONDS
+    fi
+}
+
 # --- matrix rain ----------------------------------------------------------------------
-declare -a RAIN_HEAD RAIN_LEN RAIN_COLOR_STR RAIN_CHAR_X
+declare -a RAIN_HEAD RAIN_LEN RAIN_CHAR_X RAIN_OLD_HEAD RAIN_OLD_LEN RAIN_FG RAIN_BLOCK_TOP RAIN_BLOCK_BOTTOM
 RAIN_NCOL=0
+NEEDS_FULL_RENDER=1
+LAST_STATUS=""
 
 dripfetch::__weighted_pick() { # p1 v1 p2 v2 … -> PICKED
     local r=$(( RANDOM % 1000 )) acc=0 p v pi last="" whole frac
@@ -676,24 +705,26 @@ dripfetch::weighted_pick() { # p1 v1 p2 v2 … -> echoes a value
     printf '%s' "$PICKED"
 }
 
-dripfetch::rain_respawn() { local x=$1 len speed ch color
+dripfetch::rain_respawn() { local x=$1 len speed ch color fg
     dripfetch::__weighted_pick "${RAIN_LENGTHS[@]}";   len=${PICKED:-6}
     dripfetch::__weighted_pick "${RAIN_SPEEDS[@]}";  speed=${PICKED:-40}
     ch="${RAIN_CHARS[$((RANDOM % ${#RAIN_CHARS[@]}))]}"
     dripfetch::__weighted_pick "${RAIN_COLORS[@]}";  color=${PICKED:-#21F7A8}
-    RAIN_HEAD[$x]=-1
+    dripfetch::__hex2rgb "$color"
+    if (( EMIT_TRUECOLOR )); then printf -v fg '%s[38;2;%d;%d;%dm' "$ESC" "$HEX_R" "$HEX_G" "$HEX_B"
+    else dripfetch::__rgb256 "$HEX_R" "$HEX_G" "$HEX_B"; printf -v fg '%s[38;5;%dm' "$ESC" "$RGB256"; fi
+    RAIN_FG[$x]=$fg
+    RAIN_HEAD[$x]=$(( RANDOM % TERM_H ))
     RAIN_LEN[$x]=$len
-    RAIN_COLOR_STR[$x]=$color
     RAIN_CHAR_X[$x]="$ch"
 }
 
 dripfetch::rain_init() {
     local x
     for (( x=0; x<TERM_W; x++ )); do
-        RAIN_HEAD[$x]=-1; RAIN_LEN[$x]=6
-        RAIN_COLOR_STR[$x]="#21F7A8"; RAIN_CHAR_X[$x]="│"
+        RAIN_HEAD[$x]=-1; RAIN_OLD_HEAD[$x]=-1; RAIN_LEN[$x]=6; RAIN_OLD_LEN[$x]=6; RAIN_FG[$x]=""; RAIN_CHAR_X[$x]="│"
         if (( RANDOM % 100 < RAIN_INTENSITY * 100 / TERM_W )); then
-            dripfetch::rain_respawn "$x"; RAIN_HEAD[$x]=$(( RANDOM % (TERM_H+1) ))
+            dripfetch::rain_respawn "$x"
         fi
     done
     RAIN_NCOL=$TERM_W
@@ -702,35 +733,60 @@ dripfetch::rain_init() {
 dripfetch::rain_step() {
     local x
     for (( x=0; x<RAIN_NCOL; x++ )); do
+        RAIN_OLD_HEAD[$x]=${RAIN_HEAD[$x]}; RAIN_OLD_LEN[$x]=${RAIN_LEN[$x]}
         if (( RAIN_HEAD[$x] < 0 )); then
             if (( RANDOM % (TERM_W*2) < RAIN_INTENSITY )); then dripfetch::rain_respawn "$x"; fi
             continue
         fi
-        (( RAIN_HEAD[$x] + 1 > TERM_H )) && { RAIN_HEAD[$x]=-1; continue; }
+        (( RAIN_HEAD[$x] + 1 >= TERM_H )) && { RAIN_HEAD[$x]=-1; continue; }
         RAIN_HEAD[$x]=$(( RAIN_HEAD[$x] + 1 ))
     done
 }
 
 dripfetch::rain_draw() {
-    local x head len rgbstr ch r g b y i fgstr headstr s
+    local mode=${1:-full} x head len ch y i fgstr headstr s rr cc in_run
+    local old_head old_len old_bottom new_bottom
     printf -v headstr '%s[1m%s[38;2;255;255;255m' "$ESC" "$ESC"
+    if (( BG_SET )); then dripfetch::bgb "${C_BG[0]}" "${C_BG[1]}" "${C_BG[2]}"; fi
     for (( x=0; x<RAIN_NCOL; x++ )); do
-        head=${RAIN_HEAD[$x]}; (( head < 0 )) && continue
-        len=${RAIN_LEN[$x]}; rgbstr=${RAIN_COLOR_STR[$x]}; ch=${RAIN_CHAR_X[$x]}
-        dripfetch::__hex2rgb "$rgbstr"; r=$HEX_R; g=$HEX_G; b=$HEX_B
-        if (( EMIT_TRUECOLOR )); then
-            printf -v fgstr '%s[38;2;%d;%d;%dm' "$ESC" "$r" "$g" "$b"
-        else
-            dripfetch::__rgb256 "$r" "$g" "$b"; printf -v fgstr '%s[38;5;%dm' "$ESC" "$RGB256"
+        head=${RAIN_HEAD[$x]}; len=${RAIN_LEN[$x]}; old_head=${RAIN_OLD_HEAD[$x]:--1}; old_len=${RAIN_OLD_LEN[$x]:-0}
+        if [[ "$mode" == incremental ]] && (( old_head >= 0 )); then
+            old_bottom=$(( old_head - old_len + 1 )); (( old_bottom < 0 )) && old_bottom=0
+            new_bottom=$(( head - len + 1 ))
+            if (( head == old_head + 1 && len == old_len )); then
+                y=$old_bottom; rr=$(( y + 1 )); cc=$(( x + 1 ))
+                (( rr >= TERM_H || (rr >= RAIN_BLOCK_TOP[cc] && rr <= RAIN_BLOCK_BOTTOM[cc]) )) || OUT+="${ESC}[$rr;${cc}H "
+            else
+                for (( y=old_head; y>=old_bottom; y-- )); do
+                    (( head >= 0 && y <= head && y >= new_bottom )) && continue
+                    rr=$(( y + 1 )); cc=$(( x + 1 ))
+                    (( rr >= TERM_H || (rr >= RAIN_BLOCK_TOP[cc] && rr <= RAIN_BLOCK_BOTTOM[cc]) )) && continue
+                    OUT+="${ESC}[$rr;${cc}H "
+                done
+            fi
         fi
-        s=""
+        (( head < 0 )) && continue
+        ch=${RAIN_CHAR_X[$x]}; fgstr=${RAIN_FG[$x]:-}
+        s=""; in_run=0
         for (( i=0; i<len && i<TERM_H; i++ )); do
             y=$(( head - i )); (( y < 0 )) && continue
-            s+="${ESC}[$((y+1));$((x+1))H"
-            if (( i == 0 )); then s+="$headstr$ch"; else s+="$fgstr$ch"; fi
+            rr=$(( y + 1 )); cc=$(( x + 1 ))
+            if (( rr >= TERM_H || (rr >= RAIN_BLOCK_TOP[cc] && rr <= RAIN_BLOCK_BOTTOM[cc]) )); then
+                if (( in_run )); then OUT+="$s$RESET"; s=""; in_run=0; fi
+                continue
+            fi
+            if (( in_run )); then
+                s+="${ESC}[$rr;${cc}H"
+            else
+                s+="${ESC}[$rr;${cc}H"
+                if (( i == 0 )); then s+="$headstr"; else s+="$fgstr"; fi
+                in_run=1
+            fi
+            s+="$ch"
         done
-        OUT+="$s$RESET"
+        if (( in_run )); then OUT+="$s$RESET"; fi
     done
+    if [[ "$mode" == incremental ]] && (( BG_SET )); then OUT+="$RESET"; fi
 }
 
 # --- selection / persistence ----------------------------------------------------------
@@ -767,6 +823,9 @@ dripfetch::move_sel() { local dx=$1 dy=$2
         if (( new_col < other_col + other_sw && new_col + sw > other_col && new_row < other_row + other_sh && new_row + sh > other_row )); then return; fi
     done
     BOX_META[$t]="$new_col $new_row"
+    BOX_RENDER[$t]=""
+    NEEDS_FULL_RENDER=1
+    dripfetch::__rebuild_rain_blocks
     dripfetch::persist_positions; }
 
 dripfetch::persist_positions() {
@@ -828,44 +887,130 @@ dripfetch::load_positions() {
             rect_types+=("$t"); rect_cols+=("$col"); rect_rows+=("$row"); rect_ws+=("$sw"); rect_hs+=("$sh")
         fi
         BOX_META[$t]="$col $row"
+        BOX_RENDER[$t]=""
+        NEEDS_FULL_RENDER=1
     done < "$POS_FILE"
+    dripfetch::__rebuild_rain_blocks
 }
 
 # --- frame composer --------------------------------------------------------------------
 declare -i QUIT=0 PAUSED=0 FRAME=0
+KEY=""
 
-dripfetch::render_frame() {
+dripfetch::__render_full_frame() {
     OUT=""
     OUT+="${ESC}[2J"
 
     if (( BG_SET )); then
-        local y pad
-        printf -v pad '%*s' "$TERM_W" ''
-        for (( y=1; y<=TERM_H; y++ )); do
-            dripfetch::at "$y" 1
-            dripfetch::bgb "${C_BG[0]}" "${C_BG[1]}" "${C_BG[2]}"
-            OUT+="$pad"
-        done
-        OUT+="$RESET"
+        if [[ -z "$BG_RENDER" ]]; then
+            local y pad saved=$OUT
+            printf -v pad '%*s' "$TERM_W" ''
+            OUT=""
+            for (( y=1; y<=TERM_H; y++ )); do
+                dripfetch::at "$y" 1
+                dripfetch::bgb "${C_BG[0]}" "${C_BG[1]}" "${C_BG[2]}"
+                OUT+="$pad"
+            done
+            OUT+="$RESET"; BG_RENDER=$OUT; OUT=$saved
+        fi
+        OUT+="$BG_RENDER"
     fi
 
     (( PAUSED )) || dripfetch::rain_draw
 
-    local t m col row
+    local t m col row cache_key blink
     for t in "${BOX_TYPES[@]}"; do
         (( ${BOX_VISIBLE[$t]:-0} )) || continue
-        m=${BOX_META[$t]}; col=${m%% *}; row=${m#* }
-        dripfetch::draw_box "$t" "${row:-1}" "${col:-1}" "${BOX_SLOT_W[$t]:-0}" "${BOX_SLOT_H[$t]:-0}"
+        case "$t" in
+            logo|sysinfo|text)
+                if [[ -z "${BOX_RENDER[$t]:-}" ]]; then dripfetch::__cache_box "$t"; fi
+                OUT+="${BOX_RENDER[$t]}" ;;
+            calendar)
+                dripfetch::__time_parts
+                if [[ "$CALENDAR_RENDER_KEY" != "$TODAY" || -z "${BOX_RENDER[$t]:-}" ]]; then
+                    BOX_CONTENT[$t]=$(dripfetch::box_content "$t")
+                    dripfetch::__cache_box "$t"; CALENDAR_RENDER_KEY=$TODAY
+                fi
+                OUT+="${BOX_RENDER[$t]}" ;;
+            clock)
+                dripfetch::__time_parts
+                blink=0; (( CLOCK_BLINK && (FRAME/12)%2 )) && blink=1
+                cache_key="$NOW_STAMP|$blink"
+                if [[ "$CLOCK_RENDER_KEY" != "$cache_key" || -z "${BOX_RENDER[$t]:-}" ]]; then
+                    dripfetch::__cache_box "$t"; CLOCK_RENDER_KEY=$cache_key
+                fi
+                OUT+="${BOX_RENDER[$t]}" ;;
+            weather)
+                dripfetch::__weather_refresh
+                m=${BOX_META[$t]}; col=${m%% *}; row=${m#* }
+                dripfetch::draw_box "$t" "${row:-1}" "${col:-1}" "${BOX_SLOT_W[$t]:-0}" "${BOX_SLOT_H[$t]:-0}" ;;
+            *) m=${BOX_META[$t]}; col=${m%% *}; row=${m#* }
+               dripfetch::draw_box "$t" "${row:-1}" "${col:-1}" "${BOX_SLOT_W[$t]:-0}" "${BOX_SLOT_H[$t]:-0}" ;;
+        esac
     done
 
+    LAST_STATUS=""
     if (( SEL_INDEX >= 0 )); then
         local t=${BOX_TYPES[$SEL_INDEX]}
+        LAST_STATUS=$t
         dripfetch::at "$TERM_H" 1
         OUT+="${ESC}[2K${ESC}[7m [$t] arrows/WASD move · Esc deselect ${ESC}[0m"
     fi
 
     OUT+="${ESC}[1;1H"
     printf '%s' "$OUT"
+}
+
+dripfetch::__render_incremental_frame() {
+    OUT=""
+    (( PAUSED )) || dripfetch::rain_draw incremental
+
+    local t m col row cache_key blink status_text=""
+    for t in "${BOX_TYPES[@]}"; do
+        (( ${BOX_VISIBLE[$t]:-0} )) || continue
+        case "$t" in
+            clock)
+                dripfetch::__time_parts
+                blink=0; (( CLOCK_BLINK && (FRAME/12)%2 )) && blink=1
+                cache_key="$NOW_STAMP|$blink"
+                if [[ "$CLOCK_RENDER_KEY" != "$cache_key" || -z "${BOX_RENDER[$t]:-}" ]]; then
+                    dripfetch::__cache_box "$t"; CLOCK_RENDER_KEY=$cache_key
+                fi
+                OUT+="${BOX_RENDER[$t]}" ;;
+            calendar)
+                dripfetch::__time_parts
+                if [[ "$CALENDAR_RENDER_KEY" != "$TODAY" || -z "${BOX_RENDER[$t]:-}" ]]; then
+                    BOX_CONTENT[$t]=$(dripfetch::box_content "$t")
+                    dripfetch::__cache_box "$t"; CALENDAR_RENDER_KEY=$TODAY
+                fi
+                OUT+="${BOX_RENDER[$t]}" ;;
+            weather)
+                dripfetch::__weather_refresh
+                m=${BOX_META[$t]}; col=${m%% *}; row=${m#* }
+                dripfetch::draw_box "$t" "$row" "$col" "${BOX_SLOT_W[$t]:-0}" "${BOX_SLOT_H[$t]:-0}" ;;
+            net)
+                m=${BOX_META[$t]}; col=${m%% *}; row=${m#* }
+                dripfetch::draw_box "$t" "$row" "$col" "${BOX_SLOT_W[$t]:-0}" "${BOX_SLOT_H[$t]:-0}" ;;
+        esac
+    done
+
+    if (( SEL_INDEX >= 0 )); then status_text=${BOX_TYPES[$SEL_INDEX]}; fi
+    if [[ "$status_text" != "$LAST_STATUS" ]]; then
+        dripfetch::at "$TERM_H" 1
+        if [[ -n "$status_text" ]]; then OUT+="${ESC}[2K${ESC}[7m [$status_text] arrows/WASD move · Esc deselect ${ESC}[0m"; else OUT+="${ESC}[2K"; fi
+        LAST_STATUS=$status_text
+    fi
+    OUT+="${ESC}[1;1H"
+    printf '%s' "$OUT"
+}
+
+dripfetch::render_frame() {
+    if (( NEEDS_FULL_RENDER )); then
+        dripfetch::__render_full_frame
+        NEEDS_FULL_RENDER=0
+    else
+        dripfetch::__render_incremental_frame
+    fi
 }
 
 # --- keyboard ----------------------------------------------------------------------------
@@ -879,17 +1024,17 @@ dripfetch::read_char() { # varname timeout -> 0 on success, 1 on timeout/EOF (po
 
 dripfetch::read_key() {
     local k
-    if ! dripfetch::read_char k 0.03; then return 1; fi
+    if ! dripfetch::read_char k 0.02; then return 1; fi
     if [[ "$k" == "$ESC" ]]; then
         local k2="" k3=""
         dripfetch::read_char k2 0.02 || true
         dripfetch::read_char k3 0.02 || true
         case "$k2$k3" in
-            '[A') echo UP ;; '[B') echo DOWN ;; '[C') echo RIGHT ;; '[D') echo LEFT ;;
-            '') echo ESC ;; *) echo NONE ;;
+            '[A') KEY=UP ;; '[B') KEY=DOWN ;; '[C') KEY=RIGHT ;; '[D') KEY=LEFT ;;
+            '') KEY=ESC ;; *) KEY=NONE ;;
         esac
     else
-        printf '%s' "$k"
+        KEY=$k
     fi
 }
 
@@ -906,6 +1051,20 @@ dripfetch::handle_key() { case "$1" in
 # --- layout -------------------------------------------------------------------------------
 declare -A BOX_SLOT_W BOX_SLOT_H BOX_VISIBLE
 
+dripfetch::__rebuild_rain_blocks() {
+    local t col row bottom cc
+    RAIN_BLOCK_TOP=(); RAIN_BLOCK_BOTTOM=()
+    for (( cc=1; cc<=TERM_W; cc++ )); do RAIN_BLOCK_TOP[$cc]=$(( TERM_H + 1 )); RAIN_BLOCK_BOTTOM[$cc]=0; done
+    for t in "${BOX_TYPES[@]}"; do
+        (( ${BOX_VISIBLE[$t]:-0} )) || continue
+        col=${BOX_META[$t]%% *}; row=${BOX_META[$t]#* }; bottom=$(( row + BOX_SLOT_H[$t] - 1 ))
+        for (( cc=col; cc<col+BOX_SLOT_W[$t]; cc++ )); do
+            (( row < RAIN_BLOCK_TOP[cc] )) && RAIN_BLOCK_TOP[cc]=$row
+            (( bottom > RAIN_BLOCK_BOTTOM[cc] )) && RAIN_BLOCK_BOTTOM[cc]=$bottom
+        done
+    done
+}
+
 dripfetch::layout_boxes() {
     local t is_known known
     local -A wanted=()
@@ -920,7 +1079,9 @@ dripfetch::layout_boxes() {
         (( is_known )) || order+=("$t")
     done
 
-    BOX_SLOT_W=(); BOX_SLOT_H=(); BOX_VISIBLE=()
+    BOX_SLOT_W=(); BOX_SLOT_H=(); BOX_VISIBLE=(); BOX_RENDER=()
+    BG_RENDER=""; CLOCK_RENDER_KEY=""; CALENDAR_RENDER_KEY=""
+    NEEDS_FULL_RENDER=1; LAST_STATUS=""
     local margin=1 gap=1 min_w=16 x=1 y=1 row_h=0 w h remaining remaining_h
     local max_row=$(( TERM_H - 1 ))
     for t in "${order[@]}"; do
@@ -943,11 +1104,13 @@ dripfetch::layout_boxes() {
         BOX_SLOT_W[$t]=$w; BOX_SLOT_H[$t]=$h; BOX_VISIBLE[$t]=1
         x=$(( x + w + gap )); (( h > row_h )) && row_h=$h
     done
+    dripfetch::__rebuild_rain_blocks
 
     BOX_TITLE[logo]=""; BOX_TITLE[sysinfo]="sysinfo"; BOX_TITLE[clock]="clock"
     BOX_TITLE[calendar]=""; BOX_TITLE[weather]="weather"; BOX_TITLE[text]=""; BOX_TITLE[net]="net"
 }
-declare -A BOX_W BOX_H
+declare -A BOX_W BOX_H BOX_CONTENT BOX_RENDER
+BG_RENDER=""; CLOCK_RENDER_KEY=""; CALENDAR_RENDER_KEY=""; WEATHER_CACHE_TIME=-999
 
 # --- config apply --------------------------------------------------------------------------
 dripfetch::apply_config() {
@@ -1150,12 +1313,11 @@ main() {
     dripfetch::load_positions
     dripfetch::rain_init
 
-    local key
     while true; do
         FRAME=$(( FRAME + 1 ))
         (( PAUSED )) || dripfetch::rain_step
         dripfetch::render_frame
-        if key=$(dripfetch::read_key); then dripfetch::handle_key "$key"; fi
+        if dripfetch::read_key; then dripfetch::handle_key "$KEY"; fi
         (( QUIT )) && break
     done
 }
