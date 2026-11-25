@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.28.1] - 2026-11-25 "flow"
+
+### Fixed
+- fix(examples): dripfetch rain now respawns continuously instead of disappearing after its first pass. Incremental frames update only rain and dynamic boxes, erase old tail cells correctly, rebuild collision masks after moves/restores, reserve the status row, cache weather for 60 seconds, and avoid terminal autowrap/scroll artifacts.
+
 ## [0.28.0] - 2026-11-25 "clear"
 
 ### Changed
